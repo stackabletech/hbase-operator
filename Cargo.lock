@@ -1604,6 +1604,7 @@ dependencies = [
  "serde_json",
  "serde_yaml",
  "stackable-operator",
+ "stackable-zookeeper-crd",
  "strum",
  "strum_macros",
  "thiserror",
@@ -1624,6 +1625,7 @@ dependencies = [
  "serde_json",
  "stackable-hbase-crd",
  "stackable-operator",
+ "stackable-zookeeper-crd",
  "strum",
  "strum_macros",
  "thiserror",
@@ -1676,6 +1678,26 @@ dependencies = [
  "tracing-futures",
  "tracing-subscriber",
  "uuid",
+]
+
+[[package]]
+name = "stackable-zookeeper-crd"
+version = "0.4.1-nightly"
+source = "git+https://github.com/stackabletech/zookeeper-operator.git?branch=main#d77ac26cf967df1624b96f69fea7a26fb7052b24"
+dependencies = [
+ "duplicate",
+ "k8s-openapi",
+ "kube",
+ "product-config",
+ "schemars",
+ "semver",
+ "serde",
+ "serde_json",
+ "stackable-operator",
+ "strum",
+ "strum_macros",
+ "thiserror",
+ "tracing",
 ]
 
 [[package]]

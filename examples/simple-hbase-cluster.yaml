@@ -4,18 +4,29 @@ metadata:
   name: simple
 spec:
   version: 2.4.6
+  zookeeperReference:
+    namespace: default
+    name: simple
   masters:
     roleGroups:
       default:
         selector:
           matchLabels:
             kubernetes.io/arch: stackable-linux
+        config:
+          javaHome: /usr/lib/jvm/java-1.11.0-openjdk-amd64/
+          rootDir: file:///tmp/hbase
+          masterWebUiPort: 17000
   regionServers:
     roleGroups:
       default:
         selector:
           matchLabels:
             kubernetes.io/arch: stackable-linux
+        config:
+          javaHome: /usr/lib/jvm/java-1.11.0-openjdk-amd64/
+          rootDir: file:///tmp/hbase
+          masterWebUiPort: 17000
 
 
 

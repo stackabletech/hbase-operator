@@ -2,7 +2,7 @@ mod error;
 use crate::error::Error;
 
 use async_trait::async_trait;
-use k8s_openapi::api::core::v1::{ConfigMap, EnvVar, Pod};
+use k8s_openapi::api::core::v1::{ConfigMap, Pod};
 use kube::api::{ListParams, ResourceExt};
 use kube::Api;
 use kube::CustomResourceExt;
@@ -11,7 +11,8 @@ use product_config::ProductConfigManager;
 use stackable_hbase_crd::commands::{Restart, Start, Stop};
 use stackable_hbase_crd::{
     HbaseCluster, HbaseClusterSpec, HbaseRole, HbaseVersion, APP_NAME, CONFIG_MAP_TYPE_DATA,
-    CONFIG_MAP_TYPE_ID,
+    HBASE_MASTER_PORT, HBASE_MASTER_WEB_UI_PORT, HBASE_REGION_SERVER_PORT,
+    HBASE_REGION_SERVER_WEB_UI_PORT, HBASE_ROOT_DIR, JAVA_HOME,
 };
 use stackable_operator::builder::{
     ContainerBuilder, ContainerPortBuilder, ObjectMetaBuilder, PodBuilder,
@@ -45,6 +46,7 @@ use stackable_operator::scheduler::{
 use stackable_operator::status::HasClusterExecutionStatus;
 use stackable_operator::status::{init_status, ClusterExecutionStatus};
 use stackable_operator::versioning::{finalize_versioning, init_versioning};
+use stackable_zookeeper_crd::util::ZookeeperConnectionInformation;
 use std::collections::{BTreeMap, HashMap};
 use std::future::Future;
 use std::pin::Pin;
@@ -53,7 +55,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use strum::IntoEnumIterator;
 use tracing::error;
-use tracing::{debug, info, trace, warn};
+use tracing::{debug, info, trace};
 
 const FINALIZER_NAME: &str = "hbase.stackable.tech/cleanup";
 const ID_LABEL: &str = "hbase.stackable.tech/id";
@@ -70,6 +72,7 @@ struct HbaseState {
     existing_pods: Vec<Pod>,
     eligible_nodes: EligibleNodesForRoleAndGroup,
     validated_role_config: ValidatedRoleConfigByPropertyKind,
+    zookeeper_info: Option<ZookeeperConnectionInformation>,
 }
 
 impl HbaseState {
@@ -92,6 +95,28 @@ impl HbaseState {
         mandatory_labels.insert(ID_LABEL.to_string(), None);
 
         mandatory_labels
+    }
+
+    async fn get_zookeeper_connection_information(&mut self) -> HbaseReconcileResult {
+        let zk_ref: &stackable_zookeeper_crd::util::ZookeeperReference =
+            &self.context.resource.spec.zookeeper_reference;
+
+        if let Some(chroot) = zk_ref.chroot.as_deref() {
+            stackable_zookeeper_crd::util::is_valid_zookeeper_path(chroot)?;
+        }
+
+        let zookeeper_info =
+            stackable_zookeeper_crd::util::get_zk_connection_info(&self.context.client, zk_ref)
+                .await?;
+
+        debug!(
+            "Received ZooKeeper connect string: [{}]",
+            &zookeeper_info.connection_string
+        );
+
+        self.zookeeper_info = Some(zookeeper_info);
+
+        Ok(ReconcileFunctionAction::Continue)
     }
 
     /// Will initialize the status object if it's never been set.
@@ -271,16 +296,29 @@ impl HbaseState {
         if let Some(config) =
             validated_config.get(&PropertyNameKind::File(HBASE_SITE_XML.to_string()))
         {
+            let zk_connect_string = match &self.zookeeper_info {
+                Some(zookeeper_info) => zookeeper_info.connection_string.as_str(),
+                // TODO: throw error
+                None => "abcde",
+            };
+
+            let root_dir = config.get(HBASE_ROOT_DIR).unwrap();
+            let master_port = config.get(HBASE_MASTER_PORT).unwrap();
+            let master_web_ui_port = config.get(HBASE_MASTER_WEB_UI_PORT).unwrap();
+            let region_server_port = config.get(HBASE_REGION_SERVER_PORT).unwrap();
+            let region_server_web_ui_port = config.get(HBASE_REGION_SERVER_WEB_UI_PORT).unwrap();
+
+            // TODO: remove "hbase.unsafe.stream.capability.enforce" once hdfs operator is running
             let hbase_size_xml = format!(
                 "<?xml-stylesheet type=\"text/xsl\" href=\"configuration.xsl\"?>
 <configuration>
     <property>
         <name>hbase.rootdir</name>
-        <value>file:///tmp/hbase</value>
+        <value>{}</value>
     </property>
     <property>
         <name>hbase.zookeeper.quorum</name>
-        <value>localhost:2181</value>
+        <value>{}</value>
     </property>
     <property>
         <name>hbase.cluster.distributed</name>
@@ -290,7 +328,29 @@ impl HbaseState {
         <name>hbase.unsafe.stream.capability.enforce</name>
         <value>false</value>
     </property>
-</configuration>"
+    <property>
+        <name>hbase.master.port</name>
+        <value>{}</value>
+    </property>
+    <property>
+        <name>hbase.master.info.port</name>
+        <value>{}</value>
+    </property>
+    <property>
+        <name>hbase.regionserver.port</name>
+        <value>{}</value>
+    </property>
+    <property>
+        <name>hbase.regionserver.info.port</name>
+        <value>{}</value>
+    </property>
+</configuration>",
+                root_dir,
+                zk_connect_string,
+                master_port,
+                master_web_ui_port,
+                region_server_port,
+                region_server_web_ui_port
             );
 
             // enhance with config map type label
@@ -362,8 +422,17 @@ impl HbaseState {
             .unwrap()
             .command(version)]);
 
-        container_builder.add_env_var("JAVA_HOME", "/usr/lib/jvm/java-1.11.0-openjdk-amd64/");
-        container_builder.add_env_var("HBASE_CONF_DIR", "{{configroot}}/conf");
+        if let Some(java_home) = validated_config
+            .get(&PropertyNameKind::Env)
+            .and_then(|conf| conf.get(JAVA_HOME))
+        {
+            container_builder.add_env_var(JAVA_HOME, java_home);
+        }
+
+        container_builder.add_env_var(
+            "HBASE_CONF_DIR",
+            format!("{{{{configroot}}}}/{}", CONFIG_DIR_NAME),
+        );
 
         // One mount for the config directory
         if let Some(config_map_data) = config_maps.get(HBASE_SITE_XML) {
@@ -473,6 +542,8 @@ impl ReconciliationState for HbaseState {
                     true,
                 ))
                 .await?
+                .then(self.get_zookeeper_connection_information())
+                .await?
                 .then(self.context.delete_illegal_pods(
                     self.existing_pods.as_slice(),
                     &self.get_required_labels(),
@@ -567,6 +638,7 @@ impl ControllerStrategy for HbaseStrategy {
                 vec![
                     PropertyNameKind::File(HBASE_SITE_XML.to_string()),
                     PropertyNameKind::File(CORE_SITE_XML.to_string()),
+                    PropertyNameKind::Env,
                 ],
                 context.resource.spec.masters.clone().into(),
             ),
@@ -577,6 +649,7 @@ impl ControllerStrategy for HbaseStrategy {
                 vec![
                     PropertyNameKind::File(HBASE_SITE_XML.to_string()),
                     PropertyNameKind::File(CORE_SITE_XML.to_string()),
+                    PropertyNameKind::Env,
                 ],
                 context.resource.spec.region_servers.clone().into(),
             ),
@@ -596,6 +669,7 @@ impl ControllerStrategy for HbaseStrategy {
             existing_pods,
             eligible_nodes,
             validated_role_config,
+            zookeeper_info: None,
         })
     }
 }

@@ -6,26 +6,131 @@ spec:
         regex: "^/|(/[\\w-]+)+$"
         examples:
           - "/tmp/xyz"
-    - unit: &unitPort
-        name: "port"
-        regex: "^([0-9]{1,4}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5])$"
+
 properties:
-  - property: &tickTime
+###################################################################################################
+# hbase-site.xml
+###################################################################################################
+
+  - property: &hbaseRootDir
       propertyNames:
-        - name: "tickTime"
+        - name: "hbase.rootdir"
           kind:
             type: "file"
-            file: "zoo.cfg"
+            file: "hbase-site.xml"
       datatype:
-        type: "integer"
-        min: "1"
-      recommendedValues:
+        type: "string"
+        unit: *unitDirectory
+      defaultValues:
         - fromVersion: "0.0.0"
-          value: "3000"
+          value: "${hbase.tmp.dir}/hbase"
       roles:
-        - name: "server"
+        - name: "master"
+          required: true
+        - name: "regionserver"
           required: true
       asOfVersion: "0.0.0"
-      comment: "ZK only checks whether the value is 0, all other values (including negative ones) are considered valid, we disallow negative values here, see QuorumPeerConfig.java"
-      description: "The basic time unit in milliseconds used by ZooKeeper. It is used to do heartbeats and the minimum session timeout will be twice the tickTime."
+      description: "The directory shared by region servers and into which HBase persists. The URL should be 'fully-qualified' to include the filesystem scheme. For example, to specify the HDFS directory '/hbase' where the HDFS instance's namenode is running at namenode.example.org on port 9000, set this value to: hdfs://namenode.example.org:9000/hbase. By default, we write to whatever ${hbase.tmp.dir} is set too -- usually /tmp -- so change this configuration or else all data will be lost on machine restart."
 
+  - property: &hbaseMasterPort
+      propertyNames:
+        - name: "hbase.master.port"
+          kind:
+            type: "file"
+            file: "hbase-site.xml"
+      datatype:
+        type: "integer"
+        min: "1024"
+        max: "65535"
+      defaultValues:
+        - fromVersion: "0.0.0"
+          value: "16000"
+      roles:
+        - name: "master"
+          required: true
+        - name: "regionserver"
+          required: true
+      asOfVersion: "0.0.0"
+      description: "The port the HBase Master should bind to."
+
+  - property: &hbaseMasterInfoPort
+      propertyNames:
+        - name: "hbase.master.info.port"
+          kind:
+            type: "file"
+            file: "hbase-site.xml"
+      datatype:
+        type: "integer"
+        min: "-1"
+        max: "65535"
+      defaultValues:
+        - fromVersion: "0.0.0"
+          value: "16010"
+      roles:
+        - name: "master"
+          required: true
+        - name: "regionserver"
+          required: true
+      asOfVersion: "0.0.0"
+      description: "Set to -1 if you do not want a UI instance run."
+
+  - property: &hbaseRegionserverPort
+      propertyNames:
+        - name: "hbase.regionserver.port"
+          kind:
+            type: "file"
+            file: "hbase-site.xml"
+      datatype:
+        type: "integer"
+        min: "1024"
+        max: "65535"
+      defaultValues:
+        - fromVersion: "0.0.0"
+          value: "16020"
+      roles:
+        - name: "master"
+          required: true
+        - name: "regionserver"
+          required: true
+      asOfVersion: "0.0.0"
+      description: "The port the HBase RegionServer binds to."
+
+  - property: &hbaseRegionserverInfoPort
+      propertyNames:
+        - name: "hbase.regionserver.info.port"
+          kind:
+            type: "file"
+            file: "hbase-site.xml"
+      datatype:
+        type: "integer"
+        min: "-1"
+        max: "65535"
+      defaultValues:
+        - fromVersion: "0.0.0"
+          value: "16030"
+      roles:
+        - name: "master"
+          required: true
+        - name: "regionserver"
+          required: true
+      asOfVersion: "0.0.0"
+      description: "The port for the HBase RegionServer web UI. Set to -1 if you do not want the RegionServer UI to run."
+
+  ###################################################################################################
+  # env vars
+  ###################################################################################################
+  - property: &javaHome
+      propertyNames:
+        - name: "JAVA_HOME"
+          kind:
+            type: "env"
+      datatype:
+        type: "string"
+        unit: *unitDirectory
+      roles:
+        - name: "master"
+          required: true
+        - name: "regionserver"
+          required: true
+      asOfVersion: "0.0.0"
+      description: "Points to the Java installation folder."

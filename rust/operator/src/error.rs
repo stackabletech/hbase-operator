@@ -52,4 +52,10 @@ pub enum Error {
         #[from]
         source: stackable_operator::product_config_utils::ConfigError,
     },
+
+    #[error("Error from ZooKeeper: {source}")]
+    ZookeeperError {
+        #[from]
+        source: stackable_zookeeper_crd::error::Error,
+    },
 }

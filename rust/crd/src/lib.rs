@@ -23,6 +23,7 @@ use stackable_operator::status::{
     Versioned,
 };
 use stackable_operator::versioning::{ProductVersion, Versioning, VersioningState};
+use stackable_zookeeper_crd::util::ZookeeperReference;
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
 use strum_macros::{Display, EnumIter, EnumString};
@@ -31,9 +32,15 @@ pub const APP_NAME: &str = "hbase";
 pub const MANAGED_BY: &str = "hbase-operator";
 
 pub const CONFIG_MAP_TYPE_DATA: &str = "data";
-pub const CONFIG_MAP_TYPE_ID: &str = "id";
 
-#[derive(Clone, CustomResource, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
+pub const HBASE_ROOT_DIR: &str = "hbase.rootdir";
+pub const HBASE_MASTER_PORT: &str = "hbase.master.port";
+pub const HBASE_MASTER_WEB_UI_PORT: &str = "hbase.master.info.port";
+pub const HBASE_REGION_SERVER_PORT: &str = "hbase.regionserver.port";
+pub const HBASE_REGION_SERVER_WEB_UI_PORT: &str = "hbase.regionserver.info.port";
+pub const JAVA_HOME: &str = "JAVA_HOME";
+
+#[derive(Clone, CustomResource, Debug, Deserialize, JsonSchema, Serialize)]
 #[kube(
     group = "hbase.stackable.tech",
     version = "v1alpha1",
@@ -48,6 +55,7 @@ pub struct HbaseClusterSpec {
     pub version: HbaseVersion,
     pub masters: Role<HbaseConfig>,
     pub region_servers: Role<HbaseConfig>,
+    pub zookeeper_reference: ZookeeperReference,
 }
 
 #[derive(
@@ -136,7 +144,16 @@ impl HasClusterExecutionStatus for HbaseCluster {
 // TODO: These all should be "Property" Enums that can be either simple or complex where complex allows forcing/ignoring errors and/or warnings
 #[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct HbaseConfig {}
+pub struct HbaseConfig {
+    pub root_dir: Option<String>,
+    pub master_port: Option<u16>,
+    // master_web_ui_port can be set to -1 to disable the ui
+    pub master_web_ui_port: Option<i16>,
+    pub region_server_port: Option<u16>,
+    // region_server_web_ui_port can be set to -1 to disable the ui
+    pub region_server_web_ui_port: Option<i16>,
+    pub java_home: Option<String>,
+}
 
 impl Configuration for HbaseConfig {
     type Configurable = HbaseCluster;
@@ -147,6 +164,10 @@ impl Configuration for HbaseConfig {
         _role_name: &str,
     ) -> Result<BTreeMap<String, Option<String>>, ConfigError> {
         let mut result = BTreeMap::new();
+
+        if let Some(java_home) = &self.java_home {
+            result.insert(JAVA_HOME.to_string(), Some(java_home.to_string()));
+        }
 
         // TODO: Readd if we want jmx metrics gathered
         //if let Some(metrics_port) = self.metrics_port {
@@ -170,8 +191,30 @@ impl Configuration for HbaseConfig {
         _file: &str,
     ) -> Result<BTreeMap<String, Option<String>>, ConfigError> {
         let mut result = BTreeMap::new();
-
-        // TODO: Insert configs here
+        if let Some(root_dir) = &self.root_dir {
+            result.insert(HBASE_ROOT_DIR.to_string(), Some(root_dir.to_string()));
+        }
+        if let Some(master_port) = &self.master_port {
+            result.insert(HBASE_MASTER_PORT.to_string(), Some(master_port.to_string()));
+        }
+        if let Some(master_web_ui_port) = &self.master_web_ui_port {
+            result.insert(
+                HBASE_MASTER_WEB_UI_PORT.to_string(),
+                Some(master_web_ui_port.to_string()),
+            );
+        }
+        if let Some(region_server_port) = &self.region_server_port {
+            result.insert(
+                HBASE_REGION_SERVER_PORT.to_string(),
+                Some(region_server_port.to_string()),
+            );
+        }
+        if let Some(region_server_web_ui_port) = &self.region_server_web_ui_port {
+            result.insert(
+                HBASE_REGION_SERVER_WEB_UI_PORT.to_string(),
+                Some(region_server_web_ui_port.to_string()),
+            );
+        }
 
         Ok(result)
     }
