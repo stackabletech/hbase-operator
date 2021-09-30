@@ -1,0 +1,7 @@
+apiVersion: command.hbase.stackable.tech/v1alpha1
+kind: Start
+metadata:
+  name: hbase-cluster-command-start
+spec:
+  name: "simple"
+  rolling: true
