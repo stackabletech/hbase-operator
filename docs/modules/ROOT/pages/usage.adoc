@@ -1,0 +1,43 @@
+= Usage
+
+After installation, the CRD for this operator must be created:
+
+    kubectl apply -f /etc/stackable/hbase-operator/crd/hbasecluster.crd.yaml
+
+The Stackable Operator for Apache HBase requires an active Apache ZooKeeper installation provided by Stackable to be present.
+
+To create a single node Apache HBase (v2.4.6) cluster with Prometheus metrics exposed on port 9505 (master) and 9506 (region_server):
+
+    cat <<EOF | kubectl apply -f -
+    apiVersion: hbase.stackable.tech/v1alpha1
+    kind: HbaseCluster
+    metadata:
+      name: simple
+    spec:
+      version: 2.4.6
+      zookeeperReference:
+        namespace: default
+        name: simple
+      masters:
+        roleGroups:
+          default:
+            selector:
+              matchLabels:
+                kubernetes.io/arch: stackable-linux
+            config:
+              javaHome: /usr/lib/jvm/java-1.11.0-openjdk-amd64/
+              rootDir: file:///tmp/hbase
+              masterWebUiPort: 17000
+              metricsPort: 9505
+      regionServers:
+        roleGroups:
+          default:
+            selector:
+              matchLabels:
+                kubernetes.io/arch: stackable-linux
+            config:
+              javaHome: /usr/lib/jvm/java-1.11.0-openjdk-amd64/
+              rootDir: file:///tmp/hbase
+              masterWebUiPort: 17000
+              metricsPort: 9506
+    EOF

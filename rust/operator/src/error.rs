@@ -64,4 +64,7 @@ pub enum Error {
         #[from]
         source: stackable_zookeeper_crd::error::Error,
     },
+
+    #[error("Error with ZooKeeper connection. Could not retrieve the ZooKeeper connection. This is a bug. Please open a ticket.")]
+    ZookeeperConnectionInformationError,
 }

@@ -34,12 +34,11 @@ allow = [
 ]
 
 exceptions = [
-    { name = "stackable-opa-crd", allow = ["OSL-3.0"] },
     { name = "stackable-zookeeper-crd", allow = ["OSL-3.0"] },
-    { name = "stackable-zookeeper-crd", allow = ["OSL-3.0"] },
-    { name = "stackable-zookeeper-operator", allow = ["OSL-3.0"] },
-    { name = "stackable-zookeeper-operator-binary", allow = ["OSL-3.0"] },
-    ]
+    { name = "stackable-hbase-crd", allow = ["OSL-3.0"] },
+    { name = "stackable-hbase-operator", allow = ["OSL-3.0"] },
+    { name = "stackable-hbase-operator-binary", allow = ["OSL-3.0"] },
+]
 
 [[licenses.clarify]]
 name = "ring"

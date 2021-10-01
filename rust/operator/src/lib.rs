@@ -2,7 +2,7 @@ mod error;
 use crate::error::Error;
 
 use async_trait::async_trait;
-use k8s_openapi::api::core::v1::{ConfigMap, EnvVar, Pod};
+use k8s_openapi::api::core::v1::{ConfigMap, Pod};
 use kube::api::{ListParams, ResourceExt};
 use kube::Api;
 use kube::CustomResourceExt;
@@ -61,9 +61,10 @@ const FINALIZER_NAME: &str = "hbase.stackable.tech/cleanup";
 const ID_LABEL: &str = "hbase.stackable.tech/id";
 const SHOULD_BE_SCRAPED: &str = "monitoring.stackable.tech/should_be_scraped";
 
-const CONFIG_DIR_NAME: &str = "conf";
 const HBASE_SITE_XML: &str = "hbase-site.xml";
 const CORE_SITE_XML: &str = "core-site.xml";
+
+const CONFIG_DIR_NAME: &str = "conf";
 
 type HbaseReconcileResult = ReconcileResult<error::Error>;
 
@@ -151,7 +152,7 @@ impl HbaseState {
         // The iteration happens in two stages here, to accommodate the way our operators think
         // about roles and role groups.
         // The hierarchy is:
-        // - Roles (for ZooKeeper there - currently - is only a single role)
+        // - Roles (for HBase there are masters and region_servers)
         //   - Role groups for this role (user defined)
         for hbase_role in HbaseRole::iter() {
             if let Some(nodes_for_role) = self.eligible_nodes.get(&hbase_role.to_string()) {
@@ -259,14 +260,14 @@ impl HbaseState {
     }
 
     /// Creates the config maps required for a hbase instance (or role, role_group combination):
-    /// * The 'zoo.cfg' properties file
-    /// * The 'myid' file
+    /// * The 'hbase-site.xml' properties file
+    /// * The 'core-site.xml' properties file
     ///
-    /// The 'zoo.cfg' properties are read from the product_config and/or merged with the cluster
-    /// custom resource.
+    /// The 'hbase-site.xml' properties are read from the product_config and/or merged with the
+    /// cluster custom resource.
     ///
-    /// Labels are automatically adapted from the `recommended_labels` with a type (data for
-    /// 'zoo.cfg' and id for 'myid'). Names are generated via `name_utils::build_resource_name`.
+    /// Labels are automatically adapted from the `recommended_labels` with the type "data".
+    /// Names are generated via `name_utils::build_resource_name`.
     ///
     /// Returns a map with a 'type' identifier (e.g. data, id) as key and the corresponding
     /// ConfigMap as value. This is required to set the volume mounts in the pod later on.
@@ -298,10 +299,12 @@ impl HbaseState {
         {
             let zk_connect_string = match &self.zookeeper_info {
                 Some(zookeeper_info) => zookeeper_info.connection_string.as_str(),
-                // TODO: throw error
-                None => "abcde",
+                None => return Err(error::Error::ZookeeperConnectionInformationError),
             };
 
+            /// These unwraps are safe for now (all values are either user provided or coming
+            /// from product config).
+            /// TODO: This should be replaced however with proper templating for the config files.
             let root_dir = config.get(HBASE_ROOT_DIR).unwrap();
             let master_port = config.get(HBASE_MASTER_PORT).unwrap();
             let master_web_ui_port = config.get(HBASE_MASTER_WEB_UI_PORT).unwrap();
@@ -309,6 +312,9 @@ impl HbaseState {
             let region_server_web_ui_port = config.get(HBASE_REGION_SERVER_WEB_UI_PORT).unwrap();
 
             // TODO: remove "hbase.unsafe.stream.capability.enforce" once hdfs operator is running
+            //   (and we can actively use the provided discovery)
+            // TODO: use own or provided library for hadoop xml templating
+            //    we cannot handle optional values in here properly, no escaping etc.
             let hbase_size_xml = format!(
                 "<?xml-stylesheet type=\"text/xsl\" href=\"configuration.xsl\"?>
 <configuration>
@@ -407,11 +413,11 @@ impl HbaseState {
     ) -> Result<Pod, Error> {
         let version: &HbaseVersion = &self.context.resource.spec.version;
 
-        let mut metrics_port: Option<String> = None;
-        let mut master_rpc_port: Option<String> = None;
-        let mut master_web_ui_port: Option<String> = None;
-        let mut region_server_rpc_port: Option<String> = None;
-        let mut region_server_web_ui_port: Option<String> = None;
+        let mut metrics_port: Option<&String> = None;
+        let mut master_rpc_port: Option<&String> = None;
+        let mut master_web_ui_port: Option<&String> = None;
+        let mut region_server_rpc_port: Option<&String> = None;
+        let mut region_server_web_ui_port: Option<&String> = None;
 
         let pod_name = name_utils::build_resource_name(
             pod_id.app(),
@@ -430,13 +436,13 @@ impl HbaseState {
             match property_name_kind {
                 PropertyNameKind::File(file_name) if file_name == HBASE_SITE_XML => {
                     // we need to extract the master rpc port here to add to container ports later
-                    master_rpc_port = config.get(HBASE_MASTER_PORT).cloned();
+                    master_rpc_port = config.get(HBASE_MASTER_PORT);
                     // we need to extract the master web ui port here to add to container ports later
-                    master_web_ui_port = config.get(HBASE_MASTER_WEB_UI_PORT).cloned();
+                    master_web_ui_port = config.get(HBASE_MASTER_WEB_UI_PORT);
                     // we need to extract the region server rpc port here to add to container ports later
-                    master_rpc_port = config.get(HBASE_REGION_SERVER_PORT).cloned();
+                    region_server_rpc_port = config.get(HBASE_REGION_SERVER_PORT);
                     // we need to extract the region server web ui port here to add to container ports later
-                    master_web_ui_port = config.get(HBASE_REGION_SERVER_WEB_UI_PORT).cloned();
+                    region_server_web_ui_port = config.get(HBASE_REGION_SERVER_WEB_UI_PORT);
                 }
                 PropertyNameKind::Env => {
                     for (property_name, property_value) in config {
@@ -447,7 +453,7 @@ impl HbaseState {
                         // if a metrics port is provided (for now by user, it is not required in
                         // product config to be able to not configure any monitoring / metrics)
                         if property_name == METRICS_PORT {
-                            metrics_port = Some(property_value.to_string());
+                            metrics_port = Some(property_value);
                             container_builder.add_env_var(
                                 "HBASE_OPTS".to_string(), 
                                 format!("-javaagent:{{{{packageroot}}}}/{}/stackable/lib/jmx_prometheus_javaagent-0.16.1.jar={}:{{{{packageroot}}}}/{}/stackable/conf/jmx_exporter.yaml",
@@ -544,7 +550,7 @@ impl HbaseState {
             pod_id.group(),
         );
 
-        // we need to add the zookeeper id to the labels
+        // we need to add the id to the labels
         pod_labels.insert(ID_LABEL.to_string(), pod_id.id().to_string());
 
         let pod = PodBuilder::new()
