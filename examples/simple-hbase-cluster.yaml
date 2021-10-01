@@ -29,7 +29,3 @@ spec:
           rootDir: file:///tmp/hbase
           masterWebUiPort: 17000
           metricsPort: 7078
-
-
-
-
