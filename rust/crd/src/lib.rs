@@ -39,6 +39,7 @@ pub const HBASE_MASTER_WEB_UI_PORT: &str = "hbase.master.info.port";
 pub const HBASE_REGION_SERVER_PORT: &str = "hbase.regionserver.port";
 pub const HBASE_REGION_SERVER_WEB_UI_PORT: &str = "hbase.regionserver.info.port";
 pub const JAVA_HOME: &str = "JAVA_HOME";
+pub const METRICS_PORT: &str = "metricsPort";
 
 #[derive(Clone, CustomResource, Debug, Deserialize, JsonSchema, Serialize)]
 #[kube(
@@ -152,6 +153,7 @@ pub struct HbaseConfig {
     pub region_server_port: Option<u16>,
     // region_server_web_ui_port can be set to -1 to disable the ui
     pub region_server_web_ui_port: Option<i16>,
+    pub metrics_port: Option<u16>,
     pub java_home: Option<String>,
 }
 
@@ -169,10 +171,10 @@ impl Configuration for HbaseConfig {
             result.insert(JAVA_HOME.to_string(), Some(java_home.to_string()));
         }
 
-        // TODO: Readd if we want jmx metrics gathered
-        //if let Some(metrics_port) = self.metrics_port {
-        //    result.insert(METRICS_PORT.to_string(), Some(metrics_port.to_string()));
-        // }
+        if let Some(metrics_port) = &self.metrics_port {
+            result.insert(METRICS_PORT.to_string(), Some(metrics_port.to_string()));
+        }
+
         Ok(result)
     }
 
@@ -237,6 +239,8 @@ pub enum HbaseVersion {
     #[strum(serialize = "2.4.6")]
     v2_4_6,
 
+    // TODO: for now we only support the 2.4.6 version (remove the skip if that changes)
+    #[serde(skip)]
     #[serde(rename = "2.3.6")]
     #[strum(serialize = "2.3.6")]
     v2_3_6,

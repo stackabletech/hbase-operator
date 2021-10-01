@@ -53,6 +53,12 @@ pub enum Error {
         source: stackable_operator::product_config_utils::ConfigError,
     },
 
+    #[error("ParserError: {source}")]
+    StrumParseError {
+        #[from]
+        source: strum::ParseError,
+    },
+
     #[error("Error from ZooKeeper: {source}")]
     ZookeeperError {
         #[from]

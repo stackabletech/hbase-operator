@@ -17,6 +17,7 @@ spec:
           javaHome: /usr/lib/jvm/java-1.11.0-openjdk-amd64/
           rootDir: file:///tmp/hbase
           masterWebUiPort: 17000
+          metricsPort: 7077
   regionServers:
     roleGroups:
       default:
@@ -27,6 +28,7 @@ spec:
           javaHome: /usr/lib/jvm/java-1.11.0-openjdk-amd64/
           rootDir: file:///tmp/hbase
           masterWebUiPort: 17000
+          metricsPort: 7078
 
 
 

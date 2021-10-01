@@ -44,6 +44,11 @@ spec:
                           format: int16
                           nullable: true
                           type: integer
+                        metricsPort:
+                          format: uint16
+                          minimum: 0.0
+                          nullable: true
+                          type: integer
                         regionServerPort:
                           format: uint16
                           minimum: 0.0
@@ -90,6 +95,11 @@ spec:
                                 type: integer
                               masterWebUiPort:
                                 format: int16
+                                nullable: true
+                                type: integer
+                              metricsPort:
+                                format: uint16
+                                minimum: 0.0
                                 nullable: true
                                 type: integer
                               regionServerPort:
@@ -180,6 +190,11 @@ spec:
                           format: int16
                           nullable: true
                           type: integer
+                        metricsPort:
+                          format: uint16
+                          minimum: 0.0
+                          nullable: true
+                          type: integer
                         regionServerPort:
                           format: uint16
                           minimum: 0.0
@@ -226,6 +241,11 @@ spec:
                                 type: integer
                               masterWebUiPort:
                                 format: int16
+                                nullable: true
+                                type: integer
+                              metricsPort:
+                                format: uint16
+                                minimum: 0.0
                                 nullable: true
                                 type: integer
                               regionServerPort:
@@ -297,7 +317,6 @@ spec:
                 version:
                   enum:
                     - 2.4.6
-                    - 2.3.6
                   type: string
                 zookeeperReference:
                   description: Contains all necessary information identify a Stackable managed ZooKeeper ensemble and build a connection string for it. The main purpose for this struct is for other operators that need to reference a ZooKeeper ensemble to use in their CRDs. This has the benefit of keeping references to Zookeeper ensembles consistent throughout the entire stack.
@@ -400,13 +419,11 @@ spec:
                     current:
                       enum:
                         - 2.4.6
-                        - 2.3.6
                       nullable: true
                       type: string
                     target:
                       enum:
                         - 2.4.6
-                        - 2.3.6
                       nullable: true
                       type: string
                   type: object

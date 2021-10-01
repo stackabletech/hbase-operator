@@ -2,7 +2,7 @@ mod error;
 use crate::error::Error;
 
 use async_trait::async_trait;
-use k8s_openapi::api::core::v1::{ConfigMap, Pod};
+use k8s_openapi::api::core::v1::{ConfigMap, EnvVar, Pod};
 use kube::api::{ListParams, ResourceExt};
 use kube::Api;
 use kube::CustomResourceExt;
@@ -12,7 +12,7 @@ use stackable_hbase_crd::commands::{Restart, Start, Stop};
 use stackable_hbase_crd::{
     HbaseCluster, HbaseClusterSpec, HbaseRole, HbaseVersion, APP_NAME, CONFIG_MAP_TYPE_DATA,
     HBASE_MASTER_PORT, HBASE_MASTER_WEB_UI_PORT, HBASE_REGION_SERVER_PORT,
-    HBASE_REGION_SERVER_WEB_UI_PORT, HBASE_ROOT_DIR, JAVA_HOME,
+    HBASE_REGION_SERVER_WEB_UI_PORT, HBASE_ROOT_DIR, METRICS_PORT,
 };
 use stackable_operator::builder::{
     ContainerBuilder, ContainerPortBuilder, ObjectMetaBuilder, PodBuilder,
@@ -55,7 +55,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use strum::IntoEnumIterator;
 use tracing::error;
-use tracing::{debug, info, trace};
+use tracing::{debug, info, trace, warn};
 
 const FINALIZER_NAME: &str = "hbase.stackable.tech/cleanup";
 const ID_LABEL: &str = "hbase.stackable.tech/id";
@@ -281,7 +281,7 @@ impl HbaseState {
         &self,
         pod_id: &PodIdentity,
         validated_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
-        id_mapping: &PodToNodeMapping,
+        _id_mapping: &PodToNodeMapping,
     ) -> Result<HashMap<&'static str, ConfigMap>, Error> {
         let mut config_maps = HashMap::new();
 
@@ -407,6 +407,12 @@ impl HbaseState {
     ) -> Result<Pod, Error> {
         let version: &HbaseVersion = &self.context.resource.spec.version;
 
+        let mut metrics_port: Option<String> = None;
+        let mut master_rpc_port: Option<String> = None;
+        let mut master_web_ui_port: Option<String> = None;
+        let mut region_server_rpc_port: Option<String> = None;
+        let mut region_server_web_ui_port: Option<String> = None;
+
         let pod_name = name_utils::build_resource_name(
             pod_id.app(),
             pod_id.instance(),
@@ -418,19 +424,47 @@ impl HbaseState {
 
         let mut container_builder = ContainerBuilder::new(APP_NAME);
         container_builder.image(format!("stackable/hbase:{}", version.to_string()));
-        container_builder.command(vec![HbaseRole::from_str(pod_id.role())
-            .unwrap()
-            .command(version)]);
+        container_builder.command(vec![HbaseRole::from_str(pod_id.role())?.command(version)]);
 
-        if let Some(java_home) = validated_config
-            .get(&PropertyNameKind::Env)
-            .and_then(|conf| conf.get(JAVA_HOME))
-        {
-            container_builder.add_env_var(JAVA_HOME, java_home);
+        for (property_name_kind, config) in validated_config {
+            match property_name_kind {
+                PropertyNameKind::File(file_name) if file_name == HBASE_SITE_XML => {
+                    // we need to extract the master rpc port here to add to container ports later
+                    master_rpc_port = config.get(HBASE_MASTER_PORT).cloned();
+                    // we need to extract the master web ui port here to add to container ports later
+                    master_web_ui_port = config.get(HBASE_MASTER_WEB_UI_PORT).cloned();
+                    // we need to extract the region server rpc port here to add to container ports later
+                    master_rpc_port = config.get(HBASE_REGION_SERVER_PORT).cloned();
+                    // we need to extract the region server web ui port here to add to container ports later
+                    master_web_ui_port = config.get(HBASE_REGION_SERVER_WEB_UI_PORT).cloned();
+                }
+                PropertyNameKind::Env => {
+                    for (property_name, property_value) in config {
+                        if property_name.is_empty() {
+                            warn!("Received empty property_name for ENV... skipping");
+                            continue;
+                        }
+                        // if a metrics port is provided (for now by user, it is not required in
+                        // product config to be able to not configure any monitoring / metrics)
+                        if property_name == METRICS_PORT {
+                            metrics_port = Some(property_value.to_string());
+                            container_builder.add_env_var(
+                                "HBASE_OPTS".to_string(), 
+                                format!("-javaagent:{{{{packageroot}}}}/{}/stackable/lib/jmx_prometheus_javaagent-0.16.1.jar={}:{{{{packageroot}}}}/{}/stackable/conf/jmx_exporter.yaml",
+                                              version.package_name(), property_value, version.package_name()));
+                            continue;
+                        }
+
+                        container_builder.add_env_var(property_name, property_value);
+                    }
+                }
+                _ => {}
+            }
         }
 
+        // add the config dir
         container_builder.add_env_var(
-            "HBASE_CONF_DIR",
+            "HBASE_CONF_DIR".to_string(),
             format!("{{{{configroot}}}}/{}", CONFIG_DIR_NAME),
         );
 
@@ -450,6 +484,58 @@ impl HbaseState {
             });
         }
 
+        let mut annotations = BTreeMap::new();
+        // only add metrics container port and annotation if available
+        if let Some(metrics_port) = metrics_port {
+            annotations.insert(SHOULD_BE_SCRAPED.to_string(), "true".to_string());
+            container_builder.add_container_port(
+                ContainerPortBuilder::new(metrics_port.parse()?)
+                    .name("metrics")
+                    .build(),
+            );
+        }
+
+        match HbaseRole::from_str(pod_id.role())? {
+            // add master container ports
+            HbaseRole::Master => {
+                if let Some(master_rpc_port) = &master_rpc_port {
+                    container_builder.add_container_port(
+                        ContainerPortBuilder::new(master_rpc_port.parse()?)
+                            .name("rpc")
+                            .build(),
+                    );
+                }
+
+                // add admin port if available
+                if let Some(master_web_ui_port) = master_web_ui_port {
+                    container_builder.add_container_port(
+                        ContainerPortBuilder::new(master_web_ui_port.parse()?)
+                            .name("http")
+                            .build(),
+                    );
+                }
+            }
+            // add region server container ports
+            HbaseRole::RegionServer => {
+                if let Some(region_server_rpc_port) = region_server_rpc_port {
+                    container_builder.add_container_port(
+                        ContainerPortBuilder::new(region_server_rpc_port.parse()?)
+                            .name("rpc")
+                            .build(),
+                    );
+                }
+
+                // add admin port if available
+                if let Some(region_server_web_ui_port) = region_server_web_ui_port {
+                    container_builder.add_container_port(
+                        ContainerPortBuilder::new(region_server_web_ui_port.parse()?)
+                            .name("http")
+                            .build(),
+                    );
+                }
+            }
+        }
+
         let mut pod_labels = get_recommended_labels(
             &self.context.resource,
             pod_id.app(),
@@ -467,6 +553,7 @@ impl HbaseState {
                     .generate_name(pod_name)
                     .namespace(&self.context.client.default_namespace)
                     .with_labels(pod_labels)
+                    .with_annotations(annotations)
                     .ownerreference_from_resource(&self.context.resource, Some(true), Some(true))?
                     .build()?,
             )
