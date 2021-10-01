@@ -302,9 +302,9 @@ impl HbaseState {
                 None => return Err(error::Error::ZookeeperConnectionInformationError),
             };
 
-            /// These unwraps are safe for now (all values are either user provided or coming
-            /// from product config).
-            /// TODO: This should be replaced however with proper templating for the config files.
+            // These unwraps are safe for now (all values are either user provided or coming
+            // from product config).
+            // TODO: This should be replaced however with proper templating for the config files.
             let root_dir = config.get(HBASE_ROOT_DIR).unwrap();
             let master_port = config.get(HBASE_MASTER_PORT).unwrap();
             let master_web_ui_port = config.get(HBASE_MASTER_WEB_UI_PORT).unwrap();
@@ -312,7 +312,7 @@ impl HbaseState {
             let region_server_web_ui_port = config.get(HBASE_REGION_SERVER_WEB_UI_PORT).unwrap();
 
             // TODO: remove "hbase.unsafe.stream.capability.enforce" once hdfs operator is running
-            //   (and we can actively use the provided discovery)
+            //   (and we can actively use the provided hdfs discovery)
             // TODO: use own or provided library for hadoop xml templating
             //    we cannot handle optional values in here properly, no escaping etc.
             let hbase_size_xml = format!(
