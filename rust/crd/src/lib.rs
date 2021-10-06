@@ -208,7 +208,7 @@ impl Configuration for HbaseConfig {
         let mut result = BTreeMap::new();
 
         if file == HBASE_SITE_XML {
-            if role_name == &HbaseRole::Master.to_string() {
+            if role_name == HbaseRole::Master.to_string() {
                 if let Some(master_port) = &self.master_port {
                     result.insert(HBASE_MASTER_PORT.to_string(), Some(master_port.to_string()));
                 }
@@ -218,7 +218,7 @@ impl Configuration for HbaseConfig {
                         Some(master_web_ui_port.to_string()),
                     );
                 }
-            } else if role_name == &HbaseRole::RegionServer.to_string() {
+            } else if role_name == HbaseRole::RegionServer.to_string() {
                 if let Some(region_server_port) = &self.region_server_port {
                     result.insert(
                         HBASE_REGION_SERVER_PORT.to_string(),

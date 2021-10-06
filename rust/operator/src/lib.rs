@@ -329,6 +329,8 @@ impl HbaseState {
                     data.insert(
                         FS_DEFAULT_FS.to_string(),
                         // TODO: just a hack to remove "/hbase" from the connect string
+                        //   will fail if something like "/production/hbase is used
+                        //   should be adapted in hbase discovery
                         Some(
                             hdfs_connect_string[..hdfs_connect_string.rfind('/').unwrap()]
                                 .to_string(),
