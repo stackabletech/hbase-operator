@@ -22,6 +22,20 @@ spec:
           properties:
             spec:
               properties:
+                hdfsReference:
+                  description: Contains all necessary information identify a Stackable managed ZooKeeper ensemble and build a connection string for it. The main purpose for this struct is for other operators that need to reference a ZooKeeper ensemble to use in their CRDs. This has the benefit of keeping references to Zookeeper ensembles consistent throughout the entire stack.
+                  properties:
+                    chroot:
+                      nullable: true
+                      type: string
+                    name:
+                      type: string
+                    namespace:
+                      type: string
+                  required:
+                    - name
+                    - namespace
+                  type: object
                 masters:
                   properties:
                     cliOverrides:
@@ -58,9 +72,6 @@ spec:
                           format: int16
                           nullable: true
                           type: integer
-                        rootDir:
-                          nullable: true
-                          type: string
                       type: object
                     configOverrides:
                       additionalProperties:
@@ -111,9 +122,6 @@ spec:
                                 format: int16
                                 nullable: true
                                 type: integer
-                              rootDir:
-                                nullable: true
-                                type: string
                             type: object
                           configOverrides:
                             additionalProperties:
@@ -204,9 +212,6 @@ spec:
                           format: int16
                           nullable: true
                           type: integer
-                        rootDir:
-                          nullable: true
-                          type: string
                       type: object
                     configOverrides:
                       additionalProperties:
@@ -257,9 +262,6 @@ spec:
                                 format: int16
                                 nullable: true
                                 type: integer
-                              rootDir:
-                                nullable: true
-                                type: string
                             type: object
                           configOverrides:
                             additionalProperties:
@@ -333,6 +335,7 @@ spec:
                     - namespace
                   type: object
               required:
+                - hdfsReference
                 - masters
                 - regionServers
                 - version

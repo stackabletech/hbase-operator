@@ -3,6 +3,15 @@ use std::num::ParseIntError;
 #[allow(clippy::enum_variant_names)]
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
+    #[error("Error with HDFS connection. Could not retrieve the HDFS connection. This is a bug. Please open a ticket.")]
+    HdfsConnectionInformationError,
+
+    #[error("Error from HDFS: {source}")]
+    HdfsError {
+        #[from]
+        source: stackable_hdfs_crd::error::Error,
+    },
+
     #[error(
         "ConfigMap of type [{cm_type}] is for pod with generate_name [{pod_name}] is missing."
     )]

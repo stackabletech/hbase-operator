@@ -11,9 +11,11 @@ use product_config::ProductConfigManager;
 use stackable_hbase_crd::commands::{Restart, Start, Stop};
 use stackable_hbase_crd::{
     HbaseCluster, HbaseClusterSpec, HbaseRole, HbaseVersion, APP_NAME, CONFIG_MAP_TYPE_DATA,
-    HBASE_MASTER_PORT, HBASE_MASTER_WEB_UI_PORT, HBASE_REGION_SERVER_PORT,
-    HBASE_REGION_SERVER_WEB_UI_PORT, HBASE_ROOT_DIR, METRICS_PORT,
+    CORE_SITE_XML, FS_DEFAULT_FS, HBASE_MASTER_PORT, HBASE_MASTER_WEB_UI_PORT,
+    HBASE_REGION_SERVER_PORT, HBASE_REGION_SERVER_WEB_UI_PORT, HBASE_ROOT_DIR, HBASE_SITE_XML,
+    HBASE_ZOOKEEPER_QUORUM, HTTP_PORT, METRICS_PORT, RPC_PORT,
 };
+use stackable_hdfs_crd::discovery::HdfsConnectionInformation;
 use stackable_operator::builder::{
     ContainerBuilder, ContainerPortBuilder, ObjectMetaBuilder, PodBuilder,
 };
@@ -61,9 +63,6 @@ const FINALIZER_NAME: &str = "hbase.stackable.tech/cleanup";
 const ID_LABEL: &str = "hbase.stackable.tech/id";
 const SHOULD_BE_SCRAPED: &str = "monitoring.stackable.tech/should_be_scraped";
 
-const HBASE_SITE_XML: &str = "hbase-site.xml";
-const CORE_SITE_XML: &str = "core-site.xml";
-
 const CONFIG_DIR_NAME: &str = "conf";
 
 type HbaseReconcileResult = ReconcileResult<error::Error>;
@@ -74,6 +73,7 @@ struct HbaseState {
     eligible_nodes: EligibleNodesForRoleAndGroup,
     validated_role_config: ValidatedRoleConfigByPropertyKind,
     zookeeper_info: Option<ZookeeperConnectionInformation>,
+    hdfs_info: Option<HdfsConnectionInformation>,
 }
 
 impl HbaseState {
@@ -110,12 +110,27 @@ impl HbaseState {
             stackable_zookeeper_crd::util::get_zk_connection_info(&self.context.client, zk_ref)
                 .await?;
 
-        debug!(
+        warn!(
             "Received ZooKeeper connect string: [{}]",
             &zookeeper_info.connection_string
         );
 
         self.zookeeper_info = Some(zookeeper_info);
+
+        Ok(ReconcileFunctionAction::Continue)
+    }
+
+    async fn get_hdfs_connection_information(&mut self) -> HbaseReconcileResult {
+        let hdfs_ref: &stackable_hdfs_crd::discovery::HdfsReference =
+            &self.context.resource.spec.hdfs_reference;
+
+        let hdfs_info =
+            stackable_hdfs_crd::discovery::get_hdfs_connection_info(&self.context.client, hdfs_ref)
+                .await?;
+
+        warn!("Received HBASE connection string: [{:?}]", &hdfs_info);
+
+        self.hdfs_info = hdfs_info;
 
         Ok(ReconcileFunctionAction::Continue)
     }
@@ -285,6 +300,7 @@ impl HbaseState {
         _id_mapping: &PodToNodeMapping,
     ) -> Result<HashMap<&'static str, ConfigMap>, Error> {
         let mut config_maps = HashMap::new();
+        let mut config_maps_data = BTreeMap::new();
 
         let recommended_labels = get_recommended_labels(
             &self.context.resource,
@@ -294,103 +310,101 @@ impl HbaseState {
             pod_id.group(),
         );
 
-        if let Some(config) =
-            validated_config.get(&PropertyNameKind::File(HBASE_SITE_XML.to_string()))
-        {
-            let zk_connect_string = match &self.zookeeper_info {
-                Some(zookeeper_info) => zookeeper_info.connection_string.as_str(),
-                None => return Err(error::Error::ZookeeperConnectionInformationError),
-            };
+        let zk_connect_string = match &self.zookeeper_info {
+            Some(zookeeper_info) => zookeeper_info.connection_string.as_str(),
+            None => return Err(error::Error::ZookeeperConnectionInformationError),
+        };
 
-            // These unwraps are safe for now (all values are either user provided or coming
-            // from product config).
-            // TODO: This should be replaced however with proper templating for the config files.
-            let root_dir = config.get(HBASE_ROOT_DIR).unwrap();
-            let master_port = config.get(HBASE_MASTER_PORT).unwrap();
-            let master_web_ui_port = config.get(HBASE_MASTER_WEB_UI_PORT).unwrap();
-            let region_server_port = config.get(HBASE_REGION_SERVER_PORT).unwrap();
-            let region_server_web_ui_port = config.get(HBASE_REGION_SERVER_WEB_UI_PORT).unwrap();
+        let hdfs_connect_string = match &self.hdfs_info {
+            Some(hdfs_info) => hdfs_info.connection_string.as_str(),
+            None => return Err(error::Error::HdfsConnectionInformationError),
+        };
 
-            // TODO: remove "hbase.unsafe.stream.capability.enforce" once hdfs operator is running
-            //   (and we can actively use the provided hdfs discovery)
-            // TODO: use own or provided library for hadoop xml templating
-            //    we cannot handle optional values in here properly, no escaping etc.
-            let hbase_size_xml = format!(
-                "<?xml-stylesheet type=\"text/xsl\" href=\"configuration.xsl\"?>
-<configuration>
-    <property>
-        <name>hbase.rootdir</name>
-        <value>{}</value>
-    </property>
-    <property>
-        <name>hbase.zookeeper.quorum</name>
-        <value>{}</value>
-    </property>
-    <property>
-        <name>hbase.cluster.distributed</name>
-        <value>true</value>
-    </property>
-    <property>
-        <name>hbase.unsafe.stream.capability.enforce</name>
-        <value>false</value>
-    </property>
-    <property>
-        <name>hbase.master.port</name>
-        <value>{}</value>
-    </property>
-    <property>
-        <name>hbase.master.info.port</name>
-        <value>{}</value>
-    </property>
-    <property>
-        <name>hbase.regionserver.port</name>
-        <value>{}</value>
-    </property>
-    <property>
-        <name>hbase.regionserver.info.port</name>
-        <value>{}</value>
-    </property>
-</configuration>",
-                root_dir,
-                zk_connect_string,
-                master_port,
-                master_web_ui_port,
-                region_server_port,
-                region_server_web_ui_port
-            );
+        for (property_name_kind, config) in validated_config {
+            match property_name_kind {
+                PropertyNameKind::File(file_name) if file_name == CORE_SITE_XML => {
+                    let mut data = BTreeMap::new();
 
-            // enhance with config map type label
-            let mut cm_config_data_labels = recommended_labels.clone();
-            cm_config_data_labels.insert(
-                configmap::CONFIGMAP_TYPE_LABEL.to_string(),
-                CONFIG_MAP_TYPE_DATA.to_string(),
-            );
+                    // discovery
+                    data.insert(
+                        FS_DEFAULT_FS.to_string(),
+                        // TODO: just a hack to remove "/hbase" from the connect string
+                        Some(
+                            hdfs_connect_string[..hdfs_connect_string.rfind('/').unwrap()]
+                                .to_string(),
+                        ),
+                    );
 
-            let cm_data_name = name_utils::build_resource_name(
-                pod_id.app(),
-                pod_id.instance(),
-                pod_id.role(),
-                Some(pod_id.group()),
-                None,
-                Some(CONFIG_MAP_TYPE_DATA),
-            )?;
+                    for (property_name, property_value) in config {
+                        data.insert(property_name.to_string(), Some(property_value.to_string()));
+                    }
 
-            let mut cm_config_data = BTreeMap::new();
-            cm_config_data.insert(HBASE_SITE_XML.to_string(), hbase_size_xml);
+                    config_maps_data.insert(
+                        file_name.clone(),
+                        product_config::writer::to_hadoop_xml(data.iter()),
+                    );
+                }
+                PropertyNameKind::File(file_name) if file_name == HBASE_SITE_XML => {
+                    let mut data = BTreeMap::new();
 
-            let cm_data = configmap::build_config_map(
-                &self.context.resource,
-                &cm_data_name,
-                &self.context.namespace(),
-                cm_config_data_labels,
-                cm_config_data,
-            )?;
+                    // hdfs discovery
+                    data.insert(
+                        HBASE_ROOT_DIR.to_string(),
+                        Some(hdfs_connect_string.to_string()),
+                    );
+                    // zk discovery
+                    data.insert(
+                        HBASE_ZOOKEEPER_QUORUM.to_string(),
+                        Some(zk_connect_string.to_string()),
+                    );
 
-            config_maps.insert(
-                HBASE_SITE_XML,
-                configmap::create_config_map(&self.context.client, cm_data).await?,
-            );
+                    // // TODO: move to product config properties
+                    // data.insert(
+                    //     HBASE_CLUSTER_DISTRIBUTED.to_string(),
+                    //     Some("true".to_string()),
+                    // );
+
+                    for (property_name, property_value) in config {
+                        data.insert(property_name.to_string(), Some(property_value.to_string()));
+                    }
+
+                    config_maps_data.insert(
+                        file_name.clone(),
+                        product_config::writer::to_hadoop_xml(data.iter()),
+                    );
+                }
+                _ => {}
+            }
         }
+
+        // enhance with config map type label
+        let mut cm_config_data_labels = recommended_labels.clone();
+        cm_config_data_labels.insert(
+            configmap::CONFIGMAP_TYPE_LABEL.to_string(),
+            CONFIG_MAP_TYPE_DATA.to_string(),
+        );
+
+        let cm_data_name = name_utils::build_resource_name(
+            pod_id.app(),
+            pod_id.instance(),
+            pod_id.role(),
+            Some(pod_id.group()),
+            None,
+            Some(CONFIG_MAP_TYPE_DATA),
+        )?;
+
+        let cm = configmap::build_config_map(
+            &self.context.resource,
+            &cm_data_name,
+            &self.context.namespace(),
+            cm_config_data_labels,
+            config_maps_data,
+        )?;
+
+        config_maps.insert(
+            CONFIG_MAP_TYPE_DATA,
+            configmap::create_config_map(&self.context.client, cm).await?,
+        );
 
         Ok(config_maps)
     }
@@ -475,7 +489,7 @@ impl HbaseState {
         );
 
         // One mount for the config directory
-        if let Some(config_map_data) = config_maps.get(HBASE_SITE_XML) {
+        if let Some(config_map_data) = config_maps.get(CONFIG_MAP_TYPE_DATA) {
             if let Some(name) = config_map_data.metadata.name.as_ref() {
                 container_builder.add_configmapvolume(name, CONFIG_DIR_NAME.to_string());
             } else {
@@ -507,7 +521,7 @@ impl HbaseState {
                 if let Some(master_rpc_port) = &master_rpc_port {
                     container_builder.add_container_port(
                         ContainerPortBuilder::new(master_rpc_port.parse()?)
-                            .name("rpc")
+                            .name(RPC_PORT)
                             .build(),
                     );
                 }
@@ -516,7 +530,7 @@ impl HbaseState {
                 if let Some(master_web_ui_port) = master_web_ui_port {
                     container_builder.add_container_port(
                         ContainerPortBuilder::new(master_web_ui_port.parse()?)
-                            .name("http")
+                            .name(HTTP_PORT)
                             .build(),
                     );
                 }
@@ -526,7 +540,7 @@ impl HbaseState {
                 if let Some(region_server_rpc_port) = region_server_rpc_port {
                     container_builder.add_container_port(
                         ContainerPortBuilder::new(region_server_rpc_port.parse()?)
-                            .name("rpc")
+                            .name(RPC_PORT)
                             .build(),
                     );
                 }
@@ -535,7 +549,7 @@ impl HbaseState {
                 if let Some(region_server_web_ui_port) = region_server_web_ui_port {
                     container_builder.add_container_port(
                         ContainerPortBuilder::new(region_server_web_ui_port.parse()?)
-                            .name("http")
+                            .name(HTTP_PORT)
                             .build(),
                     );
                 }
@@ -636,6 +650,8 @@ impl ReconciliationState for HbaseState {
                 ))
                 .await?
                 .then(self.get_zookeeper_connection_information())
+                .await?
+                .then(self.get_hdfs_connection_information())
                 .await?
                 .then(self.context.delete_illegal_pods(
                     self.existing_pods.as_slice(),
@@ -763,6 +779,7 @@ impl ControllerStrategy for HbaseStrategy {
             eligible_nodes,
             validated_role_config,
             zookeeper_info: None,
+            hdfs_info: None,
         })
     }
 }

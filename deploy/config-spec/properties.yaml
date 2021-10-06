@@ -26,11 +26,34 @@ properties:
           value: "${hbase.tmp.dir}/hbase"
       roles:
         - name: "master"
+          required: false
+        - name: "regionserver"
+          required: false
+      asOfVersion: "0.0.0"
+      description: "The directory shared by region servers and into which HBase persists. The URL should be 'fully-qualified' to include the filesystem scheme. For example, to specify the HDFS directory '/hbase' where the HDFS instance's namenode is running at namenode.example.org on port 9000, set this value to: hdfs://namenode.example.org:9000/hbase. By default, we write to whatever ${hbase.tmp.dir} is set too -- usually /tmp -- so change this configuration or else all data will be lost on machine restart."
+
+  - property: &hbaseClusterDistributed
+      propertyNames:
+        - name: "hbase.cluster.distributed"
+          kind:
+            type: "file"
+            file: "hbase-site.xml"
+      datatype:
+        type: "bool"
+      defaultValues:
+        - fromVersion: "0.0.0"
+          value: "false"
+      recommendedValues:
+        - fromVersion: "0.0.0"
+          value: "true"
+      roles:
+        - name: "master"
           required: true
         - name: "regionserver"
           required: true
       asOfVersion: "0.0.0"
-      description: "The directory shared by region servers and into which HBase persists. The URL should be 'fully-qualified' to include the filesystem scheme. For example, to specify the HDFS directory '/hbase' where the HDFS instance's namenode is running at namenode.example.org on port 9000, set this value to: hdfs://namenode.example.org:9000/hbase. By default, we write to whatever ${hbase.tmp.dir} is set too -- usually /tmp -- so change this configuration or else all data will be lost on machine restart."
+      description: "The mode the cluster will be in. Possible values are false for standalone mode and true for distributed mode. If false, startup will run all HBase and ZooKeeper daemons together in the one JVM."
+
 
   - property: &hbaseMasterPort
       propertyNames:
@@ -47,8 +70,6 @@ properties:
           value: "16000"
       roles:
         - name: "master"
-          required: true
-        - name: "regionserver"
           required: true
       asOfVersion: "0.0.0"
       description: "The port the HBase Master should bind to."
@@ -69,8 +90,6 @@ properties:
       roles:
         - name: "master"
           required: true
-        - name: "regionserver"
-          required: true
       asOfVersion: "0.0.0"
       description: "Set to -1 if you do not want a UI instance run."
 
@@ -88,8 +107,6 @@ properties:
         - fromVersion: "0.0.0"
           value: "16020"
       roles:
-        - name: "master"
-          required: true
         - name: "regionserver"
           required: true
       asOfVersion: "0.0.0"
@@ -109,8 +126,6 @@ properties:
         - fromVersion: "0.0.0"
           value: "16030"
       roles:
-        - name: "master"
-          required: true
         - name: "regionserver"
           required: true
       asOfVersion: "0.0.0"

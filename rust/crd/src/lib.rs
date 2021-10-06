@@ -12,6 +12,7 @@ use schemars::JsonSchema;
 use semver::Version;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use stackable_hdfs_crd::discovery::HdfsReference;
 use stackable_operator::command::{CommandRef, HasCommands, HasRoleRestartOrder};
 use stackable_operator::controller::HasOwned;
 use stackable_operator::crd::HasApplication;
@@ -33,13 +34,25 @@ pub const MANAGED_BY: &str = "hbase-operator";
 
 pub const CONFIG_MAP_TYPE_DATA: &str = "data";
 
+pub const FS_DEFAULT_FS: &str = "fs.DefaultFS";
 pub const HBASE_ROOT_DIR: &str = "hbase.rootdir";
+pub const HBASE_ZOOKEEPER_QUORUM: &str = "hbase.zookeeper.quorum";
+pub const HBASE_CLUSTER_DISTRIBUTED: &str = "hbase.cluster.distributed";
+
 pub const HBASE_MASTER_PORT: &str = "hbase.master.port";
 pub const HBASE_MASTER_WEB_UI_PORT: &str = "hbase.master.info.port";
+
 pub const HBASE_REGION_SERVER_PORT: &str = "hbase.regionserver.port";
 pub const HBASE_REGION_SERVER_WEB_UI_PORT: &str = "hbase.regionserver.info.port";
+
 pub const JAVA_HOME: &str = "JAVA_HOME";
 pub const METRICS_PORT: &str = "metricsPort";
+
+pub const HBASE_SITE_XML: &str = "hbase-site.xml";
+pub const CORE_SITE_XML: &str = "core-site.xml";
+
+pub const RPC_PORT: &str = "rpc";
+pub const HTTP_PORT: &str = "http";
 
 #[derive(Clone, CustomResource, Debug, Deserialize, JsonSchema, Serialize)]
 #[kube(
@@ -57,6 +70,7 @@ pub struct HbaseClusterSpec {
     pub masters: Role<HbaseConfig>,
     pub region_servers: Role<HbaseConfig>,
     pub zookeeper_reference: ZookeeperReference,
+    pub hdfs_reference: HdfsReference,
 }
 
 #[derive(
@@ -146,7 +160,6 @@ impl HasClusterExecutionStatus for HbaseCluster {
 #[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct HbaseConfig {
-    pub root_dir: Option<String>,
     pub master_port: Option<u16>,
     // master_web_ui_port can be set to -1 to disable the ui
     pub master_web_ui_port: Option<i16>,
@@ -189,33 +202,36 @@ impl Configuration for HbaseConfig {
     fn compute_files(
         &self,
         _resource: &Self::Configurable,
-        _role_name: &str,
-        _file: &str,
+        role_name: &str,
+        file: &str,
     ) -> Result<BTreeMap<String, Option<String>>, ConfigError> {
         let mut result = BTreeMap::new();
-        if let Some(root_dir) = &self.root_dir {
-            result.insert(HBASE_ROOT_DIR.to_string(), Some(root_dir.to_string()));
-        }
-        if let Some(master_port) = &self.master_port {
-            result.insert(HBASE_MASTER_PORT.to_string(), Some(master_port.to_string()));
-        }
-        if let Some(master_web_ui_port) = &self.master_web_ui_port {
-            result.insert(
-                HBASE_MASTER_WEB_UI_PORT.to_string(),
-                Some(master_web_ui_port.to_string()),
-            );
-        }
-        if let Some(region_server_port) = &self.region_server_port {
-            result.insert(
-                HBASE_REGION_SERVER_PORT.to_string(),
-                Some(region_server_port.to_string()),
-            );
-        }
-        if let Some(region_server_web_ui_port) = &self.region_server_web_ui_port {
-            result.insert(
-                HBASE_REGION_SERVER_WEB_UI_PORT.to_string(),
-                Some(region_server_web_ui_port.to_string()),
-            );
+
+        if file == HBASE_SITE_XML {
+            if role_name == &HbaseRole::Master.to_string() {
+                if let Some(master_port) = &self.master_port {
+                    result.insert(HBASE_MASTER_PORT.to_string(), Some(master_port.to_string()));
+                }
+                if let Some(master_web_ui_port) = &self.master_web_ui_port {
+                    result.insert(
+                        HBASE_MASTER_WEB_UI_PORT.to_string(),
+                        Some(master_web_ui_port.to_string()),
+                    );
+                }
+            } else if role_name == &HbaseRole::RegionServer.to_string() {
+                if let Some(region_server_port) = &self.region_server_port {
+                    result.insert(
+                        HBASE_REGION_SERVER_PORT.to_string(),
+                        Some(region_server_port.to_string()),
+                    );
+                }
+                if let Some(region_server_web_ui_port) = &self.region_server_web_ui_port {
+                    result.insert(
+                        HBASE_REGION_SERVER_WEB_UI_PORT.to_string(),
+                        Some(region_server_web_ui_port.to_string()),
+                    );
+                }
+            }
         }
 
         Ok(result)
