@@ -8,7 +8,7 @@ repository = "https://github.com/stackabletech/hbase-operator"
 version = "0.1.0-nightly"
 
 [dependencies]
-stackable-hdfs-crd = { git = "https://github.com/stackabletech/hdfs-operator.git", branch = "hackathon"}
+stackable-hdfs-crd = { git = "https://github.com/stackabletech/hdfs-operator.git", branch = "start"}
 product-config = { git = "https://github.com/stackabletech/product-config.git", branch = "main" }
 stackable-operator = { git = "https://github.com/stackabletech/operator-rs.git", branch = "main" }
 stackable-hbase-crd = { path = "../crd" }

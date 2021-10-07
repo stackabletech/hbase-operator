@@ -1667,7 +1667,7 @@ dependencies = [
 [[package]]
 name = "stackable-hdfs-crd"
 version = "0.1.0-nightly"
-source = "git+https://github.com/stackabletech/hdfs-operator.git?branch=hackathon#400e35e2c4a356f6b7aee201f8818c6a02dd0865"
+source = "git+https://github.com/stackabletech/hdfs-operator.git?branch=start#db47f0f8ac7dcf4ae812fbdf7ea3fd0519b8100e"
 dependencies = [
  "duplicate",
  "k8s-openapi",
