@@ -117,9 +117,9 @@ dependencies = [
 
 [[package]]
 name = "cc"
-version = "1.0.70"
+version = "1.0.71"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d26a6ce4b6a484fa3edb70f7efa6fc430fd2b87285fe8b84304fd0936faa0dc0"
+checksum = "79c2681d6594606957bbb8631c4b90a7fcaaa72cdb714743a437b156d6a7eedd"
 dependencies = [
  "jobserver",
 ]
@@ -1667,7 +1667,7 @@ dependencies = [
 [[package]]
 name = "stackable-hdfs-crd"
 version = "0.1.0-nightly"
-source = "git+https://github.com/stackabletech/hdfs-operator.git?branch=hackathon#2ec50165f668cd770b536d7bc2683b46a1c17fae"
+source = "git+https://github.com/stackabletech/hdfs-operator.git?branch=hackathon#400e35e2c4a356f6b7aee201f8818c6a02dd0865"
 dependencies = [
  "duplicate",
  "k8s-openapi",
@@ -1687,7 +1687,7 @@ dependencies = [
 [[package]]
 name = "stackable-operator"
 version = "0.2.3-nightly"
-source = "git+https://github.com/stackabletech/operator-rs.git?branch=main#80e2d479bc5da10360e038305769952d7e0ce513"
+source = "git+https://github.com/stackabletech/operator-rs.git?branch=main#8bda7ca941797a5f7a3fe56080d316d1f99dbe45"
 dependencies = [
  "async-trait",
  "backoff",

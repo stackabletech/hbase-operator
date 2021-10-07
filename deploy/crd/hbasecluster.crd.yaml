@@ -23,14 +23,14 @@ spec:
             spec:
               properties:
                 hdfsReference:
-                  description: Contains all necessary information identify a Stackable managed ZooKeeper ensemble and build a connection string for it. The main purpose for this struct is for other operators that need to reference a ZooKeeper ensemble to use in their CRDs. This has the benefit of keeping references to Zookeeper ensembles consistent throughout the entire stack.
+                  description: Contains all necessary information to identify a Stackable managed HDFS cluster and build a connection string for it. The main purpose for this struct is for other operators that need to reference a HDFS ensemble to use in their CRDs. This has the benefit of keeping references to HDFS ensembles consistent throughout the entire stack.
                   properties:
-                    chroot:
-                      nullable: true
-                      type: string
                     name:
                       type: string
                     namespace:
+                      type: string
+                    root:
+                      nullable: true
                       type: string
                   required:
                     - name

@@ -110,8 +110,8 @@ impl HbaseState {
             stackable_zookeeper_crd::util::get_zk_connection_info(&self.context.client, zk_ref)
                 .await?;
 
-        warn!(
-            "Received ZooKeeper connect string: [{}]",
+        debug!(
+            "Received ZooKeeper connection information: [{}]",
             &zookeeper_info.connection_string
         );
 
@@ -128,7 +128,7 @@ impl HbaseState {
             stackable_hdfs_crd::discovery::get_hdfs_connection_info(&self.context.client, hdfs_ref)
                 .await?;
 
-        warn!("Received HBASE connection string: [{:?}]", &hdfs_info);
+        debug!("Received HBASE connection information: [{:?}]", &hdfs_info);
 
         self.hdfs_info = hdfs_info;
 
@@ -310,13 +310,15 @@ impl HbaseState {
             pod_id.group(),
         );
 
-        let zk_connect_string = match &self.zookeeper_info {
-            Some(zookeeper_info) => zookeeper_info.connection_string.as_str(),
+        // zk discovery
+        let zk_info = match &self.zookeeper_info {
+            Some(zookeeper_info) => zookeeper_info,
             None => return Err(error::Error::ZookeeperConnectionInformationError),
         };
 
-        let hdfs_connect_string = match &self.hdfs_info {
-            Some(hdfs_info) => hdfs_info.connection_string.as_str(),
+        // hdfs discovery
+        let hdfs_info = match &self.hdfs_info {
+            Some(hdfs_info) => hdfs_info,
             None => return Err(error::Error::HdfsConnectionInformationError),
         };
 
@@ -325,16 +327,9 @@ impl HbaseState {
                 PropertyNameKind::File(file_name) if file_name == CORE_SITE_XML => {
                     let mut data = BTreeMap::new();
 
-                    // discovery
                     data.insert(
                         FS_DEFAULT_FS.to_string(),
-                        // TODO: just a hack to remove "/hbase" from the connect string
-                        //   will fail if something like "/production/hbase is used
-                        //   should be adapted in hbase discovery
-                        Some(
-                            hdfs_connect_string[..hdfs_connect_string.rfind('/').unwrap()]
-                                .to_string(),
-                        ),
+                        Some(hdfs_info.connection_string()),
                     );
 
                     for (property_name, property_value) in config {
@@ -352,12 +347,12 @@ impl HbaseState {
                     // hdfs discovery
                     data.insert(
                         HBASE_ROOT_DIR.to_string(),
-                        Some(hdfs_connect_string.to_string()),
+                        Some(hdfs_info.full_connection_string()),
                     );
                     // zk discovery
                     data.insert(
                         HBASE_ZOOKEEPER_QUORUM.to_string(),
-                        Some(zk_connect_string.to_string()),
+                        Some(zk_info.connection_string.clone()),
                     );
 
                     // // TODO: move to product config properties

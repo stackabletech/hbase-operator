@@ -7,7 +7,7 @@ spec:
   hdfsReference:
     namespace: default
     name: simple
-    chroot: /hbase
+    root: /hbase
   zookeeperReference:
     namespace: default
     name: simple
