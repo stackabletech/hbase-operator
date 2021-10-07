@@ -48,7 +48,7 @@ use stackable_operator::scheduler::{
 use stackable_operator::status::HasClusterExecutionStatus;
 use stackable_operator::status::{init_status, ClusterExecutionStatus};
 use stackable_operator::versioning::{finalize_versioning, init_versioning};
-use stackable_zookeeper_crd::util::ZookeeperConnectionInformation;
+use stackable_zookeeper_crd::discovery::ZookeeperConnectionInformation;
 use std::collections::{BTreeMap, HashMap};
 use std::future::Future;
 use std::pin::Pin;
@@ -99,16 +99,18 @@ impl HbaseState {
     }
 
     async fn get_zookeeper_connection_information(&mut self) -> HbaseReconcileResult {
-        let zk_ref: &stackable_zookeeper_crd::util::ZookeeperReference =
+        let zk_ref: &stackable_zookeeper_crd::discovery::ZookeeperReference =
             &self.context.resource.spec.zookeeper_reference;
 
         if let Some(chroot) = zk_ref.chroot.as_deref() {
-            stackable_zookeeper_crd::util::is_valid_zookeeper_path(chroot)?;
+            stackable_zookeeper_crd::discovery::is_valid_zookeeper_path(chroot)?;
         }
 
-        let zookeeper_info =
-            stackable_zookeeper_crd::util::get_zk_connection_info(&self.context.client, zk_ref)
-                .await?;
+        let zookeeper_info = stackable_zookeeper_crd::discovery::get_zk_connection_info(
+            &self.context.client,
+            zk_ref,
+        )
+        .await?;
 
         debug!(
             "Received ZooKeeper connection information: [{}]",

@@ -24,7 +24,7 @@ use stackable_operator::status::{
     Versioned,
 };
 use stackable_operator::versioning::{ProductVersion, Versioning, VersioningState};
-use stackable_zookeeper_crd::util::ZookeeperReference;
+use stackable_zookeeper_crd::discovery::ZookeeperReference;
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
 use strum_macros::{Display, EnumIter, EnumString};

@@ -12,7 +12,7 @@ stackable-hdfs-crd = { git = "https://github.com/stackabletech/hdfs-operator.git
 product-config = { git = "https://github.com/stackabletech/product-config.git", branch = "main" }
 stackable-operator = { git = "https://github.com/stackabletech/operator-rs.git", branch = "main" }
 stackable-hbase-crd = { path = "../crd" }
-stackable-zookeeper-crd = { git = "https://github.com/stackabletech/zookeeper-operator.git", branch = "main"}
+stackable-zookeeper-crd = { git = "https://github.com/stackabletech/zookeeper-operator.git", branch = "fix_hard_coded_zk_port"}
 
 async-trait = "0.1"
 futures = "0.3"
