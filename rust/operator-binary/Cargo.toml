@@ -30,9 +30,9 @@ systemd-units = { enable = false, unit-name = "stackable-hbase-operator" }
 assets = [
     ["../../target/release/stackable-hbase-operator", "opt/stackable/hbase-operator/", "755"],
     ["../../deploy/crd/hbasecluster.crd.yaml", "etc/stackable/hbase-operator/crd/", "644"],
-    ["../../deploy/crd/restart.command.yaml", "etc/stackable/hbase-operator/crd/", "644"],
-    ["../../deploy/crd/start.command.yaml", "etc/stackable/hbase-operator/crd/", "644"],
-    ["../../deploy/crd/stop.command.yaml", "etc/stackable/hbase-operator/crd/", "644"],
+    ["../../deploy/crd/restart.crd.yaml", "etc/stackable/hbase-operator/crd/", "644"],
+    ["../../deploy/crd/start.crd.yaml", "etc/stackable/hbase-operator/crd/", "644"],
+    ["../../deploy/crd/stop.crd.yaml", "etc/stackable/hbase-operator/crd/", "644"],
     ["../../deploy/config-spec/properties.yaml", "etc/stackable/hbase-operator/config-spec/", "644"],
 ]
 
