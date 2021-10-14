@@ -1668,7 +1668,7 @@ dependencies = [
 [[package]]
 name = "stackable-hdfs-crd"
 version = "0.1.0-nightly"
-source = "git+https://github.com/stackabletech/hdfs-operator.git?branch=main#e3ad4f0674c0f30d7b46997a014e002b1e56485e"
+source = "git+https://github.com/stackabletech/hdfs-operator.git?branch=main#d7e133ad7c16b8f97a3a6dba90b9d16f11da6cce"
 dependencies = [
  "duplicate",
  "k8s-openapi",
@@ -1679,8 +1679,8 @@ dependencies = [
  "serde",
  "serde_json",
  "stackable-operator",
- "strum 0.21.0",
- "strum_macros 0.21.1",
+ "strum 0.22.0",
+ "strum_macros 0.22.0",
  "thiserror",
  "tracing",
 ]
@@ -1688,7 +1688,7 @@ dependencies = [
 [[package]]
 name = "stackable-operator"
 version = "0.2.3-nightly"
-source = "git+https://github.com/stackabletech/operator-rs.git?branch=main#b0417309bd4c769b6d57bf11c919d8febdc3d504"
+source = "git+https://github.com/stackabletech/operator-rs.git?branch=main#7965121542135b6c9c1287b0e7b4f9cf32ae7fe2"
 dependencies = [
  "async-trait",
  "backoff",
