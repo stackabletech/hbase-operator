@@ -1622,7 +1622,7 @@ dependencies = [
  "stackable-hdfs-crd",
  "stackable-operator",
  "stackable-zookeeper-crd",
- "strum",
+ "strum 0.21.0",
  "strum_macros 0.21.1",
  "thiserror",
  "tracing",
@@ -1644,7 +1644,7 @@ dependencies = [
  "stackable-hdfs-crd",
  "stackable-operator",
  "stackable-zookeeper-crd",
- "strum",
+ "strum 0.21.0",
  "strum_macros 0.21.1",
  "thiserror",
  "tracing",
@@ -1668,7 +1668,7 @@ dependencies = [
 [[package]]
 name = "stackable-hdfs-crd"
 version = "0.1.0-nightly"
-source = "git+https://github.com/stackabletech/hdfs-operator.git?branch=start#56e4a4ae2613843129b47876178e770912c679ca"
+source = "git+https://github.com/stackabletech/hdfs-operator.git?branch=main#e3ad4f0674c0f30d7b46997a014e002b1e56485e"
 dependencies = [
  "duplicate",
  "k8s-openapi",
@@ -1679,7 +1679,7 @@ dependencies = [
  "serde",
  "serde_json",
  "stackable-operator",
- "strum",
+ "strum 0.21.0",
  "strum_macros 0.21.1",
  "thiserror",
  "tracing",
@@ -1709,7 +1709,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_yaml",
- "strum",
+ "strum 0.21.0",
  "strum_macros 0.22.0",
  "thiserror",
  "tokio",
@@ -1722,7 +1722,7 @@ dependencies = [
 [[package]]
 name = "stackable-zookeeper-crd"
 version = "0.4.1-nightly"
-source = "git+https://github.com/stackabletech/zookeeper-operator.git?branch=fix_hard_coded_zk_port#65ee74c4311ebf1eac8e65b2dcf428b2e57a9331"
+source = "git+https://github.com/stackabletech/zookeeper-operator.git?branch=main#b284bbc240512d16cf6a340ddc6cbcad9fe279fb"
 dependencies = [
  "duplicate",
  "k8s-openapi",
@@ -1733,7 +1733,7 @@ dependencies = [
  "serde",
  "serde_json",
  "stackable-operator",
- "strum",
+ "strum 0.22.0",
  "strum_macros 0.21.1",
  "thiserror",
  "tracing",
@@ -1756,6 +1756,12 @@ name = "strum"
 version = "0.21.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "aaf86bbcfd1fa9670b7a129f64fc0c9fcbbfe4f1bc4210e9e98fe71ffc12cde2"
+
+[[package]]
+name = "strum"
+version = "0.22.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f7ac893c7d471c8a21f31cfe213ec4f6d9afeed25537c772e08ef3f005f8729e"
 
 [[package]]
 name = "strum_macros"
