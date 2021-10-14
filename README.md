@@ -1,1 +1,0 @@
-# hbase-operator

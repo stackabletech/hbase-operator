@@ -1,0 +1,5 @@
+name: hbase
+version: master
+title: Stackable Operator for Apache HBase
+nav:
+  - modules/ROOT/nav.adoc

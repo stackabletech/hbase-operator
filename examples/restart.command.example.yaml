@@ -1,0 +1,7 @@
+apiVersion: command.hbase.stackable.tech/v1alpha1
+kind: Restart
+metadata:
+  name: hbase-cluster-command-restart
+spec:
+  name: "simple"
+  rolling: true

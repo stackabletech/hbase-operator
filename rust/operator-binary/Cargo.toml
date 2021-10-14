@@ -1,0 +1,42 @@
+[package]
+authors = ["Lars Francke <lars.francke@stackable.de>"]
+description = "Stackable Operator for Apache HBase"
+edition = "2018"
+license = "OSL-3.0"
+name = "stackable-hbase-operator-binary"
+repository = "https://github.com/stackabletech/hbase-operator"
+version = "0.1.0-nightly"
+build = "build.rs"
+
+[dependencies]
+stackable-operator = { git = "https://github.com/stackabletech/operator-rs.git", branch = "main" }
+stackable-hbase-crd = { path = "../crd" }
+stackable-hbase-operator = { path = "../operator" }
+
+clap = "2.33"
+k8s-openapi = { version = "0.13", default-features = false, features = ["v1_22"] }
+kube = { version = "0.60", default-features = false }
+tokio = { version = "1.10", features = ["macros", "rt-multi-thread"] }
+tracing = "0.1"
+
+[build-dependencies]
+built = { version =  "0.5", features = ["chrono", "git2"] }
+stackable-operator = { git = "https://github.com/stackabletech/operator-rs.git", branch = "main" }
+stackable-hbase-crd = { path = "../crd" }
+
+[package.metadata.deb]
+name = "stackable-hbase-operator"
+maintainer-scripts = "../../packaging/debian/"
+systemd-units = { enable = false, unit-name = "stackable-hbase-operator" }
+assets = [
+    ["../../target/release/stackable-hbase-operator", "opt/stackable/hbase-operator/", "755"],
+    ["../../deploy/crd/hbasecluster.crd.yaml", "etc/stackable/hbase-operator/crd/", "644"],
+    ["../../deploy/crd/restart.crd.yaml", "etc/stackable/hbase-operator/crd/", "644"],
+    ["../../deploy/crd/start.crd.yaml", "etc/stackable/hbase-operator/crd/", "644"],
+    ["../../deploy/crd/stop.crd.yaml", "etc/stackable/hbase-operator/crd/", "644"],
+    ["../../deploy/config-spec/properties.yaml", "etc/stackable/hbase-operator/config-spec/", "644"],
+]
+
+[[bin]]
+name = "stackable-hbase-operator"
+path = "src/stackable-hbase-operator.rs"
