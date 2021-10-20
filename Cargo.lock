@@ -1623,7 +1623,7 @@ dependencies = [
  "stackable-operator",
  "stackable-zookeeper-crd",
  "strum 0.22.0",
- "strum_macros 0.21.1",
+ "strum_macros 0.22.0",
  "thiserror",
  "tracing",
 ]
@@ -1645,7 +1645,7 @@ dependencies = [
  "stackable-operator",
  "stackable-zookeeper-crd",
  "strum 0.22.0",
- "strum_macros 0.21.1",
+ "strum_macros 0.22.0",
  "thiserror",
  "tracing",
 ]
