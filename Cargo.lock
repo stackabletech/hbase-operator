@@ -1201,7 +1201,7 @@ dependencies = [
 [[package]]
 name = "product-config"
 version = "0.2.0-nightly"
-source = "git+https://github.com/stackabletech/product-config.git?branch=main#53c4bac3aa52bf61f5cef4fc47447be67749c3ce"
+source = "git+https://github.com/stackabletech/product-config.git?branch=main#97734dfa78c5e96922b2fc99bbd0cf2a1b7ac89d"
 dependencies = [
  "java-properties",
  "regex",
@@ -1622,7 +1622,7 @@ dependencies = [
  "stackable-hdfs-crd",
  "stackable-operator",
  "stackable-zookeeper-crd",
- "strum 0.22.0",
+ "strum",
  "strum_macros 0.22.0",
  "thiserror",
  "tracing",
@@ -1644,7 +1644,7 @@ dependencies = [
  "stackable-hdfs-crd",
  "stackable-operator",
  "stackable-zookeeper-crd",
- "strum 0.22.0",
+ "strum",
  "strum_macros 0.22.0",
  "thiserror",
  "tracing",
@@ -1668,7 +1668,7 @@ dependencies = [
 [[package]]
 name = "stackable-hdfs-crd"
 version = "0.1.0-nightly"
-source = "git+https://github.com/stackabletech/hdfs-operator.git?branch=main#18675c339c47a954c68e9baae305e70f0ce3f938"
+source = "git+https://github.com/stackabletech/hdfs-operator.git?branch=main#f50fca5bdfbce75a8981ef514150b298c00e7e43"
 dependencies = [
  "duplicate",
  "k8s-openapi",
@@ -1679,7 +1679,7 @@ dependencies = [
  "serde",
  "serde_json",
  "stackable-operator",
- "strum 0.22.0",
+ "strum",
  "strum_macros 0.22.0",
  "thiserror",
  "tracing",
@@ -1688,7 +1688,7 @@ dependencies = [
 [[package]]
 name = "stackable-operator"
 version = "0.2.3-nightly"
-source = "git+https://github.com/stackabletech/operator-rs.git?branch=main#e3de43f5bd24df9c68d26cd9f0989afd3ff93e84"
+source = "git+https://github.com/stackabletech/operator-rs.git?branch=main#477c489183569db831447f978c8cb51ecf418ead"
 dependencies = [
  "async-trait",
  "backoff",
@@ -1709,7 +1709,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_yaml",
- "strum 0.21.0",
+ "strum",
  "strum_macros 0.22.0",
  "thiserror",
  "tokio",
@@ -1733,7 +1733,7 @@ dependencies = [
  "serde",
  "serde_json",
  "stackable-operator",
- "strum 0.22.0",
+ "strum",
  "strum_macros 0.21.1",
  "thiserror",
  "tracing",
@@ -1750,12 +1750,6 @@ name = "strsim"
 version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "73473c0e59e6d5812c5dfe2a064a6444949f089e20eec9a2e5506596494e4623"
-
-[[package]]
-name = "strum"
-version = "0.21.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "aaf86bbcfd1fa9670b7a129f64fc0c9fcbbfe4f1bc4210e9e98fe71ffc12cde2"
 
 [[package]]
 name = "strum"
