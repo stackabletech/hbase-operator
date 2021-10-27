@@ -2,6 +2,3 @@
 members = [
     "rust/crd", "rust/operator", "rust/operator-binary"
 ]
-
-[patch."git+https://github.com/stackabletech/hdfs-operator.git"]
-stackable-hdfs-crd = { git = "https://github.com/stackabletech//hdfs-operator.git", branch = "chore/operator-0.3.0"}

@@ -1657,7 +1657,7 @@ dependencies = [
 [[package]]
 name = "stackable-hdfs-crd"
 version = "0.1.0-nightly"
-source = "git+https://github.com/stackabletech//hdfs-operator.git?branch=chore/operator-0.3.0#5b83c739e3b25ebbc3d3ddd92312af31a55ce56b"
+source = "git+https://github.com/stackabletech/hdfs-operator.git?branch=main#cf7c779b96ba0ba0e087cc4331e2c8db5b9f1845"
 dependencies = [
  "duplicate",
  "semver",
