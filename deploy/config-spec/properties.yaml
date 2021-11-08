@@ -150,19 +150,3 @@ properties:
           required: false
       asOfVersion: "0.0.0"
       description: "The port where hbase metrics are exposed as a Prometheus endpoint."
-
-  - property: &javaHome
-      propertyNames:
-        - name: "JAVA_HOME"
-          kind:
-            type: "env"
-      datatype:
-        type: "string"
-        unit: *unitDirectory
-      roles:
-        - name: "master"
-          required: true
-        - name: "regionserver"
-          required: true
-      asOfVersion: "0.0.0"
-      description: "Points to the Java installation folder."

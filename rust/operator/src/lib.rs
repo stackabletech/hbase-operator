@@ -10,9 +10,7 @@ use stackable_hbase_crd::{
     HBASE_ZOOKEEPER_QUORUM, HTTP_PORT, METRICS_PORT, RPC_PORT,
 };
 use stackable_hdfs_crd::discovery::HdfsConnectionInformation;
-use stackable_operator::builder::{
-    ContainerBuilder, ContainerPortBuilder, ObjectMetaBuilder, PodBuilder,
-};
+use stackable_operator::builder::{ContainerBuilder, ObjectMetaBuilder, PodBuilder, VolumeBuilder};
 use stackable_operator::client::Client;
 use stackable_operator::command::materialize_command;
 use stackable_operator::controller::Controller;
@@ -62,7 +60,7 @@ const FINALIZER_NAME: &str = "hbase.stackable.tech/cleanup";
 const ID_LABEL: &str = "hbase.stackable.tech/id";
 const SHOULD_BE_SCRAPED: &str = "monitoring.stackable.tech/should_be_scraped";
 
-const CONFIG_DIR_NAME: &str = "conf";
+const CONFIG_DIR_NAME: &str = "/stackable/conf";
 
 type HbaseReconcileResult = ReconcileResult<error::Error>;
 
@@ -129,7 +127,7 @@ impl HbaseState {
             stackable_hdfs_crd::discovery::get_hdfs_connection_info(&self.context.client, hdfs_ref)
                 .await?;
 
-        debug!("Received HBase connection information: [{:?}]", &hdfs_info);
+        debug!("Received HDFS connection information: [{:?}]", &hdfs_info);
 
         self.hdfs_info = hdfs_info;
 
@@ -356,12 +354,6 @@ impl HbaseState {
                         Some(zk_info.connection_string.clone()),
                     );
 
-                    // // TODO: move to product config properties
-                    // data.insert(
-                    //     HBASE_CLUSTER_DISTRIBUTED.to_string(),
-                    //     Some("true".to_string()),
-                    // );
-
                     for (property_name, property_value) in config {
                         data.insert(property_name.to_string(), Some(property_value.to_string()));
                     }
@@ -441,8 +433,12 @@ impl HbaseState {
         )?;
 
         let mut container_builder = ContainerBuilder::new(APP_NAME);
-        container_builder.image(format!("stackable/hbase:{}", version.to_string()));
-        container_builder.command(vec![HbaseRole::from_str(pod_id.role())?.command(version)]);
+        container_builder.image(format!(
+            // TODO: how to handle the platform version?
+            "docker.stackable.tech/stackable/hbase:{}-0.1",
+            version.to_string()
+        ));
+        container_builder.command(HbaseRole::from_str(pod_id.role())?.command());
 
         for (property_name_kind, config) in validated_config {
             match property_name_kind {
@@ -468,8 +464,7 @@ impl HbaseState {
                             metrics_port = Some(property_value);
                             container_builder.add_env_var(
                                 "HBASE_OPTS".to_string(), 
-                                format!("-javaagent:{{{{packageroot}}}}/{}/stackable/lib/jmx_prometheus_javaagent-0.16.1.jar={}:{{{{packageroot}}}}/{}/stackable/conf/jmx_exporter.yaml",
-                                              version.package_name(), property_value, version.package_name()));
+                                format!("-javaagent:/stackable/jmx/jmx_prometheus_javaagent-0.16.1.jar={}:/stackable/jmx/region-server.yaml", property_value));
                             continue;
                         }
 
@@ -481,15 +476,15 @@ impl HbaseState {
         }
 
         // add the config dir
-        container_builder.add_env_var(
-            "HBASE_CONF_DIR".to_string(),
-            format!("{{{{configroot}}}}/{}", CONFIG_DIR_NAME),
-        );
+        container_builder.add_env_var("HBASE_CONF_DIR".to_string(), CONFIG_DIR_NAME.to_string());
+
+        let mut pod_builder = PodBuilder::new();
 
         // One mount for the config directory
         if let Some(config_map_data) = config_maps.get(CONFIG_MAP_TYPE_DATA) {
             if let Some(name) = config_map_data.metadata.name.as_ref() {
-                container_builder.add_configmapvolume(name, CONFIG_DIR_NAME.to_string());
+                container_builder.add_volume_mount("config", CONFIG_DIR_NAME);
+                pod_builder.add_volume(VolumeBuilder::new("config").with_config_map(name).build());
             } else {
                 return Err(error::Error::MissingConfigMapNameError {
                     cm_type: HBASE_SITE_XML,
@@ -506,50 +501,31 @@ impl HbaseState {
         // only add metrics container port and annotation if available
         if let Some(metrics_port) = metrics_port {
             annotations.insert(SHOULD_BE_SCRAPED.to_string(), "true".to_string());
-            container_builder.add_container_port(
-                ContainerPortBuilder::new(metrics_port.parse()?)
-                    .name("metrics")
-                    .build(),
-            );
+            container_builder.add_container_port("metrics", metrics_port.parse()?);
         }
 
         match HbaseRole::from_str(pod_id.role())? {
             // add master container ports
             HbaseRole::Master => {
                 if let Some(master_rpc_port) = &master_rpc_port {
-                    container_builder.add_container_port(
-                        ContainerPortBuilder::new(master_rpc_port.parse()?)
-                            .name(RPC_PORT)
-                            .build(),
-                    );
+                    container_builder.add_container_port(RPC_PORT, master_rpc_port.parse()?);
                 }
 
                 // add admin port if available
                 if let Some(master_web_ui_port) = master_web_ui_port {
-                    container_builder.add_container_port(
-                        ContainerPortBuilder::new(master_web_ui_port.parse()?)
-                            .name(HTTP_PORT)
-                            .build(),
-                    );
+                    container_builder.add_container_port(HTTP_PORT, master_web_ui_port.parse()?);
                 }
             }
             // add region server container ports
             HbaseRole::RegionServer => {
                 if let Some(region_server_rpc_port) = region_server_rpc_port {
-                    container_builder.add_container_port(
-                        ContainerPortBuilder::new(region_server_rpc_port.parse()?)
-                            .name(RPC_PORT)
-                            .build(),
-                    );
+                    container_builder.add_container_port(RPC_PORT, region_server_rpc_port.parse()?);
                 }
 
                 // add admin port if available
                 if let Some(region_server_web_ui_port) = region_server_web_ui_port {
-                    container_builder.add_container_port(
-                        ContainerPortBuilder::new(region_server_web_ui_port.parse()?)
-                            .name(HTTP_PORT)
-                            .build(),
-                    );
+                    container_builder
+                        .add_container_port(HTTP_PORT, region_server_web_ui_port.parse()?);
                 }
             }
         }
@@ -565,7 +541,7 @@ impl HbaseState {
         // we need to add the id to the labels
         pod_labels.insert(ID_LABEL.to_string(), pod_id.id().to_string());
 
-        let pod = PodBuilder::new()
+        let pod = pod_builder
             .metadata(
                 ObjectMetaBuilder::new()
                     .generate_name(pod_name)
@@ -575,9 +551,9 @@ impl HbaseState {
                     .ownerreference_from_resource(&self.context.resource, Some(true), Some(true))?
                     .build()?,
             )
-            .add_stackable_agent_tolerations()
             .add_container(container_builder.build())
             .node_name(node_name)
+            .host_network(true)
             .build()?;
 
         Ok(self.context.client.create(&pod).await?)
