@@ -45,3 +45,10 @@ To create a single node Apache HBase (v2.4.6) cluster with Prometheus metrics ex
               regionServerWebUiPort: 17001
               metricsPort: 9708
     EOF
+
+If you set up an HBase service for the first time, you might need to create the `/hbase` folder after the pods are created:
+
+    export HADOOP_USER_NAME=root
+    ./hdfs dfs -mkdir hdfs://<namenode>:9000/hbase
+    ./hdfs dfs -chown stackable hdfs://<namenode>:9000/hbase
+
