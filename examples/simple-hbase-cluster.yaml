@@ -16,20 +16,18 @@ spec:
       default:
         selector:
           matchLabels:
-            kubernetes.io/arch: stackable-linux
+            kubernetes.io/os: linux
         replicas: 1
         config:
-          javaHome: /usr/lib/jvm/java-1.11.0-openjdk-amd64/
           masterWebUiPort: 17000
-          metricsPort: 7077
+          metricsPort: 9707
   regionServers:
     roleGroups:
       default:
         selector:
           matchLabels:
-            kubernetes.io/arch: stackable-linux
-        replicas: 3
+            kubernetes.io/os: linux
+        replicas: 1
         config:
-          javaHome: /usr/lib/jvm/java-1.11.0-openjdk-amd64/
           regionServerWebUiPort: 17001
-          metricsPort: 7078
+          metricsPort: 9708

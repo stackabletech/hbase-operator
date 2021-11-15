@@ -45,7 +45,6 @@ pub const HBASE_MASTER_WEB_UI_PORT: &str = "hbase.master.info.port";
 pub const HBASE_REGION_SERVER_PORT: &str = "hbase.regionserver.port";
 pub const HBASE_REGION_SERVER_WEB_UI_PORT: &str = "hbase.regionserver.info.port";
 
-pub const JAVA_HOME: &str = "JAVA_HOME";
 pub const METRICS_PORT: &str = "metricsPort";
 
 pub const HBASE_SITE_XML: &str = "hbase-site.xml";
@@ -97,13 +96,12 @@ pub enum HbaseRole {
 }
 
 impl HbaseRole {
-    pub fn command(&self, version: &HbaseVersion) -> String {
-        // TODO: test and fix command
-        format!(
-            "{}/bin/hbase {} start",
-            version.package_name(),
-            self.to_string()
-        )
+    pub fn command(&self) -> Vec<String> {
+        vec![
+            "bin/hbase".to_string(),
+            self.to_string(),
+            "start".to_string(),
+        ]
     }
 }
 
@@ -170,7 +168,6 @@ pub struct HbaseConfig {
     // region_server_web_ui_port can be set to -1 to disable the ui
     pub region_server_web_ui_port: Option<i16>,
     pub metrics_port: Option<u16>,
-    pub java_home: Option<String>,
 }
 
 impl Configuration for HbaseConfig {
@@ -182,10 +179,6 @@ impl Configuration for HbaseConfig {
         _role_name: &str,
     ) -> Result<BTreeMap<String, Option<String>>, ConfigError> {
         let mut result = BTreeMap::new();
-
-        if let Some(java_home) = &self.java_home {
-            result.insert(JAVA_HOME.to_string(), Some(java_home.to_string()));
-        }
 
         if let Some(metrics_port) = &self.metrics_port {
             result.insert(METRICS_PORT.to_string(), Some(metrics_port.to_string()));
