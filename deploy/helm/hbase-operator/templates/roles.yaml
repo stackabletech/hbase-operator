@@ -20,13 +20,6 @@ rules:
       - get
       - list
   - apiGroups:
-      - hive.stackable.tech
-    resources:
-      - hiveclusters
-    verbs:
-      - get
-      - list
-  - apiGroups:
       - ""
     resources:
       - nodes
