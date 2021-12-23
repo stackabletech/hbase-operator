@@ -5,3 +5,7 @@ target/
 .idea/
 *.iws
 *.iml
+
+*.tgz
+deploy/helm/hbase-operator/configs
+deploy/helm/hbase-operator/templates/crds.yaml
