@@ -1,0 +1,55 @@
+version: 0.1.0
+spec:
+  units:
+    - unit: &unitDirectory
+        name: "directory"
+        regex: "^/|(/[\\w-]+)+$"
+        examples:
+          - "/tmp/xyz"
+
+properties:
+###################################################################################################
+# hbase-site.xml
+###################################################################################################
+
+  - property: &hbaseRootDir
+      propertyNames:
+        - name: "hbase.rootdir"
+          kind:
+            type: "file"
+            file: "hbase-site.xml"
+      datatype:
+        type: "string"
+        unit: *unitDirectory
+      defaultValues:
+        - fromVersion: "0.0.0"
+          value: "${hbase.tmp.dir}/hbase"
+      roles:
+        - name: "master"
+          required: false
+        - name: "regionserver"
+          required: false
+      asOfVersion: "0.0.0"
+      description: "The directory shared by region servers and into which HBase persists. The URL should be 'fully-qualified' to include the filesystem scheme. For example, to specify the HDFS directory '/hbase' where the HDFS instance's namenode is running at namenode.example.org on port 9000, set this value to: hdfs://namenode.example.org:9000/hbase. By default, we write to whatever ${hbase.tmp.dir} is set too -- usually /tmp -- so change this configuration or else all data will be lost on machine restart."
+
+  - property: &hbaseClusterDistributed
+      propertyNames:
+        - name: "hbase.cluster.distributed"
+          kind:
+            type: "file"
+            file: "hbase-site.xml"
+      datatype:
+        type: "bool"
+      defaultValues:
+        - fromVersion: "0.0.0"
+          value: "false"
+      recommendedValues:
+        - fromVersion: "0.0.0"
+          value: "true"
+      roles:
+        - name: "master"
+          required: true
+        - name: "regionserver"
+          required: true
+      asOfVersion: "0.0.0"
+      description: "The mode the cluster will be in. Possible values are false for standalone mode and true for distributed mode. If false, startup will run all HBase and ZooKeeper daemons together in the one JVM."
