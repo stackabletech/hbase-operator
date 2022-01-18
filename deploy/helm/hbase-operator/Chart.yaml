@@ -1,11 +1,9 @@
 ---
 apiVersion: v2
 name: hbase-operator
-version: <version_placeholder>
-appVersion: "<version_placeholder>"
-
+version: 0.2.0-nightly
+appVersion: "0.2.0-nightly"
 home: https://github.com/stackabletech/hbase-operator
-
 maintainers:
   - name: Stackable
     url: https://www.stackable.tech
