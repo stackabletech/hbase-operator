@@ -1,9 +1,10 @@
 mod hbase_controller;
 
+use clap::Parser;
 use futures::StreamExt;
 use stackable_hbase_crd::HbaseCluster;
 use stackable_operator::{
-    cli::Command,
+    cli::{Command, ProductOperatorRun},
     k8s_openapi::api::{apps::v1::StatefulSet, core::v1::Service},
     kube::{
         api::{DynamicObject, ListParams},
@@ -15,16 +16,15 @@ use stackable_operator::{
         CustomResourceExt, Resource,
     },
 };
-use structopt::StructOpt;
 
 mod built_info {
     include!(concat!(env!("OUT_DIR"), "/built.rs"));
 }
 
-#[derive(StructOpt)]
-#[structopt(about = built_info::PKG_DESCRIPTION, author = stackable_operator::cli::AUTHOR)]
+#[derive(clap::Parser)]
+#[clap(about = built_info::PKG_DESCRIPTION, author = stackable_operator::cli::AUTHOR)]
 struct Opts {
-    #[structopt(subcommand)]
+    #[clap(subcommand)]
     cmd: Command,
 }
 
@@ -43,10 +43,10 @@ fn erase_controller_result_type<K: Resource, E: std::error::Error + Send + Sync 
 async fn main() -> anyhow::Result<()> {
     stackable_operator::logging::initialize_logging("HBASE_OPERATOR_LOG");
 
-    let opts = Opts::from_args();
+    let opts = Opts::parse();
     match opts.cmd {
         Command::Crd => println!("{}", serde_yaml::to_string(&HbaseCluster::crd())?,),
-        Command::Run { product_config } => {
+        Command::Run(ProductOperatorRun { product_config }) => {
             stackable_operator::utils::print_startup_string(
                 built_info::PKG_DESCRIPTION,
                 built_info::PKG_VERSION,

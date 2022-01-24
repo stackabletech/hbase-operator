@@ -350,7 +350,7 @@ fn build_rolegroup_service(
             cluster_ip: Some("None".to_string()),
             ports: Some(vec![ServicePort {
                 name: Some(name.to_string()),
-                port: port,
+                port,
                 protocol: Some("TCP".to_string()),
                 ..ServicePort::default()
             }]),
