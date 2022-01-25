@@ -12,13 +12,16 @@ use strum_macros::EnumIter;
 pub const APP_NAME: &str = "hbase";
 pub const MANAGED_BY: &str = "hbase-operator";
 
+pub const HBASE_ENV_SH: &str = "hbase-env.sh";
 pub const HBASE_SITE_XML: &str = "hbase-site.xml";
-pub const CORE_SITE_XML: &str = "core-site.xml";
+pub const HDFS_SITE_XML: &str = "hdfs-site.xml";
 
-pub const FS_DEFAULT_FS: &str = "fs.DefaultFS";
-pub const HBASE_ROOT_DIR: &str = "hbase.rootdir";
-pub const HBASE_ZOOKEEPER_QUORUM: &str = "hbase.zookeeper.quorum";
+pub const HBASE_MANAGES_ZK: &str = "HBASE_MANAGES_ZK";
+
 pub const HBASE_CLUSTER_DISTRIBUTED: &str = "hbase.cluster.distributed";
+pub const HBASE_ROOTDIR: &str = "hbase.rootdir";
+pub const HBASE_ZOOKEEPER_QUORUM: &str = "hbase.zookeeper.quorum";
+pub const HDFS_CONFIG: &str = "content";
 
 #[derive(Clone, CustomResource, Debug, Default, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[kube(
@@ -44,11 +47,11 @@ pub struct HbaseClusterSpec {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub version: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub config: Option<HbaseConfig>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub masters: Option<Role<HbaseConfig>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub region_servers: Option<Role<HbaseConfig>>,
-    pub zookeeper_config_map_name: String,
-    pub hdfs_config_map_name: String,
 }
 
 #[derive(
@@ -63,14 +66,23 @@ pub enum HbaseRole {
     RegionServer,
 }
 
-// TODO Why is Default necessary?
 #[derive(Clone, Debug, Default, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct HbaseConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub hbase_rootdir: Option<String>,
+    pub zookeeper_config_map_name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hdfs_config_map_name: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub hbase_cluster_distributed: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hbase_rootdir: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hbase_zookeeper_quorum: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hbase_manages_zk: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hdfs_config: Option<String>,
 }
 
 impl Configuration for HbaseConfig {
@@ -94,23 +106,53 @@ impl Configuration for HbaseConfig {
 
     fn compute_files(
         &self,
-        _resource: &Self::Configurable,
-        _role_name: &str,
+        resource: &Self::Configurable,
+        role_name: &str,
         file: &str,
     ) -> Result<BTreeMap<String, Option<String>>, ConfigError> {
-        let mut result = BTreeMap::new();
+        let mut result = if role_name.is_empty() {
+            BTreeMap::new()
+        } else if let Some(config) = &resource.spec.config {
+            config.compute_files(resource, "", file)?
+        } else {
+            BTreeMap::new()
+        };
 
-        if file == HBASE_SITE_XML {
-            if let Some(hbase_rootdir) = &self.hbase_rootdir {
-                result.insert(HBASE_ROOT_DIR.to_string(), Some(hbase_rootdir.to_owned()));
+        match file {
+            HBASE_ENV_SH => {
+                if let Some(hbase_manages_zk) = self.hbase_manages_zk {
+                    result.insert(
+                        HBASE_MANAGES_ZK.to_string(),
+                        Some(hbase_manages_zk.to_string()),
+                    );
+                }
             }
-            if let Some(hbase_cluster_distributed) = &self.hbase_cluster_distributed {
-                result.insert(
-                    HBASE_CLUSTER_DISTRIBUTED.to_string(),
-                    Some(hbase_cluster_distributed.to_string()),
-                );
+            HBASE_SITE_XML => {
+                if let Some(hbase_cluster_distributed) = self.hbase_cluster_distributed {
+                    result.insert(
+                        HBASE_CLUSTER_DISTRIBUTED.to_string(),
+                        Some(hbase_cluster_distributed.to_string()),
+                    );
+                }
+                if let Some(hbase_rootdir) = &self.hbase_rootdir {
+                    result.insert(HBASE_ROOTDIR.to_string(), Some(hbase_rootdir.to_owned()));
+                }
+                if let Some(hbase_zookeeper_quorum) = &self.hbase_zookeeper_quorum {
+                    result.insert(
+                        HBASE_ZOOKEEPER_QUORUM.to_string(),
+                        Some(hbase_zookeeper_quorum.to_owned()),
+                    );
+                }
             }
+            HDFS_SITE_XML => {
+                if let Some(hdfs_config) = &self.hdfs_config {
+                    result.insert(HDFS_CONFIG.to_string(), Some(hdfs_config.to_owned()));
+                }
+            }
+            _ => {}
         }
+
+        result.retain(|_, maybe_value| maybe_value.is_some());
 
         Ok(result)
     }

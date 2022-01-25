@@ -22,8 +22,31 @@ spec:
           properties:
             spec:
               properties:
-                hdfsConfigMapName:
-                  type: string
+                config:
+                  nullable: true
+                  properties:
+                    hbaseClusterDistributed:
+                      nullable: true
+                      type: boolean
+                    hbaseManagesZk:
+                      nullable: true
+                      type: boolean
+                    hbaseRootdir:
+                      nullable: true
+                      type: string
+                    hbaseZookeeperQuorum:
+                      nullable: true
+                      type: string
+                    hdfsConfig:
+                      nullable: true
+                      type: string
+                    hdfsConfigMapName:
+                      nullable: true
+                      type: string
+                    zookeeperConfigMapName:
+                      nullable: true
+                      type: string
+                  type: object
                 masters:
                   nullable: true
                   properties:
@@ -38,7 +61,22 @@ spec:
                         hbaseClusterDistributed:
                           nullable: true
                           type: boolean
+                        hbaseManagesZk:
+                          nullable: true
+                          type: boolean
                         hbaseRootdir:
+                          nullable: true
+                          type: string
+                        hbaseZookeeperQuorum:
+                          nullable: true
+                          type: string
+                        hdfsConfig:
+                          nullable: true
+                          type: string
+                        hdfsConfigMapName:
+                          nullable: true
+                          type: string
+                        zookeeperConfigMapName:
                           nullable: true
                           type: string
                       type: object
@@ -68,7 +106,22 @@ spec:
                               hbaseClusterDistributed:
                                 nullable: true
                                 type: boolean
+                              hbaseManagesZk:
+                                nullable: true
+                                type: boolean
                               hbaseRootdir:
+                                nullable: true
+                                type: string
+                              hbaseZookeeperQuorum:
+                                nullable: true
+                                type: string
+                              hdfsConfig:
+                                nullable: true
+                                type: string
+                              hdfsConfigMapName:
+                                nullable: true
+                                type: string
+                              zookeeperConfigMapName:
                                 nullable: true
                                 type: string
                             type: object
@@ -139,7 +192,22 @@ spec:
                         hbaseClusterDistributed:
                           nullable: true
                           type: boolean
+                        hbaseManagesZk:
+                          nullable: true
+                          type: boolean
                         hbaseRootdir:
+                          nullable: true
+                          type: string
+                        hbaseZookeeperQuorum:
+                          nullable: true
+                          type: string
+                        hdfsConfig:
+                          nullable: true
+                          type: string
+                        hdfsConfigMapName:
+                          nullable: true
+                          type: string
+                        zookeeperConfigMapName:
                           nullable: true
                           type: string
                       type: object
@@ -169,7 +237,22 @@ spec:
                               hbaseClusterDistributed:
                                 nullable: true
                                 type: boolean
+                              hbaseManagesZk:
+                                nullable: true
+                                type: boolean
                               hbaseRootdir:
+                                nullable: true
+                                type: string
+                              hbaseZookeeperQuorum:
+                                nullable: true
+                                type: string
+                              hdfsConfig:
+                                nullable: true
+                                type: string
+                              hdfsConfigMapName:
+                                nullable: true
+                                type: string
+                              zookeeperConfigMapName:
                                 nullable: true
                                 type: string
                             type: object
@@ -234,11 +317,6 @@ spec:
                   description: Desired HBase version
                   nullable: true
                   type: string
-                zookeeperConfigMapName:
-                  type: string
-              required:
-                - hdfsConfigMapName
-                - zookeeperConfigMapName
               type: object
             status:
               nullable: true

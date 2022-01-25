@@ -7,8 +7,7 @@ use std::{
 
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_hbase_crd::{
-    HbaseCluster, HbaseRole, APP_NAME, CORE_SITE_XML, FS_DEFAULT_FS, HBASE_SITE_XML,
-    HBASE_ZOOKEEPER_QUORUM,
+    HbaseCluster, HbaseConfig, HbaseRole, APP_NAME, HBASE_ENV_SH, HBASE_SITE_XML, HDFS_SITE_XML,
 };
 use stackable_operator::{
     builder::{ConfigMapBuilder, ContainerBuilder, ObjectMetaBuilder, PodBuilder},
@@ -102,41 +101,19 @@ pub async fn reconcile_hbase(hbase: HbaseCluster, ctx: Context<Ctx>) -> Result<R
 
     let client = &ctx.get_ref().client;
 
-    let mut masters_role = hbase.spec.masters.clone().context(NoMasterRoleSnafu)?;
-    let mut region_servers_role = hbase
-        .spec
-        .region_servers
-        .clone()
-        .context(NoRegionServerRoleSnafu)?;
-
-    // TODO Make config map optional
-    let hdfs_url = get_value_from_config_map(
-        client,
-        &hbase.spec.hdfs_config_map_name,
-        hbase.metadata.namespace.as_deref(),
-        "HDFS",
-    )
-    .await
-    .context(NoHdfsUrlsSnafu)?;
-    masters_role
-        .config
-        .config
-        .hbase_rootdir
-        .get_or_insert(hdfs_url.to_owned());
-    region_servers_role
-        .config
-        .config
-        .hbase_rootdir
-        .get_or_insert(hdfs_url.to_owned());
-
-    let zookeeper_url = get_value_from_config_map(
-        client,
-        &hbase.spec.zookeeper_config_map_name,
-        hbase.metadata.namespace.as_deref(),
-        "ZOOKEEPER",
-    )
-    .await
-    .context(NoZookeeperUrlsSnafu)?;
+    let namespace = hbase.metadata.namespace.as_deref().unwrap_or("default");
+    let mut hbase = hbase.clone();
+    if let Some(config) = &mut hbase.spec.config {
+        apply_zookeeper_configmap(client, namespace, config).await?;
+        apply_hdfs_configmap(client, namespace, config).await?;
+    }
+    for role in [&mut hbase.spec.masters, &mut hbase.spec.region_servers]
+        .into_iter()
+        .flatten()
+    {
+        apply_zookeeper_configmap(client, namespace, &mut role.config.config).await?;
+        apply_hdfs_configmap(client, namespace, &mut role.config.config).await?;
+    }
 
     let role_config = transform_all_roles_to_config(
         &hbase,
@@ -144,15 +121,27 @@ pub async fn reconcile_hbase(hbase: HbaseCluster, ctx: Context<Ctx>) -> Result<R
             (
                 HbaseRole::Master.to_string(),
                 (
-                    vec![PropertyNameKind::File(HBASE_SITE_XML.to_string())],
-                    masters_role,
+                    vec![
+                        PropertyNameKind::File(HBASE_ENV_SH.to_string()),
+                        PropertyNameKind::File(HBASE_SITE_XML.to_string()),
+                        PropertyNameKind::File(HDFS_SITE_XML.to_string()),
+                    ],
+                    hbase.spec.masters.clone().context(NoMasterRoleSnafu)?,
                 ),
             ),
             (
                 HbaseRole::RegionServer.to_string(),
                 (
-                    vec![PropertyNameKind::File(HBASE_SITE_XML.to_string())],
-                    region_servers_role,
+                    vec![
+                        PropertyNameKind::File(HBASE_ENV_SH.to_string()),
+                        PropertyNameKind::File(HBASE_SITE_XML.to_string()),
+                        PropertyNameKind::File(HDFS_SITE_XML.to_string()),
+                    ],
+                    hbase
+                        .spec
+                        .region_servers
+                        .clone()
+                        .context(NoRegionServerRoleSnafu)?,
                 ),
             ),
         ]
@@ -183,8 +172,7 @@ pub async fn reconcile_hbase(hbase: HbaseCluster, ctx: Context<Ctx>) -> Result<R
         for (rolegroup_name, rolegroup_config) in group_config.iter() {
             let rolegroup = hbase.server_rolegroup_ref(role_name, rolegroup_name);
             let rg_service = build_rolegroup_service(&hbase, &rolegroup, rolegroup_config)?;
-            let rg_configmap =
-                build_rolegroup_config_map(&hbase, &rolegroup, rolegroup_config, &zookeeper_url)?;
+            let rg_configmap = build_rolegroup_config_map(&hbase, &rolegroup, rolegroup_config)?;
             let rg_statefulset = build_rolegroup_statefulset(&hbase, &rolegroup, rolegroup_config)?;
             client
                 .apply_patch(FIELD_MANAGER_SCOPE, &rg_service, &rg_service)
@@ -212,14 +200,42 @@ pub async fn reconcile_hbase(hbase: HbaseCluster, ctx: Context<Ctx>) -> Result<R
     })
 }
 
+async fn apply_zookeeper_configmap(
+    client: &Client,
+    namespace: &str,
+    config: &mut HbaseConfig,
+) -> Result<()> {
+    if let Some(config_map_name) = &config.zookeeper_config_map_name {
+        let value = get_value_from_config_map(client, config_map_name, namespace, "ZOOKEEPER")
+            .await
+            .context(NoZookeeperUrlsSnafu)?;
+        config.hbase_zookeeper_quorum = Some(value);
+    }
+    Ok(())
+}
+
+async fn apply_hdfs_configmap(
+    client: &Client,
+    namespace: &str,
+    config: &mut HbaseConfig,
+) -> Result<()> {
+    if let Some(config_map_name) = &config.hdfs_config_map_name {
+        let value = get_value_from_config_map(client, config_map_name, namespace, "hdfs-site.xml")
+            .await
+            .context(NoZookeeperUrlsSnafu)?;
+        config.hdfs_config = Some(value);
+    }
+    Ok(())
+}
+
 async fn get_value_from_config_map(
     client: &Client,
     config_map_name: &str,
-    namespace: Option<&str>,
+    namespace: &str,
     key: &'static str,
 ) -> Result<String, stackable_operator::error::Error> {
     let config_map = client
-        .get::<ConfigMap>(config_map_name, Some(namespace.unwrap_or("default")))
+        .get::<ConfigMap>(config_map_name, Some(namespace))
         .await?;
     config_map
         .data
@@ -263,20 +279,20 @@ fn build_rolegroup_config_map(
     hbase: &HbaseCluster,
     rolegroup: &RoleGroupRef<HbaseCluster>,
     rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
-    zookeeper_urls: &str,
 ) -> Result<ConfigMap, Error> {
     let hbase_site_config = rolegroup_config
         .get(&PropertyNameKind::File(HBASE_SITE_XML.to_string()))
         .cloned()
         .unwrap_or_default();
-    let mut hbase_site_config = hbase_site_config
+    let hbase_site_config = hbase_site_config
         .into_iter()
         .map(|(k, v)| (k, Some(v)))
         .collect::<BTreeMap<_, _>>();
-    hbase_site_config.insert(
-        HBASE_ZOOKEEPER_QUORUM.to_string(),
-        Some(zookeeper_urls.to_string()),
-    );
+
+    let hbase_env_config = rolegroup_config
+        .get(&PropertyNameKind::File(HBASE_ENV_SH.to_string()))
+        .cloned()
+        .unwrap_or_default();
 
     ConfigMapBuilder::new()
         .metadata(
@@ -294,29 +310,32 @@ fn build_rolegroup_config_map(
                 )
                 .build(),
         )
-        .add_data("hbase-env.sh", "export HBASE_MANAGES_ZK=false\n")
-        .add_data(
-            CORE_SITE_XML,
-            writer::to_hadoop_xml(
-                [
-                    // TODO Set HDFS connection string
-                    (
-                        &FS_DEFAULT_FS.to_string(),
-                        &Some("hdfs://server1:9000".to_string()),
-                    ),
-                ]
-                .into_iter(),
-            ),
-        )
         .add_data(
             HBASE_SITE_XML,
             writer::to_hadoop_xml(hbase_site_config.iter()),
+        )
+        .add_data(HBASE_ENV_SH, write_hbase_env_sh(hbase_env_config.iter()))
+        .add_data(
+            HDFS_SITE_XML,
+            rolegroup_config
+                .get(&PropertyNameKind::File(HDFS_SITE_XML.to_string()))
+                .and_then(|m| m.get("content").cloned())
+                .unwrap_or_default(),
         )
         .build()
         .map_err(|e| Error::BuildRoleGroupConfig {
             source: e,
             rolegroup: rolegroup.clone(),
         })
+}
+
+fn write_hbase_env_sh<'a, T>(properties: T) -> String
+where
+    T: Iterator<Item = (&'a String, &'a String)>,
+{
+    properties
+        .map(|(variable, value)| format!("export {variable}={value}\n"))
+        .collect()
 }
 
 /// The rolegroup [`Service`] is a headless service that allows direct access to the instances of a certain rolegroup

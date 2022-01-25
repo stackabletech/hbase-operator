@@ -4,8 +4,12 @@ metadata:
   name: simple
 spec:
   version: 2.4.6
-  hdfsConfigMapName: simple-hbase-hdfs
-  zookeeperConfigMapName: simple-znode
+  config:
+    hdfsConfigMapName: simple-namenode-default
+    zookeeperConfigMapName: simple-znode
+    hbaseManagesZk: false
+    hbaseClusterDistributed: true
+    hbaseRootdir: hdfs://simple/hbase
   masters:
     roleGroups:
       default:
@@ -13,8 +17,6 @@ spec:
           matchLabels:
             kubernetes.io/os: linux
         replicas: 1
-        config:
-          hbaseClusterDistributed: true
   regionServers:
     roleGroups:
       default:
@@ -22,12 +24,3 @@ spec:
           matchLabels:
             kubernetes.io/os: linux
         replicas: 1
-        config:
-          hbaseClusterDistributed: true
----
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: simple-hbase-hdfs
-data:
-  HDFS: hdfs://simple-namenode-default:8020/hbase
