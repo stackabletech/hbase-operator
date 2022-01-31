@@ -32,6 +32,7 @@ const CONFIG_DIR_NAME: &str = "/stackable/conf";
 
 const HBASE_MASTER_PORT: i32 = 60000;
 const HBASE_REGIONSERVER_PORT: i32 = 60020;
+const HBASE_REST_PORT: i32 = 8080;
 
 pub struct Ctx {
     pub client: stackable_operator::client::Client,
@@ -115,39 +116,45 @@ pub async fn reconcile_hbase(hbase: HbaseCluster, ctx: Context<Ctx>) -> Result<R
         apply_hdfs_configmap(client, namespace, &mut role.config.config).await?;
     }
 
-    let role_config = transform_all_roles_to_config(
-        &hbase,
-        [
+    let config_types = vec![
+        PropertyNameKind::File(HBASE_ENV_SH.to_string()),
+        PropertyNameKind::File(HBASE_SITE_XML.to_string()),
+        PropertyNameKind::File(HDFS_SITE_XML.to_string()),
+    ];
+
+    let mut roles: HashMap<String, _> = [
+        (
+            HbaseRole::Master.to_string(),
             (
-                HbaseRole::Master.to_string(),
-                (
-                    vec![
-                        PropertyNameKind::File(HBASE_ENV_SH.to_string()),
-                        PropertyNameKind::File(HBASE_SITE_XML.to_string()),
-                        PropertyNameKind::File(HDFS_SITE_XML.to_string()),
-                    ],
-                    hbase.spec.masters.clone().context(NoMasterRoleSnafu)?,
-                ),
+                config_types.to_owned(),
+                hbase
+                    .get_role(HbaseRole::Master)
+                    .cloned()
+                    .context(NoMasterRoleSnafu)?,
             ),
+        ),
+        (
+            HbaseRole::RegionServer.to_string(),
             (
-                HbaseRole::RegionServer.to_string(),
-                (
-                    vec![
-                        PropertyNameKind::File(HBASE_ENV_SH.to_string()),
-                        PropertyNameKind::File(HBASE_SITE_XML.to_string()),
-                        PropertyNameKind::File(HDFS_SITE_XML.to_string()),
-                    ],
-                    hbase
-                        .spec
-                        .region_servers
-                        .clone()
-                        .context(NoRegionServerRoleSnafu)?,
-                ),
+                config_types.to_owned(),
+                hbase
+                    .get_role(HbaseRole::RegionServer)
+                    .cloned()
+                    .context(NoRegionServerRoleSnafu)?,
             ),
-        ]
-        .into(),
-    )
-    .context(GenerateProductConfigSnafu)?;
+        ),
+    ]
+    .into();
+
+    if let Some(rest_servers) = hbase.get_role(HbaseRole::RestServer) {
+        roles.insert(
+            HbaseRole::RestServer.to_string(),
+            (config_types.to_owned(), rest_servers.to_owned()),
+        );
+    }
+
+    let role_config =
+        transform_all_roles_to_config(&hbase, roles).context(GenerateProductConfigSnafu)?;
 
     let validated_config = validate_all_roles_and_groups_config(
         hbase_version(&hbase)?,
@@ -158,6 +165,7 @@ pub async fn reconcile_hbase(hbase: HbaseCluster, ctx: Context<Ctx>) -> Result<R
     )
     .context(InvalidProductConfigSnafu)?;
 
+    // TODO Really master?
     let master_role_service = build_master_role_service(&hbase)?;
     client
         .apply_patch(
@@ -349,6 +357,7 @@ fn build_rolegroup_service(
     let (name, port) = match serde_yaml::from_str(&rolegroup.role).unwrap() {
         HbaseRole::Master => ("master", HBASE_MASTER_PORT),
         HbaseRole::RegionServer => ("regionserver", HBASE_REGIONSERVER_PORT),
+        HbaseRole::RestServer => ("rest", HBASE_REST_PORT),
     };
 
     Ok(Service {
@@ -401,13 +410,20 @@ fn build_rolegroup_statefulset(
         hbase_version
     );
 
+    let role = serde_yaml::from_str(&rolegroup_ref.role).unwrap();
+    let command = vec![
+        "bin/hbase".into(),
+        match role {
+            HbaseRole::Master => "master".into(),
+            HbaseRole::RegionServer => "regionserver".into(),
+            HbaseRole::RestServer => "rest".into(),
+        },
+        "start".into(),
+    ];
+
     let container = ContainerBuilder::new("hbase")
         .image(image)
-        .command(vec![
-            "bin/hbase".into(),
-            rolegroup_ref.role.to_owned(),
-            "start".into(),
-        ])
+        .command(command)
         .add_env_var("HBASE_CONF_DIR", CONFIG_DIR_NAME)
         .add_volume_mount("config", CONFIG_DIR_NAME)
         // .add_container_port("http", APP_PORT.into())
@@ -483,32 +499,20 @@ fn rolegroup_replicas(
     hbase: &HbaseCluster,
     rolegroup_ref: &RoleGroupRef<HbaseCluster>,
 ) -> Result<i32, Error> {
-    let replicas = match serde_yaml::from_str(&rolegroup_ref.role).unwrap() {
-        HbaseRole::Master => hbase
-            .spec
-            .masters
-            .as_ref()
-            .context(NoMasterRoleSnafu)?
-            .role_groups
-            .get(&rolegroup_ref.role_group)
-            .and_then(|rg| rg.replicas)
-            .map(i32::from)
-            .unwrap_or(0),
-        HbaseRole::RegionServer => hbase
-            .spec
-            .masters
-            .as_ref()
-            .context(NoRegionServerRoleSnafu)?
-            .role_groups
-            .get(&rolegroup_ref.role_group)
-            .and_then(|rg| rg.replicas)
-            .map(i32::from)
-            .unwrap_or(0),
-    };
-
     if hbase.spec.stopped.unwrap_or(false) {
         Ok(0)
     } else {
+        let role = serde_yaml::from_str(&rolegroup_ref.role).unwrap();
+
+        let replicas = hbase
+            .get_role(role)
+            .as_ref()
+            .map(|role| &role.role_groups)
+            .and_then(|role_group| role_group.get(&rolegroup_ref.role_group))
+            .and_then(|rg| rg.replicas)
+            .map(i32::from)
+            .unwrap_or(0);
+
         Ok(replicas)
     }
 }

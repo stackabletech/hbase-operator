@@ -52,6 +52,18 @@ pub struct HbaseClusterSpec {
     pub masters: Option<Role<HbaseConfig>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub region_servers: Option<Role<HbaseConfig>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rest_servers: Option<Role<HbaseConfig>>,
+}
+
+impl HbaseCluster {
+    pub fn get_role(&self, role: HbaseRole) -> Option<&Role<HbaseConfig>> {
+        match role {
+            HbaseRole::Master => self.spec.masters.as_ref(),
+            HbaseRole::RegionServer => self.spec.region_servers.as_ref(),
+            HbaseRole::RestServer => self.spec.rest_servers.as_ref(),
+        }
+    }
 }
 
 #[derive(
@@ -64,6 +76,9 @@ pub enum HbaseRole {
     #[serde(rename = "regionserver")]
     #[strum(serialize = "regionserver")]
     RegionServer,
+    #[serde(rename = "restserver")]
+    #[strum(serialize = "restserver")]
+    RestServer,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]

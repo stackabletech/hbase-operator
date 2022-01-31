@@ -1,12 +1,10 @@
 ---
 apiVersion: v2
-name: 0.2.0-nightly
+name: hbase-operator
 version: 0.2.0-nightly
-appVersion: "<version_placeholder>"
+appVersion: "0.2.0-nightly"
 description: The Stackable Operator for Apache HBase
-
 home: https://github.com/stackabletech/hbase-operator
-
 maintainers:
   - name: Stackable
     url: https://www.stackable.tech

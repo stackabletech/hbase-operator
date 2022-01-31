@@ -66,6 +66,7 @@ async fn main() -> anyhow::Result<()> {
                 Controller::new(client.get_all_api::<HbaseCluster>(), ListParams::default())
                     .owns(client.get_all_api::<Service>(), ListParams::default())
                     .owns(client.get_all_api::<StatefulSet>(), ListParams::default())
+                    .shutdown_on_signal()
                     .run(
                         hbase_controller::reconcile_hbase,
                         hbase_controller::error_policy,
