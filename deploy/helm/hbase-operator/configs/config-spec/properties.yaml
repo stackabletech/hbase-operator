@@ -1,0 +1,151 @@
+version: 0.1.0
+spec:
+  units:
+    - unit: &unitDirectory
+        name: "directory"
+        regex: "^/|(/[\\w-]+)+$"
+        examples:
+          - "/tmp/xyz"
+
+properties:
+###################################################################################################
+# hbase-site.xml
+###################################################################################################
+
+  - property: &hbaseRootDir
+      propertyNames:
+        - name: "hbase.rootdir"
+          kind:
+            type: "file"
+            file: "hbase-site.xml"
+      datatype:
+        type: "string"
+        unit: *unitDirectory
+      defaultValues:
+        - fromVersion: "0.0.0"
+          value: "${hbase.tmp.dir}/hbase"
+      roles:
+        - name: "master"
+          required: false
+        - name: "regionserver"
+          required: false
+      asOfVersion: "0.0.0"
+      description: "The directory shared by region servers and into which HBase persists. The URL should be 'fully-qualified' to include the filesystem scheme. For example, to specify the HDFS directory '/hbase' where the HDFS instance's namenode is running at namenode.example.org on port 9000, set this value to: hdfs://namenode.example.org:9000/hbase. By default, we write to whatever ${hbase.tmp.dir} is set too -- usually /tmp -- so change this configuration or else all data will be lost on machine restart."
+
+  - property: &hbaseClusterDistributed
+      propertyNames:
+        - name: "hbase.cluster.distributed"
+          kind:
+            type: "file"
+            file: "hbase-site.xml"
+      datatype:
+        type: "bool"
+      defaultValues:
+        - fromVersion: "0.0.0"
+          value: "false"
+      recommendedValues:
+        - fromVersion: "0.0.0"
+          value: "true"
+      roles:
+        - name: "master"
+          required: true
+        - name: "regionserver"
+          required: true
+      asOfVersion: "0.0.0"
+      description: "The mode the cluster will be in. Possible values are false for standalone mode and true for distributed mode. If false, startup will run all HBase and ZooKeeper daemons together in the one JVM."
+
+  - property: &hbaseMasterPort
+      propertyNames:
+        - name: "hbase.master.port"
+          kind:
+            type: "file"
+            file: "hbase-site.xml"
+      datatype:
+        type: "integer"
+        min: "1024"
+        max: "65535"
+      defaultValues:
+        - fromVersion: "0.0.0"
+          value: "16000"
+      roles:
+        - name: "master"
+          required: true
+      asOfVersion: "0.0.0"
+      description: "The port the HBase Master should bind to."
+
+  - property: &hbaseMasterInfoPort
+      propertyNames:
+        - name: "hbase.master.info.port"
+          kind:
+            type: "file"
+            file: "hbase-site.xml"
+      datatype:
+        type: "integer"
+        min: "-1"
+        max: "65535"
+      defaultValues:
+        - fromVersion: "0.0.0"
+          value: "16010"
+      roles:
+        - name: "master"
+          required: true
+      asOfVersion: "0.0.0"
+      description: "Set to -1 if you do not want a UI instance run."
+
+  - property: &hbaseRegionserverPort
+      propertyNames:
+        - name: "hbase.regionserver.port"
+          kind:
+            type: "file"
+            file: "hbase-site.xml"
+      datatype:
+        type: "integer"
+        min: "1024"
+        max: "65535"
+      defaultValues:
+        - fromVersion: "0.0.0"
+          value: "16020"
+      roles:
+        - name: "regionserver"
+          required: true
+      asOfVersion: "0.0.0"
+      description: "The port the HBase RegionServer binds to."
+
+  - property: &hbaseRegionserverInfoPort
+      propertyNames:
+        - name: "hbase.regionserver.info.port"
+          kind:
+            type: "file"
+            file: "hbase-site.xml"
+      datatype:
+        type: "integer"
+        min: "-1"
+        max: "65535"
+      defaultValues:
+        - fromVersion: "0.0.0"
+          value: "16030"
+      roles:
+        - name: "regionserver"
+          required: true
+      asOfVersion: "0.0.0"
+      description: "The port for the HBase RegionServer web UI. Set to -1 if you do not want the RegionServer UI to run."
+
+  ###################################################################################################
+  # env vars
+  ###################################################################################################
+  - property: &metricsPort
+      propertyNames:
+        - name: "metricsPort"
+          kind:
+            type: "env"
+      datatype:
+        type: "integer"
+        min: "1024"
+        max: "65535"
+      roles:
+        - name: "master"
+          required: false
+        - name: "regionserver"
+          required: false
+      asOfVersion: "0.0.0"
+      description: "The port where hbase metrics are exposed as a Prometheus endpoint."
