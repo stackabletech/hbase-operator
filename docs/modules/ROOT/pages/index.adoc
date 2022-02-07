@@ -6,9 +6,11 @@ WARNING: This operator only works with images from the https://repo.stackable.te
 
 == Supported Versions
 
-The Stackable Operator for Apache HDFS currently supports the following versions of HDFS:
+The Stackable Operator for Apache HBase currently supports the following versions of HBase:
 
 include::partial$supported-versions.adoc[]
+
+== Docker
 
 [source]
 ----
