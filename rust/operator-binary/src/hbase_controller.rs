@@ -2,6 +2,7 @@
 
 use std::{
     collections::{BTreeMap, HashMap},
+    sync::Arc,
     time::Duration,
 };
 
@@ -97,13 +98,16 @@ pub enum Error {
 }
 type Result<T, E = Error> = std::result::Result<T, E>;
 
-pub async fn reconcile_hbase(hbase: HbaseCluster, ctx: Context<Ctx>) -> Result<ReconcilerAction> {
+pub async fn reconcile_hbase(
+    hbase: Arc<HbaseCluster>,
+    ctx: Context<Ctx>,
+) -> Result<ReconcilerAction> {
     tracing::info!("Starting reconcile");
 
     let client = &ctx.get_ref().client;
 
     let namespace = hbase.metadata.namespace.as_deref().unwrap_or("default");
-    let mut hbase = hbase.clone();
+    let mut hbase = hbase.as_ref().clone();
     if let Some(config) = &mut hbase.spec.config {
         apply_zookeeper_configmap(client, namespace, config).await?;
         apply_hdfs_configmap(client, namespace, config).await?;
