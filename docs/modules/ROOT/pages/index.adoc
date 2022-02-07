@@ -4,6 +4,12 @@ This is an operator for Kubernetes that can manage https://https://hbase.apache.
 
 WARNING: This operator only works with images from the https://repo.stackable.tech/#browse/browse:docker:v2%2Fstackable%2Fhbase[Stackable] repository
 
+== Supported Versions
+
+The Stackable Operator for Apache HDFS currently supports the following versions of HDFS:
+
+include::partial$supported-versions.adoc[]
+
 [source]
 ----
 docker pull docker.stackable.tech/stackable/hbase:<version>
