@@ -258,10 +258,12 @@ async fn get_value_from_config_map(
 /// The server-role service is the primary endpoint that should be used by clients that do not perform internal load balancing,
 /// including targets outside of the cluster.
 pub fn build_region_server_role_service(hbase: &HbaseCluster) -> Result<Service> {
-    let role_name = HbaseRole::RegionServer.to_string();
+    let role = HbaseRole::RegionServer;
+    let role_name = role.to_string();
     let role_svc_name = hbase
         .server_role_service_name()
         .context(GlobalServiceNameNotFoundSnafu)?;
+    let (port_name, port_number, port_protocol) = port_properties(role);
     Ok(Service {
         metadata: ObjectMetaBuilder::new()
             .name_and_namespace(hbase)
@@ -272,9 +274,9 @@ pub fn build_region_server_role_service(hbase: &HbaseCluster) -> Result<Service>
             .build(),
         spec: Some(ServiceSpec {
             ports: Some(vec![ServicePort {
-                name: Some("regionserver".to_string()),
-                port: HBASE_REGIONSERVER_PORT,
-                protocol: Some("TCP".to_string()),
+                name: Some(port_name.into()),
+                port: port_number,
+                protocol: Some(port_protocol.into()),
                 ..ServicePort::default()
             }]),
             selector: Some(role_selector_labels(hbase, APP_NAME, &role_name)),
@@ -424,12 +426,14 @@ fn build_rolegroup_statefulset(
         "start".into(),
     ];
 
+    let (port_name, port_number, _) = port_properties(role);
+
     let container = ContainerBuilder::new("hbase")
         .image(image)
         .command(command)
         .add_env_var("HBASE_CONF_DIR", CONFIG_DIR_NAME)
         .add_volume_mount("config", CONFIG_DIR_NAME)
-        // .add_container_port("http", APP_PORT.into())
+        .add_container_port(port_name, port_number)
         .build();
     Ok(StatefulSet {
         metadata: ObjectMetaBuilder::new()
@@ -490,6 +494,15 @@ pub fn hbase_version(hbase: &HbaseCluster) -> Result<&str> {
         .version
         .as_deref()
         .context(ObjectHasNoVersionSnafu)
+}
+
+/// Returns a port name, the port number, and the protocol for the given role.
+fn port_properties(role: HbaseRole) -> (&'static str, i32, &'static str) {
+    match role {
+        HbaseRole::Master => ("master", HBASE_MASTER_PORT, "TCP"),
+        HbaseRole::RegionServer => ("regionserver", HBASE_REGIONSERVER_PORT, "TCP"),
+        HbaseRole::RestServer => ("rest", HBASE_REST_PORT, "TCP"),
+    }
 }
 
 pub fn error_policy(_error: &Error, _ctx: Context<Ctx>) -> ReconcilerAction {
