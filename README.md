@@ -4,4 +4,6 @@
 
 This is a Kubernetes Operator to manage Apache HBase ensembles.
 
-The docs can be found in the `docs` subdirectory, and they are published together with docs for all other Stackable products at https://docs.stackable.tech.
+The docs can be found in the `docs` subdirectory, and they are published
+together with docs for all other Stackable products at
+<https://docs.stackable.tech>.

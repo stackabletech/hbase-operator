@@ -3,15 +3,16 @@
 apiVersion: v1
 data:
   properties.yaml: |
+    ---
     version: 0.1.0
     spec:
       units: []
   
     properties:
   
-    ###################################################################################################
-    # hbase-env.sh
-    ###################################################################################################
+      #################################################################################################
+      # hbase-env.sh
+      #################################################################################################
   
       - property: &hbaseManagesZk
           propertyNames:
@@ -37,9 +38,9 @@ data:
           asOfVersion: "0.0.0"
           description: "This variable tells HBase whether to start/stop the ZooKeeper ensemble servers as part of HBase start/stop."
   
-    ###################################################################################################
-    # hbase-site.xml
-    ###################################################################################################
+      #################################################################################################
+      # hbase-site.xml
+      #################################################################################################
   
       - property: &hbaseClusterDistributed
           propertyNames:
@@ -107,9 +108,9 @@ data:
           asOfVersion: "0.0.0"
           description: "Comma separated list of servers in the ZooKeeper ensemble (This config. should have been named hbase.zookeeper.ensemble). For example, \"host1.mydomain.com,host2.mydomain.com,host3.mydomain.com\". By default this is set to localhost for local and pseudo-distributed modes of operation. For a fully-distributed setup, this should be set to a full list of ZooKeeper ensemble servers. If HBASE_MANAGES_ZK is set in hbase-env.sh this is the list of servers which hbase will start/stop ZooKeeper on as part of cluster start/stop. Client-side, we will take this list of ensemble members and put it together with the hbase.zookeeper.property.clientPort config. and pass it into zookeeper constructor as the connectString parameter."
   
-    ###################################################################################################
-    # hdfs-site.xml
-    ###################################################################################################
+      #################################################################################################
+      # hdfs-site.xml
+      #################################################################################################
   
       - property: &hdfsConfig
           propertyNames:
