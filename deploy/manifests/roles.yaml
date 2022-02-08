@@ -5,7 +5,6 @@ kind: ClusterRole
 metadata:
   name: hbase-operator-clusterrole
 rules:
-  # For Apache ZooKeeper dependents
   - apiGroups:
       - zookeeper.stackable.tech
     resources:
@@ -14,7 +13,6 @@ rules:
       - get
       - list
       - watch
-  # For Apache HDFS dependents
   - apiGroups:
       - hdfs.stackable.tech
     resources:
@@ -70,40 +68,11 @@ rules:
       - update
       - watch
   - apiGroups:
-      - batch
-    resources:
-      - jobs
-    verbs:
-      - create
-      - get
-      - list
-      - patch
-      - update
-      - watch
-  - apiGroups:
       - apiextensions.k8s.io
     resources:
       - customresourcedefinitions
     verbs:
       - get
-  - apiGroups:
-      - command.hbase.stackable.tech
-    resources:
-      - inits
-      - restarts
-      - starts
-      - stops
-    verbs:
-      - get
-      - list
-      - patch
-      - watch
-  - apiGroups:
-      - command.hbase.stackable.tech
-    resources:
-      - inits/status
-    verbs:
-      - patch
   - apiGroups:
       - hbase.stackable.tech
     resources:
