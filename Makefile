@@ -34,21 +34,19 @@ compile-chart: version crds config
 chart-clean:
 	rm -rf deploy/helm/hbase-operator/configs
 	rm -rf deploy/helm/hbase-operator/crds
-	rm -rf deploy/helm/hbase-operator/templates/crds.yaml
 
 version:
 	yq eval -i '.version = ${VERSION} | .appVersion = ${VERSION}' deploy/helm/hbase-operator/Chart.yaml
 
-config: deploy/helm/hbase-operator/configs
+config:
+	if [ -d "deploy/config-spec/" ]; then\
+		mkdir -p deploy/helm/hbase-operator/configs;\
+		cp -r deploy/config-spec/* deploy/helm/hbase-operator/configs;\
+	fi
 
-deploy/helm/hbase-operator/configs:
-	cp -r deploy/config-spec deploy/helm/hbase-operator/configs
-
-crds: deploy/helm/hbase-operator/crds/crds.yaml
-
-deploy/helm/hbase-operator/crds/crds.yaml:
+crds:
 	mkdir -p deploy/helm/hbase-operator/crds
-	cat deploy/crd/*.yaml | yq eval '.metadata.annotations["helm.sh/resource-policy"]="keep"' - > ${@}
+	cat deploy/crd/*.yaml | yq eval '.metadata.annotations["helm.sh/resource-policy"]="keep"' - > deploy/helm/hbase-operator/crds/crds.yaml
 
 chart-lint: compile-chart
 	docker run -it -v $(shell pwd):/build/helm-charts -w /build/helm-charts quay.io/helmpack/chart-testing:v3.5.0  ct lint --config deploy/helm/ct.yaml
@@ -60,3 +58,11 @@ clean-manifests:
 
 generate-manifests: clean-manifests compile-chart
 	./scripts/generate-manifests.sh
+
+clean-crds:
+	rm -rf deploy/crd/*
+
+generate-crds:
+	cargo build
+
+regenerate-charts: clean-crds chart-clean clean-manifests generate-crds compile-chart generate-manifests

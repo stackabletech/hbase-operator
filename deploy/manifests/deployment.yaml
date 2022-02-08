@@ -1,11 +1,15 @@
+---
+# Source: hbase-operator/templates/deployment.yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: hbase-operator-deployment
   labels:
+    helm.sh/chart: hbase-operator-0.2.0-nightly
     app.kubernetes.io/name: hbase-operator
     app.kubernetes.io/instance: hbase-operator
     app.kubernetes.io/version: "0.2.0-nightly"
+    app.kubernetes.io/managed-by: Helm
 spec:
   replicas: 1
   strategy:
@@ -21,13 +25,16 @@ spec:
         app.kubernetes.io/instance: hbase-operator
     spec:
       serviceAccountName: hbase-operator-serviceaccount
-      securityContext: {}
+      securityContext:
+        {}
       containers:
         - name: hbase-operator
-          securityContext: {}
+          securityContext:
+            {}
           image: "docker.stackable.tech/stackable/hbase-operator:0.2.0-nightly"
           imagePullPolicy: IfNotPresent
-          resources: {}
+          resources:
+            {}
           volumeMounts:
             - mountPath: /etc/stackable/hbase-operator/config-spec
               name: config-spec
