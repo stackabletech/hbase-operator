@@ -8,7 +8,8 @@ use std::{
 
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_hbase_crd::{
-    HbaseCluster, HbaseConfig, HbaseRole, APP_NAME, HBASE_ENV_SH, HBASE_SITE_XML, HDFS_SITE_XML,
+    HbaseCluster, HbaseConfig, HbaseRole, APP_NAME, HBASE_ENV_SH, HBASE_SITE_XML, HDFS_CONFIG,
+    HDFS_SITE_XML,
 };
 use stackable_operator::{
     builder::{ConfigMapBuilder, ContainerBuilder, ObjectMetaBuilder, PodBuilder},
@@ -91,8 +92,8 @@ pub enum Error {
     NoZookeeperUrls {
         source: stackable_operator::error::Error,
     },
-    #[snafu(display("failed to retrieve the HDFS cluster location"))]
-    NoHdfsUrls {
+    #[snafu(display("failed to retrieve the HDFS configuration"))]
+    NoHdfsSiteConfig {
         source: stackable_operator::error::Error,
     },
 }
@@ -112,9 +113,13 @@ pub async fn reconcile_hbase(
         apply_zookeeper_configmap(client, namespace, config).await?;
         apply_hdfs_configmap(client, namespace, config).await?;
     }
-    for role in [&mut hbase.spec.masters, &mut hbase.spec.region_servers]
-        .into_iter()
-        .flatten()
+    for role in [
+        &mut hbase.spec.masters,
+        &mut hbase.spec.region_servers,
+        &mut hbase.spec.rest_servers,
+    ]
+    .into_iter()
+    .flatten()
     {
         apply_zookeeper_configmap(client, namespace, &mut role.config.config).await?;
         apply_hdfs_configmap(client, namespace, &mut role.config.config).await?;
@@ -233,7 +238,7 @@ async fn apply_hdfs_configmap(
     if let Some(config_map_name) = &config.hdfs_config_map_name {
         let value = get_value_from_config_map(client, config_map_name, namespace, "hdfs-site.xml")
             .await
-            .context(NoZookeeperUrlsSnafu)?;
+            .context(NoHdfsSiteConfigSnafu)?;
         config.hdfs_config = Some(value);
     }
     Ok(())
@@ -307,7 +312,9 @@ fn build_rolegroup_config_map(
         .cloned()
         .unwrap_or_default();
 
-    ConfigMapBuilder::new()
+    let mut builder = ConfigMapBuilder::new();
+
+    builder
         .metadata(
             ObjectMetaBuilder::new()
                 .name_and_namespace(hbase)
@@ -327,19 +334,19 @@ fn build_rolegroup_config_map(
             HBASE_SITE_XML,
             writer::to_hadoop_xml(hbase_site_config.iter()),
         )
-        .add_data(HBASE_ENV_SH, write_hbase_env_sh(hbase_env_config.iter()))
-        .add_data(
-            HDFS_SITE_XML,
-            rolegroup_config
-                .get(&PropertyNameKind::File(HDFS_SITE_XML.to_string()))
-                .and_then(|m| m.get("content").cloned())
-                .unwrap_or_default(),
-        )
-        .build()
-        .map_err(|e| Error::BuildRoleGroupConfig {
-            source: e,
-            rolegroup: rolegroup.clone(),
-        })
+        .add_data(HBASE_ENV_SH, write_hbase_env_sh(hbase_env_config.iter()));
+
+    if let Some(hdfs_config) = rolegroup_config
+        .get(&PropertyNameKind::File(HDFS_SITE_XML.to_string()))
+        .and_then(|m| m.get(HDFS_CONFIG).cloned())
+    {
+        builder.add_data(HDFS_SITE_XML, hdfs_config);
+    };
+
+    builder.build().map_err(|e| Error::BuildRoleGroupConfig {
+        source: e,
+        rolegroup: rolegroup.clone(),
+    })
 }
 
 fn write_hbase_env_sh<'a, T>(properties: T) -> String
@@ -359,11 +366,8 @@ fn build_rolegroup_service(
     rolegroup: &RoleGroupRef<HbaseCluster>,
     _rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
 ) -> Result<Service> {
-    let (name, port) = match serde_yaml::from_str(&rolegroup.role).unwrap() {
-        HbaseRole::Master => ("master", HBASE_MASTER_PORT),
-        HbaseRole::RegionServer => ("regionserver", HBASE_REGIONSERVER_PORT),
-        HbaseRole::RestServer => ("rest", HBASE_REST_PORT),
-    };
+    let role = serde_yaml::from_str(&rolegroup.role).unwrap();
+    let (port_name, port_number, port_protocol) = port_properties(role);
 
     Ok(Service {
         metadata: ObjectMetaBuilder::new()
@@ -382,9 +386,9 @@ fn build_rolegroup_service(
         spec: Some(ServiceSpec {
             cluster_ip: Some("None".to_string()),
             ports: Some(vec![ServicePort {
-                name: Some(name.to_string()),
-                port,
-                protocol: Some("TCP".to_string()),
+                name: Some(port_name.into()),
+                port: port_number,
+                protocol: Some(port_protocol.into()),
                 ..ServicePort::default()
             }]),
             selector: Some(role_group_selector_labels(
@@ -488,14 +492,6 @@ fn build_rolegroup_statefulset(
     })
 }
 
-pub fn hbase_version(hbase: &HbaseCluster) -> Result<&str> {
-    hbase
-        .spec
-        .version
-        .as_deref()
-        .context(ObjectHasNoVersionSnafu)
-}
-
 /// Returns a port name, the port number, and the protocol for the given role.
 fn port_properties(role: HbaseRole) -> (&'static str, i32, &'static str) {
     match role {
@@ -505,10 +501,12 @@ fn port_properties(role: HbaseRole) -> (&'static str, i32, &'static str) {
     }
 }
 
-pub fn error_policy(_error: &Error, _ctx: Context<Ctx>) -> ReconcilerAction {
-    ReconcilerAction {
-        requeue_after: Some(Duration::from_secs(5)),
-    }
+fn hbase_version(hbase: &HbaseCluster) -> Result<&str> {
+    hbase
+        .spec
+        .version
+        .as_deref()
+        .context(ObjectHasNoVersionSnafu)
 }
 
 fn rolegroup_replicas(
@@ -530,5 +528,11 @@ fn rolegroup_replicas(
             .unwrap_or(0);
 
         Ok(replicas)
+    }
+}
+
+pub fn error_policy(_error: &Error, _ctx: Context<Ctx>) -> ReconcilerAction {
+    ReconcilerAction {
+        requeue_after: Some(Duration::from_secs(5)),
     }
 }

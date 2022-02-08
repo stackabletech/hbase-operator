@@ -183,15 +183,6 @@ impl HbaseCluster {
         self.metadata.name.clone()
     }
 
-    /// The fully-qualified domain name of the role-level load-balanced Kubernetes `Service`
-    pub fn server_role_service_fqdn(&self) -> Option<String> {
-        Some(format!(
-            "{}.{}.svc.cluster.local",
-            self.server_role_service_name()?,
-            self.metadata.namespace.as_ref()?
-        ))
-    }
-
     /// Metadata about a server rolegroup
     pub fn server_rolegroup_ref(
         &self,
