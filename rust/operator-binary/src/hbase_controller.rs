@@ -169,13 +169,12 @@ pub async fn reconcile_hbase(
     )
     .context(InvalidProductConfigSnafu)?;
 
-    // TODO Really master?
-    let master_role_service = build_master_role_service(&hbase)?;
+    let region_server_role_service = build_region_server_role_service(&hbase)?;
     client
         .apply_patch(
             FIELD_MANAGER_SCOPE,
-            &master_role_service,
-            &master_role_service,
+            &region_server_role_service,
+            &region_server_role_service,
         )
         .await
         .context(ApplyRoleServiceSnafu)?;
@@ -258,8 +257,8 @@ async fn get_value_from_config_map(
 
 /// The server-role service is the primary endpoint that should be used by clients that do not perform internal load balancing,
 /// including targets outside of the cluster.
-pub fn build_master_role_service(hbase: &HbaseCluster) -> Result<Service> {
-    let role_name = HbaseRole::Master.to_string();
+pub fn build_region_server_role_service(hbase: &HbaseCluster) -> Result<Service> {
+    let role_name = HbaseRole::RegionServer.to_string();
     let role_svc_name = hbase
         .server_role_service_name()
         .context(GlobalServiceNameNotFoundSnafu)?;
@@ -273,8 +272,8 @@ pub fn build_master_role_service(hbase: &HbaseCluster) -> Result<Service> {
             .build(),
         spec: Some(ServiceSpec {
             ports: Some(vec![ServicePort {
-                name: Some("master".to_string()),
-                port: HBASE_MASTER_PORT,
+                name: Some("regionserver".to_string()),
+                port: HBASE_REGIONSERVER_PORT,
                 protocol: Some("TCP".to_string()),
                 ..ServicePort::default()
             }]),
