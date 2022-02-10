@@ -34,8 +34,12 @@ const FIELD_MANAGER_SCOPE: &str = "hbasecluster";
 
 const CONFIG_DIR_NAME: &str = "/stackable/conf";
 
+const HBASE_UI_PORT_NAME: &str = "ui";
+
 const HBASE_MASTER_PORT: i32 = 60000;
+const HBASE_MASTER_UI_PORT: i32 = 16010;
 const HBASE_REGIONSERVER_PORT: i32 = 60020;
+const HBASE_REGIONSERVER_UI_PORT: i32 = 16030;
 const HBASE_REST_PORT: i32 = 8080;
 
 pub struct Ctx {
@@ -515,10 +519,12 @@ fn port_properties(role: HbaseRole) -> Vec<(&'static str, i32, &'static str)> {
     match role {
         HbaseRole::Master => vec![
             ("master", HBASE_MASTER_PORT, "TCP"),
+            (HBASE_UI_PORT_NAME, HBASE_MASTER_UI_PORT, "TCP"),
             (METRICS_PORT_NAME, METRICS_PORT, "TCP"),
         ],
         HbaseRole::RegionServer => vec![
             ("regionserver", HBASE_REGIONSERVER_PORT, "TCP"),
+            (HBASE_UI_PORT_NAME, HBASE_REGIONSERVER_UI_PORT, "TCP"),
             (METRICS_PORT_NAME, METRICS_PORT, "TCP"),
         ],
         HbaseRole::RestServer => vec![
