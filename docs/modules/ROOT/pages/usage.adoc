@@ -15,15 +15,15 @@ An Apache HBase cluster can be created with the following cluster specification:
 apiVersion: hbase.stackable.tech/v1alpha1
 kind: HbaseCluster
 metadata:
-  name: simple
+  name: simple-hbase
 spec:
   version: 2.4.6
   config:
-    hdfsConfigMapName: simple-namenode-default
-    zookeeperConfigMapName: simple-znode
+    hdfsConfigMapName: simple-hdfs-namenode-default
+    zookeeperConfigMapName: simple-hbase-znode
     hbaseManagesZk: false
     hbaseClusterDistributed: true
-    hbaseRootdir: hdfs://simple/hbase
+    hbaseRootdir: hdfs://simple-hdfs/hbase
   masters:
     roleGroups:
       default:
@@ -45,6 +45,14 @@ spec:
           matchLabels:
             kubernetes.io/os: linux
         replicas: 1
+---
+apiVersion: zookeeper.stackable.tech/v1alpha1
+kind: ZookeeperZnode
+metadata:
+  name: simple-hbase-znode
+spec:
+  clusterRef:
+    name: simple-zk
 ----
 
 `hdfsConfigMapName` references the config map created by the Stackable HDFS operator.
