@@ -8,6 +8,7 @@ spec:
     hdfsConfigMapName: simple-hdfs-namenode-default
     zookeeperConfigMapName: simple-hbase-znode
     hbaseManagesZk: false
+    hbaseOpts:
     hbaseClusterDistributed: true
     hbaseRootdir: hdfs://simple-hdfs/hbase
   masters:

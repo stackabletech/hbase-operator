@@ -17,11 +17,15 @@ pub const HBASE_SITE_XML: &str = "hbase-site.xml";
 pub const HDFS_SITE_XML: &str = "hdfs-site.xml";
 
 pub const HBASE_MANAGES_ZK: &str = "HBASE_MANAGES_ZK";
+pub const HBASE_OPTS: &str = "HBASE_OPTS";
 
 pub const HBASE_CLUSTER_DISTRIBUTED: &str = "hbase.cluster.distributed";
 pub const HBASE_ROOTDIR: &str = "hbase.rootdir";
 pub const HBASE_ZOOKEEPER_QUORUM: &str = "hbase.zookeeper.quorum";
 pub const HDFS_CONFIG: &str = "content";
+
+pub const METRICS_PORT_NAME: &str = "metrics";
+pub const METRICS_PORT: i32 = 8081;
 
 #[derive(Clone, CustomResource, Debug, Default, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[kube(
@@ -97,6 +101,8 @@ pub struct HbaseConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub hbase_manages_zk: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hbase_opts: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub hdfs_config: Option<String>,
 }
 
@@ -141,6 +147,12 @@ impl Configuration for HbaseConfig {
                         Some(hbase_manages_zk.to_string()),
                     );
                 }
+                let mut all_hbase_opts = format!("-javaagent:/stackable/jmx/jmx_prometheus_javaagent-0.16.1.jar={METRICS_PORT}:/stackable/jmx/region-server.yaml");
+                if let Some(hbase_opts) = &self.hbase_opts {
+                    all_hbase_opts += " ";
+                    all_hbase_opts += hbase_opts;
+                }
+                result.insert(HBASE_OPTS.to_string(), Some(all_hbase_opts));
             }
             HBASE_SITE_XML => {
                 if let Some(hbase_cluster_distributed) = self.hbase_cluster_distributed {

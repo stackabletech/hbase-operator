@@ -31,6 +31,9 @@ spec:
                     hbaseManagesZk:
                       nullable: true
                       type: boolean
+                    hbaseOpts:
+                      nullable: true
+                      type: string
                     hbaseRootdir:
                       nullable: true
                       type: string
@@ -64,6 +67,9 @@ spec:
                         hbaseManagesZk:
                           nullable: true
                           type: boolean
+                        hbaseOpts:
+                          nullable: true
+                          type: string
                         hbaseRootdir:
                           nullable: true
                           type: string
@@ -109,6 +115,9 @@ spec:
                               hbaseManagesZk:
                                 nullable: true
                                 type: boolean
+                              hbaseOpts:
+                                nullable: true
+                                type: string
                               hbaseRootdir:
                                 nullable: true
                                 type: string
@@ -195,6 +204,9 @@ spec:
                         hbaseManagesZk:
                           nullable: true
                           type: boolean
+                        hbaseOpts:
+                          nullable: true
+                          type: string
                         hbaseRootdir:
                           nullable: true
                           type: string
@@ -240,6 +252,9 @@ spec:
                               hbaseManagesZk:
                                 nullable: true
                                 type: boolean
+                              hbaseOpts:
+                                nullable: true
+                                type: string
                               hbaseRootdir:
                                 nullable: true
                                 type: string
@@ -326,6 +341,9 @@ spec:
                         hbaseManagesZk:
                           nullable: true
                           type: boolean
+                        hbaseOpts:
+                          nullable: true
+                          type: string
                         hbaseRootdir:
                           nullable: true
                           type: string
@@ -371,6 +389,9 @@ spec:
                               hbaseManagesZk:
                                 nullable: true
                                 type: boolean
+                              hbaseOpts:
+                                nullable: true
+                                type: string
                               hbaseRootdir:
                                 nullable: true
                                 type: string

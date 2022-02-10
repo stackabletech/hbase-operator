@@ -22,6 +22,7 @@ spec:
     hdfsConfigMapName: simple-hdfs-namenode-default
     zookeeperConfigMapName: simple-hbase-znode
     hbaseManagesZk: false
+    hbaseOpts:
     hbaseClusterDistributed: true
     hbaseRootdir: hdfs://simple-hdfs/hbase
   masters:
@@ -61,6 +62,13 @@ spec:
 
 `hbaseManagesZk` is mapped to the environment variable `HBASE_MANAGES_ZK` in `hbase-env.sh`.
 
+`hbaseOpts` is mapped to the environment variable `HBASE_OPTS` in `hbase-env.sh`.
+
 `hbaseClusterDistributed` is mapped to `hbase.cluster.distributed` in `hbase-site.xml`.
 
 `hbaseRootdir` is mapped to `hbase.rootdir` in `hbase-site.xml`.
+
+== Monitoring
+
+The managed HBase instances are automatically configured to export Prometheus metrics. See
+xref:home::monitoring.adoc[] for more details.

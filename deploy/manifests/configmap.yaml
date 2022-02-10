@@ -37,6 +37,29 @@ data:
               required: false
           asOfVersion: "0.0.0"
           description: "This variable tells HBase whether to start/stop the ZooKeeper ensemble servers as part of HBase start/stop."
+      - property: &hbaseOpts
+          propertyNames:
+            - name: "HBASE_OPTS"
+              kind:
+                type: "file"
+                file: "hbase-env.sh"
+          datatype:
+            type: "string"
+          defaultValues:
+            - fromVersion: "0.0.0"
+              value: ""
+          recommendedValues:
+            - fromVersion: "0.0.0"
+              value: ""
+          roles:
+            - name: "master"
+              required: false
+            - name: "regionserver"
+              required: false
+            - name: "restserver"
+              required: false
+          asOfVersion: "0.0.0"
+          description: "This variable allows to pass VM options to HBase."
   
       #################################################################################################
       # hbase-site.xml

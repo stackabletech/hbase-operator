@@ -9,7 +9,7 @@ use std::{
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_hbase_crd::{
     HbaseCluster, HbaseConfig, HbaseRole, APP_NAME, HBASE_ENV_SH, HBASE_SITE_XML, HDFS_CONFIG,
-    HDFS_SITE_XML,
+    HDFS_SITE_XML, METRICS_PORT, METRICS_PORT_NAME,
 };
 use stackable_operator::{
     builder::{ConfigMapBuilder, ContainerBuilder, ObjectMetaBuilder, PodBuilder},
@@ -17,7 +17,9 @@ use stackable_operator::{
     k8s_openapi::{
         api::{
             apps::v1::{StatefulSet, StatefulSetSpec},
-            core::v1::{ConfigMap, ConfigMapVolumeSource, Service, ServicePort, ServiceSpec},
+            core::v1::{
+                ConfigMap, ConfigMapVolumeSource, ContainerPort, Service, ServicePort, ServiceSpec,
+            },
         },
         apimachinery::pkg::apis::meta::v1::LabelSelector,
     },
@@ -268,7 +270,16 @@ pub fn build_region_server_role_service(hbase: &HbaseCluster) -> Result<Service>
     let role_svc_name = hbase
         .server_role_service_name()
         .context(GlobalServiceNameNotFoundSnafu)?;
-    let (port_name, port_number, port_protocol) = port_properties(role);
+    let ports = port_properties(role)
+        .into_iter()
+        .map(|(port_name, port_number, port_protocol)| ServicePort {
+            name: Some(port_name.into()),
+            port: port_number,
+            protocol: Some(port_protocol.into()),
+            ..ServicePort::default()
+        })
+        .collect();
+
     Ok(Service {
         metadata: ObjectMetaBuilder::new()
             .name_and_namespace(hbase)
@@ -278,12 +289,7 @@ pub fn build_region_server_role_service(hbase: &HbaseCluster) -> Result<Service>
             .with_recommended_labels(hbase, APP_NAME, hbase_version(hbase)?, &role_name, "global")
             .build(),
         spec: Some(ServiceSpec {
-            ports: Some(vec![ServicePort {
-                name: Some(port_name.into()),
-                port: port_number,
-                protocol: Some(port_protocol.into()),
-                ..ServicePort::default()
-            }]),
+            ports: Some(ports),
             selector: Some(role_selector_labels(hbase, APP_NAME, &role_name)),
             type_: Some("NodePort".to_string()),
             ..ServiceSpec::default()
@@ -367,7 +373,15 @@ fn build_rolegroup_service(
     _rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
 ) -> Result<Service> {
     let role = serde_yaml::from_str(&rolegroup.role).unwrap();
-    let (port_name, port_number, port_protocol) = port_properties(role);
+    let ports = port_properties(role)
+        .into_iter()
+        .map(|(port_name, port_number, port_protocol)| ServicePort {
+            name: Some(port_name.into()),
+            port: port_number,
+            protocol: Some(port_protocol.into()),
+            ..ServicePort::default()
+        })
+        .collect();
 
     Ok(Service {
         metadata: ObjectMetaBuilder::new()
@@ -382,15 +396,11 @@ fn build_rolegroup_service(
                 &rolegroup.role,
                 &rolegroup.role_group,
             )
+            .with_label("prometheus.io/scrape", "true")
             .build(),
         spec: Some(ServiceSpec {
             cluster_ip: Some("None".to_string()),
-            ports: Some(vec![ServicePort {
-                name: Some(port_name.into()),
-                port: port_number,
-                protocol: Some(port_protocol.into()),
-                ..ServicePort::default()
-            }]),
+            ports: Some(ports),
             selector: Some(role_group_selector_labels(
                 hbase,
                 APP_NAME,
@@ -430,14 +440,22 @@ fn build_rolegroup_statefulset(
         "start".into(),
     ];
 
-    let (port_name, port_number, _) = port_properties(role);
+    let ports = port_properties(role)
+        .into_iter()
+        .map(|(port_name, port_number, port_protocol)| ContainerPort {
+            name: Some(port_name.into()),
+            container_port: port_number,
+            protocol: Some(port_protocol.into()),
+            ..ContainerPort::default()
+        })
+        .collect();
 
     let container = ContainerBuilder::new("hbase")
         .image(image)
         .command(command)
         .add_env_var("HBASE_CONF_DIR", CONFIG_DIR_NAME)
         .add_volume_mount("config", CONFIG_DIR_NAME)
-        .add_container_port(port_name, port_number)
+        .add_container_ports(ports)
         .build();
     Ok(StatefulSet {
         metadata: ObjectMetaBuilder::new()
@@ -493,11 +511,20 @@ fn build_rolegroup_statefulset(
 }
 
 /// Returns a port name, the port number, and the protocol for the given role.
-fn port_properties(role: HbaseRole) -> (&'static str, i32, &'static str) {
+fn port_properties(role: HbaseRole) -> Vec<(&'static str, i32, &'static str)> {
     match role {
-        HbaseRole::Master => ("master", HBASE_MASTER_PORT, "TCP"),
-        HbaseRole::RegionServer => ("regionserver", HBASE_REGIONSERVER_PORT, "TCP"),
-        HbaseRole::RestServer => ("rest", HBASE_REST_PORT, "TCP"),
+        HbaseRole::Master => vec![
+            ("master", HBASE_MASTER_PORT, "TCP"),
+            (METRICS_PORT_NAME, METRICS_PORT, "TCP"),
+        ],
+        HbaseRole::RegionServer => vec![
+            ("regionserver", HBASE_REGIONSERVER_PORT, "TCP"),
+            (METRICS_PORT_NAME, METRICS_PORT, "TCP"),
+        ],
+        HbaseRole::RestServer => vec![
+            ("rest", HBASE_REST_PORT, "TCP"),
+            (METRICS_PORT_NAME, METRICS_PORT, "TCP"),
+        ],
     }
 }
 
