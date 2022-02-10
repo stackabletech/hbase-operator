@@ -18,10 +18,11 @@ use stackable_operator::{
         api::{
             apps::v1::{StatefulSet, StatefulSetSpec},
             core::v1::{
-                ConfigMap, ConfigMapVolumeSource, ContainerPort, Service, ServicePort, ServiceSpec,
+                ConfigMap, ConfigMapVolumeSource, ContainerPort, HTTPGetAction, Probe, Service,
+                ServicePort, ServiceSpec, TCPSocketAction,
             },
         },
-        apimachinery::pkg::apis::meta::v1::LabelSelector,
+        apimachinery::pkg::{apis::meta::v1::LabelSelector, util::intstr::IntOrString},
     },
     kube::runtime::controller::{Context, ReconcilerAction},
     labels::{role_group_selector_labels, role_selector_labels},
@@ -36,9 +37,9 @@ const CONFIG_DIR_NAME: &str = "/stackable/conf";
 
 const HBASE_UI_PORT_NAME: &str = "ui";
 
-const HBASE_MASTER_PORT: i32 = 60000;
+const HBASE_MASTER_PORT: i32 = 16000;
 const HBASE_MASTER_UI_PORT: i32 = 16010;
-const HBASE_REGIONSERVER_PORT: i32 = 60020;
+const HBASE_REGIONSERVER_PORT: i32 = 16020;
 const HBASE_REGIONSERVER_UI_PORT: i32 = 16030;
 const HBASE_REST_PORT: i32 = 8080;
 
@@ -444,7 +445,7 @@ fn build_rolegroup_statefulset(
         "start".into(),
     ];
 
-    let ports = port_properties(role)
+    let ports = port_properties(role.to_owned())
         .into_iter()
         .map(|(port_name, port_number, port_protocol)| ContainerPort {
             name: Some(port_name.into()),
@@ -454,12 +455,41 @@ fn build_rolegroup_statefulset(
         })
         .collect();
 
+    let probe = match role {
+        HbaseRole::Master => Probe {
+            initial_delay_seconds: Some(30),
+            tcp_socket: Some(TCPSocketAction {
+                port: IntOrString::Int(HBASE_MASTER_PORT),
+                ..TCPSocketAction::default()
+            }),
+            ..Probe::default()
+        },
+        HbaseRole::RegionServer => Probe {
+            initial_delay_seconds: Some(30),
+            tcp_socket: Some(TCPSocketAction {
+                port: IntOrString::Int(HBASE_REGIONSERVER_PORT),
+                ..TCPSocketAction::default()
+            }),
+            ..Probe::default()
+        },
+        HbaseRole::RestServer => Probe {
+            initial_delay_seconds: Some(30),
+            http_get: Some(HTTPGetAction {
+                port: IntOrString::Int(HBASE_REST_PORT),
+                ..HTTPGetAction::default()
+            }),
+            ..Probe::default()
+        },
+    };
+
     let container = ContainerBuilder::new("hbase")
         .image(image)
         .command(command)
         .add_env_var("HBASE_CONF_DIR", CONFIG_DIR_NAME)
         .add_volume_mount("config", CONFIG_DIR_NAME)
         .add_container_ports(ports)
+        .readiness_probe(probe.to_owned())
+        .liveness_probe(probe)
         .build();
     Ok(StatefulSet {
         metadata: ObjectMetaBuilder::new()
