@@ -10,7 +10,6 @@ use strum_macros::Display;
 use strum_macros::EnumIter;
 
 pub const APP_NAME: &str = "hbase";
-pub const MANAGED_BY: &str = "hbase-operator";
 
 pub const HBASE_ENV_SH: &str = "hbase-env.sh";
 pub const HBASE_SITE_XML: &str = "hbase-site.xml";
