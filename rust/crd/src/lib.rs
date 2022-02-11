@@ -23,7 +23,14 @@ pub const HBASE_ROOTDIR: &str = "hbase.rootdir";
 pub const HBASE_ZOOKEEPER_QUORUM: &str = "hbase.zookeeper.quorum";
 pub const HDFS_CONFIG: &str = "content";
 
+pub const HBASE_UI_PORT_NAME: &str = "ui";
 pub const METRICS_PORT_NAME: &str = "metrics";
+
+pub const HBASE_MASTER_PORT: i32 = 16000;
+pub const HBASE_MASTER_UI_PORT: i32 = 16010;
+pub const HBASE_REGIONSERVER_PORT: i32 = 16020;
+pub const HBASE_REGIONSERVER_UI_PORT: i32 = 16030;
+pub const HBASE_REST_PORT: i32 = 8080;
 pub const METRICS_PORT: i32 = 8081;
 
 #[derive(Clone, CustomResource, Debug, Default, Deserialize, JsonSchema, PartialEq, Serialize)]
@@ -82,6 +89,40 @@ pub enum HbaseRole {
     #[serde(rename = "restserver")]
     #[strum(serialize = "restserver")]
     RestServer,
+}
+
+impl HbaseRole {
+    pub fn command(&self) -> Vec<String> {
+        vec![
+            "bin/hbase".into(),
+            match self {
+                HbaseRole::Master => "master".into(),
+                HbaseRole::RegionServer => "regionserver".into(),
+                HbaseRole::RestServer => "rest".into(),
+            },
+            "start".into(),
+        ]
+    }
+
+    /// Returns a port name, the port number, and the protocol for the given role.
+    pub fn port_properties(&self) -> Vec<(&'static str, i32, &'static str)> {
+        match self {
+            HbaseRole::Master => vec![
+                ("master", HBASE_MASTER_PORT, "TCP"),
+                (HBASE_UI_PORT_NAME, HBASE_MASTER_UI_PORT, "TCP"),
+                (METRICS_PORT_NAME, METRICS_PORT, "TCP"),
+            ],
+            HbaseRole::RegionServer => vec![
+                ("regionserver", HBASE_REGIONSERVER_PORT, "TCP"),
+                (HBASE_UI_PORT_NAME, HBASE_REGIONSERVER_UI_PORT, "TCP"),
+                (METRICS_PORT_NAME, METRICS_PORT, "TCP"),
+            ],
+            HbaseRole::RestServer => vec![
+                ("rest", HBASE_REST_PORT, "TCP"),
+                (METRICS_PORT_NAME, METRICS_PORT, "TCP"),
+            ],
+        }
+    }
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]

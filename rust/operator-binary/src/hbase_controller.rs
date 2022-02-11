@@ -8,8 +8,8 @@ use std::{
 
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_hbase_crd::{
-    HbaseCluster, HbaseConfig, HbaseRole, APP_NAME, HBASE_ENV_SH, HBASE_SITE_XML, HDFS_CONFIG,
-    HDFS_SITE_XML, METRICS_PORT, METRICS_PORT_NAME,
+    HbaseCluster, HbaseConfig, HbaseRole, APP_NAME, HBASE_ENV_SH, HBASE_MASTER_PORT,
+    HBASE_REGIONSERVER_PORT, HBASE_REST_PORT, HBASE_SITE_XML, HDFS_CONFIG, HDFS_SITE_XML,
 };
 use stackable_operator::{
     builder::{ConfigMapBuilder, ContainerBuilder, ObjectMetaBuilder, PodBuilder},
@@ -34,14 +34,6 @@ use stackable_operator::{
 const FIELD_MANAGER_SCOPE: &str = "hbasecluster";
 
 const CONFIG_DIR_NAME: &str = "/stackable/conf";
-
-const HBASE_UI_PORT_NAME: &str = "ui";
-
-const HBASE_MASTER_PORT: i32 = 16000;
-const HBASE_MASTER_UI_PORT: i32 = 16010;
-const HBASE_REGIONSERVER_PORT: i32 = 16020;
-const HBASE_REGIONSERVER_UI_PORT: i32 = 16030;
-const HBASE_REST_PORT: i32 = 8080;
 
 pub struct Ctx {
     pub client: stackable_operator::client::Client,
@@ -275,7 +267,8 @@ pub fn build_region_server_role_service(hbase: &HbaseCluster) -> Result<Service>
     let role_svc_name = hbase
         .server_role_service_name()
         .context(GlobalServiceNameNotFoundSnafu)?;
-    let ports = port_properties(role)
+    let ports = role
+        .port_properties()
         .into_iter()
         .map(|(port_name, port_number, port_protocol)| ServicePort {
             name: Some(port_name.into()),
@@ -377,8 +370,9 @@ fn build_rolegroup_service(
     rolegroup: &RoleGroupRef<HbaseCluster>,
     _rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
 ) -> Result<Service> {
-    let role = serde_yaml::from_str(&rolegroup.role).unwrap();
-    let ports = port_properties(role)
+    let role = serde_yaml::from_str::<HbaseRole>(&rolegroup.role).unwrap();
+    let ports = role
+        .port_properties()
         .into_iter()
         .map(|(port_name, port_number, port_protocol)| ServicePort {
             name: Some(port_name.into()),
@@ -434,18 +428,11 @@ fn build_rolegroup_statefulset(
         hbase_version
     );
 
-    let role = serde_yaml::from_str(&rolegroup_ref.role).unwrap();
-    let command = vec![
-        "bin/hbase".into(),
-        match role {
-            HbaseRole::Master => "master".into(),
-            HbaseRole::RegionServer => "regionserver".into(),
-            HbaseRole::RestServer => "rest".into(),
-        },
-        "start".into(),
-    ];
+    let role = serde_yaml::from_str::<HbaseRole>(&rolegroup_ref.role).unwrap();
+    let command = role.command();
 
-    let ports = port_properties(role.to_owned())
+    let ports = role
+        .port_properties()
         .into_iter()
         .map(|(port_name, port_number, port_protocol)| ContainerPort {
             name: Some(port_name.into()),
@@ -542,26 +529,6 @@ fn build_rolegroup_statefulset(
         }),
         status: None,
     })
-}
-
-/// Returns a port name, the port number, and the protocol for the given role.
-fn port_properties(role: HbaseRole) -> Vec<(&'static str, i32, &'static str)> {
-    match role {
-        HbaseRole::Master => vec![
-            ("master", HBASE_MASTER_PORT, "TCP"),
-            (HBASE_UI_PORT_NAME, HBASE_MASTER_UI_PORT, "TCP"),
-            (METRICS_PORT_NAME, METRICS_PORT, "TCP"),
-        ],
-        HbaseRole::RegionServer => vec![
-            ("regionserver", HBASE_REGIONSERVER_PORT, "TCP"),
-            (HBASE_UI_PORT_NAME, HBASE_REGIONSERVER_UI_PORT, "TCP"),
-            (METRICS_PORT_NAME, METRICS_PORT, "TCP"),
-        ],
-        HbaseRole::RestServer => vec![
-            ("rest", HBASE_REST_PORT, "TCP"),
-            (METRICS_PORT_NAME, METRICS_PORT, "TCP"),
-        ],
-    }
 }
 
 fn hbase_version(hbase: &HbaseCluster) -> Result<&str> {
