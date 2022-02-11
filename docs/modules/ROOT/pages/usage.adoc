@@ -1,54 +1,74 @@
 = Usage
 
-After installation, the CRD for this operator must be created:
+== Requirements
 
-    kubectl apply -f /etc/stackable/hbase-operator/crd/hbasecluster.crd.yaml
+A distributed Apache HBase installation depends on a running Apache ZooKeeper and HDFS cluster. See
+the documentation for the https://docs.stackable.tech/hdfs/usage.html[Stackable Operator for Apache HDFS]
+how to set up these clusters.
 
-The Stackable Operator for Apache HBase requires an active Apache ZooKeeper installation provided by Stackable to be present.
+== Deployment of an Apache HBase cluster
 
-The Stackable Operator for Apache HBase requires an active Apache HDFS installation provided by Stackable to be present.
+An Apache HBase cluster can be created with the following cluster specification:
 
-To create a single node Apache HBase (v2.4.6) cluster with Prometheus metrics exposed on port 9505 (master) and 9506 (region_server):
+[source,yaml]
+----
+apiVersion: hbase.stackable.tech/v1alpha1
+kind: HbaseCluster
+metadata:
+  name: simple-hbase
+spec:
+  version: 2.4.6
+  config:
+    hdfsConfigMapName: simple-hdfs-namenode-default
+    zookeeperConfigMapName: simple-hbase-znode
+    hbaseManagesZk: false
+    hbaseOpts:
+    hbaseClusterDistributed: true
+    hbaseRootdir: hdfs://simple-hdfs/hbase
+  masters:
+    roleGroups:
+      default:
+        selector:
+          matchLabels:
+            kubernetes.io/os: linux
+        replicas: 1
+  regionServers:
+    roleGroups:
+      default:
+        selector:
+          matchLabels:
+            kubernetes.io/os: linux
+        replicas: 1
+  restServers:
+    roleGroups:
+      default:
+        selector:
+          matchLabels:
+            kubernetes.io/os: linux
+        replicas: 1
+---
+apiVersion: zookeeper.stackable.tech/v1alpha1
+kind: ZookeeperZnode
+metadata:
+  name: simple-hbase-znode
+spec:
+  clusterRef:
+    name: simple-zk
+----
 
-    cat <<EOF | kubectl apply -f -
-    apiVersion: hbase.stackable.tech/v1alpha1
-    kind: HbaseCluster
-    metadata:
-      name: simple
-    spec:
-      version: 2.4.6
-      hdfsReference:
-        namespace: default
-        name: simple
-        root: /hbase
-      zookeeperReference:
-        namespace: default
-        name: simple
-      masters:
-        roleGroups:
-          default:
-            selector:
-              matchLabels:
-                kubernetes.io/os: linux
-            replicas: 1
-            config:
-              masterWebUiPort: 17000
-              metricsPort: 9707
-      regionServers:
-        roleGroups:
-          default:
-            selector:
-              matchLabels:
-                kubernetes.io/os: linux
-            replicas: 1
-            config:
-              regionServerWebUiPort: 17001
-              metricsPort: 9708
-    EOF
+`hdfsConfigMapName` references the config map created by the Stackable HDFS operator.
 
-If you set up an HBase service for the first time, you might need to create the `/hbase` folder after the pods are created:
+`zookeeperConfigMapName` references the config map created by the Stackable ZooKeeper operator.
 
-    export HADOOP_USER_NAME=root
-    ./hdfs dfs -mkdir hdfs://<namenode>:9000/hbase
-    ./hdfs dfs -chown stackable hdfs://<namenode>:9000/hbase
+`hbaseManagesZk` is mapped to the environment variable `HBASE_MANAGES_ZK` in `hbase-env.sh`.
 
+`hbaseOpts` is mapped to the environment variable `HBASE_OPTS` in `hbase-env.sh`.
+
+`hbaseClusterDistributed` is mapped to `hbase.cluster.distributed` in `hbase-site.xml`.
+
+`hbaseRootdir` is mapped to `hbase.rootdir` in `hbase-site.xml`.
+
+== Monitoring
+
+The managed HBase instances are automatically configured to export Prometheus metrics. See
+xref:home::monitoring.adoc[] for more details.

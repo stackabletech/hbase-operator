@@ -1,16 +1,87 @@
+---
+apiVersion: zookeeper.stackable.tech/v1alpha1
+kind: ZookeeperCluster
+metadata:
+  name: simple-zk
+spec:
+  servers:
+    roleGroups:
+      primary:
+        replicas: 2
+        config:
+          myidOffset: 10
+      secondary:
+        replicas: 1
+        config:
+          myidOffset: 20
+  version: 3.5.8
+  stopped: false
+---
+apiVersion: hdfs.stackable.tech/v1alpha1
+kind: HdfsCluster
+metadata:
+  name: simple-hdfs
+spec:
+  version: 3.2.2
+  zookeeperConfigMapName: simple-hdfs-znode
+  dfsReplication: 3
+  log4j: |-
+    # Define some default values that can be overridden by system properties
+    hadoop.root.logger=INFO,console
+    hadoop.log.dir=.
+    hadoop.log.file=hadoop.log
+    # Define the root logger to the system property "hadoop.root.logger".
+    log4j.rootLogger=${hadoop.root.logger}, EventCounter
+    # Logging Threshold
+    log4j.threshold=ALL
+    log4j.appender.console=org.apache.log4j.ConsoleAppender
+    log4j.appender.console.target=System.err
+    log4j.appender.console.layout=org.apache.log4j.PatternLayout
+    log4j.appender.console.layout.ConversionPattern=%d{ISO8601} %p %c{2}: %m%n
+    log4j.appender.EventCounter=org.apache.hadoop.log.metrics.EventCounter
+  nameNodes:
+    roleGroups:
+      default:
+        selector:
+          matchLabels:
+            kubernetes.io/os: linux
+        replicas: 2
+  dataNodes:
+    roleGroups:
+      default:
+        selector:
+          matchLabels:
+            kubernetes.io/os: linux
+        replicas: 3
+  journalNodes:
+    roleGroups:
+      default:
+        selector:
+          matchLabels:
+            kubernetes.io/os: linux
+        replicas: 3
+---
+apiVersion: zookeeper.stackable.tech/v1alpha1
+kind: ZookeeperZnode
+metadata:
+  name: simple-hdfs-znode
+spec:
+  clusterRef:
+    name: simple-zk
+---
 apiVersion: hbase.stackable.tech/v1alpha1
 kind: HbaseCluster
 metadata:
-  name: simple
+  name: simple-hbase
 spec:
   version: 2.4.6
-  hdfsReference:
-    namespace: default
-    name: simple
-    root: /hbase
-  zookeeperReference:
-    namespace: default
-    name: simple
+  config:
+    hdfsConfigMapName: simple-hdfs-namenode-default
+    zookeeperConfigMapName: simple-hbase-znode
+    hbaseManagesZk: false
+    hbaseOpts:
+    hbaseClusterDistributed: true
+    hbaseRootdir: hdfs://simple-hdfs/hbase
   masters:
     roleGroups:
       default:
@@ -18,9 +89,6 @@ spec:
           matchLabels:
             kubernetes.io/os: linux
         replicas: 1
-        config:
-          masterWebUiPort: 17000
-          metricsPort: 9707
   regionServers:
     roleGroups:
       default:
@@ -28,6 +96,18 @@ spec:
           matchLabels:
             kubernetes.io/os: linux
         replicas: 1
-        config:
-          regionServerWebUiPort: 17001
-          metricsPort: 9708
+  restServers:
+    roleGroups:
+      default:
+        selector:
+          matchLabels:
+            kubernetes.io/os: linux
+        replicas: 1
+---
+apiVersion: zookeeper.stackable.tech/v1alpha1
+kind: ZookeeperZnode
+metadata:
+  name: simple-hbase-znode
+spec:
+  clusterRef:
+    name: simple-zk

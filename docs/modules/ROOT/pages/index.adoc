@@ -1,9 +1,19 @@
 = Stackable Operator for Apache HBase
 
-This is an operator for Kubernetes that can manage https://https://hbase.apache.org/[Apache HBase] clusters.
+This is an operator for Kubernetes that can manage https://hbase.apache.org/[Apache HBase]
+clusters.
 
-WARNING: This operator only works with images from the https://repo.stackable.tech/#browse/browse:docker:v2%2Fstackable%2Fhbase[Stackable] repository
+WARNING: This operator is part of the Stackable Data Platform and only works with images from the
+https://repo.stackable.tech/#browse/browse:docker:v2%2Fstackable%2Fhbase[Stackable] repository.
 
+== Supported Versions
+
+The Stackable Operator for Apache HBase currently supports the following versions of Apache HBase:
+
+include::partial$supported-versions.adoc[]
+
+== Getting the Docker image
+￼
 [source]
 ----
 docker pull docker.stackable.tech/stackable/hbase:<version>

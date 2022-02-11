@@ -1,0 +1,6 @@
+// The version ranges supported by HBase-Operator
+// This is a separate file, since it is used by both the direct HBase-Operator documentation, and the overarching
+// Stackable Platform documentation.
+
+- 2.4.6
+- 2.4.8
