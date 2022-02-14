@@ -88,7 +88,7 @@ For a role or role group, at the same level of `config`, you can specify: `confi
 
 // hdfs-site.xml is not listed here. The file is always taken from the referenced hdfs cluster
 
-. For example, if you want to set the `hbase.rest.threads.min` to 4 and the `HBASE_HEAPSIZE` to two GB adapt the `restServers` section of the cluster resource like so:
+For example, if you want to set the `hbase.rest.threads.min` to 4 and the `HBASE_HEAPSIZE` to two GB adapt the `restServers` section of the cluster resource like so:
 
 [source,yaml]
 ----
