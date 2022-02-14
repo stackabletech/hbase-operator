@@ -126,3 +126,5 @@ For a full list of configuration options we refer to the HBase https://hbase.apa
 
 // Environment configuration is not implemented. The environment is managed
 // with the hbase-env.sh configuration file
+
+// CLI overrides are also not implemented
