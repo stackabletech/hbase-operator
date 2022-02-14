@@ -72,3 +72,57 @@ spec:
 
 The managed HBase instances are automatically configured to export Prometheus metrics. See
 xref:home::monitoring.adoc[] for more details.
+
+== Configuration Overrides
+
+The cluster definition also supports overriding configuration properties and environment variables, either per role or per role group, where the more specific override (role group) has precedence over the less specific one (role).
+
+IMPORTANT: Overriding certain properties which are set by operator can interfere with the operator and can lead to problems.
+
+=== Configuration Properties
+
+For a role or role group, at the same level of `config`, you can specify: `configOverrides` for the following files:
+
+- `hbase-site.xml`
+- `hbase-env.sh`
+
+// TODO what about hdfs-site.xml ??
+
+. For example, if you want to set the `hbase.rest.threads.min` to 4 and the `HBASE_HEAPSIZE` to two GB adapt the `restServers` section of the cluster resource like so:
+
+[source,yaml]
+----
+restServers:
+  roleGroups:
+    default:
+      config: {}
+      configOverrides:
+        hbase-site.xml:
+          hbase.rest.threads.min: "4"
+        hbase-env.sh:
+          HBASE_HEAPSIZE: "2G"
+      replicas: 1
+----
+
+Just as for the `config`, it is possible to specify this at role level as well:
+
+[source,yaml]
+----
+restServers:
+  configOverrides:
+    hbase-site.xml:
+      hbase.rest.threads.min: "4"
+    hbase-env.sh:
+      HBASE_HEAPSIZE: "2G"
+  roleGroups:
+    default:
+      config: {}
+      replicas: 1
+----
+
+All override property values must be strings. The properties will be formatted and escaped correctly into the XML file, respectively inserted as is into the `env.sh` file.
+
+For a full list of configuration options we refer to the HBase https://hbase.apache.org/book.html#config.files[Configuration Documentation].
+
+// Environment configuration is not implemented. The environment is managed
+// with the hbase-env.sh configuration file
