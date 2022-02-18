@@ -11,6 +11,7 @@ use stackable_operator::{
         runtime::{controller::Context, Controller},
         CustomResourceExt,
     },
+    logging::controller::report_controller_reconciled,
 };
 
 mod built_info {
@@ -60,17 +61,14 @@ async fn main() -> anyhow::Result<()> {
                         product_config,
                     }),
                 )
-                .for_each(|res| async {
-                    match res {
-                        Ok((obj, _)) => tracing::info!(object = %obj, "Reconciled object"),
-                        Err(err) => {
-                            tracing::error!(
-                                error = &err as &dyn std::error::Error,
-                                "Failed to reconcile object",
-                            )
-                        }
-                    }
+                .map(|res| {
+                    report_controller_reconciled(
+                        &client,
+                        "hbaseclusters.hbase.stackable.tech",
+                        &res,
+                    )
                 })
+                .collect::<()>()
                 .await;
         }
     }
