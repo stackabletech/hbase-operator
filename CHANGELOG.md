@@ -4,6 +4,14 @@
 
 ## [0.2.0] - 2022-02-14
 
+- Reconciliation errors are now reported as Kubernetes events ([#127]).
+
+### Changed
+
+- `operator-rs` `0.10.0` -> `0.12.0` ([#127]).
+
+[127]: https://github.com/stackabletech/hbase-operator/pull/127
+
 ### Changed
 
 - Migrated to StatefulSet rather than direct Pod management ([#110]).
