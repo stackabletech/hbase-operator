@@ -4,22 +4,6 @@ metadata:
   name: {{ .Release.Name }}-clusterrole
 rules:
   - apiGroups:
-      - zookeeper.stackable.tech
-    resources:
-      - zookeeperclusters
-    verbs:
-      - get
-      - list
-      - watch
-  - apiGroups:
-      - hdfs.stackable.tech
-    resources:
-      - hdfsclusters
-    verbs:
-      - get
-      - list
-      - watch
-  - apiGroups:
       - ""
     resources:
       - nodes
@@ -71,6 +55,12 @@ rules:
       - customresourcedefinitions
     verbs:
       - get
+  - apiGroups:
+      - events.k8s.io
+    resources:
+      - events
+    verbs:
+      - create
   - apiGroups:
       - {{ include "operator.name" . }}.stackable.tech
     resources:
