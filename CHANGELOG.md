@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Added
+
+- Support for HBase 2.4.9 ([#133]).
+
+[#133]: https://github.com/stackabletech/hbase-operator/pull/133
+
 ## [0.2.0] - 2022-02-14
 
 ### Added
@@ -12,7 +18,7 @@
 
 - `operator-rs` `0.10.0` -> `0.12.0` ([#127]).
 
-[127]: https://github.com/stackabletech/hbase-operator/pull/127
+[#127]: https://github.com/stackabletech/hbase-operator/pull/127
 
 ### Changed
 
