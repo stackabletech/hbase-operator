@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Added
+
+- Support for HBase 2.4.9 ([#000]).
+
+[000]: https://github.com/stackabletech/hbase-operator/pull/000
+
 ## [0.2.0] - 2022-02-14
 
 ### Added
