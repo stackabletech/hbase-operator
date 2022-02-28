@@ -62,6 +62,6 @@ the time of writing).
 
 [source]
 ----
-cargo run -- crd | kubectl apply -f -
-cargo run -- run
+stackable-hbase-operator crd | kubectl apply -f -
+stackable-hbase-operator run
 ----
