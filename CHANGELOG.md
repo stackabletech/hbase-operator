@@ -5,8 +5,15 @@
 ### Added
 
 - Support for HBase 2.4.9 ([#133]).
+- Use cli argument `watch-namespace` / env var `WATCH_NAMESPACE` to specify
+  a single namespace to watch ([#137]).
+
+## Changed
+
+- `operator-rs` `0.12.0` -> `0.13.0` ([#137]).
 
 [#133]: https://github.com/stackabletech/hbase-operator/pull/133
+[#137]: https://github.com/stackabletech/hbase-operator/pull/137
 
 ## [0.2.0] - 2022-02-14
 

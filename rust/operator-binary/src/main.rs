@@ -32,7 +32,10 @@ async fn main() -> anyhow::Result<()> {
     let opts = Opts::parse();
     match opts.cmd {
         Command::Crd => println!("{}", serde_yaml::to_string(&HbaseCluster::crd())?,),
-        Command::Run(ProductOperatorRun { product_config }) => {
+        Command::Run(ProductOperatorRun {
+            product_config,
+            watch_namespace,
+        }) => {
             stackable_operator::utils::print_startup_string(
                 built_info::PKG_DESCRIPTION,
                 built_info::PKG_VERSION,
@@ -49,27 +52,32 @@ async fn main() -> anyhow::Result<()> {
                 stackable_operator::client::create_client(Some("hbase.stackable.tech".to_string()))
                     .await?;
 
-            Controller::new(client.get_all_api::<HbaseCluster>(), ListParams::default())
-                .owns(client.get_all_api::<Service>(), ListParams::default())
-                .owns(client.get_all_api::<StatefulSet>(), ListParams::default())
-                .shutdown_on_signal()
-                .run(
-                    hbase_controller::reconcile_hbase,
-                    hbase_controller::error_policy,
-                    Context::new(hbase_controller::Ctx {
-                        client: client.clone(),
-                        product_config,
-                    }),
-                )
-                .map(|res| {
-                    report_controller_reconciled(
-                        &client,
-                        "hbaseclusters.hbase.stackable.tech",
-                        &res,
-                    )
-                })
-                .collect::<()>()
-                .await;
+            Controller::new(
+                watch_namespace.get_api::<HbaseCluster>(&client),
+                ListParams::default(),
+            )
+            .owns(
+                watch_namespace.get_api::<Service>(&client),
+                ListParams::default(),
+            )
+            .owns(
+                watch_namespace.get_api::<StatefulSet>(&client),
+                ListParams::default(),
+            )
+            .shutdown_on_signal()
+            .run(
+                hbase_controller::reconcile_hbase,
+                hbase_controller::error_policy,
+                Context::new(hbase_controller::Ctx {
+                    client: client.clone(),
+                    product_config,
+                }),
+            )
+            .map(|res| {
+                report_controller_reconciled(&client, "hbaseclusters.hbase.stackable.tech", &res)
+            })
+            .collect::<()>()
+            .await;
         }
     }
 
