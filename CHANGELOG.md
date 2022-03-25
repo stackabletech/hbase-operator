@@ -11,11 +11,12 @@
 
 ## Changed
 
-- `operator-rs` `0.12.0` -> `0.13.0` ([#137]).
+- `operator-rs` `0.12.0` -> `0.15.0` ([#137], #[153]).
 
 [#133]: https://github.com/stackabletech/hbase-operator/pull/133
 [#137]: https://github.com/stackabletech/hbase-operator/pull/137
 [#148]: https://github.com/stackabletech/hbase-operator/pull/148
+[#153]: https://github.com/stackabletech/hbase-operator/pull/153
 
 ## [0.2.0] - 2022-02-14
 

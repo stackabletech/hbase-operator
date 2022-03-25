@@ -18,7 +18,7 @@ use stackable_operator::{
         },
         apimachinery::pkg::{apis::meta::v1::LabelSelector, util::intstr::IntOrString},
     },
-    kube::runtime::controller::{Context, ReconcilerAction},
+    kube::runtime::controller::{Action, Context},
     labels::{role_group_selector_labels, role_selector_labels},
     logging::controller::ReconcilerError,
     product_config::{types::PropertyNameKind, writer, ProductConfigManager},
@@ -109,10 +109,7 @@ impl ReconcilerError for Error {
     }
 }
 
-pub async fn reconcile_hbase(
-    hbase: Arc<HbaseCluster>,
-    ctx: Context<Ctx>,
-) -> Result<ReconcilerAction> {
+pub async fn reconcile_hbase(hbase: Arc<HbaseCluster>, ctx: Context<Ctx>) -> Result<Action> {
     tracing::info!("Starting reconcile");
 
     let client = &ctx.get_ref().client;
@@ -219,9 +216,7 @@ pub async fn reconcile_hbase(
         }
     }
 
-    Ok(ReconcilerAction {
-        requeue_after: None,
-    })
+    Ok(Action::await_change())
 }
 
 async fn apply_zookeeper_configmap(
@@ -603,8 +598,6 @@ fn rolegroup_replicas(
     }
 }
 
-pub fn error_policy(_error: &Error, _ctx: Context<Ctx>) -> ReconcilerAction {
-    ReconcilerAction {
-        requeue_after: Some(Duration::from_secs(5)),
-    }
+pub fn error_policy(_error: &Error, _ctx: Context<Ctx>) -> Action {
+    Action::requeue(Duration::from_secs(5))
 }

@@ -75,7 +75,7 @@ spec:
     hbaseManagesZk: false
     hbaseOpts:
     hbaseClusterDistributed: true
-    hbaseRootdir: hdfs://simple-hdfs/hbase
+    hbaseRootdir: /hbase
   masters:
     roleGroups:
       default:
