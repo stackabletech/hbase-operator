@@ -20,7 +20,6 @@ pub const HBASE_OPTS: &str = "HBASE_OPTS";
 pub const HBASE_CLUSTER_DISTRIBUTED: &str = "hbase.cluster.distributed";
 pub const HBASE_ROOTDIR: &str = "hbase.rootdir";
 pub const HBASE_ZOOKEEPER_QUORUM: &str = "hbase.zookeeper.quorum";
-pub const HDFS_CONFIG: &str = "content";
 
 pub const HBASE_UI_PORT_NAME: &str = "ui";
 pub const METRICS_PORT_NAME: &str = "metrics";
@@ -91,18 +90,6 @@ pub enum HbaseRole {
 }
 
 impl HbaseRole {
-    pub fn command(&self) -> Vec<String> {
-        vec![
-            "bin/hbase".into(),
-            match self {
-                HbaseRole::Master => "master".into(),
-                HbaseRole::RegionServer => "regionserver".into(),
-                HbaseRole::RestServer => "rest".into(),
-            },
-            "start".into(),
-        ]
-    }
-
     /// Returns a port name, the port number, and the protocol for the given role.
     pub fn port_properties(&self) -> Vec<(&'static str, i32, &'static str)> {
         match self {
@@ -208,11 +195,6 @@ impl Configuration for HbaseConfig {
                         HBASE_ZOOKEEPER_QUORUM.to_string(),
                         Some(hbase_zookeeper_quorum.to_owned()),
                     );
-                }
-            }
-            HDFS_SITE_XML => {
-                if let Some(hdfs_config) = &self.hdfs_config {
-                    result.insert(HDFS_CONFIG.to_string(), Some(hdfs_config.to_owned()));
                 }
             }
             _ => {}
