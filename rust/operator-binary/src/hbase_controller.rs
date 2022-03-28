@@ -3,7 +3,7 @@
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_hbase_crd::{
     HbaseCluster, HbaseConfig, HbaseRole, APP_NAME, HBASE_ENV_SH, HBASE_MASTER_PORT,
-    HBASE_REGIONSERVER_PORT, HBASE_REST_PORT, HBASE_SITE_XML, HDFS_SITE_XML,
+    HBASE_REGIONSERVER_PORT, HBASE_REST_PORT, HBASE_SITE_XML,
 };
 use stackable_operator::{
     builder::{ConfigMapBuilder, ContainerBuilder, ObjectMetaBuilder, PodBuilder},
@@ -133,7 +133,6 @@ pub async fn reconcile_hbase(hbase: Arc<HbaseCluster>, ctx: Context<Ctx>) -> Res
     let config_types = vec![
         PropertyNameKind::File(HBASE_ENV_SH.to_string()),
         PropertyNameKind::File(HBASE_SITE_XML.to_string()),
-        PropertyNameKind::File(HDFS_SITE_XML.to_string()),
     ];
 
     let mut roles: HashMap<String, _> = [
@@ -411,15 +410,12 @@ fn build_rolegroup_statefulset(
         hbase_version
     );
 
-    // TODO: remove unwrap
     let hdfs_discovery_cm_name = hbase
         .spec
         .config
         .as_ref()
-        .unwrap()
-        .hdfs_config_map_name
-        .as_ref()
-        .unwrap();
+        .and_then(|config| config.hdfs_config_map_name.as_ref())
+        .cloned();
 
     let role = serde_yaml::from_str::<HbaseRole>(&rolegroup_ref.role).unwrap();
 
@@ -556,7 +552,7 @@ fn build_rolegroup_statefulset(
                 .add_volume(stackable_operator::k8s_openapi::api::core::v1::Volume {
                     name: "hdfs-discovery".to_string(),
                     config_map: Some(ConfigMapVolumeSource {
-                        name: Some(hdfs_discovery_cm_name.to_string()),
+                        name: hdfs_discovery_cm_name,
                         ..Default::default()
                     }),
                     ..Default::default()

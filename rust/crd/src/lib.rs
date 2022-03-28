@@ -12,7 +12,6 @@ pub const APP_NAME: &str = "hbase";
 
 pub const HBASE_ENV_SH: &str = "hbase-env.sh";
 pub const HBASE_SITE_XML: &str = "hbase-site.xml";
-pub const HDFS_SITE_XML: &str = "hdfs-site.xml";
 
 pub const HBASE_MANAGES_ZK: &str = "HBASE_MANAGES_ZK";
 pub const HBASE_OPTS: &str = "HBASE_OPTS";
