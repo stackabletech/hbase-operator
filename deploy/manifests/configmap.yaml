@@ -1,5 +1,4 @@
 ---
-# Source: hbase-operator/templates/configmap.yaml
 apiVersion: v1
 data:
   properties.yaml: |
@@ -7,13 +6,13 @@ data:
     version: 0.1.0
     spec:
       units: []
-  
+
     properties:
-  
+
       #################################################################################################
       # hbase-env.sh
       #################################################################################################
-  
+
       - property: &hbaseManagesZk
           propertyNames:
             - name: "HBASE_MANAGES_ZK"
@@ -60,11 +59,11 @@ data:
               required: false
           asOfVersion: "0.0.0"
           description: "This variable allows to pass VM options to HBase."
-  
+
       #################################################################################################
       # hbase-site.xml
       #################################################################################################
-  
+
       - property: &hbaseClusterDistributed
           propertyNames:
             - name: "hbase.cluster.distributed"
@@ -88,7 +87,7 @@ data:
               required: false
           asOfVersion: "0.0.0"
           description: "The mode the cluster will be in. Possible values are false for standalone mode and true for distributed mode. If false, startup will run all HBase and ZooKeeper daemons together in the one JVM."
-  
+
       - property: &hbaseRootdir
           propertyNames:
             - name: "hbase.rootdir"
@@ -109,7 +108,7 @@ data:
               required: false
           asOfVersion: "0.0.0"
           description: "The directory shared by region servers and into which HBase persists. The URL should be 'fully-qualified' to include the filesystem scheme. For example, to specify the HDFS directory '/hbase' where the HDFS instance's namenode is running at namenode.example.org on port 9000, set this value to: hdfs://namenode.example.org:9000/hbase. By default, we write to whatever ${hbase.tmp.dir} is set too -- usually /tmp -- so change this configuration or else all data will be lost on machine restart."
-  
+
       - property: &hbaseZookeeperQuorum
           propertyNames:
             - name: "hbase.zookeeper.quorum"
@@ -130,11 +129,11 @@ data:
               required: false
           asOfVersion: "0.0.0"
           description: "Comma separated list of servers in the ZooKeeper ensemble (This config. should have been named hbase.zookeeper.ensemble). For example, \"host1.mydomain.com,host2.mydomain.com,host3.mydomain.com\". By default this is set to localhost for local and pseudo-distributed modes of operation. For a fully-distributed setup, this should be set to a full list of ZooKeeper ensemble servers. If HBASE_MANAGES_ZK is set in hbase-env.sh this is the list of servers which hbase will start/stop ZooKeeper on as part of cluster start/stop. Client-side, we will take this list of ensemble members and put it together with the hbase.zookeeper.property.clientPort config. and pass it into zookeeper constructor as the connectString parameter."
-  
+
       #################################################################################################
       # hdfs-site.xml
       #################################################################################################
-  
+
       - property: &hdfsConfig
           propertyNames:
             - name: "content"
@@ -159,8 +158,6 @@ kind: ConfigMap
 metadata:
   name: hbase-operator-configmap
   labels:
-    helm.sh/chart: hbase-operator-0.3.0-nightly
     app.kubernetes.io/name: hbase-operator
     app.kubernetes.io/instance: hbase-operator
     app.kubernetes.io/version: "0.3.0-nightly"
-    app.kubernetes.io/managed-by: Helm
