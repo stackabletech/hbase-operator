@@ -3,7 +3,7 @@
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_hbase_crd::{
     HbaseCluster, HbaseConfig, HbaseRole, APP_NAME, HBASE_ENV_SH, HBASE_MASTER_PORT,
-    HBASE_REGIONSERVER_PORT, HBASE_REST_PORT, HBASE_SITE_XML, HDFS_CONFIG, HDFS_SITE_XML,
+    HBASE_REGIONSERVER_PORT, HBASE_REST_PORT, HBASE_SITE_XML,
 };
 use stackable_operator::{
     builder::{ConfigMapBuilder, ContainerBuilder, ObjectMetaBuilder, PodBuilder},
@@ -18,7 +18,7 @@ use stackable_operator::{
         },
         apimachinery::pkg::{apis::meta::v1::LabelSelector, util::intstr::IntOrString},
     },
-    kube::runtime::controller::{Context, ReconcilerAction},
+    kube::runtime::controller::{Action, Context},
     labels::{role_group_selector_labels, role_selector_labels},
     logging::controller::ReconcilerError,
     product_config::{types::PropertyNameKind, writer, ProductConfigManager},
@@ -35,6 +35,8 @@ use strum::{EnumDiscriminants, IntoStaticStr};
 const FIELD_MANAGER_SCOPE: &str = "hbasecluster";
 
 const CONFIG_DIR_NAME: &str = "/stackable/conf";
+const HDFS_DISCOVERY_TMP_DIR: &str = "/stackable/tmp/hdfs";
+const HBASE_CONFIG_TMP_DIR: &str = "/stackable/tmp/hbase";
 
 pub struct Ctx {
     pub client: stackable_operator::client::Client,
@@ -107,10 +109,7 @@ impl ReconcilerError for Error {
     }
 }
 
-pub async fn reconcile_hbase(
-    hbase: Arc<HbaseCluster>,
-    ctx: Context<Ctx>,
-) -> Result<ReconcilerAction> {
+pub async fn reconcile_hbase(hbase: Arc<HbaseCluster>, ctx: Context<Ctx>) -> Result<Action> {
     tracing::info!("Starting reconcile");
 
     let client = &ctx.get_ref().client;
@@ -119,7 +118,6 @@ pub async fn reconcile_hbase(
     let mut hbase = hbase.as_ref().clone();
     if let Some(config) = &mut hbase.spec.config {
         apply_zookeeper_configmap(client, namespace, config).await?;
-        apply_hdfs_configmap(client, namespace, config).await?;
     }
     for role in [
         &mut hbase.spec.masters,
@@ -130,13 +128,11 @@ pub async fn reconcile_hbase(
     .flatten()
     {
         apply_zookeeper_configmap(client, namespace, &mut role.config.config).await?;
-        apply_hdfs_configmap(client, namespace, &mut role.config.config).await?;
     }
 
     let config_types = vec![
         PropertyNameKind::File(HBASE_ENV_SH.to_string()),
         PropertyNameKind::File(HBASE_SITE_XML.to_string()),
-        PropertyNameKind::File(HDFS_SITE_XML.to_string()),
     ];
 
     let mut roles: HashMap<String, _> = [
@@ -219,9 +215,7 @@ pub async fn reconcile_hbase(
         }
     }
 
-    Ok(ReconcilerAction {
-        requeue_after: None,
-    })
+    Ok(Action::await_change())
 }
 
 async fn apply_zookeeper_configmap(
@@ -234,20 +228,6 @@ async fn apply_zookeeper_configmap(
             .await
             .context(NoZookeeperUrlsSnafu)?;
         config.hbase_zookeeper_quorum = Some(value);
-    }
-    Ok(())
-}
-
-async fn apply_hdfs_configmap(
-    client: &Client,
-    namespace: &str,
-    config: &mut HbaseConfig,
-) -> Result<()> {
-    if let Some(config_map_name) = &config.hdfs_config_map_name {
-        let value = get_value_from_config_map(client, config_map_name, namespace, "hdfs-site.xml")
-            .await
-            .context(NoHdfsSiteConfigSnafu)?;
-        config.hdfs_config = Some(value);
     }
     Ok(())
 }
@@ -349,13 +329,6 @@ fn build_rolegroup_config_map(
         )
         .add_data(HBASE_ENV_SH, write_hbase_env_sh(hbase_env_config.iter()));
 
-    if let Some(hdfs_config) = rolegroup_config
-        .get(&PropertyNameKind::File(HDFS_SITE_XML.to_string()))
-        .and_then(|m| m.get(HDFS_CONFIG).cloned())
-    {
-        builder.add_data(HDFS_SITE_XML, hdfs_config);
-    };
-
     builder.build().map_err(|e| Error::BuildRoleGroupConfig {
         source: e,
         rolegroup: rolegroup.clone(),
@@ -437,8 +410,14 @@ fn build_rolegroup_statefulset(
         hbase_version
     );
 
+    let hdfs_discovery_cm_name = hbase
+        .spec
+        .config
+        .as_ref()
+        .and_then(|config| config.hdfs_config_map_name.as_ref())
+        .cloned();
+
     let role = serde_yaml::from_str::<HbaseRole>(&rolegroup_ref.role).unwrap();
-    let command = role.command();
 
     let ports = role
         .port_properties()
@@ -480,13 +459,42 @@ fn build_rolegroup_statefulset(
 
     let container = ContainerBuilder::new("hbase")
         .image(image)
-        .command(command)
+        .command(vec![
+            "/bin/bash".to_string(),
+            "-x".to_string(),
+            "-euo".to_string(),
+            "pipefail".to_string(),
+            "-c".to_string(),
+        ])
+        .args(vec![[
+            format!("mkdir -p {}", CONFIG_DIR_NAME),
+            format!(
+                "cp {}/hdfs-site.xml {}",
+                HDFS_DISCOVERY_TMP_DIR, CONFIG_DIR_NAME
+            ),
+            format!(
+                "cp {}/core-site.xml {}",
+                HDFS_DISCOVERY_TMP_DIR, CONFIG_DIR_NAME
+            ),
+            format!("cp {}/* {}", HBASE_CONFIG_TMP_DIR, CONFIG_DIR_NAME),
+            format!(
+                "bin/hbase {} start",
+                match role {
+                    HbaseRole::Master => "master",
+                    HbaseRole::RegionServer => "regionserver",
+                    HbaseRole::RestServer => "rest",
+                }
+            ),
+        ]
+        .join(" && ")])
         .add_env_var("HBASE_CONF_DIR", CONFIG_DIR_NAME)
-        .add_volume_mount("config", CONFIG_DIR_NAME)
+        .add_volume_mount("hbase-config", HBASE_CONFIG_TMP_DIR)
+        .add_volume_mount("hdfs-discovery", HDFS_DISCOVERY_TMP_DIR)
         .add_container_ports(ports)
         .readiness_probe(probe.to_owned())
         .liveness_probe(probe)
         .build();
+
     Ok(StatefulSet {
         metadata: ObjectMetaBuilder::new()
             .name_and_namespace(hbase)
@@ -526,9 +534,17 @@ fn build_rolegroup_statefulset(
                 })
                 .add_container(container)
                 .add_volume(stackable_operator::k8s_openapi::api::core::v1::Volume {
-                    name: "config".to_string(),
+                    name: "hbase-config".to_string(),
                     config_map: Some(ConfigMapVolumeSource {
                         name: Some(rolegroup_ref.object_name()),
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                })
+                .add_volume(stackable_operator::k8s_openapi::api::core::v1::Volume {
+                    name: "hdfs-discovery".to_string(),
+                    config_map: Some(ConfigMapVolumeSource {
+                        name: hdfs_discovery_cm_name,
                         ..Default::default()
                     }),
                     ..Default::default()
@@ -570,8 +586,6 @@ fn rolegroup_replicas(
     }
 }
 
-pub fn error_policy(_error: &Error, _ctx: Context<Ctx>) -> ReconcilerAction {
-    ReconcilerAction {
-        requeue_after: Some(Duration::from_secs(5)),
-    }
+pub fn error_policy(_error: &Error, _ctx: Context<Ctx>) -> Action {
+    Action::requeue(Duration::from_secs(5))
 }
