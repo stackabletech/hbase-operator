@@ -461,28 +461,20 @@ fn build_rolegroup_statefulset(
         .image(image)
         .command(vec![
             "/bin/bash".to_string(),
-            "-c".to_string(),
+            "-x".to_string(),
             "-euo".to_string(),
             "pipefail".to_string(),
+            "-c".to_string(),
         ])
         .args(vec![[
-            format!("echo Create dir {}", CONFIG_DIR_NAME),
-            format!("mkdir {}", CONFIG_DIR_NAME),
+            format!("mkdir -p {}", CONFIG_DIR_NAME),
             format!(
                 "cp {}/hdfs-site.xml {}",
                 HDFS_DISCOVERY_TMP_DIR, CONFIG_DIR_NAME
             ),
             format!(
-                "echo Copying core-site.xml from [{}] to config folder [{}]",
-                HDFS_DISCOVERY_TMP_DIR, CONFIG_DIR_NAME
-            ),
-            format!(
                 "cp {}/core-site.xml {}",
                 HDFS_DISCOVERY_TMP_DIR, CONFIG_DIR_NAME
-            ),
-            format!(
-                "echo Copying all files from [{}] to config folder [{}]",
-                HBASE_CONFIG_TMP_DIR, CONFIG_DIR_NAME
             ),
             format!("cp {}/* {}", HBASE_CONFIG_TMP_DIR, CONFIG_DIR_NAME),
             format!(
