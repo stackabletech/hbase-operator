@@ -1,5 +1,6 @@
 //! Ensures that `Pod`s are configured and running for each [`HbaseCluster`]
 
+use crate::discovery::build_discovery_configmap;
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_hbase_crd::{
     HbaseCluster, HbaseConfig, HbaseRole, APP_NAME, HBASE_ENV_SH, HBASE_MASTER_PORT,
@@ -67,6 +68,14 @@ pub enum Error {
     ApplyRoleGroupService {
         source: stackable_operator::error::Error,
         rolegroup: RoleGroupRef<HbaseCluster>,
+    },
+    #[snafu(display("failed to apply discovery configmap"))]
+    ApplyDiscoveryConfigMap {
+        source: stackable_operator::error::Error,
+    },
+    #[snafu(display("failed to build discovery configmap"))]
+    BuildDiscoveryConfigMap {
+        source: stackable_operator::error::Error,
     },
     #[snafu(display("failed to build ConfigMap for {}", rolegroup))]
     BuildRoleGroupConfig {
@@ -158,6 +167,14 @@ pub async fn reconcile_hbase(hbase: Arc<HbaseCluster>, ctx: Context<Ctx>) -> Res
         )
         .await
         .context(ApplyRoleServiceSnafu)?;
+
+    // discovery config map
+    let discovery_cm = build_discovery_configmap(&hbase, &zk_connect_string)
+        .context(BuildDiscoveryConfigMapSnafu)?;
+    client
+        .apply_patch(FIELD_MANAGER_SCOPE, &discovery_cm, &discovery_cm)
+        .await
+        .context(ApplyDiscoveryConfigMapSnafu)?;
 
     for (role_name, group_config) in validated_config.iter() {
         for (rolegroup_name, rolegroup_config) in group_config.iter() {
@@ -493,7 +510,7 @@ fn build_rolegroup_statefulset(
     })
 }
 
-fn hbase_version(hbase: &HbaseCluster) -> Result<&str> {
+pub fn hbase_version(hbase: &HbaseCluster) -> Result<&str> {
     hbase
         .spec
         .version
