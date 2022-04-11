@@ -8,6 +8,7 @@
 - Support for HBase 2.4.11 ([#148]).
 - Use cli argument `watch-namespace` / env var `WATCH_NAMESPACE` to specify
   a single namespace to watch ([#137]).
+- Writing a discovery config map containing `hbase-size.xml` with the `hbase.zookeeper.quorum` property ([#163]).
 
 ## Changed
 
@@ -20,6 +21,7 @@
 [#148]: https://github.com/stackabletech/hbase-operator/pull/148
 [#153]: https://github.com/stackabletech/hbase-operator/pull/153
 [#162]: https://github.com/stackabletech/hbase-operator/pull/162
+[#163]: https://github.com/stackabletech/hbase-operator/pull/163
 
 ## [0.2.0] - 2022-02-14
 
