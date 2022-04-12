@@ -53,6 +53,8 @@ pub struct HbaseClusterSpec {
     /// Desired HBase version
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub version: Option<String>,
+    pub zookeeper_config_map_name: String,
+    pub hdfs_config_map_name: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub config: Option<HbaseConfig>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -61,16 +63,6 @@ pub struct HbaseClusterSpec {
     pub region_servers: Option<Role<HbaseConfig>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rest_servers: Option<Role<HbaseConfig>>,
-}
-
-impl HbaseCluster {
-    pub fn get_role(&self, role: HbaseRole) -> Option<&Role<HbaseConfig>> {
-        match role {
-            HbaseRole::Master => self.spec.masters.as_ref(),
-            HbaseRole::RegionServer => self.spec.region_servers.as_ref(),
-            HbaseRole::RestServer => self.spec.rest_servers.as_ref(),
-        }
-    }
 }
 
 #[derive(
@@ -114,21 +106,9 @@ impl HbaseRole {
 #[serde(rename_all = "camelCase")]
 pub struct HbaseConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub zookeeper_config_map_name: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub hdfs_config_map_name: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub hbase_cluster_distributed: Option<bool>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub hbase_rootdir: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub hbase_zookeeper_quorum: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub hbase_manages_zk: Option<bool>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub hbase_opts: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub hdfs_config: Option<String>,
 }
 
 impl Configuration for HbaseConfig {
@@ -166,12 +146,7 @@ impl Configuration for HbaseConfig {
 
         match file {
             HBASE_ENV_SH => {
-                if let Some(hbase_manages_zk) = self.hbase_manages_zk {
-                    result.insert(
-                        HBASE_MANAGES_ZK.to_string(),
-                        Some(hbase_manages_zk.to_string()),
-                    );
-                }
+                result.insert(HBASE_MANAGES_ZK.to_string(), Some("false".to_string()));
                 let mut all_hbase_opts = format!("-javaagent:/stackable/jmx/jmx_prometheus_javaagent-0.16.1.jar={METRICS_PORT}:/stackable/jmx/region-server.yaml");
                 if let Some(hbase_opts) = &self.hbase_opts {
                     all_hbase_opts += " ";
@@ -180,21 +155,19 @@ impl Configuration for HbaseConfig {
                 result.insert(HBASE_OPTS.to_string(), Some(all_hbase_opts));
             }
             HBASE_SITE_XML => {
-                if let Some(hbase_cluster_distributed) = self.hbase_cluster_distributed {
-                    result.insert(
-                        HBASE_CLUSTER_DISTRIBUTED.to_string(),
-                        Some(hbase_cluster_distributed.to_string()),
-                    );
-                }
-                if let Some(hbase_rootdir) = &self.hbase_rootdir {
-                    result.insert(HBASE_ROOTDIR.to_string(), Some(hbase_rootdir.to_owned()));
-                }
-                if let Some(hbase_zookeeper_quorum) = &self.hbase_zookeeper_quorum {
-                    result.insert(
-                        HBASE_ZOOKEEPER_QUORUM.to_string(),
-                        Some(hbase_zookeeper_quorum.to_owned()),
-                    );
-                }
+                result.insert(
+                    HBASE_CLUSTER_DISTRIBUTED.to_string(),
+                    Some("true".to_string()),
+                );
+                result.insert(
+                    HBASE_ROOTDIR.to_string(),
+                    Some(
+                        self.hbase_rootdir
+                            .as_deref()
+                            .unwrap_or("/hbase")
+                            .to_string(),
+                    ),
+                );
             }
             _ => {}
         }
@@ -225,6 +198,14 @@ impl HbaseCluster {
             cluster: ObjectRef::from_obj(self),
             role: role_name.into(),
             role_group: group_name.into(),
+        }
+    }
+
+    pub fn get_role(&self, role: HbaseRole) -> Option<&Role<HbaseConfig>> {
+        match role {
+            HbaseRole::Master => self.spec.masters.as_ref(),
+            HbaseRole::RegionServer => self.spec.region_servers.as_ref(),
+            HbaseRole::RestServer => self.spec.rest_servers.as_ref(),
         }
     }
 }

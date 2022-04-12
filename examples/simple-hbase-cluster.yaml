@@ -11,6 +11,14 @@ spec:
   version: 3.5.8
   stopped: false
 ---
+apiVersion: zookeeper.stackable.tech/v1alpha1
+kind: ZookeeperZnode
+metadata:
+  name: simple-hdfs-znode
+spec:
+  clusterRef:
+    name: simple-zk
+---
 apiVersion: hdfs.stackable.tech/v1alpha1
 kind: HdfsCluster
 metadata:
@@ -58,7 +66,7 @@ spec:
 apiVersion: zookeeper.stackable.tech/v1alpha1
 kind: ZookeeperZnode
 metadata:
-  name: simple-hdfs-znode
+  name: simple-hbase-znode
 spec:
   clusterRef:
     name: simple-zk
@@ -69,12 +77,9 @@ metadata:
   name: simple-hbase
 spec:
   version: 2.4.11
+  hdfsConfigMapName: simple-hdfs
+  zookeeperConfigMapName: simple-hbase-znode
   config:
-    hdfsConfigMapName: simple-hdfs
-    zookeeperConfigMapName: simple-hbase-znode
-    hbaseManagesZk: false
-    hbaseOpts:
-    hbaseClusterDistributed: true
     hbaseRootdir: /hbase
   masters:
     roleGroups:
@@ -97,11 +102,3 @@ spec:
           matchLabels:
             kubernetes.io/os: linux
         replicas: 1
----
-apiVersion: zookeeper.stackable.tech/v1alpha1
-kind: ZookeeperZnode
-metadata:
-  name: simple-hbase-znode
-spec:
-  clusterRef:
-    name: simple-zk
