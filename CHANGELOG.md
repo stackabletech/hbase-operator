@@ -8,7 +8,7 @@
 - Support for HBase 2.4.11 ([#148]).
 - Use cli argument `watch-namespace` / env var `WATCH_NAMESPACE` to specify
   a single namespace to watch ([#137]).
-- Writing a discovery config map containing `hbase-size.xml` with the `hbase.zookeeper.quorum` property ([#163]).
+- Writing a discovery config map containing `hbase-site.xml` with the `hbase.zookeeper.quorum` property ([#163]).
 
 ## Changed
 
