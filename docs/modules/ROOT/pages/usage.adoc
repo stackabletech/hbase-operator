@@ -22,7 +22,7 @@ spec:
   zookeeperConfigMapName: simple-hbase-znode
   config:
     hbaseOpts:
-    hbaseRootdir: hdfs://simple-hdfs/hbase
+    hbaseRootdir: /hbase
   masters:
     roleGroups:
       default:
