@@ -21,6 +21,7 @@ spec:
   hdfsConfigMapName: simple-hdfs-namenode-default
   zookeeperConfigMapName: simple-hbase-znode
   config:
+    hbaseOpts:
     hbaseRootdir: hdfs://simple-hdfs/hbase
   masters:
     roleGroups:
@@ -53,11 +54,10 @@ spec:
     name: simple-zk
 ----
 
-`hdfsConfigMapName` references the config map created by the Stackable HDFS operator.
-
-`zookeeperConfigMapName` references the config map created by the Stackable ZooKeeper operator.
-
-`hbaseRootdir` is mapped to `hbase.rootdir` in `hbase-site.xml`.
+- `hdfsConfigMapName` references the config map created by the Stackable HDFS operator.
+- `zookeeperConfigMapName` references the config map created by the Stackable ZooKeeper operator.
+- `hbaseOpts` is mapped to the environment variable `HBASE_OPTS` in `hbase-env.sh`.
+- `hbaseRootdir` is mapped to `hbase.rootdir` in `hbase-site.xml`.
 
 == Monitoring
 
