@@ -13,7 +13,9 @@
 
 - `operator-rs` `0.12.0` -> `0.15.0` ([#137], [#153]).
 - Now using HDFS discovery config map instead of hdfs name node config map ([#153])
-- BREAKING: Consolidated CRD - discovery config maps now top level, removed several `HbaseConfig` options ([#162]).
+- BREAKING: Consolidated CRD - discovery config maps now top level, removed several `HbaseConfig` options (can still be overridden) ([#162]):
+  - `hbaseManagesZk`: defaults to false
+  - `hbaseClusterDistributed`: defaults to true
 
 [#133]: https://github.com/stackabletech/hbase-operator/pull/133
 [#137]: https://github.com/stackabletech/hbase-operator/pull/137
