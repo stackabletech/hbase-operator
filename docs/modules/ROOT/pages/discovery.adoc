@@ -31,7 +31,7 @@ The resulting discovery `ConfigMap` is located at `{namespace}/{clusterName}`.
 
 == Contents
 
-The `ConfigMap` data values are formatted as Hadoop XML files which allows simple mounting of that ConfigMap into pods that require access to HBase.
+The `ConfigMap` data values are formatted as Hadoop XML files which allows simple mounting of that `ConfigMap` into pods that require access to HBase.
 
 `hbase-site.xml`::
 Contains the `hbase.zookeeper.quorum` property.
