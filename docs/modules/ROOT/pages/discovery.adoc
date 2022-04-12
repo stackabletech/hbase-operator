@@ -21,7 +21,6 @@ spec:
   zookeeperConfigMapName: {zookeeper-znode-name} #<4>
   config:
     hbaseRootdir: /hbase
-  [...]
 ----
 <1> The name of the HBase cluster, which is also the name of the created discovery `ConfigMap`.
 <2> The namespace of the discovery `ConfigMap`.
