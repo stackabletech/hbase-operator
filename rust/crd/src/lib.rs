@@ -159,15 +159,7 @@ impl Configuration for HbaseConfig {
                     HBASE_CLUSTER_DISTRIBUTED.to_string(),
                     Some("true".to_string()),
                 );
-                result.insert(
-                    HBASE_ROOTDIR.to_string(),
-                    Some(
-                        self.hbase_rootdir
-                            .as_deref()
-                            .unwrap_or("/hbase")
-                            .to_string(),
-                    ),
-                );
+                result.insert(HBASE_ROOTDIR.to_string(), Some(resource.root_dir()));
             }
             _ => {}
         }
@@ -207,5 +199,14 @@ impl HbaseCluster {
             HbaseRole::RegionServer => self.spec.region_servers.as_ref(),
             HbaseRole::RestServer => self.spec.rest_servers.as_ref(),
         }
+    }
+
+    pub fn root_dir(&self) -> String {
+        self.spec
+            .config
+            .as_ref()
+            .and_then(|c| c.hbase_rootdir.as_deref())
+            .unwrap_or("/hbase")
+            .to_string()
     }
 }

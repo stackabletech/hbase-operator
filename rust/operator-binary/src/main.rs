@@ -1,3 +1,4 @@
+mod discovery;
 mod hbase_controller;
 
 use clap::Parser;
