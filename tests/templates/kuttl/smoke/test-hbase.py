@@ -4,13 +4,14 @@ import requests
 import xml.etree.ElementTree as ET
 import sys
 
+
 class HbaseClient:
     def __init__(self):
         self.session = requests.Session()
         self.session.headers.update({
-                'Accept': 'text/xml',
-                'Content-Type': 'text/xml',
-            })
+            'Accept': 'text/xml',
+            'Content-Type': 'text/xml',
+        })
         http.client.HTTPConnection.debuglevel = 1
 
     @staticmethod
@@ -23,13 +24,13 @@ class HbaseClient:
 
     def create_table(self, rest_url, name, column_family):
         response = self.session.put(
-                f'{rest_url}/{name}/schema',
-                data = f'''
+            f'{rest_url}/{name}/schema',
+            data=f'''
                     <TableSchema name="{name}">
                         <ColumnSchema name="{column_family}" />
                     </TableSchema>
                 '''
-            )
+        )
         assert response.status_code == 201
         table_schema_location = response.headers['location']
         table_location = table_schema_location.removesuffix('/schema')
@@ -42,8 +43,8 @@ class HbaseClient:
     def put_row(self, table_location, row_key, column_family, column, cell_value):
         cell_column = f'{column_family}:{column}'
         response = self.session.put(
-                f'{table_location}/{row_key}',
-                data = f'''
+            f'{table_location}/{row_key}',
+            data=f'''
                     <CellSet>
                         <Row key="{self.encode_value(row_key)}">
                             <Cell column="{self.encode_value(cell_column)}">
@@ -52,14 +53,14 @@ class HbaseClient:
                         </Row>
                     </CellSet>
                 '''
-            )
+        )
         assert response.status_code == 200
 
     def put_scanner(self, table_location):
         response = self.session.put(
-                f'{table_location}/scanner',
-                data = '<Scanner batch="1" />'
-            )
+            f'{table_location}/scanner',
+            data='<Scanner batch="1" />'
+        )
         assert response.status_code == 201
         return response.headers['location']
 
@@ -72,6 +73,7 @@ class HbaseClient:
         response = self.session.delete(scanner_location)
         assert response.status_code == 200
 
+
 hbase_rest_url = sys.argv[1]
 
 hbase = HbaseClient()
@@ -81,22 +83,22 @@ Create a table
 ==============''')
 column_family = 'cf'
 (table_location, table_schema_location) = hbase.create_table(
-        rest_url = hbase_rest_url,
-        name = 'companies',
-        column_family = column_family
-    )
+    rest_url=hbase_rest_url,
+    name='companies',
+    column_family=column_family
+)
 
 print('''
 Write a row to the table
 ========================''')
 cell_value = 'Stackable GmbH'
 hbase.put_row(
-        table_location = table_location,
-        row_key = 'stackable',
-        column_family = column_family,
-        column = 'name',
-        cell_value = cell_value
-    )
+    table_location=table_location,
+    row_key='stackable',
+    column_family=column_family,
+    column='name',
+    cell_value=cell_value
+)
 
 print('''
 Get a scanner object
