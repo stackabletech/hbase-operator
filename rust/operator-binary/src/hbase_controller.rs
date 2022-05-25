@@ -366,10 +366,7 @@ fn build_rolegroup_statefulset(
 ) -> Result<StatefulSet> {
     let hbase_version = hbase_version(hbase)?;
 
-    let image = format!(
-        "docker.stackable.tech/stackable/hbase:{}",
-        hbase_version
-    );
+    let image = format!("docker.stackable.tech/stackable/hbase:{}", hbase_version);
 
     let role = serde_yaml::from_str::<HbaseRole>(&rolegroup_ref.role).unwrap();
 
