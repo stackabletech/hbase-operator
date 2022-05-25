@@ -8,7 +8,7 @@ spec:
     roleGroups:
       default:
         replicas: 3
-  version: 3.5.8
+  version: 3.5.8-stackable0.7.0
   stopped: false
 ---
 apiVersion: zookeeper.stackable.tech/v1alpha1
@@ -24,7 +24,7 @@ kind: HdfsCluster
 metadata:
   name: simple-hdfs
 spec:
-  version: 3.2.2
+  version: 3.2.2-stackable0.5.0
   zookeeperConfigMapName: simple-hdfs-znode
   dfsReplication: 3
   log4j: |-
@@ -76,7 +76,7 @@ kind: HbaseCluster
 metadata:
   name: simple-hbase
 spec:
-  version: 2.4.11
+  version: 2.4.11-stackable0.6.0
   hdfsConfigMapName: simple-hdfs
   zookeeperConfigMapName: simple-hbase-znode
   config:
@@ -94,7 +94,7 @@ spec:
         selector:
           matchLabels:
             kubernetes.io/os: linux
-        replicas: 1
+        replicas: 3
   restServers:
     roleGroups:
       default:

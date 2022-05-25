@@ -367,7 +367,7 @@ fn build_rolegroup_statefulset(
     let hbase_version = hbase_version(hbase)?;
 
     let image = format!(
-        "docker.stackable.tech/stackable/hbase:{}-stackable0",
+        "docker.stackable.tech/stackable/hbase:{}",
         hbase_version
     );
 
