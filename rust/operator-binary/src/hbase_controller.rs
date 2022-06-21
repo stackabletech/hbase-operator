@@ -8,6 +8,7 @@ use stackable_hbase_crd::{
 };
 use stackable_operator::{
     builder::{ConfigMapBuilder, ContainerBuilder, ObjectMetaBuilder, PodBuilder},
+    cluster_resources::ClusterResources,
     k8s_openapi::{
         api::{
             apps::v1::{StatefulSet, StatefulSetSpec},
@@ -18,7 +19,7 @@ use stackable_operator::{
         },
         apimachinery::pkg::{apis::meta::v1::LabelSelector, util::intstr::IntOrString},
     },
-    kube::{runtime::controller::Action, ResourceExt},
+    kube::{runtime::controller::Action, Resource, ResourceExt},
     labels::{role_group_selector_labels, role_selector_labels},
     logging::controller::ReconcilerError,
     product_config::{types::PropertyNameKind, writer, ProductConfigManager},
@@ -57,17 +58,8 @@ pub enum Error {
     NoRegionServerRole,
     #[snafu(display("failed to calculate global service name"))]
     GlobalServiceNameNotFound,
-    #[snafu(display("failed to apply global Service"))]
-    ApplyRoleService {
-        source: stackable_operator::error::Error,
-    },
-    #[snafu(display("failed to apply Service for {}", rolegroup))]
-    ApplyRoleGroupService {
-        source: stackable_operator::error::Error,
-        rolegroup: RoleGroupRef<HbaseCluster>,
-    },
-    #[snafu(display("failed to apply discovery configmap"))]
-    ApplyDiscoveryConfigMap {
+    #[snafu(display("failed to update cluster resources"))]
+    UpdateClusterResources {
         source: stackable_operator::error::Error,
     },
     #[snafu(display("failed to build discovery configmap"))]
@@ -76,16 +68,6 @@ pub enum Error {
     },
     #[snafu(display("failed to build ConfigMap for {}", rolegroup))]
     BuildRoleGroupConfig {
-        source: stackable_operator::error::Error,
-        rolegroup: RoleGroupRef<HbaseCluster>,
-    },
-    #[snafu(display("failed to apply ConfigMap for {}", rolegroup))]
-    ApplyRoleGroupConfig {
-        source: stackable_operator::error::Error,
-        rolegroup: RoleGroupRef<HbaseCluster>,
-    },
-    #[snafu(display("failed to apply StatefulSet for {}", rolegroup))]
-    ApplyRoleGroupStatefulSet {
         source: stackable_operator::error::Error,
         rolegroup: RoleGroupRef<HbaseCluster>,
     },
@@ -155,55 +137,48 @@ pub async fn reconcile_hbase(hbase: Arc<HbaseCluster>, ctx: Arc<Ctx>) -> Result<
     )
     .context(InvalidProductConfigSnafu)?;
 
+    let mut cluster_services = Vec::new();
+    let mut cluster_configmaps = Vec::new();
+    let mut cluster_statefulsets = Vec::new();
+
     let region_server_role_service = build_region_server_role_service(&hbase)?;
-    client
-        .apply_patch(
-            FIELD_MANAGER_SCOPE,
-            &region_server_role_service,
-            &region_server_role_service,
-        )
-        .await
-        .context(ApplyRoleServiceSnafu)?;
+    cluster_services.push(region_server_role_service);
 
     // discovery config map
     let discovery_cm = build_discovery_configmap(&hbase, &zk_connect_string)
         .context(BuildDiscoveryConfigMapSnafu)?;
-    client
-        .apply_patch(FIELD_MANAGER_SCOPE, &discovery_cm, &discovery_cm)
-        .await
-        .context(ApplyDiscoveryConfigMapSnafu)?;
+    cluster_configmaps.push(discovery_cm);
 
     for (role_name, group_config) in validated_config.iter() {
         for (rolegroup_name, rolegroup_config) in group_config.iter() {
             let rolegroup = hbase.server_rolegroup_ref(role_name, rolegroup_name);
             let rg_service = build_rolegroup_service(&hbase, &rolegroup, rolegroup_config)?;
+            cluster_services.push(rg_service);
+
             let rg_configmap = build_rolegroup_config_map(
                 &hbase,
                 &rolegroup,
                 rolegroup_config,
                 &zk_connect_string,
             )?;
+            cluster_configmaps.push(rg_configmap);
+
             let rg_statefulset = build_rolegroup_statefulset(&hbase, &rolegroup, rolegroup_config)?;
-            client
-                .apply_patch(FIELD_MANAGER_SCOPE, &rg_service, &rg_service)
-                .await
-                .with_context(|_| ApplyRoleGroupServiceSnafu {
-                    rolegroup: rolegroup.clone(),
-                })?;
-            client
-                .apply_patch(FIELD_MANAGER_SCOPE, &rg_configmap, &rg_configmap)
-                .await
-                .with_context(|_| ApplyRoleGroupConfigSnafu {
-                    rolegroup: rolegroup.clone(),
-                })?;
-            client
-                .apply_patch(FIELD_MANAGER_SCOPE, &rg_statefulset, &rg_statefulset)
-                .await
-                .with_context(|_| ApplyRoleGroupStatefulSetSnafu {
-                    rolegroup: rolegroup.clone(),
-                })?;
+            cluster_statefulsets.push(rg_statefulset);
         }
     }
+
+    ClusterResources::new(
+        APP_NAME,
+        FIELD_MANAGER_SCOPE,
+        &hbase.object_ref(&()),
+        &cluster_services,
+        &cluster_configmaps,
+        &cluster_statefulsets,
+    )
+    .update(client)
+    .await
+    .context(UpdateClusterResourcesSnafu)?;
 
     Ok(Action::await_change())
 }

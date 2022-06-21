@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## Changed
+
+- Startup probe created and thresholds in liveness and readiness probes fine-tuned ([#193]).
+- Orphaned resources are deleted
+
+[#193]: https://github.com/stackabletech/hbase-operator/pull/193
+
 ## [0.3.0] - 2022-06-30
 
 ### Added
@@ -21,7 +28,6 @@
   - `hbaseManagesZk`: defaults to false
   - `hbaseClusterDistributed`: defaults to true
 - [BREAKING] Specifying the product version has been changed to adhere to [ADR018](https://docs.stackable.tech/home/contributor/adr/ADR018-product_image_versioning.html) instead of just specifying the product version you will now have to add the Stackable image version as well, so `version: 3.5.8` becomes (for example) `version: 3.5.8-stackable0.1.0` ([#179])
-- Startup probe created and thresholds in liveness and readiness probes fine-tuned ([#193]).
 
 [#133]: https://github.com/stackabletech/hbase-operator/pull/133
 [#137]: https://github.com/stackabletech/hbase-operator/pull/137
@@ -30,7 +36,6 @@
 [#162]: https://github.com/stackabletech/hbase-operator/pull/162
 [#163]: https://github.com/stackabletech/hbase-operator/pull/163
 [#179]: https://github.com/stackabletech/hbase-operator/pull/179
-[#193]: https://github.com/stackabletech/hbase-operator/pull/193
 [#197]: https://github.com/stackabletech/hbase-operator/pull/197
 
 ## [0.2.0] - 2022-02-14
