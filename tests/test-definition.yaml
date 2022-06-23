@@ -21,3 +21,8 @@ tests:
       - hbase
       - zookeeper
       - hdfs
+  - name: orphaned_resources
+    dimensions:
+      - hbase
+      - zookeeper
+      - hdfs

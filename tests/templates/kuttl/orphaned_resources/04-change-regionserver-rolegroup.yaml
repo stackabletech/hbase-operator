@@ -1,0 +1,11 @@
+---
+apiVersion: hbase.stackable.tech/v1alpha1
+kind: HbaseCluster
+metadata:
+  name: test-hbase
+spec:
+  regionServers:
+    roleGroups:
+      default: null
+      newrolegroup:
+        replicas: 1
