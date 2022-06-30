@@ -3,7 +3,7 @@ dimensions:
   - name: hdfs
     values:
       - 3.2.2-stackable0.5.0
-      - 3.3.3-stackable0.5.0
+      - 3.3.3-stackable0.1.0
   - name: hbase
     values:
       - 2.4.8-stackable0.6.0
