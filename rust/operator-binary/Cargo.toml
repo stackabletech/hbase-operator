@@ -3,7 +3,7 @@ name = "stackable-hbase-operator"
 authors = ["Stackable GmbH <info@stackable.de>"]
 description = "Stackable Operator for Apache HBase"
 license = "OSL-3.0"
-version = "0.3.0-nightly"
+version = "0.3.0"
 edition = "2021"
 repository = "https://github.com/stackabletech/hbase-operator"
 
