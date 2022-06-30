@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.3.0] - 2022-06-30
+
 ### Added
 
 - Support for HBase 2.4.9 ([#133]).
