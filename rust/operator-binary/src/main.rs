@@ -1,17 +1,15 @@
 mod discovery;
 mod hbase_controller;
 
+use std::sync::Arc;
+
 use clap::Parser;
 use futures::StreamExt;
 use stackable_hbase_crd::{HbaseCluster, APP_NAME};
 use stackable_operator::{
     cli::{Command, ProductOperatorRun},
     k8s_openapi::api::{apps::v1::StatefulSet, core::v1::Service},
-    kube::{
-        api::ListParams,
-        runtime::{controller::Context, Controller},
-        CustomResourceExt,
-    },
+    kube::{api::ListParams, runtime::controller::Controller, CustomResourceExt},
     logging::controller::report_controller_reconciled,
 };
 
@@ -73,7 +71,7 @@ async fn main() -> anyhow::Result<()> {
             .run(
                 hbase_controller::reconcile_hbase,
                 hbase_controller::error_policy,
-                Context::new(hbase_controller::Ctx {
+                Arc::new(hbase_controller::Ctx {
                     client: client.clone(),
                     product_config,
                 }),
