@@ -1,5 +1,7 @@
-:clusterName: \{clusterName\}
+:cluster-name: \{cluster-name\}
 :namespace: \{namespace\}
+:hdfs-cluster-name: \{hdfs-cluster-name\}
+:zookeeper-znode-name: \{zookeeper-znode-name\}
 
 = Discovery
 
@@ -14,11 +16,11 @@ Given the following HBase cluster:
 apiVersion: hbase.stackable.tech/v1alpha1
 kind: HbaseCluster
 metadata:
-  name: {clusterName} # <1>
+  name: {cluster-name} # <1>
   namespace: {namespace} # <2>
 spec:
-  hdfsConfigMapName: \{hdfs-cluster-name} #<3>
-  zookeeperConfigMapName: \{zookeeper-znode-name} #<4>
+  hdfsConfigMapName: {hdfs-cluster-name} #<3>
+  zookeeperConfigMapName: {zookeeper-znode-name} #<4>
   config:
     hbaseRootdir: /hbase
 ----
@@ -27,7 +29,7 @@ spec:
 <3> The `ConfigMap` name to discover the HDFS cluster.
 <4> The `ConfigMap` name to discover the ZooKeeper cluster.
 
-The resulting discovery `ConfigMap` is located at `{namespace}/{clusterName}`.
+The resulting discovery `ConfigMap` is located at `{namespace}/{cluster-name}`.
 
 == Contents
 
