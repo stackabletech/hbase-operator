@@ -3,7 +3,7 @@ mod hbase_controller;
 
 use clap::Parser;
 use futures::StreamExt;
-use stackable_hbase_crd::HbaseCluster;
+use stackable_hbase_crd::{HbaseCluster, APP_NAME};
 use stackable_operator::{
     cli::{Command, ProductOperatorRun},
     k8s_openapi::api::{apps::v1::StatefulSet, core::v1::Service},
@@ -28,15 +28,19 @@ struct Opts {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    stackable_operator::logging::initialize_logging("HBASE_OPERATOR_LOG");
-
     let opts = Opts::parse();
     match opts.cmd {
         Command::Crd => println!("{}", serde_yaml::to_string(&HbaseCluster::crd())?,),
         Command::Run(ProductOperatorRun {
             product_config,
             watch_namespace,
+            tracing_target,
         }) => {
+            stackable_operator::logging::initialize_logging(
+                "HBASE_OPERATOR_LOG",
+                APP_NAME,
+                tracing_target,
+            );
             stackable_operator::utils::print_startup_string(
                 built_info::PKG_DESCRIPTION,
                 built_info::PKG_VERSION,
