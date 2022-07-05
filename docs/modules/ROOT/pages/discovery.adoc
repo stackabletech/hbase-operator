@@ -1,5 +1,7 @@
-:clusterName: \{clusterName\}
+:clusterName: \{cluster-name\}
 :namespace: \{namespace\}
+:hdfs-cluster-name: \{hdfs-cluster-name\}
+:zookeeper-znode-name: \{zookeeper-znode-name\}
 
 = Discovery
 
@@ -17,8 +19,8 @@ metadata:
   name: {clusterName} # <1>
   namespace: {namespace} # <2>
 spec:
-  hdfsConfigMapName: \{hdfs-cluster-name} #<3>
-  zookeeperConfigMapName: \{zookeeper-znode-name} #<4>
+  hdfsConfigMapName: {hdfs-cluster-name} #<3>
+  zookeeperConfigMapName: {zookeeper-znode-name} #<4>
   config:
     hbaseRootdir: /hbase
 ----
