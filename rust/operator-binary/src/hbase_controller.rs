@@ -378,9 +378,8 @@ fn build_rolegroup_statefulset(
         })
         .collect();
 
-    let probe = match role {
+    let probe_template = match role {
         HbaseRole::Master => Probe {
-            initial_delay_seconds: Some(30),
             tcp_socket: Some(TCPSocketAction {
                 port: IntOrString::Int(HBASE_MASTER_PORT),
                 ..TCPSocketAction::default()
@@ -388,7 +387,6 @@ fn build_rolegroup_statefulset(
             ..Probe::default()
         },
         HbaseRole::RegionServer => Probe {
-            initial_delay_seconds: Some(30),
             tcp_socket: Some(TCPSocketAction {
                 port: IntOrString::Int(HBASE_REGIONSERVER_PORT),
                 ..TCPSocketAction::default()
@@ -396,13 +394,32 @@ fn build_rolegroup_statefulset(
             ..Probe::default()
         },
         HbaseRole::RestServer => Probe {
-            initial_delay_seconds: Some(30),
             http_get: Some(HTTPGetAction {
                 port: IntOrString::Int(HBASE_REST_PORT),
                 ..HTTPGetAction::default()
             }),
             ..Probe::default()
         },
+    };
+
+    let startup_probe = Probe {
+        failure_threshold: Some(120),
+        initial_delay_seconds: Some(4),
+        period_seconds: Some(5),
+        timeout_seconds: Some(3),
+        ..probe_template.clone()
+    };
+    let liveness_probe = Probe {
+        failure_threshold: Some(3),
+        period_seconds: Some(10),
+        timeout_seconds: Some(3),
+        ..probe_template.clone()
+    };
+    let readiness_probe = Probe {
+        failure_threshold: Some(1),
+        period_seconds: Some(10),
+        timeout_seconds: Some(2),
+        ..probe_template
     };
 
     let container = ContainerBuilder::new("hbase")
@@ -439,8 +456,9 @@ fn build_rolegroup_statefulset(
         .add_volume_mount("hbase-config", HBASE_CONFIG_TMP_DIR)
         .add_volume_mount("hdfs-discovery", HDFS_DISCOVERY_TMP_DIR)
         .add_container_ports(ports)
-        .readiness_probe(probe.to_owned())
-        .liveness_probe(probe)
+        .startup_probe(startup_probe)
+        .liveness_probe(liveness_probe)
+        .readiness_probe(readiness_probe)
         .build();
 
     Ok(StatefulSet {
