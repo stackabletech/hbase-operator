@@ -58,6 +58,10 @@ pub enum Error {
     NoRegionServerRole,
     #[snafu(display("failed to calculate global service name"))]
     GlobalServiceNameNotFound,
+    #[snafu(display("failed to create cluster resources"))]
+    CreateClusterResources {
+        source: stackable_operator::error::Error,
+    },
     #[snafu(display("failed to update cluster resources"))]
     UpdateClusterResources {
         source: stackable_operator::error::Error,
@@ -168,7 +172,7 @@ pub async fn reconcile_hbase(hbase: Arc<HbaseCluster>, ctx: Arc<Ctx>) -> Result<
         }
     }
 
-    ClusterResources::new(
+    let mut cluster_resources = ClusterResources::new(
         APP_NAME,
         FIELD_MANAGER_SCOPE,
         &hbase.object_ref(&()),
@@ -176,9 +180,12 @@ pub async fn reconcile_hbase(hbase: Arc<HbaseCluster>, ctx: Arc<Ctx>) -> Result<
         &cluster_configmaps,
         &cluster_statefulsets,
     )
-    .update(client)
-    .await
-    .context(UpdateClusterResourcesSnafu)?;
+    .context(CreateClusterResourcesSnafu)?;
+
+    cluster_resources
+        .update(client)
+        .await
+        .context(UpdateClusterResourcesSnafu)?;
 
     Ok(Action::await_change())
 }
