@@ -33,7 +33,7 @@ use std::{
 };
 use strum::{EnumDiscriminants, IntoStaticStr};
 
-const FIELD_MANAGER_SCOPE: &str = "hbasecluster";
+const OPERATOR_NAME: &str = "hbase-operator";
 
 const CONFIG_DIR_NAME: &str = "/stackable/conf";
 const HDFS_DISCOVERY_TMP_DIR: &str = "/stackable/tmp/hdfs";
@@ -62,8 +62,21 @@ pub enum Error {
     CreateClusterResources {
         source: stackable_operator::error::Error,
     },
-    #[snafu(display("failed to update cluster resources"))]
-    UpdateClusterResources {
+    #[snafu(display("failed to delete orphaned resources"))]
+    DeleteOrphanedResources {
+        source: stackable_operator::error::Error,
+    },
+    #[snafu(display("failed to apply global Service"))]
+    ApplyRoleService {
+        source: stackable_operator::error::Error,
+    },
+    #[snafu(display("failed to apply Service for {}", rolegroup))]
+    ApplyRoleGroupService {
+        source: stackable_operator::error::Error,
+        rolegroup: RoleGroupRef<HbaseCluster>,
+    },
+    #[snafu(display("failed to apply discovery configmap"))]
+    ApplyDiscoveryConfigMap {
         source: stackable_operator::error::Error,
     },
     #[snafu(display("failed to build discovery configmap"))]
@@ -72,6 +85,16 @@ pub enum Error {
     },
     #[snafu(display("failed to build ConfigMap for {}", rolegroup))]
     BuildRoleGroupConfig {
+        source: stackable_operator::error::Error,
+        rolegroup: RoleGroupRef<HbaseCluster>,
+    },
+    #[snafu(display("failed to apply ConfigMap for {}", rolegroup))]
+    ApplyRoleGroupConfig {
+        source: stackable_operator::error::Error,
+        rolegroup: RoleGroupRef<HbaseCluster>,
+    },
+    #[snafu(display("failed to apply StatefulSet for {}", rolegroup))]
+    ApplyRoleGroupStatefulSet {
         source: stackable_operator::error::Error,
         rolegroup: RoleGroupRef<HbaseCluster>,
     },
@@ -141,51 +164,60 @@ pub async fn reconcile_hbase(hbase: Arc<HbaseCluster>, ctx: Arc<Ctx>) -> Result<
     )
     .context(InvalidProductConfigSnafu)?;
 
-    let mut cluster_services = Vec::new();
-    let mut cluster_configmaps = Vec::new();
-    let mut cluster_statefulsets = Vec::new();
+    let mut cluster_resources =
+        ClusterResources::new(APP_NAME, OPERATOR_NAME, &hbase.object_ref(&()))
+            .context(CreateClusterResourcesSnafu)?;
 
     let region_server_role_service = build_region_server_role_service(&hbase)?;
-    cluster_services.push(region_server_role_service);
+    cluster_resources
+        .add_service(client, &region_server_role_service)
+        .await
+        .context(ApplyRoleServiceSnafu)?;
 
     // discovery config map
-    let discovery_cm = build_discovery_configmap(&hbase, &zk_connect_string)
+    let discovery_cm = build_discovery_configmap(&hbase, &zk_connect_string, OPERATOR_NAME)
         .context(BuildDiscoveryConfigMapSnafu)?;
-    cluster_configmaps.push(discovery_cm);
+    cluster_resources
+        .add_configmap(client, &discovery_cm)
+        .await
+        .context(ApplyDiscoveryConfigMapSnafu)?;
 
     for (role_name, group_config) in validated_config.iter() {
         for (rolegroup_name, rolegroup_config) in group_config.iter() {
             let rolegroup = hbase.server_rolegroup_ref(role_name, rolegroup_name);
             let rg_service = build_rolegroup_service(&hbase, &rolegroup, rolegroup_config)?;
-            cluster_services.push(rg_service);
-
             let rg_configmap = build_rolegroup_config_map(
                 &hbase,
                 &rolegroup,
                 rolegroup_config,
                 &zk_connect_string,
             )?;
-            cluster_configmaps.push(rg_configmap);
-
             let rg_statefulset = build_rolegroup_statefulset(&hbase, &rolegroup, rolegroup_config)?;
-            cluster_statefulsets.push(rg_statefulset);
+            cluster_resources
+                .add_service(client, &rg_service)
+                .await
+                .with_context(|_| ApplyRoleGroupServiceSnafu {
+                    rolegroup: rolegroup.clone(),
+                })?;
+            cluster_resources
+                .add_configmap(client, &rg_configmap)
+                .await
+                .with_context(|_| ApplyRoleGroupConfigSnafu {
+                    rolegroup: rolegroup.clone(),
+                })?;
+            cluster_resources
+                .add_statefulset(client, &rg_statefulset)
+                .await
+                .with_context(|_| ApplyRoleGroupStatefulSetSnafu {
+                    rolegroup: rolegroup.clone(),
+                })?;
         }
     }
 
-    let mut cluster_resources = ClusterResources::new(
-        APP_NAME,
-        FIELD_MANAGER_SCOPE,
-        &hbase.object_ref(&()),
-        &cluster_services,
-        &cluster_configmaps,
-        &cluster_statefulsets,
-    )
-    .context(CreateClusterResourcesSnafu)?;
-
     cluster_resources
-        .update(client)
+        .finalize(client)
         .await
-        .context(UpdateClusterResourcesSnafu)?;
+        .context(DeleteOrphanedResourcesSnafu)?;
 
     Ok(Action::await_change())
 }
@@ -215,7 +247,14 @@ pub fn build_region_server_role_service(hbase: &HbaseCluster) -> Result<Service>
             .name(&role_svc_name)
             .ownerreference_from_resource(hbase, None, Some(true))
             .context(ObjectMissingMetadataForOwnerRefSnafu)?
-            .with_recommended_labels(hbase, APP_NAME, hbase_version(hbase)?, &role_name, "global")
+            .with_recommended_labels(
+                hbase,
+                APP_NAME,
+                hbase_version(hbase)?,
+                OPERATOR_NAME,
+                &role_name,
+                "global",
+            )
             .build(),
         spec: Some(ServiceSpec {
             ports: Some(ports),
@@ -267,6 +306,7 @@ fn build_rolegroup_config_map(
                     hbase,
                     APP_NAME,
                     hbase_version(hbase)?,
+                    OPERATOR_NAME,
                     &rolegroup.role,
                     &rolegroup.role_group,
                 )
@@ -314,6 +354,7 @@ fn build_rolegroup_service(
                 hbase,
                 APP_NAME,
                 hbase_version(hbase)?,
+                OPERATOR_NAME,
                 &rolegroup.role,
                 &rolegroup.role_group,
             )
@@ -453,6 +494,7 @@ fn build_rolegroup_statefulset(
                 hbase,
                 APP_NAME,
                 hbase_version,
+                OPERATOR_NAME,
                 &rolegroup_ref.role,
                 &rolegroup_ref.role_group,
             )
@@ -476,6 +518,7 @@ fn build_rolegroup_statefulset(
                         hbase,
                         APP_NAME,
                         hbase_version,
+                        OPERATOR_NAME,
                         &rolegroup_ref.role,
                         &rolegroup_ref.role_group,
                     )
