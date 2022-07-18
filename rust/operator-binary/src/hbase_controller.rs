@@ -170,7 +170,7 @@ pub async fn reconcile_hbase(hbase: Arc<HbaseCluster>, ctx: Arc<Ctx>) -> Result<
 
     let region_server_role_service = build_region_server_role_service(&hbase)?;
     cluster_resources
-        .add_service(client, &region_server_role_service)
+        .add(client, &region_server_role_service)
         .await
         .context(ApplyRoleServiceSnafu)?;
 
@@ -178,7 +178,7 @@ pub async fn reconcile_hbase(hbase: Arc<HbaseCluster>, ctx: Arc<Ctx>) -> Result<
     let discovery_cm = build_discovery_configmap(&hbase, &zk_connect_string, OPERATOR_NAME)
         .context(BuildDiscoveryConfigMapSnafu)?;
     cluster_resources
-        .add_configmap(client, &discovery_cm)
+        .add(client, &discovery_cm)
         .await
         .context(ApplyDiscoveryConfigMapSnafu)?;
 
@@ -194,19 +194,19 @@ pub async fn reconcile_hbase(hbase: Arc<HbaseCluster>, ctx: Arc<Ctx>) -> Result<
             )?;
             let rg_statefulset = build_rolegroup_statefulset(&hbase, &rolegroup, rolegroup_config)?;
             cluster_resources
-                .add_service(client, &rg_service)
+                .add(client, &rg_service)
                 .await
                 .with_context(|_| ApplyRoleGroupServiceSnafu {
                     rolegroup: rolegroup.clone(),
                 })?;
             cluster_resources
-                .add_configmap(client, &rg_configmap)
+                .add(client, &rg_configmap)
                 .await
                 .with_context(|_| ApplyRoleGroupConfigSnafu {
                     rolegroup: rolegroup.clone(),
                 })?;
             cluster_resources
-                .add_statefulset(client, &rg_statefulset)
+                .add(client, &rg_statefulset)
                 .await
                 .with_context(|_| ApplyRoleGroupStatefulSetSnafu {
                     rolegroup: rolegroup.clone(),
