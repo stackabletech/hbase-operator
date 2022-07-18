@@ -33,7 +33,7 @@ use std::{
 };
 use strum::{EnumDiscriminants, IntoStaticStr};
 
-const OPERATOR_NAME: &str = "hbase-operator";
+const CONTROLLER_NAME: &str = "hbase-operator";
 
 const CONFIG_DIR_NAME: &str = "/stackable/conf";
 const HDFS_DISCOVERY_TMP_DIR: &str = "/stackable/tmp/hdfs";
@@ -165,7 +165,7 @@ pub async fn reconcile_hbase(hbase: Arc<HbaseCluster>, ctx: Arc<Ctx>) -> Result<
     .context(InvalidProductConfigSnafu)?;
 
     let mut cluster_resources =
-        ClusterResources::new(APP_NAME, OPERATOR_NAME, &hbase.object_ref(&()))
+        ClusterResources::new(APP_NAME, CONTROLLER_NAME, &hbase.object_ref(&()))
             .context(CreateClusterResourcesSnafu)?;
 
     let region_server_role_service = build_region_server_role_service(&hbase)?;
@@ -175,7 +175,7 @@ pub async fn reconcile_hbase(hbase: Arc<HbaseCluster>, ctx: Arc<Ctx>) -> Result<
         .context(ApplyRoleServiceSnafu)?;
 
     // discovery config map
-    let discovery_cm = build_discovery_configmap(&hbase, &zk_connect_string, OPERATOR_NAME)
+    let discovery_cm = build_discovery_configmap(&hbase, &zk_connect_string, CONTROLLER_NAME)
         .context(BuildDiscoveryConfigMapSnafu)?;
     cluster_resources
         .add(client, &discovery_cm)
@@ -251,7 +251,7 @@ pub fn build_region_server_role_service(hbase: &HbaseCluster) -> Result<Service>
                 hbase,
                 APP_NAME,
                 hbase_version(hbase)?,
-                OPERATOR_NAME,
+                CONTROLLER_NAME,
                 &role_name,
                 "global",
             )
@@ -306,7 +306,7 @@ fn build_rolegroup_config_map(
                     hbase,
                     APP_NAME,
                     hbase_version(hbase)?,
-                    OPERATOR_NAME,
+                    CONTROLLER_NAME,
                     &rolegroup.role,
                     &rolegroup.role_group,
                 )
@@ -354,7 +354,7 @@ fn build_rolegroup_service(
                 hbase,
                 APP_NAME,
                 hbase_version(hbase)?,
-                OPERATOR_NAME,
+                CONTROLLER_NAME,
                 &rolegroup.role,
                 &rolegroup.role_group,
             )
@@ -494,7 +494,7 @@ fn build_rolegroup_statefulset(
                 hbase,
                 APP_NAME,
                 hbase_version,
-                OPERATOR_NAME,
+                CONTROLLER_NAME,
                 &rolegroup_ref.role,
                 &rolegroup_ref.role_group,
             )
@@ -518,7 +518,7 @@ fn build_rolegroup_statefulset(
                         hbase,
                         APP_NAME,
                         hbase_version,
-                        OPERATOR_NAME,
+                        CONTROLLER_NAME,
                         &rolegroup_ref.role,
                         &rolegroup_ref.role_group,
                     )
