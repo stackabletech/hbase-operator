@@ -14,7 +14,8 @@ pub const HBASE_ENV_SH: &str = "hbase-env.sh";
 pub const HBASE_SITE_XML: &str = "hbase-site.xml";
 
 pub const HBASE_MANAGES_ZK: &str = "HBASE_MANAGES_ZK";
-pub const HBASE_OPTS: &str = "HBASE_OPTS";
+pub const HBASE_MASTER_OPTS: &str = "HBASE_MASTER_OPTS";
+pub const BASE_REGIONSERVER_OPTS: &str = "BASE_REGIONSERVER_OPTS";
 
 pub const HBASE_CLUSTER_DISTRIBUTED: &str = "hbase.cluster.distributed";
 pub const HBASE_ROOTDIR: &str = "hbase.rootdir";
@@ -152,7 +153,10 @@ impl Configuration for HbaseConfig {
                     all_hbase_opts += " ";
                     all_hbase_opts += hbase_opts;
                 }
-                result.insert(HBASE_OPTS.to_string(), Some(all_hbase_opts));
+                // set the jmx exporter in HBASE_MASTER_OPTS and BASE_REGIONSERVER_OPTS instead of HBASE_OPTS to prevent a port-conflict
+                // i.e. CLI tools read HBASE_OPTS and may then try to re-start the exporter
+                result.insert(HBASE_MASTER_OPTS.to_string(), Some(all_hbase_opts.clone()));
+                result.insert(BASE_REGIONSERVER_OPTS.to_string(), Some(all_hbase_opts));
             }
             HBASE_SITE_XML => {
                 result.insert(
