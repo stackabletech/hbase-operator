@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::str::FromStr;
 
 use serde::{Deserialize, Serialize};
 use stackable_operator::kube::runtime::reflector::ObjectRef;
@@ -6,7 +7,7 @@ use stackable_operator::kube::CustomResource;
 use stackable_operator::product_config_utils::{ConfigError, Configuration};
 use stackable_operator::role_utils::{Role, RoleGroupRef};
 use stackable_operator::schemars::{self, JsonSchema};
-use strum::{Display, EnumIter};
+use strum::{Display, EnumIter, EnumString};
 
 pub const APP_NAME: &str = "hbase";
 
@@ -67,7 +68,17 @@ pub struct HbaseClusterSpec {
 }
 
 #[derive(
-    Clone, Debug, Deserialize, Display, EnumIter, Eq, Hash, JsonSchema, PartialEq, Serialize,
+    Clone,
+    Debug,
+    Deserialize,
+    Display,
+    EnumIter,
+    Eq,
+    Hash,
+    JsonSchema,
+    PartialEq,
+    Serialize,
+    EnumString,
 )]
 pub enum HbaseRole {
     #[serde(rename = "master")]
@@ -155,8 +166,27 @@ impl Configuration for HbaseConfig {
                 }
                 // set the jmx exporter in HBASE_MASTER_OPTS and BASE_REGIONSERVER_OPTS instead of HBASE_OPTS to prevent a port-conflict
                 // i.e. CLI tools read HBASE_OPTS and may then try to re-start the exporter
-                result.insert(HBASE_MASTER_OPTS.to_string(), Some(all_hbase_opts.clone()));
-                result.insert(BASE_REGIONSERVER_OPTS.to_string(), Some(all_hbase_opts));
+                if !role_name.is_empty() {
+                    let role = HbaseRole::from_str(role_name).unwrap();
+                    match role {
+                        HbaseRole::Master => {
+                            result.insert(
+                                HBASE_MASTER_OPTS.to_string(),
+                                Some(all_hbase_opts.clone()),
+                            );
+                        }
+                        HbaseRole::RegionServer => {
+                            result.insert(BASE_REGIONSERVER_OPTS.to_string(), Some(all_hbase_opts));
+                        }
+                        HbaseRole::RestServer => {
+                            result.insert(
+                                HBASE_MASTER_OPTS.to_string(),
+                                Some(all_hbase_opts.clone()),
+                            );
+                            result.insert(BASE_REGIONSERVER_OPTS.to_string(), Some(all_hbase_opts));
+                        }
+                    }
+                }
             }
             HBASE_SITE_XML => {
                 result.insert(
