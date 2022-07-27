@@ -6,7 +6,6 @@ dimensions:
       - 3.3.3-stackable0.1.0
   - name: hbase
     values:
-      - 2.4.8-stackable0.6.0
       - 2.4.9-stackable0.6.0
       - 2.4.11-stackable0.6.0
       - 2.4.12-stackable0.1.0
