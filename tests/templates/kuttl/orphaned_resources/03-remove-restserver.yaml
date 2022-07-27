@@ -1,0 +1,7 @@
+---
+apiVersion: hbase.stackable.tech/v1alpha1
+kind: HbaseCluster
+metadata:
+  name: test-hbase
+spec:
+  restServers: null
