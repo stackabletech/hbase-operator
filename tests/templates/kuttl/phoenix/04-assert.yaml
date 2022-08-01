@@ -1,0 +1,7 @@
+---
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+metadata:
+  name: test-phoenix
+commands:
+  - script: kubectl exec --namespace=$NAMESPACE test-hbase-master-default-0 -- python /tmp/test-phoenix.py
