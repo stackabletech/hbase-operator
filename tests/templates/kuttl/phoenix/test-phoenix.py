@@ -13,7 +13,7 @@ result = {}
 for row in output.decode('utf-8').split('\n'):
     s = row.split()
     if len(s) > 1:
-        print({s[0]:[str(y) for y in s[1:]]})
+        print(f'{s[0]}: {[str(y) for y in s[1:]]}')
         result[s[0]] = [str(y) for y in s[1:]]
 
 print('''
