@@ -215,7 +215,7 @@ pub async fn reconcile_hbase(hbase: Arc<HbaseCluster>, ctx: Arc<Ctx>) -> Result<
     }
 
     cluster_resources
-        .finalize(client)
+        .delete_orphaned_resources(client)
         .await
         .context(DeleteOrphanedResourcesSnafu)?;
 
