@@ -5,9 +5,11 @@
 ## Changed
 
 - Include chart name when installing with a custom release name ([#209], [#210]).
+- Fix HBase-shell start failure ([#218]).
 
 [#209]: https://github.com/stackabletech/hbase-operator/pull/209
 [#210]: https://github.com/stackabletech/hbase-operator/pull/210
+[#218]: https://github.com/stackabletech/hbase-operator/pull/218
 
 ## [0.3.0] - 2022-06-30
 
