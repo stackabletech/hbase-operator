@@ -6,10 +6,12 @@
 
 - Include chart name when installing with a custom release name ([#209], [#210]).
 - Fix HBase-shell start failure ([#218]).
+- Add integration tests and usage documentation for Phoenix ([#221]).
 
 [#209]: https://github.com/stackabletech/hbase-operator/pull/209
 [#210]: https://github.com/stackabletech/hbase-operator/pull/210
 [#218]: https://github.com/stackabletech/hbase-operator/pull/218
+[#221]: https://github.com/stackabletech/hbase-operator/pull/221
 
 ## [0.3.0] - 2022-06-30
 
