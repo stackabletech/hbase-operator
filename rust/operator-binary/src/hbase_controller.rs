@@ -446,6 +446,7 @@ fn build_rolegroup_statefulset(
     };
 
     let container = ContainerBuilder::new("hbase")
+        .expect("ContainerBuilder not created")
         .image(image)
         .command(vec![
             "/bin/bash".to_string(),
