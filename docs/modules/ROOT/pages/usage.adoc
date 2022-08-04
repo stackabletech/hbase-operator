@@ -147,15 +147,18 @@ This script creates a java command that creates, populates and queries a Phoenix
 /stackable/phoenix/bin/sqlline.py [zookeeper] [sql file]
 ----
 
-The zookeeper information does not need to be provided as that is already available via `$HBASE_CONF_DIR/hbase-site.xml`. The script opens an SQL prompt from where one can list, query, create and generally interact with Phoenix tables. So, to query the table that was created in the previous step, start the script and enter some SQL at the prompt:
+The script opens an SQL prompt from where one can list, query, create and generally interact with Phoenix tables. So, to query the table that was created in the previous step, start the script and enter some SQL at the prompt:
 
 image::phoenix_sqlline.png[Phoenix Sqlline]
 
-The Phoenix table WEB_STAT is created as an HBase table, and can be viewed normally from within the HBase UI:
+The Phoenix table `WEB_STAT` is created as an HBase table, and can be viewed normally from within the HBase UI:
 
 image::phoenix_tables.png[Phoenix Tables]
 
 The `SYSTEM`* tables are those required by Phoenix and are created the first time that Phoenix is invoked.
+
+NOTE: Both `psql.py` and `sqlline.py` generate a java command that calls classes from the Phoenix client library `.jar`. The Zookeeper quorum does not need to be supplied as part of the URL used by the JDBC connection string, as long as the environment variable `HBASE_CONF_DIR` is set and supplied as an element for the `-cp` classpath search: the cluster information is then extracted from `$HBASE_CONF_DIR/hbase-site.xml`.
+
 
 
 
