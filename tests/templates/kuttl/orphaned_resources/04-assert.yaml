@@ -4,10 +4,6 @@ kind: TestAssert
 metadata:
   name: change-regionserver-rolegroup
 timeout: 600
-commands:
-  - script: |
-      kubectl kuttl errors --namespace $NAMESPACE \
-      ../templates/kuttl/orphaned_resources/orphaned_regionserver.yaml
 ---
 apiVersion: apps/v1
 kind: StatefulSet
