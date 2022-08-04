@@ -4,7 +4,7 @@ kind: HbaseCluster
 metadata:
   name: test-hbase
 spec:
-  version: {{ test_scenario['values']['hbase'] }}
+  version: {{ test_scenario['values']['hbase-latest'] }}
   hdfsConfigMapName: test-hdfs-namenode-default
   zookeeperConfigMapName: test-znode
   config:
