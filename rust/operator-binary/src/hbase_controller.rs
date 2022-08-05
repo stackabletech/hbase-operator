@@ -8,6 +8,7 @@ use stackable_hbase_crd::{
 };
 use stackable_operator::{
     builder::{ConfigMapBuilder, ContainerBuilder, ObjectMetaBuilder, PodBuilder},
+    cluster_resources::ClusterResources,
     k8s_openapi::{
         api::{
             apps::v1::{StatefulSet, StatefulSetSpec},
@@ -18,7 +19,7 @@ use stackable_operator::{
         },
         apimachinery::pkg::{apis::meta::v1::LabelSelector, util::intstr::IntOrString},
     },
-    kube::{runtime::controller::Action, ResourceExt},
+    kube::{runtime::controller::Action, Resource, ResourceExt},
     labels::{role_group_selector_labels, role_selector_labels},
     logging::controller::ReconcilerError,
     product_config::{types::PropertyNameKind, writer, ProductConfigManager},
@@ -32,7 +33,7 @@ use std::{
 };
 use strum::{EnumDiscriminants, IntoStaticStr};
 
-const FIELD_MANAGER_SCOPE: &str = "hbasecluster";
+const CONTROLLER_NAME: &str = "hbase-operator";
 
 const CONFIG_DIR_NAME: &str = "/stackable/conf";
 const HDFS_DISCOVERY_TMP_DIR: &str = "/stackable/tmp/hdfs";
@@ -57,6 +58,14 @@ pub enum Error {
     NoRegionServerRole,
     #[snafu(display("failed to calculate global service name"))]
     GlobalServiceNameNotFound,
+    #[snafu(display("failed to create cluster resources"))]
+    CreateClusterResources {
+        source: stackable_operator::error::Error,
+    },
+    #[snafu(display("failed to delete orphaned resources"))]
+    DeleteOrphanedResources {
+        source: stackable_operator::error::Error,
+    },
     #[snafu(display("failed to apply global Service"))]
     ApplyRoleService {
         source: stackable_operator::error::Error,
@@ -155,21 +164,21 @@ pub async fn reconcile_hbase(hbase: Arc<HbaseCluster>, ctx: Arc<Ctx>) -> Result<
     )
     .context(InvalidProductConfigSnafu)?;
 
+    let mut cluster_resources =
+        ClusterResources::new(APP_NAME, CONTROLLER_NAME, &hbase.object_ref(&()))
+            .context(CreateClusterResourcesSnafu)?;
+
     let region_server_role_service = build_region_server_role_service(&hbase)?;
-    client
-        .apply_patch(
-            FIELD_MANAGER_SCOPE,
-            &region_server_role_service,
-            &region_server_role_service,
-        )
+    cluster_resources
+        .add(client, &region_server_role_service)
         .await
         .context(ApplyRoleServiceSnafu)?;
 
     // discovery config map
-    let discovery_cm = build_discovery_configmap(&hbase, &zk_connect_string)
+    let discovery_cm = build_discovery_configmap(&hbase, &zk_connect_string, CONTROLLER_NAME)
         .context(BuildDiscoveryConfigMapSnafu)?;
-    client
-        .apply_patch(FIELD_MANAGER_SCOPE, &discovery_cm, &discovery_cm)
+    cluster_resources
+        .add(client, &discovery_cm)
         .await
         .context(ApplyDiscoveryConfigMapSnafu)?;
 
@@ -184,26 +193,31 @@ pub async fn reconcile_hbase(hbase: Arc<HbaseCluster>, ctx: Arc<Ctx>) -> Result<
                 &zk_connect_string,
             )?;
             let rg_statefulset = build_rolegroup_statefulset(&hbase, &rolegroup, rolegroup_config)?;
-            client
-                .apply_patch(FIELD_MANAGER_SCOPE, &rg_service, &rg_service)
+            cluster_resources
+                .add(client, &rg_service)
                 .await
                 .with_context(|_| ApplyRoleGroupServiceSnafu {
                     rolegroup: rolegroup.clone(),
                 })?;
-            client
-                .apply_patch(FIELD_MANAGER_SCOPE, &rg_configmap, &rg_configmap)
+            cluster_resources
+                .add(client, &rg_configmap)
                 .await
                 .with_context(|_| ApplyRoleGroupConfigSnafu {
                     rolegroup: rolegroup.clone(),
                 })?;
-            client
-                .apply_patch(FIELD_MANAGER_SCOPE, &rg_statefulset, &rg_statefulset)
+            cluster_resources
+                .add(client, &rg_statefulset)
                 .await
                 .with_context(|_| ApplyRoleGroupStatefulSetSnafu {
                     rolegroup: rolegroup.clone(),
                 })?;
         }
     }
+
+    cluster_resources
+        .delete_orphaned_resources(client)
+        .await
+        .context(DeleteOrphanedResourcesSnafu)?;
 
     Ok(Action::await_change())
 }
@@ -233,7 +247,14 @@ pub fn build_region_server_role_service(hbase: &HbaseCluster) -> Result<Service>
             .name(&role_svc_name)
             .ownerreference_from_resource(hbase, None, Some(true))
             .context(ObjectMissingMetadataForOwnerRefSnafu)?
-            .with_recommended_labels(hbase, APP_NAME, hbase_version(hbase)?, &role_name, "global")
+            .with_recommended_labels(
+                hbase,
+                APP_NAME,
+                hbase_version(hbase)?,
+                CONTROLLER_NAME,
+                &role_name,
+                "global",
+            )
             .build(),
         spec: Some(ServiceSpec {
             ports: Some(ports),
@@ -285,6 +306,7 @@ fn build_rolegroup_config_map(
                     hbase,
                     APP_NAME,
                     hbase_version(hbase)?,
+                    CONTROLLER_NAME,
                     &rolegroup.role,
                     &rolegroup.role_group,
                 )
@@ -332,6 +354,7 @@ fn build_rolegroup_service(
                 hbase,
                 APP_NAME,
                 hbase_version(hbase)?,
+                CONTROLLER_NAME,
                 &rolegroup.role,
                 &rolegroup.role_group,
             )
@@ -423,6 +446,7 @@ fn build_rolegroup_statefulset(
     };
 
     let container = ContainerBuilder::new("hbase")
+        .expect("ContainerBuilder not created")
         .image(image)
         .command(vec![
             "/bin/bash".to_string(),
@@ -471,6 +495,7 @@ fn build_rolegroup_statefulset(
                 hbase,
                 APP_NAME,
                 hbase_version,
+                CONTROLLER_NAME,
                 &rolegroup_ref.role,
                 &rolegroup_ref.role_group,
             )
@@ -494,6 +519,7 @@ fn build_rolegroup_statefulset(
                         hbase,
                         APP_NAME,
                         hbase_version,
+                        CONTROLLER_NAME,
                         &rolegroup_ref.role,
                         &rolegroup_ref.role_group,
                     )

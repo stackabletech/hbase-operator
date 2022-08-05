@@ -13,6 +13,7 @@ use std::collections::HashMap;
 pub fn build_discovery_configmap(
     hbase: &HbaseCluster,
     zookeeper_connect_string: &str,
+    managed_by: &str,
 ) -> OperatorResult<ConfigMap> {
     let hbase_site_data: HashMap<String, Option<String>> = [(
         HBASE_ZOOKEEPER_QUORUM.to_string(),
@@ -29,6 +30,7 @@ pub fn build_discovery_configmap(
                     hbase,
                     APP_NAME,
                     hbase_version(hbase).map_err(|_| Error::MissingObjectKey { key: "version" })?,
+                    managed_by,
                     &HbaseRole::RegionServer.to_string(),
                     "discovery",
                 )
