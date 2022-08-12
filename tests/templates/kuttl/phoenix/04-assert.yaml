@@ -2,7 +2,7 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestAssert
 metadata:
-  name: test-phoenix-phoenix
+  name: test-phoenix-access
 commands:
   - script: kubectl exec --namespace=$NAMESPACE test-hbase-phoenix-master-default-0 -- python /tmp/test-phoenix.py
-    timeout: 240
+timeout: 240
