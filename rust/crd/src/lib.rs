@@ -189,7 +189,7 @@ impl Configuration for HbaseConfig {
     }
 }
 
-#[derive(Clone, Debug, Default, Deserialize, JsonSchema, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct HbaseClusterStatus {}
 
