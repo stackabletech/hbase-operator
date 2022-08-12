@@ -25,18 +25,18 @@ dimensions:
     values:
       - 3.8.0-stackable0.7.1
 tests:
-  - name: smoke
-    dimensions:
-      - hbase
-      - zookeeper
-      - hdfs
+  #- name: smoke
+  #  dimensions:
+  #    - hbase
+  #    - zookeeper
+  #    - hdfs
   - name: phoenix
     dimensions:
       - hbase-latest
       - zookeeper-latest
       - hdfs-latest
-  - name: orphaned_resources
-    dimensions:
-      - hbase-latest
-      - hdfs-latest
-      - zookeeper-latest
+  #- name: orphaned_resources
+  #  dimensions:
+  #    - hbase-latest
+  #    - hdfs-latest
+  #    - zookeeper-latest
