@@ -159,6 +159,3 @@ The `SYSTEM`* tables are those required by Phoenix and are created the first tim
 
 NOTE: Both `psql.py` and `sqlline.py` generate a java command that calls classes from the Phoenix client library `.jar`. The Zookeeper quorum does not need to be supplied as part of the URL used by the JDBC connection string, as long as the environment variable `HBASE_CONF_DIR` is set and supplied as an element for the `-cp` classpath search: the cluster information is then extracted from `$HBASE_CONF_DIR/hbase-site.xml`.
 
-
-
-
