@@ -8,7 +8,7 @@ spec:
     roleGroups:
       default:
         replicas: 1
-  version: {{ test_scenario['values']['zookeeper-latest'] }}
+  version: {{ test_scenario['values']['zookeeper'] }}
 ---
 apiVersion: zookeeper.stackable.tech/v1alpha1
 kind: ZookeeperZnode
