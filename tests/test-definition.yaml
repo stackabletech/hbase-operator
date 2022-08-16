@@ -32,7 +32,7 @@ tests:
       - hdfs
   - name: phoenix
     dimensions:
-      - hbase-phoenix
+      - hbase
       - zookeeper
       - hdfs
   - name: orphaned_resources
