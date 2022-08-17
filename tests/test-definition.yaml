@@ -30,11 +30,6 @@ tests:
       - hbase
       - zookeeper
       - hdfs
-  - name: phoenix
-    dimensions:
-      - hbase
-      - zookeeper
-      - hdfs
   - name: orphaned_resources
     dimensions:
       - hbase-latest

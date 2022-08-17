@@ -1,5 +1,0 @@
----
-apiVersion: kuttl.dev/v1beta1
-kind: TestStep
-commands:
-  - script: kubectl cp --namespace=$NAMESPACE ./test-phoenix.py test-hbase-phoenix-master-default-0:/tmp
