@@ -4,5 +4,5 @@ kind: TestAssert
 metadata:
   name: test-phoenix-access
 commands:
-  - script: kubectl exec --namespace=$NAMESPACE test-hbase-master-default-0 -- python /tmp/test-phoenix.py
+  - script: kubectl exec --namespace=$NAMESPACE test-hbase-restserver-default-0 -- python /tmp/test-phoenix.py
 timeout: 240
