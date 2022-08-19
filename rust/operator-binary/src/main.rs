@@ -1,5 +1,6 @@
 mod discovery;
 mod hbase_controller;
+mod rbac;
 
 use std::sync::Arc;
 
