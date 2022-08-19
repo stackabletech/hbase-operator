@@ -6,7 +6,7 @@ result=$(/stackable/phoenix/bin/psql.py /stackable/phoenix/examples/WEB_STAT.sql
 echo "Phoenix query result: $result"
 
 # split into elements
-result=($result)
+IFS=" " read -r -a result <<< "$result"
 el0=${result[0]}
 el1=${result[1]}
 
