@@ -4,5 +4,6 @@ kind: TestAssert
 metadata:
   name: test-phoenix-access
 commands:
-  - script: kubectl exec --namespace=$NAMESPACE test-hbase-restserver-default-0 -- /stackable/phoenix/bin/psql.py /stackable/phoenix/examples/WEB_STAT.sql /stackable/phoenix/examples/WEB_STAT.csv /stackable/phoenix/examples/WEB_STAT_QUERIES.sql
+   - script: kubectl exec --namespace=$NAMESPACE test-hbase-restserver-default-0 -- chmod +x /tmp/test_phoenix.sh
+   - script: kubectl exec --namespace=$NAMESPACE test-hbase-restserver-default-0 -- /tmp/test_phoenix.sh
 timeout: 480
