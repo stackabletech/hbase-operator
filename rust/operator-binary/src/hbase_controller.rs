@@ -1,13 +1,16 @@
 //! Ensures that `Pod`s are configured and running for each [`HbaseCluster`]
 
-use crate::discovery::build_discovery_configmap;
+use crate::{discovery::build_discovery_configmap, rbac};
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_hbase_crd::{
     HbaseCluster, HbaseConfig, HbaseRole, APP_NAME, HBASE_ENV_SH, HBASE_MASTER_PORT,
     HBASE_REGIONSERVER_PORT, HBASE_REST_PORT, HBASE_SITE_XML, HBASE_ZOOKEEPER_QUORUM,
 };
 use stackable_operator::{
-    builder::{ConfigMapBuilder, ContainerBuilder, ObjectMetaBuilder, PodBuilder},
+    builder::{
+        ConfigMapBuilder, ContainerBuilder, ObjectMetaBuilder, PodBuilder,
+        PodSecurityContextBuilder,
+    },
     cluster_resources::ClusterResources,
     k8s_openapi::{
         api::{
@@ -124,6 +127,16 @@ pub enum Error {
         entry: &'static str,
         cm_name: String,
     },
+    #[snafu(display("failed to patch service account: {source}"))]
+    ApplyServiceAccount {
+        name: String,
+        source: stackable_operator::error::Error,
+    },
+    #[snafu(display("failed to patch role binding: {source}"))]
+    ApplyRoleBinding {
+        name: String,
+        source: stackable_operator::error::Error,
+    },
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -182,6 +195,20 @@ pub async fn reconcile_hbase(hbase: Arc<HbaseCluster>, ctx: Arc<Ctx>) -> Result<
         .await
         .context(ApplyDiscoveryConfigMapSnafu)?;
 
+    let (rbac_sa, rbac_rolebinding) = rbac::build_rbac_resources(hbase.as_ref(), "hbase");
+    client
+        .apply_patch(CONTROLLER_NAME, &rbac_sa, &rbac_sa)
+        .await
+        .with_context(|_| ApplyServiceAccountSnafu {
+            name: rbac_sa.name_unchecked(),
+        })?;
+    client
+        .apply_patch(CONTROLLER_NAME, &rbac_rolebinding, &rbac_rolebinding)
+        .await
+        .with_context(|_| ApplyRoleBindingSnafu {
+            name: rbac_rolebinding.name_unchecked(),
+        })?;
+
     for (role_name, group_config) in validated_config.iter() {
         for (rolegroup_name, rolegroup_config) in group_config.iter() {
             let rolegroup = hbase.server_rolegroup_ref(role_name, rolegroup_name);
@@ -192,7 +219,12 @@ pub async fn reconcile_hbase(hbase: Arc<HbaseCluster>, ctx: Arc<Ctx>) -> Result<
                 rolegroup_config,
                 &zk_connect_string,
             )?;
-            let rg_statefulset = build_rolegroup_statefulset(&hbase, &rolegroup, rolegroup_config)?;
+            let rg_statefulset = build_rolegroup_statefulset(
+                &hbase,
+                &rolegroup,
+                rolegroup_config,
+                &rbac_sa.name_unchecked(),
+            )?;
             cluster_resources
                 .add(client, &rg_service)
                 .await
@@ -383,6 +415,7 @@ fn build_rolegroup_statefulset(
     hbase: &HbaseCluster,
     rolegroup_ref: &RoleGroupRef<HbaseCluster>,
     _rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
+    sa_name: &str,
 ) -> Result<StatefulSet> {
     let hbase_version = hbase_version(hbase)?;
 
@@ -541,6 +574,14 @@ fn build_rolegroup_statefulset(
                     }),
                     ..Default::default()
                 })
+                .service_account_name(sa_name)
+                .security_context(
+                    PodSecurityContextBuilder::new()
+                        .run_as_user(rbac::HBASE_UID)
+                        .run_as_group(0)
+                        .fs_group(1000) // Needed for secret-operator
+                        .build(),
+                )
                 .build_template(),
             ..StatefulSetSpec::default()
         }),
