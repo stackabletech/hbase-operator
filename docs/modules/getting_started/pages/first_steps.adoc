@@ -139,6 +139,62 @@ include::example$code/getting_started.sh[tag=get-table]
    ]
 }
 
+An alternative way to interact with HBase is to use the https://phoenix.apache.org/index.html[Phoenix] library that is pre-installed on the Stackable HBase image. Use the python utility `psql.py` to create, populate and query a table called `WEB_STAT`:
+
+[source]
+include::example$code/getting_started.sh[tag=phoenix-table]
+
+The final command will display some grouped data like this:
+
+[source]
+HO                    TOTAL_ACTIVE_VISITORS
+-- ----------------------------------------
+EU                                      150
+NA                                        1
+Time: 0.017 sec(s)
+
+Check the tables again with:
+
+[source]
+include::example$code/getting_started.sh[tag=get-table]
+
+This time the list includes not just `users` (created above with the REST API) and `WEB_STAT`, but several other tables too:
+
+[source,json]
+{
+   "table" : [
+      {
+         "name" : "SYSTEM.CATALOG"
+      },
+      {
+         "name" : "SYSTEM.CHILD_LINK"
+      },
+      {
+         "name" : "SYSTEM.FUNCTION"
+      },
+      {
+         "name" : "SYSTEM.LOG"
+      },
+      {
+         "name" : "SYSTEM.MUTEX"
+      },
+      {
+         "name" : "SYSTEM.SEQUENCE"
+      },
+      {
+         "name" : "SYSTEM.STATS"
+      },
+      {
+         "name" : "SYSTEM.TASK"
+      },
+      {
+         "name" : "WEB_STAT"
+      },
+      {
+         "name" : "users"
+      }
+   ]
+}
 
 
 == What's next

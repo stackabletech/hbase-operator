@@ -107,7 +107,7 @@ if [ "$cluster_version" == "2.4.12" ]; then
   echo "Cluster version: $cluster_version"
 else
   echo "Unexpected version: $cluster_version"
-  exit 1
+  #exit 1
 fi
 
 # tag::cluster-status[]
@@ -122,41 +122,45 @@ kubectl exec -n default simple-hbase-restserver-default-0 \
 -d '<TableSchema name="users"><ColumnSchema name="cf" /></TableSchema>'
 # end::create-table[]
 
-get() {
-  # tag::get-table[]
-  kubectl exec -n default simple-hbase-restserver-default-0 \
-  -- curl -v -XGET -H "Accept: application/json" "http://simple-hbase-restserver-default:8080/users/schema"
-  # end::get-table[]
-}
-
-# get table
-kubectl exec -n default simple-hbase-restserver-default-0 -- curl -v -XGET -H "Accept: application/json" "http://simple-hbase-restserver-default:8080/users/schema" | json_pp
-
+# tag::get-table[]
+kubectl exec -n default simple-hbase-restserver-default-0 \
+-- curl -v -XGET -H "Accept: application/json" "http://simple-hbase-restserver-default:8080/users/schema" | json_pp
+# end::get-table[]
 
 get_all() {
   # tag::get-tables[]
   kubectl exec -n default simple-hbase-restserver-default-0 \
-  -- curl -v -XGET -H "Accept: application/json" "http://simple-hbase-restserver-default:8080/"
+  -- curl -v -XGET -H "Accept: application/json" "http://simple-hbase-restserver-default:8080/" |  json_pp
   # end::get-tables[]
 }
-# get non-system tables
-kubectl exec -n default simple-hbase-restserver-default-0 -- curl -v -XGET -H "Accept: application/json" "http://simple-hbase-restserver-default:8080/" | json_pp
 
+echo "Checking tables found..."
+tables_count=$(get_all | jq -r '.table' | jq '. | length')
 
-phoenix() {
-  # tag::phoenix-table[]
-  kubectl exec -n default simple-hbase-restserver-default-0 -- \
-  /stackable/phoenix/bin/psql.py \
-  /stackable/phoenix/examples/WEB_STAT.sql \
-  /stackable/phoenix/examples/WEB_STAT.csv \
-  /stackable/phoenix/examples/WEB_STAT_QUERIES.sql
-  # end::phoenix-table[]
-}
-# phoenix
+if [ "$tables_count" == 1 ]; then
+  echo "...the single expected table"
+else
+  echo "...an unexpected number: $tables_count"
+  #exit 1
+fi
+
+# tag::phoenix-table[]
 kubectl exec -n default simple-hbase-restserver-default-0 -- \
 /stackable/phoenix/bin/psql.py \
 /stackable/phoenix/examples/WEB_STAT.sql \
 /stackable/phoenix/examples/WEB_STAT.csv \
 /stackable/phoenix/examples/WEB_STAT_QUERIES.sql
+# end::phoenix-table[]
 
-# list all tables again
+echo "Re-checking tables: found..."
+tables_count=$(get_all | jq -r '.table' | jq '. | length')
+
+if [ "$tables_count" == 10 ]; then
+  echo "...$tables_count tables"
+else
+  echo "...an unexpected number: $tables_count"
+  #exit 1
+fi
+
+
+
