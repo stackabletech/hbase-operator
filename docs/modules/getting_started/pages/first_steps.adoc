@@ -196,6 +196,7 @@ This time the list includes not just `users` (created above with the REST API) a
    ]
 }
 
+This is because Phoenix requires these `SYSTEM.` tables for its own internal mapping mechanism, and they are created the first time that Phoenix is used on the cluster.
 
 == What's next
 
