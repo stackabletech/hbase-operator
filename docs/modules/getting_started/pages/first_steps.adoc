@@ -1,0 +1,146 @@
+= First steps
+
+Once you have followed the steps in the xref:installation.adoc[] section to install the operator and its dependencies, you will now deploy an HBase cluster and its dependencies. Afterwards you can <<_verify_that_it_works, verify that it works>> by creating tables and data in HBase using the REST API and Apache Phoenix (an SQL layer used to interact with HBase).
+
+== Setup
+
+=== Zookeeper
+
+To deploy a Zookeeper cluster create one file called `zk.yaml`:
+
+[source,yaml]
+include::example$code/zk.yaml[]
+
+We also need to define a ZNode that will be used by the HDFS cluster to reference Zookeeper. Create another file called `znode.yaml`:
+
+[source,yaml]
+include::example$code/znode.yaml[]
+
+Apply both of these files:
+
+[source]
+include::example$code/getting_started.sh[tag=install-zk]
+
+The state of the Zookeeper cluster can be tracked with `kubectl`:
+
+[source]
+include::example$code/getting_started.sh[tag=watch-zk-rollout]
+
+=== HDFS
+
+An HDFS cluster has three components: the `namenode`, the `datanode` and the `journalnode`. Create a file named `hdfs.yaml` defining 2 `namenodes` and one `datanode` and `journalnode` each:
+
+[source,yaml]
+----
+include::example$code/hdfs.yaml[]
+----
+
+Where:
+
+- `metadata.name` contains the name of the HDFS cluster
+- the label of the Docker image provided by Stackable must be set in `spec.version`
+
+NOTE: Please note that the version you need to specify for `spec.version` is not only the version of Hadoop which you want to roll out, but has to be amended with a Stackable version as shown. This Stackable version is the version of the underlying container image which is used to execute the processes. For a list of available versions please check our
+https://repo.stackable.tech/#browse/browse:docker:v2%2Fstackable%hadoop%2Ftags[image registry].
+It should generally be safe to simply use the latest image version that is available.
+
+Create the actual HDFS cluster by applying the file:
+
+----
+include::example$code/getting_started.sh[tag=install-hdfs]
+----
+
+Track the progress with `kubectl` as this step may take a few minutes:
+
+[source]
+include::example$code/getting_started.sh[tag=watch-hdfs-rollout]
+
+=== HBase
+
+You can now create the HBase cluster. Create a file called `hbase.yaml` containing the following:
+
+[source,yaml]
+----
+include::example$code/hbase.yaml[]
+----
+
+== Verify that it works
+
+To test the cluster you will use the REST API to check its version and status, and to create and inspect a new table. You will also use Phoenix to create, populate and query a second new table, before listing all non-system tables in HBase. These actions wil be carried out from one of the HBase components, the REST server.
+
+First, check the cluster version with this callout:
+
+[source]
+include::example$code/getting_started.sh[tag=cluster-version]
+
+This will return the version that was specified in the HBase cluster definition:
+
+[source,json]
+{"Version":"2.4.12"}
+
+The cluster status can be checked and formatted like this:
+
+[source]
+include::example$code/getting_started.sh[tag=cluster-status]
+
+which will display cluster metadata that looks like this (only the first region is included for the sake of readability:
+
+[source,json]
+{
+   "DeadNodes" : [],
+   "LiveNodes" : [
+      {
+         "Region" : [
+            {
+               "currentCompactedKVs" : 0,
+               "memStoreSizeMB" : 0,
+               "name" : "U1lTVEVNLkNBVEFMT0csLDE2NjExNjA0NDM2NjcuYmYwMzA1YmM4ZjFmOGIwZWMwYjhmMGNjMWI5N2RmMmUu",
+               "readRequestsCount" : 104,
+               "rootIndexSizeKB" : 1,
+               "storefileIndexSizeKB" : 1,
+               "storefileSizeMB" : 1,
+               "storefiles" : 1,
+               "stores" : 1,
+               "totalCompactingKVs" : 0,
+               "totalStaticBloomSizeKB" : 0,
+               "totalStaticIndexSizeKB" : 1,
+               "writeRequestsCount" : 360
+            },
+            ...
+         ],
+         "heapSizeMB" : 351,
+         "maxHeapSizeMB" : 11978,
+         "name" : "simple-hbase-regionserver-default-0.simple-hbase-regionserver-default.default.svc.cluster.local:16020",
+         "requests" : 395,
+         "startCode" : 1661156787704
+      }
+   ],
+   "averageLoad" : 43,
+   "regions" : 43,
+   "requests" : 1716
+}
+
+You can now create a table like this:
+
+[source]
+include::example$code/getting_started.sh[tag=create-table]
+
+This will create a table `users` with a single column family `cf`. Its creation can be verified by listing it:
+
+[source]
+include::example$code/getting_started.sh[tag=get-table]
+
+[source,json]
+{
+   "table" : [
+      {
+         "name" : "users"
+      }
+   ]
+}
+
+
+
+== What's next
+
+Look at the xref:ROOT:usage.adoc[Usage page] to find out more about configuring your HBase cluster.

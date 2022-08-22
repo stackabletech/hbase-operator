@@ -1,0 +1,23 @@
+---
+apiVersion: hbase.stackable.tech/v1alpha1
+kind: HbaseCluster
+metadata:
+  name: simple-hbase
+spec:
+  version: 2.4.12-stackable0.2.0
+  hdfsConfigMapName: simple-hdfs
+  zookeeperConfigMapName: simple-znode
+  config:
+    hbaseRootdir: /hbase
+  masters:
+    roleGroups:
+      default:
+        replicas: 1
+  regionServers:
+    roleGroups:
+      default:
+        replicas: 1
+  restServers:
+    roleGroups:
+      default:
+        replicas: 1
