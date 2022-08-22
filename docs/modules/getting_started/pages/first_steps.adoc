@@ -83,7 +83,7 @@ The cluster status can be checked and formatted like this:
 [source]
 include::example$code/getting_started.sh[tag=cluster-status]
 
-which will display cluster metadata that looks like this (only the first region is included for the sake of readability:
+which will display cluster metadata that looks like this (only the first region is included for the sake of readability):
 
 [source,json]
 {
