@@ -2,12 +2,13 @@
 
 ## [Unreleased]
 
-## Changed
+### Changed
 
 - Startup probe created and thresholds in liveness and readiness probes fine-tuned ([#193]).
 - Include chart name when installing with a custom release name ([#209], [#210]).
 - Orphaned resources are deleted ([#215]).
 - Fix HBase-shell start failure ([#218]).
+- Add integration tests and usage documentation for Phoenix ([#221]).
 - Added OpenShift compatiblity ([#232])
 
 [#193]: https://github.com/stackabletech/hbase-operator/pull/193
@@ -15,6 +16,7 @@
 [#210]: https://github.com/stackabletech/hbase-operator/pull/210
 [#215]: https://github.com/stackabletech/hbase-operator/pull/215
 [#218]: https://github.com/stackabletech/hbase-operator/pull/218
+[#221]: https://github.com/stackabletech/hbase-operator/pull/221
 [#232]: https://github.com/stackabletech/hbase-operator/pull/232
 
 ## [0.3.0] - 2022-06-30
@@ -28,7 +30,7 @@
   a single namespace to watch ([#137]).
 - Writing a discovery config map containing `hbase-site.xml` with the `hbase.zookeeper.quorum` property ([#163]).
 
-## Changed
+### Changed
 
 - `operator-rs` `0.12.0` -> `0.15.0` ([#137], [#153]).
 - Now using HDFS discovery config map instead of hdfs name node config map ([#153])
@@ -55,13 +57,9 @@
 ### Changed
 
 - `operator-rs` `0.10.0` -> `0.12.0` ([#127]).
-
-[#127]: https://github.com/stackabletech/hbase-operator/pull/127
-
-### Changed
-
 - Migrated to StatefulSet rather than direct Pod management ([#110]).
 
+[#127]: https://github.com/stackabletech/hbase-operator/pull/127
 [#110]: https://github.com/stackabletech/hbase-operator/pull/110
 
 ## [0.1.0] - 2021-10-28
