@@ -22,16 +22,11 @@ After you have installed stackablectl run the following command to install all o
 include::example$code/getting_started.sh[tag=stackablectl-install-operators]
 ----
 
-The tool will show:
+The tool will show
 
 [source]
-----
-[INFO ] Installing commons operator
-[INFO ] Installing secret operator
-[INFO ] Installing zookeeper operator
-[INFO ] Installing hdfs operator
-[INFO ] Installing hbase operator
-----
+include::example$code/install_output.txt[]
+
 
 TIP: Consult the xref:stackablectl::quickstart.adoc[] to learn more about how to use stackablectl. For example, you can use the `-k` flag to create a Kubernetes cluster with link:https://kind.sigs.k8s.io/[kind].
 

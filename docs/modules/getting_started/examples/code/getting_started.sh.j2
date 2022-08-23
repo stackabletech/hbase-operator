@@ -3,10 +3,8 @@ set -euo pipefail
 
 # This script contains all the code snippets from the guide, as well as some assert tests
 # to test if the instructions in the guide work. The user *could* use it, but it is intended
-# for testing only.
-# The script will install the operators, create a superset instance and briefly open a port
-# forward and connect to the superset instance to make sure it is up and running.
-# No running processes are left behind (i.e. the port-forwarding is closed at the end)
+# for testing only. It installs an HBase cluster and its dependencies and executes several steps
+# to verify that it is working.
 
 if [ $# -eq 0 ]
 then

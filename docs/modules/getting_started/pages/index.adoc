@@ -8,6 +8,7 @@ You will need:
 
 * a Kubernetes cluster
 * kubectl
+* jq, a commandline JSON processor
 * optional: Helm
 
 == What's next
