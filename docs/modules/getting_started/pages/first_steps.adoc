@@ -139,7 +139,7 @@ include::example$code/getting_started.sh[tag=get-table]
    ]
 }
 
-An alternative way to interact with HBase is to use the https://phoenix.apache.org/index.html[Phoenix] library that is pre-installed on the Stackable HBase image. Use the python utility `psql.py` to create, populate and query a table called `WEB_STAT`:
+An alternative way to interact with HBase is to use the https://phoenix.apache.org/index.html[Phoenix] library that is pre-installed on the Stackable HBase image (in the /stackable/phoenix directory). Use the python utility `psql.py` (found in /stackable/phoenix/bin) to create, populate and query a table called `WEB_STAT`:
 
 [source]
 include::example$code/getting_started.sh[tag=phoenix-table]
