@@ -44,7 +44,7 @@ exit 1
 ;;
 esac
 
-echo "Creating Zookeeper cluster"
+echo "Creating ZooKeeper cluster"
 # tag::install-zk[]
 kubectl apply -f zk.yaml
 # end::install-zk[]
@@ -56,7 +56,7 @@ kubectl apply -f znode.yaml
 
 sleep 5
 
-echo "Awaiting Zookeeper rollout finish"
+echo "Awaiting ZooKeeper rollout finish"
 # tag::watch-zk-rollout[]
 kubectl rollout status --watch statefulset/simple-zk-server-default
 # end::watch-zk-rollout[]
@@ -108,11 +108,13 @@ else
   exit 1
 fi
 
+echo "Check cluster status..."
 # tag::cluster-status[]
 kubectl exec -n default simple-hbase-restserver-default-0 \
 -- curl -s -XGET -H "Accept: application/json" "http://simple-hbase-restserver-default:8080/status/cluster" | json_pp
 # end::cluster-status[]
 
+echo "Check table via REST API..."
 # tag::create-table[]
 kubectl exec -n default simple-hbase-restserver-default-0 \
 -- curl -s -XPUT -H "Accept: text/xml" -H "Content-Type: text/xml" \
@@ -142,6 +144,7 @@ else
   exit 1
 fi
 
+echo "Check table via Phoenix..."
 # tag::phoenix-table[]
 kubectl exec -n default simple-hbase-restserver-default-0 -- \
 /stackable/phoenix/bin/psql.py \

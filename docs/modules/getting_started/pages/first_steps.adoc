@@ -4,14 +4,14 @@ Once you have followed the steps in the xref:installation.adoc[] section to inst
 
 == Setup
 
-=== Zookeeper
+=== ZooKeeper
 
-To deploy a Zookeeper cluster create one file called `zk.yaml`:
+To deploy a ZooKeeper cluster create one file called `zk.yaml`:
 
 [source,yaml]
 include::example$code/zk.yaml[]
 
-We also need to define a ZNode that will be used by the HDFS and HBase clusters to reference Zookeeper. Create another file called `znode.yaml`:
+We also need to define a ZNode that will be used by the HDFS and HBase clusters to reference ZooKeeper. Create another file called `znode.yaml`:
 
 [source,yaml]
 include::example$code/znode.yaml[]
@@ -21,7 +21,7 @@ Apply both of these files:
 [source]
 include::example$code/getting_started.sh[tag=install-zk]
 
-The state of the Zookeeper cluster can be tracked with `kubectl`:
+The state of the ZooKeeper cluster can be tracked with `kubectl`:
 
 [source]
 include::example$code/getting_started.sh[tag=watch-zk-rollout]
