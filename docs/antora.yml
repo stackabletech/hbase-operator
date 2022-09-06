@@ -1,7 +1,7 @@
 name: hbase
-version: "nightly"
+version: "0.4"
 title: Stackable Operator for Apache HBase
 nav:
   - modules/getting_started/nav.adoc
   - modules/ROOT/nav.adoc
-prerelease: true
+prerelease: false

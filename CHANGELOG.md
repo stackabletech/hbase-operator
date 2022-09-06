@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.4.0] - 2022-09-06
+
 ### Changed
 
 - Startup probe created and thresholds in liveness and readiness probes fine-tuned ([#193]).
