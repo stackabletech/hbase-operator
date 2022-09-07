@@ -126,6 +126,76 @@ For a full list of configuration options we refer to the HBase https://hbase.apa
 
 // CLI overrides are also not implemented
 
+=== Storage for data volumes
+
+The HBase Operator currently does not support any https://kubernetes.io/docs/concepts/storage/persistent-volumes[PersistentVolumeClaims].
+
+=== Memory requests
+
+You can request a certain amount of memory for each individual role or role group, where the role group configuration overrides existing parts (otherwise they will be inherited) from the role configuration:
+
+[source,yaml]
+----
+regionServers:
+  config:
+    resources:
+      memory:
+        limit: '2Gi'
+  roleGroups:
+    default:
+      config:
+        resources:
+          memory:
+            limit: '3Gi'
+----
+
+In this example, each HBase region server in the `default` group will have a maximum of `3Gi` (gigabytes) of memory. To be more precise, these memory limits apply to the container running HBase but not to any sidecar containers that are part of the pod.
+
+Not specifying any memory limits in the role group will use the provided `2Gi` from the role. If the role is not specified it will use defaults as demonstrated below.
+
+Setting this property will also automatically set the maximum Java heap size for the corresponding process to 80% of the available memory. Be aware that if the memory constraint is too low, the cluster might fail to start. If pods terminate with an 'OOMKilled' status and the cluster doesn't start, try increasing the memory limit.
+
+For more details regarding Kubernetes memory requests and limits see: https://kubernetes.io/docs/tasks/configure-pod-container/assign-memory-resource/[Assign Memory Resources to Containers and Pods].
+
+=== CPU requests
+
+Similarly to memory resources, you can also configure CPU limits, as shown below:
+
+[source,yaml]
+----
+regionServers:
+  roleGroups:
+    default:
+      config:
+        resources:
+          cpu:
+            max: '500m'
+            min: '250m'
+----
+
+=== Defaults
+
+If nothing is specified, the operator will automatically set the following default values for resources:
+
+[source,yaml]
+----
+regionServers:
+  roleGroups:
+    default:
+      config:
+        resources:
+          requests:
+            cpu: 200m
+            memory: 2Gi
+          limits:
+            cpu: "4"
+            memory: 2Gi
+----
+
+WARNING: The default values are _most likely_ not sufficient to run a proper cluster in production. Please adapt according to your requirements.
+
+For more details regarding Kubernetes CPU limits see: https://kubernetes.io/docs/tasks/configure-pod-container/assign-cpu-resource/[Assign CPU Resources to Containers and Pods].
+
 == Phoenix
 
 The Apache Phoenix project provides the ability to interact with HBase with JBDC using familiar SQL-syntax. The Phoenix dependencies are bundled with the Stackable HBase image and do not need to be installed separately (client components will need to ensure that they have the correct client-side libraries available). Information about client-side installation can be found https://phoenix.apache.org/installation.html[here].
