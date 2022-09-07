@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Added
+
+- Cpu and memory limits are now configurable ([#245]).
+
+[#245]: https://github.com/stackabletech/druid-operator/pull/245
+
 ## [0.4.0] - 2022-09-06
 
 ### Changed
