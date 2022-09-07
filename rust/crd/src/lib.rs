@@ -127,7 +127,7 @@ impl HbaseRole {
     }
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Merge, JsonSchema, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Eq, Merge, JsonSchema, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct HbaseStorageConfig {}
 
