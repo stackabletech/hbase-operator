@@ -1,0 +1,39 @@
+---
+apiVersion: hbase.stackable.tech/v1alpha1
+kind: HbaseCluster
+metadata:
+  name: test-hbase
+spec:
+  version: {{ test_scenario['values']['hbase-latest'] }}
+  hdfsConfigMapName: test-hdfs-namenode-default
+  zookeeperConfigMapName: test-znode
+  config:
+    hbaseRootdir: /hbase
+  masters:
+    roleGroups:
+      default:
+        replicas: 1
+  regionServers:
+    config:
+      resources:
+        cpu:
+          min: 100m
+          max: "1"
+        memory:
+          limit: 1Gi
+    roleGroups:
+      resources-from-role:
+        replicas: 1
+      resources-from-role-group:
+        config:
+          resources:
+            cpu:
+              min: 300m
+              max: "3"
+            memory:
+              limit: 3Gi
+        replicas: 1
+  restServers:
+    roleGroups:
+      default:
+        replicas: 1
