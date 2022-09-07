@@ -16,6 +16,13 @@ spec:
   regionServers:
     roleGroups:
       default:
+        config:
+          resources:
+            cpu:
+              min: 300m
+              max: "3"
+            memory:
+              limit: 3Gi
         replicas: 1
   restServers:
     roleGroups:
