@@ -3,9 +3,12 @@
 use crate::{discovery::build_discovery_configmap, rbac};
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_hbase_crd::{
-    HbaseCluster, HbaseConfig, HbaseRole, APP_NAME, HBASE_ENV_SH, HBASE_MASTER_PORT,
-    HBASE_REGIONSERVER_PORT, HBASE_REST_PORT, HBASE_SITE_XML, HBASE_ZOOKEEPER_QUORUM,
+    HbaseCluster, HbaseConfig, HbaseRole, HbaseStorageConfig, APP_NAME, HBASE_ENV_SH,
+    HBASE_HEAPSIZE, HBASE_MASTER_PORT, HBASE_REGIONSERVER_PORT, HBASE_REST_PORT, HBASE_SITE_XML,
+    HBASE_ZOOKEEPER_QUORUM, JVM_HEAP_FACTOR,
 };
+use stackable_operator::commons::resources::{NoRuntimeLimits, Resources};
+use stackable_operator::memory::{to_java_heap_value, BinaryMultiple};
 use stackable_operator::{
     builder::{
         ConfigMapBuilder, ContainerBuilder, ObjectMetaBuilder, PodBuilder,
@@ -31,6 +34,7 @@ use stackable_operator::{
 };
 use std::{
     collections::{BTreeMap, HashMap},
+    str::FromStr,
     sync::Arc,
     time::Duration,
 };
@@ -137,6 +141,20 @@ pub enum Error {
         name: String,
         source: stackable_operator::error::Error,
     },
+    #[snafu(display("could not parse Hbase role [{role}]"))]
+    UnidentifiedHbaseRole {
+        source: strum::ParseError,
+        role: String,
+    },
+    #[snafu(display("failed to resolve and merge resource config for role and role group"))]
+    FailedToResolveResourceConfig,
+    #[snafu(display("invalid java heap config - missing default or value in crd?"))]
+    InvalidJavaHeapConfig,
+    #[snafu(display("failed to convert java heap config to unit [{unit}]"))]
+    FailedToConvertJavaHeap {
+        source: stackable_operator::error::Error,
+        unit: String,
+    },
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -210,20 +228,30 @@ pub async fn reconcile_hbase(hbase: Arc<HbaseCluster>, ctx: Arc<Ctx>) -> Result<
         })?;
 
     for (role_name, group_config) in validated_config.iter() {
+        let hbase_role = HbaseRole::from_str(role_name).context(UnidentifiedHbaseRoleSnafu {
+            role: role_name.to_string(),
+        })?;
         for (rolegroup_name, rolegroup_config) in group_config.iter() {
             let rolegroup = hbase.server_rolegroup_ref(role_name, rolegroup_name);
+
+            let resources = hbase
+                .resolve_resource_config_for_role_and_rolegroup(&hbase_role, &rolegroup)
+                .context(FailedToResolveResourceConfigSnafu)?;
+
             let rg_service = build_rolegroup_service(&hbase, &rolegroup, rolegroup_config)?;
             let rg_configmap = build_rolegroup_config_map(
                 &hbase,
                 &rolegroup,
                 rolegroup_config,
                 &zk_connect_string,
+                &resources,
             )?;
             let rg_statefulset = build_rolegroup_statefulset(
                 &hbase,
                 &rolegroup,
                 rolegroup_config,
                 &rbac_sa.name_unchecked(),
+                &resources,
             )?;
             cluster_resources
                 .add(client, &rg_service)
@@ -304,6 +332,7 @@ fn build_rolegroup_config_map(
     rolegroup: &RoleGroupRef<HbaseCluster>,
     rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
     zk_connect_string: &str,
+    resources: &Resources<HbaseStorageConfig, NoRuntimeLimits>,
 ) -> Result<ConfigMap, Error> {
     let mut hbase_site_config = rolegroup_config
         .get(&PropertyNameKind::File(HBASE_SITE_XML.to_string()))
@@ -320,10 +349,25 @@ fn build_rolegroup_config_map(
         .map(|(k, v)| (k, Some(v)))
         .collect::<BTreeMap<_, _>>();
 
-    let hbase_env_config = rolegroup_config
+    let mut hbase_env_config = rolegroup_config
         .get(&PropertyNameKind::File(HBASE_ENV_SH.to_string()))
         .cloned()
         .unwrap_or_default();
+
+    let heap_in_mebi = to_java_heap_value(
+        resources
+            .memory
+            .limit
+            .as_ref()
+            .context(InvalidJavaHeapConfigSnafu)?,
+        JVM_HEAP_FACTOR,
+        BinaryMultiple::Mebi,
+    )
+    .context(FailedToConvertJavaHeapSnafu {
+        unit: BinaryMultiple::Mebi.to_java_memory_unit(),
+    })?;
+
+    hbase_env_config.insert(HBASE_HEAPSIZE.to_string(), format!("{}m", heap_in_mebi));
 
     let mut builder = ConfigMapBuilder::new();
 
@@ -416,6 +460,7 @@ fn build_rolegroup_statefulset(
     rolegroup_ref: &RoleGroupRef<HbaseCluster>,
     _rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
     sa_name: &str,
+    resources: &Resources<HbaseStorageConfig, NoRuntimeLimits>,
 ) -> Result<StatefulSet> {
     let hbase_version = hbase_version(hbase)?;
 
@@ -513,6 +558,7 @@ fn build_rolegroup_statefulset(
         .add_volume_mount("hbase-config", HBASE_CONFIG_TMP_DIR)
         .add_volume_mount("hdfs-discovery", HDFS_DISCOVERY_TMP_DIR)
         .add_container_ports(ports)
+        .resources(resources.clone().into())
         .startup_probe(startup_probe)
         .liveness_probe(liveness_probe)
         .readiness_probe(readiness_probe)

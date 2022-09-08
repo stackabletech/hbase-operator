@@ -2,11 +2,11 @@
 apiVersion: hbase.stackable.tech/v1alpha1
 kind: HbaseCluster
 metadata:
-  name: simple-hbase
+  name: test-hbase
 spec:
-  version: 2.4.12-stackable0.2.0
-  hdfsConfigMapName: simple-hdfs
-  zookeeperConfigMapName: simple-znode
+  version: {{ test_scenario['values']['hbase-latest'] }}
+  hdfsConfigMapName: test-hdfs-namenode-default
+  zookeeperConfigMapName: test-znode
   config:
     hbaseRootdir: /hbase
   masters:
@@ -14,8 +14,17 @@ spec:
       default:
         replicas: 1
   regionServers:
+    config:
+      resources:
+        cpu:
+          min: 100m
+          max: "1"
+        memory:
+          limit: 1Gi
     roleGroups:
-      default:
+      resources-from-role:
+        replicas: 1
+      resources-from-role-group:
         config:
           resources:
             cpu:

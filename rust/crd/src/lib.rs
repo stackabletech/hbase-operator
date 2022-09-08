@@ -1,9 +1,14 @@
 use serde::{Deserialize, Serialize};
-use stackable_operator::kube::runtime::reflector::ObjectRef;
-use stackable_operator::kube::CustomResource;
-use stackable_operator::product_config_utils::{ConfigError, Configuration};
-use stackable_operator::role_utils::{Role, RoleGroupRef};
-use stackable_operator::schemars::{self, JsonSchema};
+use snafu::Snafu;
+use stackable_operator::{
+    commons::resources::{CpuLimits, MemoryLimits, NoRuntimeLimits, Resources},
+    config::merge::Merge,
+    k8s_openapi::apimachinery::pkg::api::resource::Quantity,
+    kube::{runtime::reflector::ObjectRef, CustomResource},
+    product_config_utils::{ConfigError, Configuration},
+    role_utils::{Role, RoleGroupRef},
+    schemars::{self, JsonSchema},
+};
 use std::collections::BTreeMap;
 use strum::{Display, EnumIter, EnumString};
 
@@ -20,6 +25,7 @@ pub const HBASE_REST_OPTS: &str = "HBASE_REST_OPTS";
 pub const HBASE_CLUSTER_DISTRIBUTED: &str = "hbase.cluster.distributed";
 pub const HBASE_ROOTDIR: &str = "hbase.rootdir";
 pub const HBASE_ZOOKEEPER_QUORUM: &str = "hbase.zookeeper.quorum";
+pub const HBASE_HEAPSIZE: &str = "HBASE_HEAPSIZE";
 
 pub const HBASE_UI_PORT_NAME: &str = "ui";
 pub const METRICS_PORT_NAME: &str = "metrics";
@@ -30,6 +36,14 @@ pub const HBASE_REGIONSERVER_PORT: i32 = 16020;
 pub const HBASE_REGIONSERVER_UI_PORT: i32 = 16030;
 pub const HBASE_REST_PORT: i32 = 8080;
 pub const METRICS_PORT: i32 = 8081;
+
+pub const JVM_HEAP_FACTOR: f32 = 0.8;
+
+#[derive(Snafu, Debug)]
+pub enum Error {
+    #[snafu(display("Unknown Hbase role found {role}. Should be one of {roles:?}"))]
+    UnknownHbaseRole { role: String, roles: Vec<String> },
+}
 
 #[derive(Clone, CustomResource, Debug, Default, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[kube(
@@ -113,13 +127,34 @@ impl HbaseRole {
     }
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Eq, Merge, JsonSchema, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HbaseStorageConfig {}
+
+#[derive(Clone, Debug, Default, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct HbaseConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub hbase_rootdir: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub hbase_opts: Option<String>,
+    pub resources: Option<Resources<HbaseStorageConfig, NoRuntimeLimits>>,
+}
+
+impl HbaseConfig {
+    fn default_resources() -> Resources<HbaseStorageConfig, NoRuntimeLimits> {
+        Resources {
+            cpu: CpuLimits {
+                min: Some(Quantity("200m".to_owned())),
+                max: Some(Quantity("4".to_owned())),
+            },
+            memory: MemoryLimits {
+                limit: Some(Quantity("2Gi".to_owned())),
+                runtime_limits: NoRuntimeLimits {},
+            },
+            storage: HbaseStorageConfig {},
+        }
+    }
 }
 
 impl Configuration for HbaseConfig {
@@ -227,5 +262,43 @@ impl HbaseCluster {
             .and_then(|c| c.hbase_rootdir.as_deref())
             .unwrap_or("/hbase")
             .to_string()
+    }
+
+    /// Retrieve and merge resource configs for role and role groups
+    pub fn resolve_resource_config_for_role_and_rolegroup(
+        &self,
+        role: &HbaseRole,
+        rolegroup_ref: &RoleGroupRef<HbaseCluster>,
+    ) -> Option<Resources<HbaseStorageConfig, NoRuntimeLimits>> {
+        // Initialize the result with all default values as baseline
+        let conf_defaults = HbaseConfig::default_resources();
+
+        let role = match role {
+            HbaseRole::Master => self.spec.masters.as_ref()?,
+            HbaseRole::RegionServer => self.spec.region_servers.as_ref()?,
+            HbaseRole::RestServer => self.spec.rest_servers.as_ref()?,
+        };
+
+        // Retrieve role resource config
+        let mut conf_role: Resources<HbaseStorageConfig, NoRuntimeLimits> =
+            role.config.config.resources.clone().unwrap_or_default();
+
+        // Retrieve rolegroup specific resource config
+        let mut conf_rolegroup: Resources<HbaseStorageConfig, NoRuntimeLimits> = role
+            .role_groups
+            .get(&rolegroup_ref.role_group)
+            .and_then(|rg| rg.config.config.resources.clone())
+            .unwrap_or_default();
+
+        // Merge more specific configs into default config
+        // Hierarchy is:
+        // 1. RoleGroup
+        // 2. Role
+        // 3. Default
+        conf_role.merge(&conf_defaults);
+        conf_rolegroup.merge(&conf_role);
+
+        tracing::debug!("Merged resource config: {:?}", conf_rolegroup);
+        Some(conf_rolegroup)
     }
 }
