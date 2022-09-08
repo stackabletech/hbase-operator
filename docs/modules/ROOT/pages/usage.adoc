@@ -203,10 +203,10 @@ Phoenix comes bundled with a few simple scripts to verify a correct server-side 
 
 [source,shell script]
 ----
-/stackable/phoenix/bin/psql.py  && \
-   /stackable/phoenix/examples/WEB_STAT.sql && \
-   /stackable/phoenix/examples/WEB_STAT.csv  && \
-   /stackable/phoenix/examples/WEB_STAT_QUERIES.sql
+/stackable/phoenix/bin/psql.py \
+/stackable/phoenix/examples/WEB_STAT.sql \
+/stackable/phoenix/examples/WEB_STAT.csv \
+/stackable/phoenix/examples/WEB_STAT_QUERIES.sql
 ----
 
 This script creates a java command that creates, populates and queries a Phoenix table called `WEB_STAT`. Alternatively, one can use the `sqlline.py` script (which wraps the https://github.com/julianhyde/sqlline[sqlline] utility):
@@ -216,7 +216,9 @@ This script creates a java command that creates, populates and queries a Phoenix
 /stackable/phoenix/bin/sqlline.py [zookeeper] [sql file]
 ----
 
-The script opens an SQL prompt from where one can list, query, create and generally interact with Phoenix tables. So, to query the table that was created in the previous step, start the script and enter some SQL at the prompt:
+The script opens an SQL prompt from where one can list, query, create and generally interact with Phoenix tables. If the script is run from a pod running a Stackable Hase image then the ZooKeeper quorum can be resolved automatically as Phoenix has access to the local HBase configuration details.
+
+To query the table that was created in the previous step, start the script and enter some SQL at the prompt:
 
 image::phoenix_sqlline.png[Phoenix Sqlline]
 
