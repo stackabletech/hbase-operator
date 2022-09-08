@@ -184,12 +184,11 @@ regionServers:
     default:
       config:
         resources:
-          requests:
-            cpu: 200m
-            memory: 2Gi
-          limits:
-            cpu: "4"
-            memory: 2Gi
+          cpu:
+            min: '200m'
+            max: "4"
+          memory:
+            limit: '2Gi'
 ----
 
 WARNING: The default values are _most likely_ not sufficient to run a proper cluster in production. Please adapt according to your requirements.
