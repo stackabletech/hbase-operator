@@ -137,7 +137,7 @@ The HBase Operator currently does not support any https://kubernetes.io/docs/con
 // TODO: remove the "nightly" version after the next platform release (current: 22.09)
 include::nightly@home:concepts:stackable_resource_requests.adoc[]
 
-If no resources are configured explicitely, the Hbase operator uses following defaults:
+If no resources are configured explicitly, the HBase operator uses following defaults:
 
 [source,yaml]
 ----
