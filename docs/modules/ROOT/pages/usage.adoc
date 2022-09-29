@@ -130,52 +130,14 @@ For a full list of configuration options we refer to the HBase https://hbase.apa
 
 The HBase Operator currently does not support any https://kubernetes.io/docs/concepts/storage/persistent-volumes[PersistentVolumeClaims].
 
-=== Memory requests
+=== Resource Requests
 
-You can request a certain amount of memory for each individual role or role group, where the role group configuration overrides existing parts (otherwise they will be inherited) from the role configuration:
+// The "nightly" version is needed because the "include" directive searches for
+// files in the "stable" version by default.
+// TODO: remove the "nightly" version after the next platform release (current: 22.09)
+include::nightly@home:concepts:stackable_resource_requests.adoc[]
 
-[source,yaml]
-----
-regionServers:
-  config:
-    resources:
-      memory:
-        limit: '2Gi'
-  roleGroups:
-    default:
-      config:
-        resources:
-          memory:
-            limit: '3Gi'
-----
-
-In this example, each HBase region server in the `default` group will have a maximum of `3Gi` (gigabytes) of memory. To be more precise, these memory limits apply to the container running HBase but not to any sidecar containers that are part of the pod.
-
-Not specifying any memory limits in the role group will use the provided `2Gi` from the role. If the role is not specified it will use defaults as demonstrated below.
-
-Setting this property will also automatically set the maximum Java heap size for the corresponding process to 80% of the available memory. Be aware that if the memory constraint is too low, the cluster might fail to start. If pods terminate with an 'OOMKilled' status and the cluster doesn't start, try increasing the memory limit.
-
-For more details regarding Kubernetes memory requests and limits see: https://kubernetes.io/docs/tasks/configure-pod-container/assign-memory-resource/[Assign Memory Resources to Containers and Pods].
-
-=== CPU requests
-
-Similarly to memory resources, you can also configure CPU limits, as shown below:
-
-[source,yaml]
-----
-regionServers:
-  roleGroups:
-    default:
-      config:
-        resources:
-          cpu:
-            max: '500m'
-            min: '250m'
-----
-
-=== Defaults
-
-If nothing is specified, the operator will automatically set the following default values for resources:
+If no resources are configured explicitly, the HBase operator uses following defaults:
 
 [source,yaml]
 ----
