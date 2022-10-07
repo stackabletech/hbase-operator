@@ -12,12 +12,24 @@ spec:
   masters:
     roleGroups:
       default:
+        configOverrides:
+          hbase-site.xml:
+            phoenix.log.saltBuckets: "2"
+            hbase.regionserver.wal.codec: "org.apache.hadoop.hbase.regionserver.wal.IndexedWALEditCodec"
         replicas: 1
   regionServers:
     roleGroups:
       default:
+        configOverrides:
+          hbase-site.xml:
+            phoenix.log.saltBuckets: "2"
+            hbase.regionserver.wal.codec: "org.apache.hadoop.hbase.regionserver.wal.IndexedWALEditCodec"
         replicas: 1
   restServers:
     roleGroups:
       default:
+        configOverrides:
+          hbase-site.xml:
+            phoenix.log.saltBuckets: "2"
+            hbase.regionserver.wal.codec: "org.apache.hadoop.hbase.regionserver.wal.IndexedWALEditCodec"
         replicas: 1

@@ -5,8 +5,10 @@
 ### Added
 
 - Cpu and memory limits are now configurable ([#245]).
+- Fix for Phoenix tests ([#261])
 
 [#245]: https://github.com/stackabletech/hbase-operator/pull/245
+[#261]: https://github.com/stackabletech/hbase-operator/pull/261
 
 ## [0.4.0] - 2022-09-06
 

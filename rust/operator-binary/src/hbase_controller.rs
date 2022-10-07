@@ -555,6 +555,8 @@ fn build_rolegroup_statefulset(
         ]
         .join(" && ")])
         .add_env_var("HBASE_CONF_DIR", CONFIG_DIR_NAME)
+        // required by phoenix (for cases where Kerberos is enabled): see https://issues.apache.org/jira/browse/PHOENIX-2369
+        .add_env_var("HADOOP_CONF_DIR", CONFIG_DIR_NAME)
         .add_volume_mount("hbase-config", HBASE_CONFIG_TMP_DIR)
         .add_volume_mount("hdfs-discovery", HDFS_DISCOVERY_TMP_DIR)
         .add_container_ports(ports)
