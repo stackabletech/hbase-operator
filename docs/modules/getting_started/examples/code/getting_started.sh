@@ -20,22 +20,22 @@ helm repo add stackable-dev https://repo.stackable.tech/repository/helm-dev/
 # end::helm-add-repo[]
 echo "Installing Operators with Helm"
 # tag::helm-install-operators[]
-helm install --wait zookeeper-operator stackable-dev/zookeeper-operator --version 0.12.0-nightly
-helm install --wait hdfs-operator stackable-dev/hdfs-operator --version 0.6.0-nightly
-helm install --wait commons-operator stackable-dev/commons-operator --version 0.4.0-nightly
-helm install --wait secret-operator stackable-dev/secret-operator --version 0.6.0-nightly
-helm install --wait hbase-operator stackable-dev/hbase-operator --version 0.5.0-nightly
+helm install --wait zookeeper-operator stackable-dev/zookeeper-operator --version 0.12.0
+helm install --wait hdfs-operator stackable-dev/hdfs-operator --version 0.6.0
+helm install --wait commons-operator stackable-dev/commons-operator --version 0.4.0
+helm install --wait secret-operator stackable-dev/secret-operator --version 0.6.0
+helm install --wait hbase-operator stackable-dev/hbase-operator --version 0.5.0
 # end::helm-install-operators[]
 ;;
 "stackablectl")
 echo "installing Operators with stackablectl"
 # tag::stackablectl-install-operators[]
 stackablectl operator install \
-  commons=0.4.0-nightly \
-  secret=0.6.0-nightly \
-  zookeeper=0.12.0-nightly \
-  hdfs=0.6.0-nightly \
-  hbase=0.5.0-nightly
+  commons=0.4.0 \
+  secret=0.6.0 \
+  zookeeper=0.12.0 \
+  hdfs=0.6.0 \
+  hbase=0.5.0
 # end::stackablectl-install-operators[]
 ;;
 *)
