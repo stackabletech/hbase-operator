@@ -14,17 +14,17 @@ fi
 
 case "$1" in
 "helm")
-echo "Adding 'stackable-dev' Helm Chart repository"
+echo "Adding 'stackable-stable' Helm Chart repository"
 # tag::helm-add-repo[]
-helm repo add stackable-dev https://repo.stackable.tech/repository/helm-dev/
+helm repo add stackable-stable https://repo.stackable.tech/repository/helm-stable/
 # end::helm-add-repo[]
 echo "Installing Operators with Helm"
 # tag::helm-install-operators[]
-helm install --wait zookeeper-operator stackable-dev/zookeeper-operator --version 0.12.0
-helm install --wait hdfs-operator stackable-dev/hdfs-operator --version 0.6.0
-helm install --wait commons-operator stackable-dev/commons-operator --version 0.4.0
-helm install --wait secret-operator stackable-dev/secret-operator --version 0.6.0
-helm install --wait hbase-operator stackable-dev/hbase-operator --version 0.5.0
+helm install --wait zookeeper-operator stackable-stable/zookeeper-operator --version 0.12.0
+helm install --wait hdfs-operator stackable-stable/hdfs-operator --version 0.6.0
+helm install --wait commons-operator stackable-stable/commons-operator --version 0.4.0
+helm install --wait secret-operator stackable-stable/secret-operator --version 0.6.0
+helm install --wait hbase-operator stackable-stable/hbase-operator --version 0.5.0
 # end::helm-install-operators[]
 ;;
 "stackablectl")
