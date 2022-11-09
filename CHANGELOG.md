@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Updated stackable image versions ([#xxx]).
+
+[#xxx]: https://github.com/stackabletech/hbase-operator/pull/xxx
+
 ## [0.5.0] - 2022-11-07
 
 ### Added
