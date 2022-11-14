@@ -2,28 +2,28 @@
 dimensions:
   - name: hbase
     values:
-      - 2.4.8-stackable0.7.0
-      - 2.4.9-stackable0.7.0
-      - 2.4.11-stackable0.7.0
-      - 2.4.12-stackable0.2.0
+      - 2.4.8-stackable0.8.0
+      - 2.4.9-stackable0.8.0
+      - 2.4.11-stackable0.8.0
+      - 2.4.12-stackable0.3.0
   - name: hbase-latest
     values:
-      - 2.4.12-stackable0.2.0
+      - 2.4.12-stackable0.3.0
   - name: hdfs
     values:
-      - 3.2.2-stackable0.5.0
-      - 3.3.3-stackable0.1.0
+      - 3.2.2-stackable0.6.0
+      - 3.3.3-stackable0.2.0
   - name: hdfs-latest
     values:
-      - 3.3.3-stackable0.1.0
+      - 3.3.4-stackable0.2.0
   - name: zookeeper
     values:
-      - 3.6.3-stackable0.7.1
-      - 3.7.0-stackable0.7.1
-      - 3.8.0-stackable0.7.1
+      - 3.6.3-stackable0.8.0
+      - 3.7.0-stackable0.8.0
+      - 3.8.0-stackable0.8.0
   - name: zookeeper-latest
     values:
-      - 3.8.0-stackable0.7.1
+      - 3.8.0-stackable0.8.0
 tests:
   - name: smoke
     dimensions:
