@@ -121,10 +121,6 @@ pub enum Error {
     ObjectMissingMetadataForOwnerRef {
         source: stackable_operator::error::Error,
     },
-    #[snafu(display("failed to retrieve the HDFS configuration"))]
-    NoHdfsSiteConfig {
-        source: stackable_operator::error::Error,
-    },
     #[snafu(display("no configmap_name for {cm_name} discovery is configured"))]
     MissingConfigMap {
         source: stackable_operator::error::Error,

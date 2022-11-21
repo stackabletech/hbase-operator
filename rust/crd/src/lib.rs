@@ -44,8 +44,6 @@ pub const JVM_HEAP_FACTOR: f32 = 0.8;
 
 #[derive(Snafu, Debug)]
 pub enum Error {
-    #[snafu(display("the HBase role [{role}] is not valid. Available roles are [{roles:?}]"))]
-    UnknownHbaseRole { role: String, roles: Vec<String> },
     #[snafu(display("the HBase role [{role}] is missing from spec"))]
     MissingHbaseRole { role: String },
     #[snafu(display("fragment validation failure"))]
