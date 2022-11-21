@@ -5,8 +5,10 @@
 ### Changed
 
 - Updated stackable image versions ([#275]).
+- `operator-rs` `0.2402` -> `0.27.1` ([#277]).
 
 [#275]: https://github.com/stackabletech/hbase-operator/pull/275
+[#277]: https://github.com/stackabletech/hbase-operator/pull/277
 
 ## [0.5.0] - 2022-11-07
 
@@ -27,7 +29,7 @@
 - Orphaned resources are deleted ([#215]).
 - Fix HBase-shell start failure ([#218]).
 - Add integration tests and usage documentation for Phoenix ([#221]).
-- Added OpenShift compatiblity ([#232])
+- Added OpenShift compatibility ([#232])
 
 [#193]: https://github.com/stackabletech/hbase-operator/pull/193
 [#209]: https://github.com/stackabletech/hbase-operator/pull/209
