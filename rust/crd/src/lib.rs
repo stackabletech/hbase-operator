@@ -1,8 +1,11 @@
 use serde::{Deserialize, Serialize};
-use snafu::Snafu;
+use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
-    commons::resources::{CpuLimits, MemoryLimits, NoRuntimeLimits, Resources},
-    config::merge::Merge,
+    commons::resources::{
+        CpuLimitsFragment, MemoryLimitsFragment, NoRuntimeLimits, NoRuntimeLimitsFragment,
+        Resources, ResourcesFragment,
+    },
+    config::{fragment, fragment::Fragment, fragment::ValidationError, merge::Merge},
     k8s_openapi::apimachinery::pkg::api::resource::Quantity,
     kube::{runtime::reflector::ObjectRef, CustomResource},
     product_config_utils::{ConfigError, Configuration},
@@ -10,7 +13,7 @@ use stackable_operator::{
     schemars::{self, JsonSchema},
 };
 use std::collections::BTreeMap;
-use strum::{Display, EnumIter, EnumString};
+use strum::{Display, EnumIter, EnumString, IntoEnumIterator};
 
 pub const APP_NAME: &str = "hbase";
 
@@ -41,8 +44,12 @@ pub const JVM_HEAP_FACTOR: f32 = 0.8;
 
 #[derive(Snafu, Debug)]
 pub enum Error {
-    #[snafu(display("Unknown Hbase role found {role}. Should be one of {roles:?}"))]
+    #[snafu(display("the HBase role [{role}] is not valid. Available roles are [{roles:?}]"))]
     UnknownHbaseRole { role: String, roles: Vec<String> },
+    #[snafu(display("the HBase role [{role}] is missing from spec"))]
+    MissingHbaseRole { role: String },
+    #[snafu(display("fragment validation failure"))]
+    FragmentValidationFailure { source: ValidationError },
 }
 
 #[derive(Clone, CustomResource, Debug, Default, Deserialize, JsonSchema, PartialEq, Serialize)]
@@ -125,10 +132,32 @@ impl HbaseRole {
             ],
         }
     }
+
+    pub fn roles() -> Vec<String> {
+        let mut roles = vec![];
+        for role in Self::iter() {
+            roles.push(role.to_string())
+        }
+        roles
+    }
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Eq, Merge, JsonSchema, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase")]
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, Debug, Default, JsonSchema, PartialEq, Fragment)]
+#[fragment_attrs(
+    allow(clippy::derive_partial_eq_without_eq),
+    derive(
+        Clone,
+        Debug,
+        Default,
+        Deserialize,
+        Merge,
+        JsonSchema,
+        PartialEq,
+        Serialize
+    ),
+    serde(rename_all = "camelCase")
+)]
 pub struct HbaseStorageConfig {}
 
 #[derive(Clone, Debug, Default, Deserialize, JsonSchema, PartialEq, Serialize)]
@@ -138,21 +167,21 @@ pub struct HbaseConfig {
     pub hbase_rootdir: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub hbase_opts: Option<String>,
-    pub resources: Option<Resources<HbaseStorageConfig, NoRuntimeLimits>>,
+    pub resources: Option<ResourcesFragment<HbaseStorageConfig, NoRuntimeLimits>>,
 }
 
 impl HbaseConfig {
-    fn default_resources() -> Resources<HbaseStorageConfig, NoRuntimeLimits> {
-        Resources {
-            cpu: CpuLimits {
+    fn default_resources() -> ResourcesFragment<HbaseStorageConfig, NoRuntimeLimits> {
+        ResourcesFragment {
+            cpu: CpuLimitsFragment {
                 min: Some(Quantity("200m".to_owned())),
                 max: Some(Quantity("4".to_owned())),
             },
-            memory: MemoryLimits {
+            memory: MemoryLimitsFragment {
                 limit: Some(Quantity("2Gi".to_owned())),
-                runtime_limits: NoRuntimeLimits {},
+                runtime_limits: NoRuntimeLimitsFragment {},
             },
-            storage: HbaseStorageConfig {},
+            storage: HbaseStorageConfigFragment {},
         }
     }
 }
@@ -269,22 +298,38 @@ impl HbaseCluster {
         &self,
         role: &HbaseRole,
         rolegroup_ref: &RoleGroupRef<HbaseCluster>,
-    ) -> Option<Resources<HbaseStorageConfig, NoRuntimeLimits>> {
+    ) -> Result<Resources<HbaseStorageConfig, NoRuntimeLimits>, Error> {
         // Initialize the result with all default values as baseline
         let conf_defaults = HbaseConfig::default_resources();
 
         let role = match role {
-            HbaseRole::Master => self.spec.masters.as_ref()?,
-            HbaseRole::RegionServer => self.spec.region_servers.as_ref()?,
-            HbaseRole::RestServer => self.spec.rest_servers.as_ref()?,
+            HbaseRole::Master => self.spec.masters.as_ref().context(MissingHbaseRoleSnafu {
+                role: HbaseRole::Master.to_string(),
+            })?,
+            HbaseRole::RegionServer => {
+                self.spec
+                    .region_servers
+                    .as_ref()
+                    .context(MissingHbaseRoleSnafu {
+                        role: HbaseRole::RegionServer.to_string(),
+                    })?
+            }
+            HbaseRole::RestServer => {
+                self.spec
+                    .rest_servers
+                    .as_ref()
+                    .context(MissingHbaseRoleSnafu {
+                        role: HbaseRole::RestServer.to_string(),
+                    })?
+            }
         };
 
         // Retrieve role resource config
-        let mut conf_role: Resources<HbaseStorageConfig, NoRuntimeLimits> =
+        let mut conf_role: ResourcesFragment<HbaseStorageConfig, NoRuntimeLimits> =
             role.config.config.resources.clone().unwrap_or_default();
 
         // Retrieve rolegroup specific resource config
-        let mut conf_rolegroup: Resources<HbaseStorageConfig, NoRuntimeLimits> = role
+        let mut conf_rolegroup: ResourcesFragment<HbaseStorageConfig, NoRuntimeLimits> = role
             .role_groups
             .get(&rolegroup_ref.role_group)
             .and_then(|rg| rg.config.config.resources.clone())
@@ -299,6 +344,6 @@ impl HbaseCluster {
         conf_rolegroup.merge(&conf_role);
 
         tracing::debug!("Merged resource config: {:?}", conf_rolegroup);
-        Some(conf_rolegroup)
+        fragment::validate(conf_rolegroup).context(FragmentValidationFailureSnafu)
     }
 }

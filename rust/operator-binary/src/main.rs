@@ -2,7 +2,7 @@ mod discovery;
 mod hbase_controller;
 mod rbac;
 
-use std::sync::Arc;
+use crate::hbase_controller::HBASE_CONTROLLER_NAME;
 
 use clap::Parser;
 use futures::StreamExt;
@@ -10,13 +10,17 @@ use stackable_hbase_crd::{HbaseCluster, APP_NAME};
 use stackable_operator::{
     cli::{Command, ProductOperatorRun},
     k8s_openapi::api::{apps::v1::StatefulSet, core::v1::Service},
-    kube::{api::ListParams, runtime::controller::Controller, CustomResourceExt},
+    kube::{api::ListParams, runtime::controller::Controller},
     logging::controller::report_controller_reconciled,
+    CustomResourceExt,
 };
+use std::sync::Arc;
 
 mod built_info {
     include!(concat!(env!("OUT_DIR"), "/built.rs"));
 }
+
+const OPERATOR_NAME: &str = "hbase.stackable.com";
 
 #[derive(Parser)]
 #[clap(about = built_info::PKG_DESCRIPTION, author = stackable_operator::cli::AUTHOR)]
@@ -29,7 +33,9 @@ struct Opts {
 async fn main() -> anyhow::Result<()> {
     let opts = Opts::parse();
     match opts.cmd {
-        Command::Crd => println!("{}", serde_yaml::to_string(&HbaseCluster::crd())?,),
+        Command::Crd => {
+            HbaseCluster::print_yaml_schema()?;
+        }
         Command::Run(ProductOperatorRun {
             product_config,
             watch_namespace,
@@ -53,8 +59,7 @@ async fn main() -> anyhow::Result<()> {
                 "/etc/stackable/hbase-operator/config-spec/properties.yaml",
             ])?;
             let client =
-                stackable_operator::client::create_client(Some("hbase.stackable.tech".to_string()))
-                    .await?;
+                stackable_operator::client::create_client(Some(OPERATOR_NAME.to_string())).await?;
 
             Controller::new(
                 watch_namespace.get_api::<HbaseCluster>(&client),
@@ -78,7 +83,11 @@ async fn main() -> anyhow::Result<()> {
                 }),
             )
             .map(|res| {
-                report_controller_reconciled(&client, "hbaseclusters.hbase.stackable.tech", &res)
+                report_controller_reconciled(
+                    &client,
+                    &format!("{HBASE_CONTROLLER_NAME}.{OPERATOR_NAME}"),
+                    &res,
+                )
             })
             .collect::<()>()
             .await;
