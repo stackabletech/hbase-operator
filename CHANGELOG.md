@@ -5,7 +5,7 @@
 ### Changed
 
 - Updated stackable image versions ([#275]).
-- `operator-rs` `0.24.2` -> `0.27.1` ([#277]).
+- `operator-rs` `0.24.0` -> `0.27.1` ([#277]).
 
 [#275]: https://github.com/stackabletech/hbase-operator/pull/275
 [#277]: https://github.com/stackabletech/hbase-operator/pull/277
