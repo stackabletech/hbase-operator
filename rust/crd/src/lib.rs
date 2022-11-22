@@ -13,7 +13,7 @@ use stackable_operator::{
     schemars::{self, JsonSchema},
 };
 use std::collections::BTreeMap;
-use strum::{Display, EnumIter, EnumString, IntoEnumIterator};
+use strum::{Display, EnumIter, EnumString};
 
 pub const APP_NAME: &str = "hbase";
 
@@ -129,14 +129,6 @@ impl HbaseRole {
                 (METRICS_PORT_NAME, METRICS_PORT, "TCP"),
             ],
         }
-    }
-
-    pub fn roles() -> Vec<String> {
-        let mut roles = vec![];
-        for role in Self::iter() {
-            roles.push(role.to_string())
-        }
-        roles
     }
 }
 
