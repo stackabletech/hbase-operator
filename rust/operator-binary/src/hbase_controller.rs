@@ -660,7 +660,7 @@ fn rolegroup_replicas(
             })?;
 
         let replicas = hbase
-            .get_role(role)
+            .get_role(&role)
             .as_ref()
             .map(|role| &role.role_groups)
             .and_then(|role_group| role_group.get(&rolegroup_ref.role_group))
@@ -685,7 +685,7 @@ fn build_roles(hbase: &HbaseCluster) -> Result<RoleConfig> {
             (
                 config_types.to_owned(),
                 hbase
-                    .get_role(HbaseRole::Master)
+                    .get_role(&HbaseRole::Master)
                     .cloned()
                     .context(NoMasterRoleSnafu)?,
             ),
@@ -695,7 +695,7 @@ fn build_roles(hbase: &HbaseCluster) -> Result<RoleConfig> {
             (
                 config_types.to_owned(),
                 hbase
-                    .get_role(HbaseRole::RegionServer)
+                    .get_role(&HbaseRole::RegionServer)
                     .cloned()
                     .context(NoRegionServerRoleSnafu)?,
             ),
@@ -703,7 +703,7 @@ fn build_roles(hbase: &HbaseCluster) -> Result<RoleConfig> {
     ]
     .into();
 
-    if let Some(rest_servers) = hbase.get_role(HbaseRole::RestServer) {
+    if let Some(rest_servers) = hbase.get_role(&HbaseRole::RestServer) {
         roles.insert(
             HbaseRole::RestServer.to_string(),
             (config_types, rest_servers.to_owned()),

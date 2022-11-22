@@ -274,7 +274,7 @@ impl HbaseCluster {
         }
     }
 
-    pub fn get_role(&self, role: HbaseRole) -> Option<&Role<HbaseConfig>> {
+    pub fn get_role(&self, role: &HbaseRole) -> Option<&Role<HbaseConfig>> {
         match role {
             HbaseRole::Master => self.spec.masters.as_ref(),
             HbaseRole::RegionServer => self.spec.region_servers.as_ref(),
@@ -300,27 +300,9 @@ impl HbaseCluster {
         // Initialize the result with all default values as baseline
         let conf_defaults = HbaseConfig::default_resources();
 
-        let role = match role {
-            HbaseRole::Master => self.spec.masters.as_ref().context(MissingHbaseRoleSnafu {
-                role: HbaseRole::Master.to_string(),
-            })?,
-            HbaseRole::RegionServer => {
-                self.spec
-                    .region_servers
-                    .as_ref()
-                    .context(MissingHbaseRoleSnafu {
-                        role: HbaseRole::RegionServer.to_string(),
-                    })?
-            }
-            HbaseRole::RestServer => {
-                self.spec
-                    .rest_servers
-                    .as_ref()
-                    .context(MissingHbaseRoleSnafu {
-                        role: HbaseRole::RestServer.to_string(),
-                    })?
-            }
-        };
+        let role = self.get_role(role).context(MissingHbaseRoleSnafu {
+            role: role.to_string(),
+        })?;
 
         // Retrieve role resource config
         let mut conf_role: ResourcesFragment<HbaseStorageConfig, NoRuntimeLimits> =
