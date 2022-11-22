@@ -1,7 +1,5 @@
-use crate::hbase_controller::hbase_version;
-use stackable_hbase_crd::{
-    HbaseCluster, HbaseRole, APP_NAME, HBASE_SITE_XML, HBASE_ZOOKEEPER_QUORUM,
-};
+use crate::hbase_controller::{build_recommended_labels, hbase_version};
+use stackable_hbase_crd::{HbaseCluster, HbaseRole, HBASE_SITE_XML, HBASE_ZOOKEEPER_QUORUM};
 use stackable_operator::{
     builder::{ConfigMapBuilder, ObjectMetaBuilder},
     error::{Error, OperatorResult},
@@ -13,7 +11,6 @@ use std::collections::HashMap;
 pub fn build_discovery_configmap(
     hbase: &HbaseCluster,
     zookeeper_connect_string: &str,
-    managed_by: &str,
 ) -> OperatorResult<ConfigMap> {
     let hbase_site_data: HashMap<String, Option<String>> = [(
         HBASE_ZOOKEEPER_QUORUM.to_string(),
@@ -26,14 +23,12 @@ pub fn build_discovery_configmap(
             ObjectMetaBuilder::new()
                 .name_and_namespace(hbase)
                 .ownerreference_from_resource(hbase, None, Some(true))?
-                .with_recommended_labels(
+                .with_recommended_labels(build_recommended_labels(
                     hbase,
-                    APP_NAME,
                     hbase_version(hbase).map_err(|_| Error::MissingObjectKey { key: "version" })?,
-                    managed_by,
                     &HbaseRole::RegionServer.to_string(),
                     "discovery",
-                )
+                ))
                 .build(),
         )
         .add_data(

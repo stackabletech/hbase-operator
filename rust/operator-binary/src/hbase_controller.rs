@@ -1,20 +1,21 @@
 //! Ensures that `Pod`s are configured and running for each [`HbaseCluster`]
 
-use crate::{discovery::build_discovery_configmap, rbac};
+use crate::{discovery::build_discovery_configmap, rbac, OPERATOR_NAME};
+
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_hbase_crd::{
     HbaseCluster, HbaseConfig, HbaseRole, HbaseStorageConfig, APP_NAME, HBASE_ENV_SH,
     HBASE_HEAPSIZE, HBASE_MASTER_PORT, HBASE_REGIONSERVER_PORT, HBASE_REST_PORT, HBASE_SITE_XML,
     HBASE_ZOOKEEPER_QUORUM, JVM_HEAP_FACTOR,
 };
-use stackable_operator::commons::resources::{NoRuntimeLimits, Resources};
-use stackable_operator::memory::{to_java_heap_value, BinaryMultiple};
+use stackable_operator::labels::ObjectLabels;
 use stackable_operator::{
     builder::{
         ConfigMapBuilder, ContainerBuilder, ObjectMetaBuilder, PodBuilder,
         PodSecurityContextBuilder,
     },
     cluster_resources::ClusterResources,
+    commons::resources::{NoRuntimeLimits, Resources},
     k8s_openapi::{
         api::{
             apps::v1::{StatefulSet, StatefulSetSpec},
@@ -28,6 +29,7 @@ use stackable_operator::{
     kube::{runtime::controller::Action, Resource, ResourceExt},
     labels::{role_group_selector_labels, role_selector_labels},
     logging::controller::ReconcilerError,
+    memory::{to_java_heap_value, BinaryMultiple},
     product_config::{types::PropertyNameKind, writer, ProductConfigManager},
     product_config_utils::{transform_all_roles_to_config, validate_all_roles_and_groups_config},
     role_utils::{Role, RoleGroupRef},
@@ -40,7 +42,7 @@ use std::{
 };
 use strum::{EnumDiscriminants, IntoStaticStr};
 
-const CONTROLLER_NAME: &str = "hbase-operator";
+pub const HBASE_CONTROLLER_NAME: &str = "hbasecluster";
 
 const CONFIG_DIR_NAME: &str = "/stackable/conf";
 const HDFS_DISCOVERY_TMP_DIR: &str = "/stackable/tmp/hdfs";
@@ -59,6 +61,8 @@ pub struct Ctx {
 pub enum Error {
     #[snafu(display("object defines no version"))]
     ObjectHasNoVersion,
+    #[snafu(display("object defines no namespace"))]
+    ObjectHasNoNamespace,
     #[snafu(display("object defines no master role"))]
     NoMasterRole,
     #[snafu(display("object defines no regionserver role"))]
@@ -117,10 +121,6 @@ pub enum Error {
     ObjectMissingMetadataForOwnerRef {
         source: stackable_operator::error::Error,
     },
-    #[snafu(display("failed to retrieve the HDFS configuration"))]
-    NoHdfsSiteConfig {
-        source: stackable_operator::error::Error,
-    },
     #[snafu(display("no configmap_name for {cm_name} discovery is configured"))]
     MissingConfigMap {
         source: stackable_operator::error::Error,
@@ -147,7 +147,7 @@ pub enum Error {
         role: String,
     },
     #[snafu(display("failed to resolve and merge resource config for role and role group"))]
-    FailedToResolveResourceConfig,
+    FailedToResolveResourceConfig { source: stackable_hbase_crd::Error },
     #[snafu(display("invalid java heap config - missing default or value in crd?"))]
     InvalidJavaHeapConfig,
     #[snafu(display("failed to convert java heap config to unit [{unit}]"))]
@@ -172,7 +172,13 @@ pub async fn reconcile_hbase(hbase: Arc<HbaseCluster>, ctx: Arc<Ctx>) -> Result<
 
     let zk_discovery_cm_name = &hbase.spec.zookeeper_config_map_name;
     let zk_connect_string = client
-        .get::<ConfigMap>(zk_discovery_cm_name, hbase.namespace().as_deref())
+        .get::<ConfigMap>(
+            zk_discovery_cm_name,
+            hbase
+                .namespace()
+                .as_deref()
+                .context(ObjectHasNoNamespaceSnafu)?,
+        )
         .await
         .context(MissingConfigMapSnafu {
             cm_name: zk_discovery_cm_name.to_string(),
@@ -195,9 +201,13 @@ pub async fn reconcile_hbase(hbase: Arc<HbaseCluster>, ctx: Arc<Ctx>) -> Result<
     )
     .context(InvalidProductConfigSnafu)?;
 
-    let mut cluster_resources =
-        ClusterResources::new(APP_NAME, CONTROLLER_NAME, &hbase.object_ref(&()))
-            .context(CreateClusterResourcesSnafu)?;
+    let mut cluster_resources = ClusterResources::new(
+        APP_NAME,
+        OPERATOR_NAME,
+        HBASE_CONTROLLER_NAME,
+        &hbase.object_ref(&()),
+    )
+    .context(CreateClusterResourcesSnafu)?;
 
     let region_server_role_service = build_region_server_role_service(&hbase)?;
     cluster_resources
@@ -206,7 +216,7 @@ pub async fn reconcile_hbase(hbase: Arc<HbaseCluster>, ctx: Arc<Ctx>) -> Result<
         .context(ApplyRoleServiceSnafu)?;
 
     // discovery config map
-    let discovery_cm = build_discovery_configmap(&hbase, &zk_connect_string, CONTROLLER_NAME)
+    let discovery_cm = build_discovery_configmap(&hbase, &zk_connect_string)
         .context(BuildDiscoveryConfigMapSnafu)?;
     cluster_resources
         .add(client, &discovery_cm)
@@ -215,13 +225,13 @@ pub async fn reconcile_hbase(hbase: Arc<HbaseCluster>, ctx: Arc<Ctx>) -> Result<
 
     let (rbac_sa, rbac_rolebinding) = rbac::build_rbac_resources(hbase.as_ref(), "hbase");
     client
-        .apply_patch(CONTROLLER_NAME, &rbac_sa, &rbac_sa)
+        .apply_patch(HBASE_CONTROLLER_NAME, &rbac_sa, &rbac_sa)
         .await
         .with_context(|_| ApplyServiceAccountSnafu {
             name: rbac_sa.name_unchecked(),
         })?;
     client
-        .apply_patch(CONTROLLER_NAME, &rbac_rolebinding, &rbac_rolebinding)
+        .apply_patch(HBASE_CONTROLLER_NAME, &rbac_rolebinding, &rbac_rolebinding)
         .await
         .with_context(|_| ApplyRoleBindingSnafu {
             name: rbac_rolebinding.name_unchecked(),
@@ -307,14 +317,12 @@ pub fn build_region_server_role_service(hbase: &HbaseCluster) -> Result<Service>
             .name(&role_svc_name)
             .ownerreference_from_resource(hbase, None, Some(true))
             .context(ObjectMissingMetadataForOwnerRefSnafu)?
-            .with_recommended_labels(
+            .with_recommended_labels(build_recommended_labels(
                 hbase,
-                APP_NAME,
                 hbase_version(hbase)?,
-                CONTROLLER_NAME,
                 &role_name,
                 "global",
-            )
+            ))
             .build(),
         spec: Some(ServiceSpec {
             ports: Some(ports),
@@ -378,14 +386,12 @@ fn build_rolegroup_config_map(
                 .name(rolegroup.object_name())
                 .ownerreference_from_resource(hbase, None, Some(true))
                 .context(ObjectMissingMetadataForOwnerRefSnafu)?
-                .with_recommended_labels(
+                .with_recommended_labels(build_recommended_labels(
                     hbase,
-                    APP_NAME,
                     hbase_version(hbase)?,
-                    CONTROLLER_NAME,
                     &rolegroup.role,
                     &rolegroup.role_group,
-                )
+                ))
                 .build(),
         )
         .add_data(
@@ -408,7 +414,9 @@ fn build_rolegroup_service(
     rolegroup: &RoleGroupRef<HbaseCluster>,
     _rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
 ) -> Result<Service> {
-    let role = serde_yaml::from_str::<HbaseRole>(&rolegroup.role).unwrap();
+    let role = HbaseRole::from_str(&rolegroup.role).context(UnidentifiedHbaseRoleSnafu {
+        role: rolegroup.role.to_string(),
+    })?;
     let ports = role
         .port_properties()
         .into_iter()
@@ -426,14 +434,12 @@ fn build_rolegroup_service(
             .name(&rolegroup.object_name())
             .ownerreference_from_resource(hbase, None, Some(true))
             .context(ObjectMissingMetadataForOwnerRefSnafu)?
-            .with_recommended_labels(
+            .with_recommended_labels(build_recommended_labels(
                 hbase,
-                APP_NAME,
                 hbase_version(hbase)?,
-                CONTROLLER_NAME,
                 &rolegroup.role,
                 &rolegroup.role_group,
-            )
+            ))
             .with_label("prometheus.io/scrape", "true")
             .build(),
         spec: Some(ServiceSpec {
@@ -463,10 +469,10 @@ fn build_rolegroup_statefulset(
     resources: &Resources<HbaseStorageConfig, NoRuntimeLimits>,
 ) -> Result<StatefulSet> {
     let hbase_version = hbase_version(hbase)?;
-
+    let role = HbaseRole::from_str(&rolegroup_ref.role).context(UnidentifiedHbaseRoleSnafu {
+        role: rolegroup_ref.role.to_string(),
+    })?;
     let image = format!("docker.stackable.tech/stackable/hbase:{}", hbase_version);
-
-    let role = serde_yaml::from_str::<HbaseRole>(&rolegroup_ref.role).unwrap();
 
     let ports = role
         .port_properties()
@@ -572,14 +578,12 @@ fn build_rolegroup_statefulset(
             .name(&rolegroup_ref.object_name())
             .ownerreference_from_resource(hbase, None, Some(true))
             .context(ObjectMissingMetadataForOwnerRefSnafu)?
-            .with_recommended_labels(
+            .with_recommended_labels(build_recommended_labels(
                 hbase,
-                APP_NAME,
                 hbase_version,
-                CONTROLLER_NAME,
                 &rolegroup_ref.role,
                 &rolegroup_ref.role_group,
-            )
+            ))
             .build(),
         spec: Some(StatefulSetSpec {
             pod_management_policy: Some("Parallel".to_string()),
@@ -596,14 +600,12 @@ fn build_rolegroup_statefulset(
             service_name: rolegroup_ref.object_name(),
             template: PodBuilder::new()
                 .metadata_builder(|m| {
-                    m.with_recommended_labels(
+                    m.with_recommended_labels(build_recommended_labels(
                         hbase,
-                        APP_NAME,
                         hbase_version,
-                        CONTROLLER_NAME,
                         &rolegroup_ref.role,
                         &rolegroup_ref.role_group,
-                    )
+                    ))
                 })
                 .add_container(container)
                 .add_volume(stackable_operator::k8s_openapi::api::core::v1::Volume {
@@ -652,10 +654,13 @@ fn rolegroup_replicas(
     if hbase.spec.stopped.unwrap_or(false) {
         Ok(0)
     } else {
-        let role = serde_yaml::from_str(&rolegroup_ref.role).unwrap();
+        let role =
+            HbaseRole::from_str(&rolegroup_ref.role).context(UnidentifiedHbaseRoleSnafu {
+                role: rolegroup_ref.role.to_string(),
+            })?;
 
         let replicas = hbase
-            .get_role(role)
+            .get_role(&role)
             .as_ref()
             .map(|role| &role.role_groups)
             .and_then(|role_group| role_group.get(&rolegroup_ref.role_group))
@@ -680,7 +685,7 @@ fn build_roles(hbase: &HbaseCluster) -> Result<RoleConfig> {
             (
                 config_types.to_owned(),
                 hbase
-                    .get_role(HbaseRole::Master)
+                    .get_role(&HbaseRole::Master)
                     .cloned()
                     .context(NoMasterRoleSnafu)?,
             ),
@@ -690,7 +695,7 @@ fn build_roles(hbase: &HbaseCluster) -> Result<RoleConfig> {
             (
                 config_types.to_owned(),
                 hbase
-                    .get_role(HbaseRole::RegionServer)
+                    .get_role(&HbaseRole::RegionServer)
                     .cloned()
                     .context(NoRegionServerRoleSnafu)?,
             ),
@@ -698,7 +703,7 @@ fn build_roles(hbase: &HbaseCluster) -> Result<RoleConfig> {
     ]
     .into();
 
-    if let Some(rest_servers) = hbase.get_role(HbaseRole::RestServer) {
+    if let Some(rest_servers) = hbase.get_role(&HbaseRole::RestServer) {
         roles.insert(
             HbaseRole::RestServer.to_string(),
             (config_types, rest_servers.to_owned()),
@@ -717,6 +722,23 @@ where
         .collect()
 }
 
-pub fn error_policy(_error: &Error, _ctx: Arc<Ctx>) -> Action {
+pub fn error_policy(_obj: Arc<HbaseCluster>, _error: &Error, _ctx: Arc<Ctx>) -> Action {
     Action::requeue(Duration::from_secs(5))
+}
+
+pub fn build_recommended_labels<'a>(
+    owner: &'a HbaseCluster,
+    app_version: &'a str,
+    role: &'a str,
+    role_group: &'a str,
+) -> ObjectLabels<'a, HbaseCluster> {
+    ObjectLabels {
+        owner,
+        app_name: APP_NAME,
+        app_version,
+        operator_name: OPERATOR_NAME,
+        controller_name: HBASE_CONTROLLER_NAME,
+        role,
+        role_group,
+    }
 }
