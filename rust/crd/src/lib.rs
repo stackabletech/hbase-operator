@@ -1,9 +1,12 @@
 use serde::{Deserialize, Serialize};
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
-    commons::resources::{
-        CpuLimitsFragment, MemoryLimitsFragment, NoRuntimeLimits, NoRuntimeLimitsFragment,
-        Resources, ResourcesFragment,
+    commons::{
+        product_image_selection::ProductImage,
+        resources::{
+            CpuLimitsFragment, MemoryLimitsFragment, NoRuntimeLimits, NoRuntimeLimitsFragment,
+            Resources, ResourcesFragment,
+        },
     },
     config::{fragment, fragment::Fragment, fragment::ValidationError, merge::Merge},
     k8s_openapi::apimachinery::pkg::api::resource::Quantity,
@@ -50,7 +53,7 @@ pub enum Error {
     FragmentValidationFailure { source: ValidationError },
 }
 
-#[derive(Clone, CustomResource, Debug, Default, Deserialize, JsonSchema, PartialEq, Serialize)]
+#[derive(Clone, CustomResource, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[kube(
     group = "hbase.stackable.tech",
     version = "v1alpha1",
@@ -70,10 +73,11 @@ pub struct HbaseClusterSpec {
     /// Emergency stop button, if `true` then all pods are stopped without affecting configuration (as setting `replicas` to `0` would)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub stopped: Option<bool>,
-    /// Desired HBase version
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub version: Option<String>,
+    /// Desired HBase image
+    pub image: ProductImage,
+    /// ZooKeeper cluster connection details from discovery config map
     pub zookeeper_config_map_name: String,
+    /// HDFS cluster connection details from discovery config map
     pub hdfs_config_map_name: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub config: Option<HbaseConfig>,

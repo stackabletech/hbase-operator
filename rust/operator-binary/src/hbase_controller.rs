@@ -15,7 +15,10 @@ use stackable_operator::{
         PodSecurityContextBuilder,
     },
     cluster_resources::ClusterResources,
-    commons::resources::{NoRuntimeLimits, Resources},
+    commons::{
+        product_image_selection::ResolvedProductImage,
+        resources::{NoRuntimeLimits, Resources},
+    },
     k8s_openapi::{
         api::{
             apps::v1::{StatefulSet, StatefulSetSpec},
@@ -49,6 +52,8 @@ const HDFS_DISCOVERY_TMP_DIR: &str = "/stackable/tmp/hdfs";
 const HBASE_CONFIG_TMP_DIR: &str = "/stackable/tmp/hbase";
 
 const ZOOKEEPER_DISCOVERY_CM_ENTRY: &str = "ZOOKEEPER";
+
+const DOCKER_IMAGE_BASE_NAME: &str = "hbase";
 
 pub struct Ctx {
     pub client: stackable_operator::client::Client,
@@ -170,6 +175,8 @@ pub async fn reconcile_hbase(hbase: Arc<HbaseCluster>, ctx: Arc<Ctx>) -> Result<
 
     let client = &ctx.client;
 
+    let resolved_product_image = hbase.spec.image.resolve(DOCKER_IMAGE_BASE_NAME);
+
     let zk_discovery_cm_name = &hbase.spec.zookeeper_config_map_name;
     let zk_connect_string = client
         .get::<ConfigMap>(
@@ -193,7 +200,7 @@ pub async fn reconcile_hbase(hbase: Arc<HbaseCluster>, ctx: Arc<Ctx>) -> Result<
     let roles = build_roles(&hbase)?;
 
     let validated_config = validate_all_roles_and_groups_config(
-        hbase_version(&hbase)?,
+        &resolved_product_image.app_version_label,
         &transform_all_roles_to_config(&*hbase, roles).context(GenerateProductConfigSnafu)?,
         &ctx.product_config,
         false,
@@ -209,15 +216,17 @@ pub async fn reconcile_hbase(hbase: Arc<HbaseCluster>, ctx: Arc<Ctx>) -> Result<
     )
     .context(CreateClusterResourcesSnafu)?;
 
-    let region_server_role_service = build_region_server_role_service(&hbase)?;
+    let region_server_role_service =
+        build_region_server_role_service(&hbase, &resolved_product_image)?;
     cluster_resources
         .add(client, &region_server_role_service)
         .await
         .context(ApplyRoleServiceSnafu)?;
 
     // discovery config map
-    let discovery_cm = build_discovery_configmap(&hbase, &zk_connect_string)
-        .context(BuildDiscoveryConfigMapSnafu)?;
+    let discovery_cm =
+        build_discovery_configmap(&hbase, &zk_connect_string, &resolved_product_image)
+            .context(BuildDiscoveryConfigMapSnafu)?;
     cluster_resources
         .add(client, &discovery_cm)
         .await
@@ -248,20 +257,21 @@ pub async fn reconcile_hbase(hbase: Arc<HbaseCluster>, ctx: Arc<Ctx>) -> Result<
                 .resolve_resource_config_for_role_and_rolegroup(&hbase_role, &rolegroup)
                 .context(FailedToResolveResourceConfigSnafu)?;
 
-            let rg_service = build_rolegroup_service(&hbase, &rolegroup, rolegroup_config)?;
+            let rg_service = build_rolegroup_service(&hbase, &rolegroup, &resolved_product_image)?;
             let rg_configmap = build_rolegroup_config_map(
                 &hbase,
                 &rolegroup,
                 rolegroup_config,
                 &zk_connect_string,
                 &resources,
+                &resolved_product_image,
             )?;
             let rg_statefulset = build_rolegroup_statefulset(
                 &hbase,
                 &rolegroup,
-                rolegroup_config,
                 &rbac_sa.name_unchecked(),
                 &resources,
+                &resolved_product_image,
             )?;
             cluster_resources
                 .add(client, &rg_service)
@@ -294,7 +304,10 @@ pub async fn reconcile_hbase(hbase: Arc<HbaseCluster>, ctx: Arc<Ctx>) -> Result<
 
 /// The server-role service is the primary endpoint that should be used by clients that do not perform internal load balancing,
 /// including targets outside of the cluster.
-pub fn build_region_server_role_service(hbase: &HbaseCluster) -> Result<Service> {
+pub fn build_region_server_role_service(
+    hbase: &HbaseCluster,
+    resolved_product_image: &ResolvedProductImage,
+) -> Result<Service> {
     let role = HbaseRole::RegionServer;
     let role_name = role.to_string();
     let role_svc_name = hbase
@@ -319,7 +332,7 @@ pub fn build_region_server_role_service(hbase: &HbaseCluster) -> Result<Service>
             .context(ObjectMissingMetadataForOwnerRefSnafu)?
             .with_recommended_labels(build_recommended_labels(
                 hbase,
-                hbase_version(hbase)?,
+                &resolved_product_image.app_version_label,
                 &role_name,
                 "global",
             ))
@@ -341,6 +354,7 @@ fn build_rolegroup_config_map(
     rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
     zk_connect_string: &str,
     resources: &Resources<HbaseStorageConfig, NoRuntimeLimits>,
+    resolved_product_image: &ResolvedProductImage,
 ) -> Result<ConfigMap, Error> {
     let mut hbase_site_config = rolegroup_config
         .get(&PropertyNameKind::File(HBASE_SITE_XML.to_string()))
@@ -388,7 +402,7 @@ fn build_rolegroup_config_map(
                 .context(ObjectMissingMetadataForOwnerRefSnafu)?
                 .with_recommended_labels(build_recommended_labels(
                     hbase,
-                    hbase_version(hbase)?,
+                    &resolved_product_image.app_version_label,
                     &rolegroup.role,
                     &rolegroup.role_group,
                 ))
@@ -412,7 +426,7 @@ fn build_rolegroup_config_map(
 fn build_rolegroup_service(
     hbase: &HbaseCluster,
     rolegroup: &RoleGroupRef<HbaseCluster>,
-    _rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
+    resolved_product_image: &ResolvedProductImage,
 ) -> Result<Service> {
     let role = HbaseRole::from_str(&rolegroup.role).context(UnidentifiedHbaseRoleSnafu {
         role: rolegroup.role.to_string(),
@@ -436,7 +450,7 @@ fn build_rolegroup_service(
             .context(ObjectMissingMetadataForOwnerRefSnafu)?
             .with_recommended_labels(build_recommended_labels(
                 hbase,
-                hbase_version(hbase)?,
+                &resolved_product_image.app_version_label,
                 &rolegroup.role,
                 &rolegroup.role_group,
             ))
@@ -464,15 +478,14 @@ fn build_rolegroup_service(
 fn build_rolegroup_statefulset(
     hbase: &HbaseCluster,
     rolegroup_ref: &RoleGroupRef<HbaseCluster>,
-    _rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
     sa_name: &str,
     resources: &Resources<HbaseStorageConfig, NoRuntimeLimits>,
+    resolved_product_image: &ResolvedProductImage,
 ) -> Result<StatefulSet> {
-    let hbase_version = hbase_version(hbase)?;
+    let hbase_version = &resolved_product_image.app_version_label;
     let role = HbaseRole::from_str(&rolegroup_ref.role).context(UnidentifiedHbaseRoleSnafu {
         role: rolegroup_ref.role.to_string(),
     })?;
-    let image = format!("docker.stackable.tech/stackable/hbase:{}", hbase_version);
 
     let ports = role
         .port_properties()
@@ -531,7 +544,7 @@ fn build_rolegroup_statefulset(
 
     let container = ContainerBuilder::new("hbase")
         .expect("ContainerBuilder not created")
-        .image(image)
+        .image_from_product_image(resolved_product_image)
         .command(vec![
             "/bin/bash".to_string(),
             "-x".to_string(),
@@ -607,6 +620,7 @@ fn build_rolegroup_statefulset(
                         &rolegroup_ref.role_group,
                     ))
                 })
+                .image_pull_secrets_from_product_image(resolved_product_image)
                 .add_container(container)
                 .add_volume(stackable_operator::k8s_openapi::api::core::v1::Volume {
                     name: "hbase-config".to_string(),
@@ -637,14 +651,6 @@ fn build_rolegroup_statefulset(
         }),
         status: None,
     })
-}
-
-pub fn hbase_version(hbase: &HbaseCluster) -> Result<&str> {
-    hbase
-        .spec
-        .version
-        .as_deref()
-        .context(ObjectHasNoVersionSnafu)
 }
 
 fn rolegroup_replicas(
