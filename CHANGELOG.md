@@ -4,13 +4,15 @@
 
 ### Changed
 
+- [BREAKING] Use Product image selection instead of version. `spec.version` has been replaced by `spec.image` ([#282]).
 - Updated stackable image versions ([#275]).
 - `operator-rs` `0.24.0` -> `0.27.1` ([#277]).
-- [BREAKING] Use Product image selection instead of version. `spec.version` has been replaced by `spec.image` ([#282]).
+- Set runAsGroup to 1000 rather than 0 ([#283]).
 
 [#275]: https://github.com/stackabletech/hbase-operator/pull/275
 [#277]: https://github.com/stackabletech/hbase-operator/pull/277
 [#282]: https://github.com/stackabletech/hbase-operator/pull/282
+[#283]: https://github.com/stackabletech/hbase-operator/pull/283
 
 ## [0.5.0] - 2022-11-07
 
