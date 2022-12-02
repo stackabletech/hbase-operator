@@ -641,9 +641,9 @@ fn build_rolegroup_statefulset(
                 .service_account_name(sa_name)
                 .security_context(
                     PodSecurityContextBuilder::new()
-                        .run_as_user(rbac::HBASE_UID)
-                        .run_as_group(0)
-                        .fs_group(1000) // Needed for secret-operator
+                        .run_as_user(1000)
+                        .run_as_group(1000)
+                        .fs_group(1000)
                         .build(),
                 )
                 .build_template(),
