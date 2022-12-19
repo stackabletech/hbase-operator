@@ -2,9 +2,83 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestAssert
 timeout: 600
-skipLogOutput: true
-commands:
-  - script: kubectl get cm -n $NAMESPACE test-hbase-master-default -o yaml | grep -- 'HBASE_HEAPSIZE=1638m'
-  - script: kubectl get cm -n $NAMESPACE test-hbase-regionserver-resources-from-role -o yaml | grep -- 'HBASE_HEAPSIZE=819m'
-  - script: kubectl get cm -n $NAMESPACE test-hbase-regionserver-resources-from-role-group -o yaml | grep -- 'HBASE_HEAPSIZE=2457m'
-  - script: kubectl get cm -n $NAMESPACE test-hbase-restserver-default -o yaml | grep -- 'HBASE_HEAPSIZE=1638m'
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: test-hbase-master-default
+spec:
+  template:
+    spec:
+      containers:
+        - name: hbase
+          resources:
+            requests:
+              cpu: 200m
+              memory: 2Gi
+            limits:
+              cpu: "4"
+              memory: 2Gi
+status:
+  readyReplicas: 1
+  replicas: 1
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: test-hbase-regionserver-resources-from-role
+spec:
+  template:
+    spec:
+      containers:
+        - name: hbase
+          resources:
+            requests:
+              cpu: 100m
+              memory: 1Gi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+status:
+  readyReplicas: 1
+  replicas: 1
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: test-hbase-regionserver-resources-from-role-group
+spec:
+  template:
+    spec:
+      containers:
+        - name: hbase
+          resources:
+            requests:
+              cpu: 300m
+              memory: 3Gi
+            limits:
+              cpu: "3"
+              memory: 3Gi
+status:
+  readyReplicas: 1
+  replicas: 1
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: test-hbase-restserver-default
+spec:
+  template:
+    spec:
+      containers:
+        - name: hbase
+          resources:
+            requests:
+              cpu: 200m
+              memory: 2Gi
+            limits:
+              cpu: "4"
+              memory: 2Gi
+status:
+  readyReplicas: 1
+  replicas: 1

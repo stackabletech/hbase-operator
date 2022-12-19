@@ -2,7 +2,13 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestAssert
 metadata:
-  name: test-hbase
-commands:
-  - script: kubectl exec --namespace=$NAMESPACE hbase-test-runner-0 -- python /tmp/test-hbase.py http://test-hbase-restserver-default:8080
-timeout: 240
+  name: hbase-test-runner
+timeout: 300
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: hbase-test-runner
+status:
+  readyReplicas: 1
+  replicas: 1
