@@ -32,7 +32,14 @@ spec:
                     nullable: true
                     type: string
                   resources:
-                    nullable: true
+                    default:
+                      memory:
+                        limit: null
+                        runtimeLimits: {}
+                      cpu:
+                        min: null
+                        max: null
+                      storage: {}
                     properties:
                       cpu:
                         default:
@@ -218,7 +225,14 @@ spec:
                         nullable: true
                         type: string
                       resources:
-                        nullable: true
+                        default:
+                          memory:
+                            limit: null
+                            runtimeLimits: {}
+                          cpu:
+                            min: null
+                            max: null
+                          storage: {}
                         properties:
                           cpu:
                             default:
@@ -370,7 +384,14 @@ spec:
                               nullable: true
                               type: string
                             resources:
-                              nullable: true
+                              default:
+                                memory:
+                                  limit: null
+                                  runtimeLimits: {}
+                                cpu:
+                                  min: null
+                                  max: null
+                                storage: {}
                               properties:
                                 cpu:
                                   default:
@@ -563,7 +584,14 @@ spec:
                         nullable: true
                         type: string
                       resources:
-                        nullable: true
+                        default:
+                          memory:
+                            limit: null
+                            runtimeLimits: {}
+                          cpu:
+                            min: null
+                            max: null
+                          storage: {}
                         properties:
                           cpu:
                             default:
@@ -715,7 +743,14 @@ spec:
                               nullable: true
                               type: string
                             resources:
-                              nullable: true
+                              default:
+                                memory:
+                                  limit: null
+                                  runtimeLimits: {}
+                                cpu:
+                                  min: null
+                                  max: null
+                                storage: {}
                               properties:
                                 cpu:
                                   default:
@@ -908,7 +943,14 @@ spec:
                         nullable: true
                         type: string
                       resources:
-                        nullable: true
+                        default:
+                          memory:
+                            limit: null
+                            runtimeLimits: {}
+                          cpu:
+                            min: null
+                            max: null
+                          storage: {}
                         properties:
                           cpu:
                             default:
@@ -1060,7 +1102,14 @@ spec:
                               nullable: true
                               type: string
                             resources:
-                              nullable: true
+                              default:
+                                memory:
+                                  limit: null
+                                  runtimeLimits: {}
+                                cpu:
+                                  min: null
+                                  max: null
+                                storage: {}
                               properties:
                                 cpu:
                                   default:

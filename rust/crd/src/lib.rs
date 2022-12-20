@@ -80,13 +80,13 @@ pub struct HbaseClusterSpec {
     /// HDFS cluster connection details from discovery config map
     pub hdfs_config_map_name: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub config: Option<HbaseConfig>,
+    pub config: Option<HbaseConfigFragment>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub masters: Option<Role<HbaseConfig>>,
+    pub masters: Option<Role<HbaseConfigFragment>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub region_servers: Option<Role<HbaseConfig>>,
+    pub region_servers: Option<Role<HbaseConfigFragment>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub rest_servers: Option<Role<HbaseConfig>>,
+    pub rest_servers: Option<Role<HbaseConfigFragment>>,
 }
 
 #[derive(
@@ -154,33 +154,50 @@ impl HbaseRole {
 )]
 pub struct HbaseStorageConfig {}
 
-#[derive(Clone, Debug, Default, Deserialize, JsonSchema, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Clone, Debug, Default, Fragment, JsonSchema, PartialEq)]
+#[fragment_attrs(
+    derive(
+        Clone,
+        Debug,
+        Default,
+        Deserialize,
+        Merge,
+        JsonSchema,
+        PartialEq,
+        Serialize
+    ),
+    serde(rename_all = "camelCase")
+)]
 pub struct HbaseConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub hbase_rootdir: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub hbase_opts: Option<String>,
-    pub resources: Option<ResourcesFragment<HbaseStorageConfig, NoRuntimeLimits>>,
+    #[fragment_attrs(serde(default))]
+    pub resources: Resources<HbaseStorageConfig, NoRuntimeLimits>,
 }
 
 impl HbaseConfig {
-    fn default_resources() -> ResourcesFragment<HbaseStorageConfig, NoRuntimeLimits> {
-        ResourcesFragment {
-            cpu: CpuLimitsFragment {
-                min: Some(Quantity("200m".to_owned())),
-                max: Some(Quantity("4".to_owned())),
+    fn default_config() -> HbaseConfigFragment {
+        HbaseConfigFragment {
+            hbase_rootdir: None,
+            hbase_opts: None,
+            resources: ResourcesFragment {
+                cpu: CpuLimitsFragment {
+                    min: Some(Quantity("200m".to_owned())),
+                    max: Some(Quantity("4".to_owned())),
+                },
+                memory: MemoryLimitsFragment {
+                    limit: Some(Quantity("2Gi".to_owned())),
+                    runtime_limits: NoRuntimeLimitsFragment {},
+                },
+                storage: HbaseStorageConfigFragment {},
             },
-            memory: MemoryLimitsFragment {
-                limit: Some(Quantity("2Gi".to_owned())),
-                runtime_limits: NoRuntimeLimitsFragment {},
-            },
-            storage: HbaseStorageConfigFragment {},
         }
     }
 }
 
-impl Configuration for HbaseConfig {
+impl Configuration for HbaseConfigFragment {
     type Configurable = HbaseCluster;
 
     fn compute_env(
@@ -270,7 +287,7 @@ impl HbaseCluster {
         }
     }
 
-    pub fn get_role(&self, role: &HbaseRole) -> Option<&Role<HbaseConfig>> {
+    pub fn get_role(&self, role: &HbaseRole) -> Option<&Role<HbaseConfigFragment>> {
         match role {
             HbaseRole::Master => self.spec.masters.as_ref(),
             HbaseRole::RegionServer => self.spec.region_servers.as_ref(),
@@ -288,27 +305,26 @@ impl HbaseCluster {
     }
 
     /// Retrieve and merge resource configs for role and role groups
-    pub fn resolve_resource_config_for_role_and_rolegroup(
+    pub fn merged_config(
         &self,
         role: &HbaseRole,
         rolegroup_ref: &RoleGroupRef<HbaseCluster>,
-    ) -> Result<Resources<HbaseStorageConfig, NoRuntimeLimits>, Error> {
+    ) -> Result<HbaseConfig, Error> {
         // Initialize the result with all default values as baseline
-        let conf_defaults = HbaseConfig::default_resources();
+        let conf_defaults = HbaseConfig::default_config();
 
         let role = self.get_role(role).context(MissingHbaseRoleSnafu {
             role: role.to_string(),
         })?;
 
         // Retrieve role resource config
-        let mut conf_role: ResourcesFragment<HbaseStorageConfig, NoRuntimeLimits> =
-            role.config.config.resources.clone().unwrap_or_default();
+        let mut conf_role = role.config.config.to_owned();
 
         // Retrieve rolegroup specific resource config
-        let mut conf_rolegroup: ResourcesFragment<HbaseStorageConfig, NoRuntimeLimits> = role
+        let mut conf_rolegroup = role
             .role_groups
             .get(&rolegroup_ref.role_group)
-            .and_then(|rg| rg.config.config.resources.clone())
+            .map(|rg| rg.config.config.clone())
             .unwrap_or_default();
 
         // Merge more specific configs into default config
@@ -319,7 +335,7 @@ impl HbaseCluster {
         conf_role.merge(&conf_defaults);
         conf_rolegroup.merge(&conf_role);
 
-        tracing::debug!("Merged resource config: {:?}", conf_rolegroup);
+        tracing::debug!("Merged config: {:?}", conf_rolegroup);
         fragment::validate(conf_rolegroup).context(FragmentValidationFailureSnafu)
     }
 }

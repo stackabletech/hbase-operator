@@ -4,7 +4,7 @@ use crate::{discovery::build_discovery_configmap, rbac, OPERATOR_NAME};
 
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_hbase_crd::{
-    HbaseCluster, HbaseConfig, HbaseRole, HbaseStorageConfig, APP_NAME, HBASE_ENV_SH,
+    HbaseCluster, HbaseConfigFragment, HbaseRole, HbaseStorageConfig, APP_NAME, HBASE_ENV_SH,
     HBASE_HEAPSIZE, HBASE_MASTER_PORT, HBASE_REGIONSERVER_PORT, HBASE_REST_PORT, HBASE_SITE_XML,
     HBASE_ZOOKEEPER_QUORUM, JVM_HEAP_FACTOR,
 };
@@ -151,8 +151,8 @@ pub enum Error {
         source: strum::ParseError,
         role: String,
     },
-    #[snafu(display("failed to resolve and merge resource config for role and role group"))]
-    FailedToResolveResourceConfig { source: stackable_hbase_crd::Error },
+    #[snafu(display("failed to resolve and merge config for role and role group"))]
+    FailedToResolveConfig { source: stackable_hbase_crd::Error },
     #[snafu(display("invalid java heap config - missing default or value in crd?"))]
     InvalidJavaHeapConfig,
     #[snafu(display("failed to convert java heap config to unit [{unit}]"))]
@@ -254,9 +254,9 @@ pub async fn reconcile_hbase(hbase: Arc<HbaseCluster>, ctx: Arc<Ctx>) -> Result<
         for (rolegroup_name, rolegroup_config) in group_config.iter() {
             let rolegroup = hbase.server_rolegroup_ref(role_name, rolegroup_name);
 
-            let resources = hbase
-                .resolve_resource_config_for_role_and_rolegroup(&hbase_role, &rolegroup)
-                .context(FailedToResolveResourceConfigSnafu)?;
+            let config = hbase
+                .merged_config(&hbase_role, &rolegroup)
+                .context(FailedToResolveConfigSnafu)?;
 
             let rg_service = build_rolegroup_service(&hbase, &rolegroup, &resolved_product_image)?;
             let rg_configmap = build_rolegroup_config_map(
@@ -264,14 +264,14 @@ pub async fn reconcile_hbase(hbase: Arc<HbaseCluster>, ctx: Arc<Ctx>) -> Result<
                 &rolegroup,
                 rolegroup_config,
                 &zk_connect_string,
-                &resources,
+                &config.resources,
                 &resolved_product_image,
             )?;
             let rg_statefulset = build_rolegroup_statefulset(
                 &hbase,
                 &rolegroup,
                 &rbac_sa.name_unchecked(),
-                &resources,
+                &config.resources,
                 &resolved_product_image,
             )?;
             cluster_resources
@@ -679,7 +679,7 @@ fn rolegroup_replicas(
     }
 }
 
-type RoleConfig = HashMap<String, (Vec<PropertyNameKind>, Role<HbaseConfig>)>;
+type RoleConfig = HashMap<String, (Vec<PropertyNameKind>, Role<HbaseConfigFragment>)>;
 fn build_roles(hbase: &HbaseCluster) -> Result<RoleConfig> {
     let config_types = vec![
         PropertyNameKind::File(HBASE_ENV_SH.to_string()),
