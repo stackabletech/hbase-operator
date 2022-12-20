@@ -201,7 +201,8 @@ pub async fn reconcile_hbase(hbase: Arc<HbaseCluster>, ctx: Arc<Ctx>) -> Result<
 
     let validated_config = validate_all_roles_and_groups_config(
         &resolved_product_image.app_version_label,
-        &transform_all_roles_to_config(&*hbase, roles).context(GenerateProductConfigSnafu)?,
+        &transform_all_roles_to_config(hbase.as_ref(), roles)
+            .context(GenerateProductConfigSnafu)?,
         &ctx.product_config,
         false,
         false,
