@@ -17,7 +17,7 @@
 [#277]: https://github.com/stackabletech/hbase-operator/pull/277
 [#282]: https://github.com/stackabletech/hbase-operator/pull/282
 [#283]: https://github.com/stackabletech/hbase-operator/pull/283
-[#294]: https://github.com/stackabletech/zookeeper-operator/pull/294
+[#294]: https://github.com/stackabletech/hbase-operator/pull/294
 
 ## [0.5.0] - 2022-11-07
 
