@@ -1,5 +1,6 @@
 mod discovery;
 mod hbase_controller;
+mod product_logging;
 mod rbac;
 
 use crate::hbase_controller::HBASE_CONTROLLER_NAME;

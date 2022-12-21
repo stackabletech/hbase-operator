@@ -12,6 +12,7 @@ use stackable_operator::{
     k8s_openapi::apimachinery::pkg::api::resource::Quantity,
     kube::{runtime::reflector::ObjectRef, CustomResource},
     product_config_utils::{ConfigError, Configuration},
+    product_logging::{self, spec::Logging},
     role_utils::{Role, RoleGroupRef},
     schemars::{self, JsonSchema},
 };
@@ -79,6 +80,10 @@ pub struct HbaseClusterSpec {
     pub zookeeper_config_map_name: String,
     /// HDFS cluster connection details from discovery config map
     pub hdfs_config_map_name: String,
+    /// Name of the Vector aggregator discovery ConfigMap.
+    /// It must contain the key `ADDRESS` with the address of the Vector aggregator.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub vector_aggregator_config_map_name: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub config: Option<HbaseConfigFragment>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -154,6 +159,25 @@ impl HbaseRole {
 )]
 pub struct HbaseStorageConfig {}
 
+#[derive(
+    Clone,
+    Debug,
+    Deserialize,
+    Display,
+    Eq,
+    EnumIter,
+    JsonSchema,
+    Ord,
+    PartialEq,
+    PartialOrd,
+    Serialize,
+)]
+#[serde(rename_all = "camelCase")]
+pub enum Container {
+    Hbase,
+    Vector,
+}
+
 #[derive(Clone, Debug, Default, Fragment, JsonSchema, PartialEq)]
 #[fragment_attrs(
     derive(
@@ -175,6 +199,8 @@ pub struct HbaseConfig {
     pub hbase_opts: Option<String>,
     #[fragment_attrs(serde(default))]
     pub resources: Resources<HbaseStorageConfig, NoRuntimeLimits>,
+    #[fragment_attrs(serde(default))]
+    pub logging: Logging<Container>,
 }
 
 impl HbaseConfig {
@@ -193,6 +219,7 @@ impl HbaseConfig {
                 },
                 storage: HbaseStorageConfigFragment {},
             },
+            logging: product_logging::spec::default_logging(),
         }
     }
 }
