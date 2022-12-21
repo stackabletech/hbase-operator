@@ -626,7 +626,7 @@ fn build_rolegroup_statefulset(
                 .node_selector_opt(
                     hbase
                         .get_role_group(rolegroup_ref)
-                        .context(UnidentifiedHbaseRoleGroupSnafu {})?
+                        .context(UnidentifiedHbaseRoleGroupSnafu)?
                         .selector
                         .clone(),
                 )
