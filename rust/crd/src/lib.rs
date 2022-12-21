@@ -12,10 +12,10 @@ use stackable_operator::{
     k8s_openapi::apimachinery::pkg::api::resource::Quantity,
     kube::{runtime::reflector::ObjectRef, CustomResource},
     product_config_utils::{ConfigError, Configuration},
-    role_utils::{Role, RoleGroupRef},
+    role_utils::{Role, RoleGroup, RoleGroupRef},
     schemars::{self, JsonSchema},
 };
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, str::FromStr};
 use strum::{Display, EnumIter, EnumString};
 
 pub const APP_NAME: &str = "hbase";
@@ -276,6 +276,26 @@ impl HbaseCluster {
             HbaseRole::RegionServer => self.spec.region_servers.as_ref(),
             HbaseRole::RestServer => self.spec.rest_servers.as_ref(),
         }
+    }
+
+    /// Get the RoleGroup struct for the given ref. For use with RoleGroupRefs created from this cluster
+    /// (i.e. it is expected that the role and role group exist).
+    /// Panics if:
+    /// - the role variant name cannot be parsed into an HbaseRole,
+    /// - the given role is not defined in this cluster,
+    /// - the given role group is not defined.
+    pub fn get_role_group(
+        &self,
+        rolegroup_ref: &RoleGroupRef<HbaseCluster>,
+    ) -> &RoleGroup<HbaseConfig> {
+        let role_variant = HbaseRole::from_str(&rolegroup_ref.role)
+            .expect("The RoleGroupRef role string could not be converted to an HbaseRole.");
+        let role = self
+            .get_role(&role_variant)
+            .expect("The RoleGroupRef role is not defined on this HbaseCluster.");
+        role.role_groups
+            .get(&rolegroup_ref.role_group)
+            .expect("The RoleGroupRef role_group does not exist.")
     }
 
     pub fn root_dir(&self) -> String {

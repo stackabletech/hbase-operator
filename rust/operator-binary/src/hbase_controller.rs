@@ -621,6 +621,7 @@ fn build_rolegroup_statefulset(
                     ))
                 })
                 .image_pull_secrets_from_product_image(resolved_product_image)
+                .node_selector_opt(hbase.get_role_group(rolegroup_ref).selector.clone())
                 .add_container(container)
                 .add_volume(stackable_operator::k8s_openapi::api::core::v1::Volume {
                     name: "hbase-config".to_string(),
