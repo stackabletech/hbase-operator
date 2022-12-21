@@ -1,20 +1,18 @@
 //! Ensures that `Pod`s are configured and running for each [`HbaseCluster`]
 
-use crate::product_logging::{
-    extend_role_group_config_map, resolve_vector_aggregator_address, LOG4J_CONFIG_FILE,
+use crate::{
+    discovery::build_discovery_configmap,
+    product_logging::{
+        extend_role_group_config_map, resolve_vector_aggregator_address, LOG4J_CONFIG_FILE,
+    },
+    rbac, OPERATOR_NAME,
 };
-use crate::{discovery::build_discovery_configmap, rbac, OPERATOR_NAME};
 
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_hbase_crd::{
     Container, HbaseCluster, HbaseConfig, HbaseConfigFragment, HbaseRole, APP_NAME, HBASE_ENV_SH,
     HBASE_HEAPSIZE, HBASE_MASTER_PORT, HBASE_REGIONSERVER_PORT, HBASE_REST_PORT, HBASE_SITE_XML,
     HBASE_ZOOKEEPER_QUORUM, JVM_HEAP_FACTOR,
-};
-use stackable_operator::labels::ObjectLabels;
-use stackable_operator::product_logging;
-use stackable_operator::product_logging::spec::{
-    ConfigMapLogConfig, ContainerLogConfig, ContainerLogConfigChoice, CustomContainerLogConfig,
 };
 use stackable_operator::{
     builder::{
@@ -38,11 +36,18 @@ use stackable_operator::{
         apimachinery::pkg::{apis::meta::v1::LabelSelector, util::intstr::IntOrString},
     },
     kube::{runtime::controller::Action, Resource, ResourceExt},
-    labels::{role_group_selector_labels, role_selector_labels},
+    labels::{role_group_selector_labels, role_selector_labels, ObjectLabels},
     logging::controller::ReconcilerError,
     memory::{to_java_heap_value, BinaryMultiple},
     product_config::{types::PropertyNameKind, writer, ProductConfigManager},
     product_config_utils::{transform_all_roles_to_config, validate_all_roles_and_groups_config},
+    product_logging::{
+        self,
+        spec::{
+            ConfigMapLogConfig, ContainerLogConfig, ContainerLogConfigChoice,
+            CustomContainerLogConfig,
+        },
+    },
     role_utils::{Role, RoleGroupRef},
 };
 use std::{
