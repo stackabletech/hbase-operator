@@ -47,8 +47,15 @@ pub const JVM_HEAP_FACTOR: f32 = 0.8;
 
 #[derive(Snafu, Debug)]
 pub enum Error {
+    #[snafu(display("the role string [{role_string}] could not be matched to an HbaseRole"))]
+    IncorrectRoleString {
+        source: strum::ParseError,
+        role_string: String,
+    },
     #[snafu(display("the HBase role [{role}] is missing from spec"))]
     MissingHbaseRole { role: String },
+    #[snafu(display("the HBase role group [{role_group}] is missing from spec"))]
+    MissingHbaseRoleGroup { role_group: String },
     #[snafu(display("fragment validation failure"))]
     FragmentValidationFailure { source: ValidationError },
 }
@@ -278,24 +285,26 @@ impl HbaseCluster {
         }
     }
 
-    /// Get the RoleGroup struct for the given ref. For use with RoleGroupRefs created from this cluster
-    /// (i.e. it is expected that the role and role group exist).
-    /// Panics if:
-    /// - the role variant name cannot be parsed into an HbaseRole,
-    /// - the given role is not defined in this cluster,
-    /// - the given role group is not defined.
+    /// Get the RoleGroup struct for the given ref
     pub fn get_role_group(
         &self,
         rolegroup_ref: &RoleGroupRef<HbaseCluster>,
-    ) -> &RoleGroup<HbaseConfig> {
-        let role_variant = HbaseRole::from_str(&rolegroup_ref.role)
-            .expect("The RoleGroupRef role string could not be converted to an HbaseRole.");
+    ) -> Result<&RoleGroup<HbaseConfig>, Error> {
+        let role_variant = HbaseRole::from_str(&rolegroup_ref.role).with_context(|_| {
+            IncorrectRoleStringSnafu {
+                role_string: rolegroup_ref.role.to_owned(),
+            }
+        })?;
         let role = self
             .get_role(&role_variant)
-            .expect("The RoleGroupRef role is not defined on this HbaseCluster.");
+            .with_context(|| MissingHbaseRoleSnafu {
+                role: role_variant.to_string(),
+            })?;
         role.role_groups
             .get(&rolegroup_ref.role_group)
-            .expect("The RoleGroupRef role_group does not exist.")
+            .with_context(|| MissingHbaseRoleGroupSnafu {
+                role_group: rolegroup_ref.role_group.to_owned(),
+            })
     }
 
     pub fn root_dir(&self) -> String {
