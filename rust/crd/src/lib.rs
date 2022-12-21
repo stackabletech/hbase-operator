@@ -47,10 +47,10 @@ pub const JVM_HEAP_FACTOR: f32 = 0.8;
 
 #[derive(Snafu, Debug)]
 pub enum Error {
-    #[snafu(display("the role string [{role_string}] could not be matched to an HbaseRole"))]
-    IncorrectRoleString {
+    #[snafu(display("the role [{role}] is invalid and does not exist in HBase"))]
+    InvalidRole {
         source: strum::ParseError,
-        role_string: String,
+        role: String,
     },
     #[snafu(display("the HBase role [{role}] is missing from spec"))]
     MissingHbaseRole { role: String },
