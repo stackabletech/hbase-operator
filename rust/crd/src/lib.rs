@@ -290,11 +290,10 @@ impl HbaseCluster {
         &self,
         rolegroup_ref: &RoleGroupRef<HbaseCluster>,
     ) -> Result<&RoleGroup<HbaseConfig>, Error> {
-        let role_variant = HbaseRole::from_str(&rolegroup_ref.role).with_context(|_| {
-            IncorrectRoleStringSnafu {
-                role_string: rolegroup_ref.role.to_owned(),
-            }
-        })?;
+        let role_variant =
+            HbaseRole::from_str(&rolegroup_ref.role).with_context(|_| InvalidRoleSnafu {
+                role: rolegroup_ref.role.to_owned(),
+            })?;
         let role = self
             .get_role(&role_variant)
             .with_context(|| MissingHbaseRoleSnafu {
