@@ -2,13 +2,13 @@
 dimensions:
   - name: hbase
     values:
-      - 2.4.8-stackable0.8.0
-      - 2.4.9-stackable0.8.0
-      - 2.4.11-stackable0.8.0
-      - 2.4.12-stackable0.3.0
+      - 2.4.8-stackable0.9.0
+      - 2.4.9-stackable0.9.0
+      - 2.4.11-stackable0.9.0
+      - 2.4.12-stackable0.4.0
   - name: hbase-latest
     values:
-      - 2.4.12-stackable0.3.0
+      - 2.4.12-stackable0.4.0
   - name: hdfs
     values:
       - 3.2.2-stackable0.6.0
@@ -18,12 +18,12 @@ dimensions:
       - 3.3.4-stackable0.2.0
   - name: zookeeper
     values:
-      - 3.6.3-stackable0.8.0
-      - 3.7.0-stackable0.8.0
-      - 3.8.0-stackable0.8.0
+      - 3.6.3-stackable0.9.0
+      - 3.7.0-stackable0.9.0
+      - 3.8.0-stackable0.9.0
   - name: zookeeper-latest
     values:
-      - 3.8.0-stackable0.8.0
+      - 3.8.0-stackable0.9.0
 tests:
   - name: smoke
     dimensions:
@@ -33,5 +33,15 @@ tests:
   - name: orphaned_resources
     dimensions:
       - hbase-latest
+      - hdfs-latest
+      - zookeeper-latest
+  - name: resources
+    dimensions:
+      - hbase-latest
+      - hdfs-latest
+      - zookeeper-latest
+  - name: logging
+    dimensions:
+      - hbase
       - hdfs-latest
       - zookeeper-latest

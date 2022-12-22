@@ -1,23 +1,29 @@
 //! Ensures that `Pod`s are configured and running for each [`HbaseCluster`]
 
-use crate::{discovery::build_discovery_configmap, rbac, OPERATOR_NAME};
+use crate::{
+    discovery::build_discovery_configmap,
+    product_logging::{
+        extend_role_group_config_map, resolve_vector_aggregator_address, LOG4J_CONFIG_FILE,
+    },
+    rbac, OPERATOR_NAME,
+};
 
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_hbase_crd::{
-    HbaseCluster, HbaseConfig, HbaseRole, HbaseStorageConfig, APP_NAME, HBASE_ENV_SH,
+    Container, HbaseCluster, HbaseConfig, HbaseConfigFragment, HbaseRole, APP_NAME, HBASE_ENV_SH,
     HBASE_HEAPSIZE, HBASE_MASTER_PORT, HBASE_REGIONSERVER_PORT, HBASE_REST_PORT, HBASE_SITE_XML,
     HBASE_ZOOKEEPER_QUORUM, JVM_HEAP_FACTOR,
 };
-use stackable_operator::labels::ObjectLabels;
 use stackable_operator::{
     builder::{
         ConfigMapBuilder, ContainerBuilder, ObjectMetaBuilder, PodBuilder,
         PodSecurityContextBuilder,
     },
     cluster_resources::ClusterResources,
-    commons::{
-        product_image_selection::ResolvedProductImage,
-        resources::{NoRuntimeLimits, Resources},
+    commons::product_image_selection::ResolvedProductImage,
+    k8s_openapi::{
+        api::core::v1::{EmptyDirVolumeSource, Volume},
+        apimachinery::pkg::api::resource::Quantity,
     },
     k8s_openapi::{
         api::{
@@ -30,11 +36,18 @@ use stackable_operator::{
         apimachinery::pkg::{apis::meta::v1::LabelSelector, util::intstr::IntOrString},
     },
     kube::{runtime::controller::Action, Resource, ResourceExt},
-    labels::{role_group_selector_labels, role_selector_labels},
+    labels::{role_group_selector_labels, role_selector_labels, ObjectLabels},
     logging::controller::ReconcilerError,
     memory::{to_java_heap_value, BinaryMultiple},
     product_config::{types::PropertyNameKind, writer, ProductConfigManager},
     product_config_utils::{transform_all_roles_to_config, validate_all_roles_and_groups_config},
+    product_logging::{
+        self,
+        spec::{
+            ConfigMapLogConfig, ContainerLogConfig, ContainerLogConfigChoice,
+            CustomContainerLogConfig,
+        },
+    },
     role_utils::{Role, RoleGroupRef},
 };
 use std::{
@@ -46,10 +59,17 @@ use std::{
 use strum::{EnumDiscriminants, IntoStaticStr};
 
 pub const HBASE_CONTROLLER_NAME: &str = "hbasecluster";
+pub const STACKABLE_LOG_DIR: &str = "/stackable/log";
+pub const MAX_HBASE_LOG_FILES_SIZE_IN_MIB: u32 = 10;
+
+const OVERFLOW_BUFFER_ON_LOG_VOLUME_IN_MIB: u32 = 1;
+const LOG_VOLUME_SIZE_IN_MIB: u32 =
+    MAX_HBASE_LOG_FILES_SIZE_IN_MIB + OVERFLOW_BUFFER_ON_LOG_VOLUME_IN_MIB;
 
 const CONFIG_DIR_NAME: &str = "/stackable/conf";
 const HDFS_DISCOVERY_TMP_DIR: &str = "/stackable/tmp/hdfs";
 const HBASE_CONFIG_TMP_DIR: &str = "/stackable/tmp/hbase";
+const HBASE_LOG_CONFIG_TMP_DIR: &str = "/stackable/tmp/log_config";
 
 const ZOOKEEPER_DISCOVERY_CM_ENTRY: &str = "ZOOKEEPER";
 
@@ -153,14 +173,23 @@ pub enum Error {
     },
     #[snafu(display("failed to retrieve Hbase role group: {source}"))]
     UnidentifiedHbaseRoleGroup { source: stackable_hbase_crd::Error },
-    #[snafu(display("failed to resolve and merge resource config for role and role group"))]
-    FailedToResolveResourceConfig { source: stackable_hbase_crd::Error },
+    #[snafu(display("failed to resolve and merge config for role and role group"))]
+    FailedToResolveConfig { source: stackable_hbase_crd::Error },
     #[snafu(display("invalid java heap config - missing default or value in crd?"))]
     InvalidJavaHeapConfig,
     #[snafu(display("failed to convert java heap config to unit [{unit}]"))]
     FailedToConvertJavaHeap {
         source: stackable_operator::error::Error,
         unit: String,
+    },
+    #[snafu(display("failed to resolve the Vector aggregator address"))]
+    ResolveVectorAggregatorAddress {
+        source: crate::product_logging::Error,
+    },
+    #[snafu(display("failed to add the logging configuration to the ConfigMap [{cm_name}]"))]
+    InvalidLoggingConfig {
+        source: crate::product_logging::Error,
+        cm_name: String,
     },
 }
 
@@ -199,11 +228,16 @@ pub async fn reconcile_hbase(hbase: Arc<HbaseCluster>, ctx: Arc<Ctx>) -> Result<
             cm_name: zk_discovery_cm_name.to_string(),
         })?;
 
+    let vector_aggregator_address = resolve_vector_aggregator_address(&hbase, client)
+        .await
+        .context(ResolveVectorAggregatorAddressSnafu)?;
+
     let roles = build_roles(&hbase)?;
 
     let validated_config = validate_all_roles_and_groups_config(
         &resolved_product_image.app_version_label,
-        &transform_all_roles_to_config(&*hbase, roles).context(GenerateProductConfigSnafu)?,
+        &transform_all_roles_to_config(hbase.as_ref(), roles)
+            .context(GenerateProductConfigSnafu)?,
         &ctx.product_config,
         false,
         false,
@@ -255,9 +289,9 @@ pub async fn reconcile_hbase(hbase: Arc<HbaseCluster>, ctx: Arc<Ctx>) -> Result<
         for (rolegroup_name, rolegroup_config) in group_config.iter() {
             let rolegroup = hbase.server_rolegroup_ref(role_name, rolegroup_name);
 
-            let resources = hbase
-                .resolve_resource_config_for_role_and_rolegroup(&hbase_role, &rolegroup)
-                .context(FailedToResolveResourceConfigSnafu)?;
+            let config = hbase
+                .merged_config(&hbase_role, &rolegroup)
+                .context(FailedToResolveConfigSnafu)?;
 
             let rg_service = build_rolegroup_service(&hbase, &rolegroup, &resolved_product_image)?;
             let rg_configmap = build_rolegroup_config_map(
@@ -265,14 +299,15 @@ pub async fn reconcile_hbase(hbase: Arc<HbaseCluster>, ctx: Arc<Ctx>) -> Result<
                 &rolegroup,
                 rolegroup_config,
                 &zk_connect_string,
-                &resources,
+                &config,
                 &resolved_product_image,
+                vector_aggregator_address.as_deref(),
             )?;
             let rg_statefulset = build_rolegroup_statefulset(
                 &hbase,
                 &rolegroup,
                 &rbac_sa.name_unchecked(),
-                &resources,
+                &config,
                 &resolved_product_image,
             )?;
             cluster_resources
@@ -355,8 +390,9 @@ fn build_rolegroup_config_map(
     rolegroup: &RoleGroupRef<HbaseCluster>,
     rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
     zk_connect_string: &str,
-    resources: &Resources<HbaseStorageConfig, NoRuntimeLimits>,
+    config: &HbaseConfig,
     resolved_product_image: &ResolvedProductImage,
+    vector_aggregator_address: Option<&str>,
 ) -> Result<ConfigMap, Error> {
     let mut hbase_site_config = rolegroup_config
         .get(&PropertyNameKind::File(HBASE_SITE_XML.to_string()))
@@ -379,7 +415,8 @@ fn build_rolegroup_config_map(
         .unwrap_or_default();
 
     let heap_in_mebi = to_java_heap_value(
-        resources
+        config
+            .resources
             .memory
             .limit
             .as_ref()
@@ -415,6 +452,16 @@ fn build_rolegroup_config_map(
             writer::to_hadoop_xml(hbase_site_config.iter()),
         )
         .add_data(HBASE_ENV_SH, write_hbase_env_sh(hbase_env_config.iter()));
+
+    extend_role_group_config_map(
+        rolegroup,
+        vector_aggregator_address,
+        &config.logging,
+        &mut builder,
+    )
+    .context(InvalidLoggingConfigSnafu {
+        cm_name: rolegroup.object_name(),
+    })?;
 
     builder.build().map_err(|e| Error::BuildRoleGroupConfig {
         source: e,
@@ -481,7 +528,7 @@ fn build_rolegroup_statefulset(
     hbase: &HbaseCluster,
     rolegroup_ref: &RoleGroupRef<HbaseCluster>,
     sa_name: &str,
-    resources: &Resources<HbaseStorageConfig, NoRuntimeLimits>,
+    config: &HbaseConfig,
     resolved_product_image: &ResolvedProductImage,
 ) -> Result<StatefulSet> {
     let hbase_version = &resolved_product_image.app_version_label;
@@ -565,6 +612,7 @@ fn build_rolegroup_statefulset(
                 HDFS_DISCOVERY_TMP_DIR, CONFIG_DIR_NAME
             ),
             format!("cp {}/* {}", HBASE_CONFIG_TMP_DIR, CONFIG_DIR_NAME),
+            format!("cp {HBASE_LOG_CONFIG_TMP_DIR}/{LOG4J_CONFIG_FILE} {CONFIG_DIR_NAME}",),
             format!(
                 "bin/hbase {} start",
                 match role {
@@ -580,12 +628,103 @@ fn build_rolegroup_statefulset(
         .add_env_var("HADOOP_CONF_DIR", CONFIG_DIR_NAME)
         .add_volume_mount("hbase-config", HBASE_CONFIG_TMP_DIR)
         .add_volume_mount("hdfs-discovery", HDFS_DISCOVERY_TMP_DIR)
+        .add_volume_mount("log-config", HBASE_LOG_CONFIG_TMP_DIR)
+        .add_volume_mount("log", STACKABLE_LOG_DIR)
         .add_container_ports(ports)
-        .resources(resources.clone().into())
+        .resources(config.resources.clone().into())
         .startup_probe(startup_probe)
         .liveness_probe(liveness_probe)
         .readiness_probe(readiness_probe)
         .build();
+
+    let mut pod_builder = PodBuilder::new();
+    pod_builder
+        .metadata_builder(|m| {
+            m.with_recommended_labels(build_recommended_labels(
+                hbase,
+                hbase_version,
+                &rolegroup_ref.role,
+                &rolegroup_ref.role_group,
+            ))
+        })
+        .image_pull_secrets_from_product_image(resolved_product_image)
+        .node_selector_opt(
+            hbase
+                .get_role_group(rolegroup_ref)
+                .context(UnidentifiedHbaseRoleGroupSnafu)?
+                .selector
+                .clone(),
+        )
+        .add_container(container)
+        .add_volume(stackable_operator::k8s_openapi::api::core::v1::Volume {
+            name: "hbase-config".to_string(),
+            config_map: Some(ConfigMapVolumeSource {
+                name: Some(rolegroup_ref.object_name()),
+                ..Default::default()
+            }),
+            ..Default::default()
+        })
+        .add_volume(stackable_operator::k8s_openapi::api::core::v1::Volume {
+            name: "hdfs-discovery".to_string(),
+            config_map: Some(ConfigMapVolumeSource {
+                name: Some(hbase.spec.hdfs_config_map_name.clone()),
+                ..Default::default()
+            }),
+            ..Default::default()
+        })
+        .add_volume(Volume {
+            name: "log".to_string(),
+            empty_dir: Some(EmptyDirVolumeSource {
+                medium: None,
+                size_limit: Some(Quantity(format!("{LOG_VOLUME_SIZE_IN_MIB}Mi"))),
+            }),
+            ..Volume::default()
+        })
+        .service_account_name(sa_name)
+        .security_context(
+            PodSecurityContextBuilder::new()
+                .run_as_user(1000)
+                .run_as_group(1000)
+                .fs_group(1000)
+                .build(),
+        );
+
+    if let Some(ContainerLogConfig {
+        choice:
+            Some(ContainerLogConfigChoice::Custom(CustomContainerLogConfig {
+                custom: ConfigMapLogConfig { config_map },
+            })),
+    }) = config.logging.containers.get(&Container::Hbase)
+    {
+        pod_builder.add_volume(Volume {
+            name: "log-config".to_string(),
+            config_map: Some(ConfigMapVolumeSource {
+                name: Some(config_map.into()),
+                ..ConfigMapVolumeSource::default()
+            }),
+            ..Volume::default()
+        });
+    } else {
+        pod_builder.add_volume(Volume {
+            name: "log-config".to_string(),
+            config_map: Some(ConfigMapVolumeSource {
+                name: Some(rolegroup_ref.object_name()),
+                ..ConfigMapVolumeSource::default()
+            }),
+            ..Volume::default()
+        });
+    }
+
+    if config.logging.enable_vector_agent {
+        pod_builder.add_container(product_logging::framework::vector_container(
+            resolved_product_image,
+            "hbase-config",
+            "log",
+            config.logging.containers.get(&Container::Vector),
+        ));
+    }
+
+    let pod_template = pod_builder.build_template();
 
     Ok(StatefulSet {
         metadata: ObjectMetaBuilder::new()
@@ -613,49 +752,7 @@ fn build_rolegroup_statefulset(
                 ..LabelSelector::default()
             },
             service_name: rolegroup_ref.object_name(),
-            template: PodBuilder::new()
-                .metadata_builder(|m| {
-                    m.with_recommended_labels(build_recommended_labels(
-                        hbase,
-                        hbase_version,
-                        &rolegroup_ref.role,
-                        &rolegroup_ref.role_group,
-                    ))
-                })
-                .image_pull_secrets_from_product_image(resolved_product_image)
-                .node_selector_opt(
-                    hbase
-                        .get_role_group(rolegroup_ref)
-                        .context(UnidentifiedHbaseRoleGroupSnafu)?
-                        .selector
-                        .clone(),
-                )
-                .add_container(container)
-                .add_volume(stackable_operator::k8s_openapi::api::core::v1::Volume {
-                    name: "hbase-config".to_string(),
-                    config_map: Some(ConfigMapVolumeSource {
-                        name: Some(rolegroup_ref.object_name()),
-                        ..Default::default()
-                    }),
-                    ..Default::default()
-                })
-                .add_volume(stackable_operator::k8s_openapi::api::core::v1::Volume {
-                    name: "hdfs-discovery".to_string(),
-                    config_map: Some(ConfigMapVolumeSource {
-                        name: Some(hbase.spec.hdfs_config_map_name.clone()),
-                        ..Default::default()
-                    }),
-                    ..Default::default()
-                })
-                .service_account_name(sa_name)
-                .security_context(
-                    PodSecurityContextBuilder::new()
-                        .run_as_user(1000)
-                        .run_as_group(1000)
-                        .fs_group(1000)
-                        .build(),
-                )
-                .build_template(),
+            template: pod_template,
             ..StatefulSetSpec::default()
         }),
         status: None,
@@ -687,7 +784,7 @@ fn rolegroup_replicas(
     }
 }
 
-type RoleConfig = HashMap<String, (Vec<PropertyNameKind>, Role<HbaseConfig>)>;
+type RoleConfig = HashMap<String, (Vec<PropertyNameKind>, Role<HbaseConfigFragment>)>;
 fn build_roles(hbase: &HbaseCluster) -> Result<RoleConfig> {
     let config_types = vec![
         PropertyNameKind::File(HBASE_ENV_SH.to_string()),

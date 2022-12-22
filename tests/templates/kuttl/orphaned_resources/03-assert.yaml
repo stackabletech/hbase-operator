@@ -2,5 +2,29 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestAssert
 metadata:
-  name: remove-restserver
+  name: install-hbase
 timeout: 600
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: test-hbase-master-default
+status:
+  readyReplicas: 1
+  replicas: 1
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: test-hbase-regionserver-default
+status:
+  readyReplicas: 1
+  replicas: 1
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: test-hbase-restserver-default
+status:
+  readyReplicas: 1
+  replicas: 1

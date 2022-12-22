@@ -19,7 +19,7 @@ metadata:
 spec:
   image:
     productVersion: 2.4.12
-    stackableVersion: 0.3.0
+    stackableVersion: 0.4.0
   hdfsConfigMapName: simple-hdfs-namenode-default
   zookeeperConfigMapName: simple-hbase-znode
   config:
@@ -62,6 +62,32 @@ It should generally be safe to simply use the latest image version that is avail
 
 The managed HBase instances are automatically configured to export Prometheus metrics. See
 xref:home:operators:monitoring.adoc[] for more details.
+
+== Log aggregation
+
+The logs can be forwarded to a Vector log aggregator by providing a discovery
+ConfigMap for the aggregator and by enabling the log agent:
+
+[source,yaml]
+----
+spec:
+  vectorAggregatorConfigMapName: vector-aggregator-discovery
+  masters:
+    config:
+      logging:
+        enableVectorAgent: true
+  regionServers:
+    config:
+      logging:
+        enableVectorAgent: true
+  restServers:
+    config:
+      logging:
+        enableVectorAgent: true
+----
+
+Further information on how to configure logging, can be found in
+xref:home:concepts:logging.adoc[].
 
 == Configuration Overrides
 

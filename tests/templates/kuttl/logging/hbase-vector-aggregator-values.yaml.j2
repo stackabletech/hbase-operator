@@ -1,0 +1,103 @@
+---
+role: Aggregator
+service:
+  ports:
+  - name: api
+    port: 8686
+    protocol: TCP
+    targetPort: 8686
+  - name: vector
+    port: 6123
+    protocol: TCP
+    targetPort: 6000
+customConfig:
+  api:
+    address: 0.0.0.0:8686
+    enabled: true
+  sources:
+    vector:
+      address: 0.0.0.0:6000
+      type: vector
+      version: "2"
+  transforms:
+    automaticLogConfigMasterHbase:
+      type: filter
+      inputs: [vector]
+      condition: >-
+        .pod == "test-hbase-master-automatic-log-config-0" &&
+        .container == "hbase"
+    automaticLogConfigMasterVector:
+      type: filter
+      inputs: [vector]
+      condition: >-
+        .pod == "test-hbase-master-automatic-log-config-0" &&
+        .container == "vector"
+    customLogConfigMasterHbase:
+      type: filter
+      inputs: [vector]
+      condition: >-
+        .pod == "test-hbase-master-custom-log-config-0" &&
+        .container == "hbase"
+    customLogConfigMasterVector:
+      type: filter
+      inputs: [vector]
+      condition: >-
+        .pod == "test-hbase-master-custom-log-config-0" &&
+        .container == "vector"
+    automaticLogConfigRegionserverHbase:
+      type: filter
+      inputs: [vector]
+      condition: >-
+        .pod == "test-hbase-regionserver-automatic-log-config-0" &&
+        .container == "hbase"
+    automaticLogConfigRegionserverVector:
+      type: filter
+      inputs: [vector]
+      condition: >-
+        .pod == "test-hbase-regionserver-automatic-log-config-0" &&
+        .container == "vector"
+    customLogConfigRegionserverHbase:
+      type: filter
+      inputs: [vector]
+      condition: >-
+        .pod == "test-hbase-regionserver-custom-log-config-0" &&
+        .container == "hbase"
+    customLogConfigRegionserverVector:
+      type: filter
+      inputs: [vector]
+      condition: >-
+        .pod == "test-hbase-regionserver-custom-log-config-0" &&
+        .container == "vector"
+    automaticLogConfigRestserverHbase:
+      type: filter
+      inputs: [vector]
+      condition: >-
+        .pod == "test-hbase-restserver-automatic-log-config-0" &&
+        .container == "hbase"
+    automaticLogConfigRestserverVector:
+      type: filter
+      inputs: [vector]
+      condition: >-
+        .pod == "test-hbase-restserver-automatic-log-config-0" &&
+        .container == "vector"
+    customLogConfigRestserverHbase:
+      type: filter
+      inputs: [vector]
+      condition: >-
+        .pod == "test-hbase-restserver-custom-log-config-0" &&
+        .container == "hbase"
+    customLogConfigRestserverVector:
+      type: filter
+      inputs: [vector]
+      condition: >-
+        .pod == "test-hbase-restserver-custom-log-config-0" &&
+        .container == "vector"
+  sinks:
+    out:
+      inputs: [automaticLogConfig*, customLogConfig*]
+{% if lookup('env', 'VECTOR_AGGREGATOR') %}
+      type: vector
+      address: {{ lookup('env', 'VECTOR_AGGREGATOR') }}
+{% else %}
+      type: blackhole
+{% endif %}

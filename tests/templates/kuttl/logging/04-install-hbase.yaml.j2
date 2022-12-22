@@ -1,0 +1,124 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: hbase-log-config
+data:
+  log4j.properties: |
+    log4j.rootLogger=INFO, FILE
+    log4j.appender.FILE=org.apache.log4j.FileAppender
+    log4j.appender.FILE.File=/stackable/log/hbase/hbase.log4j.xml
+    log4j.appender.FILE.layout=org.apache.log4j.xml.XMLLayout
+---
+apiVersion: hbase.stackable.tech/v1alpha1
+kind: HbaseCluster
+metadata:
+  name: test-hbase
+spec:
+  image:
+    productVersion: "{{ test_scenario['values']['hbase'].split('-stackable')[0] }}"
+    stackableVersion: "{{ test_scenario['values']['hbase'].split('-stackable')[1] }}"
+  hdfsConfigMapName: test-hdfs-namenode-default
+  zookeeperConfigMapName: test-znode
+  vectorAggregatorConfigMapName: hbase-vector-aggregator-discovery
+  config:
+    hbaseRootdir: /hbase
+  masters:
+    roleGroups:
+      automatic-log-config:
+        replicas: 1
+        config:
+          logging:
+            enableVectorAgent: true
+            containers:
+              hbase:
+                console:
+                  level: INFO
+                file:
+                  level: INFO
+                loggers:
+                  ROOT:
+                    level: INFO
+              vector:
+                console:
+                  level: INFO
+                file:
+                  level: INFO
+                loggers:
+                  ROOT:
+                    level: INFO
+      custom-log-config:
+        replicas: 1
+        config:
+          logging:
+            enableVectorAgent: true
+            containers:
+              hbase:
+                custom:
+                  configMap: hbase-log-config
+  regionServers:
+    roleGroups:
+      automatic-log-config:
+        replicas: 1
+        config:
+          logging:
+            enableVectorAgent: true
+            containers:
+              hbase:
+                console:
+                  level: INFO
+                file:
+                  level: INFO
+                loggers:
+                  ROOT:
+                    level: INFO
+              vector:
+                console:
+                  level: INFO
+                file:
+                  level: INFO
+                loggers:
+                  ROOT:
+                    level: INFO
+      custom-log-config:
+        replicas: 1
+        config:
+          logging:
+            enableVectorAgent: true
+            containers:
+              hbase:
+                custom:
+                  configMap: hbase-log-config
+  restServers:
+    roleGroups:
+      automatic-log-config:
+        replicas: 1
+        config:
+          logging:
+            enableVectorAgent: true
+            containers:
+              hbase:
+                console:
+                  level: INFO
+                file:
+                  level: INFO
+                loggers:
+                  ROOT:
+                    level: INFO
+              vector:
+                console:
+                  level: INFO
+                file:
+                  level: INFO
+                loggers:
+                  ROOT:
+                    level: INFO
+      custom-log-config:
+        replicas: 1
+        config:
+          logging:
+            enableVectorAgent: true
+            containers:
+              hbase:
+                custom:
+                  configMap: hbase-log-config

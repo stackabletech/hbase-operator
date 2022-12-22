@@ -2,19 +2,19 @@
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: test-hbase-restserver-default
+  name: test-hbase-regionserver-default
 ---
 apiVersion: v1
 kind: Pod
 metadata:
-  name: test-hbase-restserver-default-0
+  name: test-hbase-regionserver-default-0
 ---
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: test-hbase-restserver-default
+  name: test-hbase-regionserver-default
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: test-hbase-restserver-default
+  name: test-hbase-regionserver-default

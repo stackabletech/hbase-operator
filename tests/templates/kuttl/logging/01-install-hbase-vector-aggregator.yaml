@@ -1,0 +1,17 @@
+---
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  - script: >-
+      helm install hbase-vector-aggregator vector
+      --namespace $NAMESPACE
+      --version 0.18.0
+      --repo https://helm.vector.dev
+      --values hbase-vector-aggregator-values.yaml
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: hbase-vector-aggregator-discovery
+data:
+  ADDRESS: hbase-vector-aggregator:6123
