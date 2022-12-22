@@ -184,7 +184,7 @@ pub enum Error {
     ResolveVectorAggregatorAddress {
         source: crate::product_logging::Error,
     },
-    #[snafu(display("failed to add the logging configuration to the ConfigMap {cm_name}"))]
+    #[snafu(display("failed to add the logging configuration to the ConfigMap [{cm_name}]"))]
     InvalidLoggingConfig {
         source: crate::product_logging::Error,
         cm_name: String,
