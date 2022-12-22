@@ -151,6 +151,8 @@ pub enum Error {
         source: strum::ParseError,
         role: String,
     },
+    #[snafu(display("failed to retrieve Hbase role group: {source}"))]
+    UnidentifiedHbaseRoleGroup { source: stackable_hbase_crd::Error },
     #[snafu(display("failed to resolve and merge resource config for role and role group"))]
     FailedToResolveResourceConfig { source: stackable_hbase_crd::Error },
     #[snafu(display("invalid java heap config - missing default or value in crd?"))]
@@ -621,6 +623,13 @@ fn build_rolegroup_statefulset(
                     ))
                 })
                 .image_pull_secrets_from_product_image(resolved_product_image)
+                .node_selector_opt(
+                    hbase
+                        .get_role_group(rolegroup_ref)
+                        .context(UnidentifiedHbaseRoleGroupSnafu)?
+                        .selector
+                        .clone(),
+                )
                 .add_container(container)
                 .add_volume(stackable_operator::k8s_openapi::api::core::v1::Volume {
                     name: "hbase-config".to_string(),

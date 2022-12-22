@@ -12,10 +12,10 @@ use stackable_operator::{
     k8s_openapi::apimachinery::pkg::api::resource::Quantity,
     kube::{runtime::reflector::ObjectRef, CustomResource},
     product_config_utils::{ConfigError, Configuration},
-    role_utils::{Role, RoleGroupRef},
+    role_utils::{Role, RoleGroup, RoleGroupRef},
     schemars::{self, JsonSchema},
 };
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, str::FromStr};
 use strum::{Display, EnumIter, EnumString};
 
 pub const APP_NAME: &str = "hbase";
@@ -47,8 +47,15 @@ pub const JVM_HEAP_FACTOR: f32 = 0.8;
 
 #[derive(Snafu, Debug)]
 pub enum Error {
+    #[snafu(display("the role [{role}] is invalid and does not exist in HBase"))]
+    InvalidRole {
+        source: strum::ParseError,
+        role: String,
+    },
     #[snafu(display("the HBase role [{role}] is missing from spec"))]
     MissingHbaseRole { role: String },
+    #[snafu(display("the HBase role group [{role_group}] is missing from spec"))]
+    MissingHbaseRoleGroup { role_group: String },
     #[snafu(display("fragment validation failure"))]
     FragmentValidationFailure { source: ValidationError },
 }
@@ -276,6 +283,27 @@ impl HbaseCluster {
             HbaseRole::RegionServer => self.spec.region_servers.as_ref(),
             HbaseRole::RestServer => self.spec.rest_servers.as_ref(),
         }
+    }
+
+    /// Get the RoleGroup struct for the given ref
+    pub fn get_role_group(
+        &self,
+        rolegroup_ref: &RoleGroupRef<HbaseCluster>,
+    ) -> Result<&RoleGroup<HbaseConfig>, Error> {
+        let role_variant =
+            HbaseRole::from_str(&rolegroup_ref.role).with_context(|_| InvalidRoleSnafu {
+                role: rolegroup_ref.role.to_owned(),
+            })?;
+        let role = self
+            .get_role(&role_variant)
+            .with_context(|| MissingHbaseRoleSnafu {
+                role: role_variant.to_string(),
+            })?;
+        role.role_groups
+            .get(&rolegroup_ref.role_group)
+            .with_context(|| MissingHbaseRoleGroupSnafu {
+                role_group: rolegroup_ref.role_group.to_owned(),
+            })
     }
 
     pub fn root_dir(&self) -> String {
