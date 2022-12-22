@@ -10,13 +10,15 @@
 
 - [BREAKING] Use Product image selection instead of version. `spec.version` has been replaced by `spec.image` ([#282]).
 - Updated stackable image versions ([#275]).
-- `operator-rs` `0.24.0` -> `0.30.2` ([#277], [#294]).
+- `operator-rs` `0.24.0` -> `0.30.2` ([#277], [#293], [#294]).
 - Set runAsGroup to 1000 rather than 0 ([#283]).
+- Fixed: `selector` in role groups now works. It was not working before ([#293])
 
 [#275]: https://github.com/stackabletech/hbase-operator/pull/275
 [#277]: https://github.com/stackabletech/hbase-operator/pull/277
 [#282]: https://github.com/stackabletech/hbase-operator/pull/282
 [#283]: https://github.com/stackabletech/hbase-operator/pull/283
+[#293]: https://github.com/stackabletech/hbase-operator/pull/293
 [#294]: https://github.com/stackabletech/hbase-operator/pull/294
 
 ## [0.5.0] - 2022-11-07
