@@ -65,11 +65,13 @@ xref:home:operators:monitoring.adoc[] for more details.
 
 == Log aggregation
 
-The logs can be forwarded to a Vector log aggregator by enabling the log agent:
+The logs can be forwarded to a Vector log aggregator by providing a discovery
+ConfigMap for the aggregator and by enabling the log agent:
 
 [source,yaml]
 ----
 spec:
+  vectorAggregatorConfigMapName: vector-aggregator-discovery
   masters:
     config:
       logging:
@@ -85,7 +87,7 @@ spec:
 ----
 
 Further information on how to configure logging, can be found in
-xref::nightly@home:concepts:logging.adoc[].
+xref::home:concepts:logging.adoc[].
 
 == Configuration Overrides
 
