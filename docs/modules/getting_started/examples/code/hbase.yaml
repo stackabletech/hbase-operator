@@ -6,7 +6,7 @@ metadata:
 spec:
   image:
     productVersion: 2.4.12
-    stackableVersion: 0.4.0
+    stackableVersion: 23.1.0
   hdfsConfigMapName: simple-hdfs
   zookeeperConfigMapName: simple-znode
   config:

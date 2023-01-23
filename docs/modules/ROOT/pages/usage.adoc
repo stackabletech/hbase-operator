@@ -154,7 +154,7 @@ The HBase Operator currently does not support any https://kubernetes.io/docs/con
 // The "nightly" version is needed because the "include" directive searches for
 // files in the "stable" version by default.
 // TODO: remove the "nightly" version after the next platform release (current: 22.09)
-include::nightly@home:concepts:stackable_resource_requests.adoc[]
+include::home:concepts:stackable_resource_requests.adoc[]
 
 If no resources are configured explicitly, the HBase operator uses following defaults:
 
