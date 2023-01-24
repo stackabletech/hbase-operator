@@ -1,5 +1,5 @@
 name: hbase
-version: "23.1.0"
+version: "23.1"
 title: Stackable Operator for Apache HBase
 nav:
   - modules/getting_started/nav.adoc
