@@ -1,6 +1,6 @@
 = First steps
 
-Once you have followed the steps in the xref:installation.adoc[] section to install the operator and its dependencies, you will now deploy an HBase cluster and its dependencies. Afterwards you can <<_verify_that_it_works, verify that it works>> by creating tables and data in HBase using the REST API and Apache Phoenix (an SQL layer used to interact with HBase).
+Once you have followed the steps in the xref:getting_started/installation.adoc[] section to install the operator and its dependencies, you will now deploy an HBase cluster and its dependencies. Afterwards you can <<_verify_that_it_works, verify that it works>> by creating tables and data in HBase using the REST API and Apache Phoenix (an SQL layer used to interact with HBase).
 
 == Setup
 
@@ -9,22 +9,22 @@ Once you have followed the steps in the xref:installation.adoc[] section to inst
 To deploy a ZooKeeper cluster create one file called `zk.yaml`:
 
 [source,yaml]
-include::example$code/zk.yaml[]
+include::example$getting_started/zk.yaml[]
 
 We also need to define a ZNode that will be used by the HDFS and HBase clusters to reference ZooKeeper. Create another file called `znode.yaml`:
 
 [source,yaml]
-include::example$code/znode.yaml[]
+include::example$getting_started/znode.yaml[]
 
 Apply both of these files:
 
 [source]
-include::example$code/getting_started.sh[tag=install-zk]
+include::example$getting_started/getting_started.sh[tag=install-zk]
 
 The state of the ZooKeeper cluster can be tracked with `kubectl`:
 
 [source]
-include::example$code/getting_started.sh[tag=watch-zk-rollout]
+include::example$getting_started/getting_started.sh[tag=watch-zk-rollout]
 
 === HDFS
 
@@ -32,7 +32,7 @@ An HDFS cluster has three components: the `namenode`, the `datanode` and the `jo
 
 [source,yaml]
 ----
-include::example$code/hdfs.yaml[]
+include::example$getting_started/hdfs.yaml[]
 ----
 
 Where:
@@ -47,13 +47,13 @@ It should generally be safe to simply use the latest image version that is avail
 Create the actual HDFS cluster by applying the file:
 
 ----
-include::example$code/getting_started.sh[tag=install-hdfs]
+include::example$getting_started/getting_started.sh[tag=install-hdfs]
 ----
 
 Track the progress with `kubectl` as this step may take a few minutes:
 
 [source]
-include::example$code/getting_started.sh[tag=watch-hdfs-rollout]
+include::example$getting_started/getting_started.sh[tag=watch-hdfs-rollout]
 
 === HBase
 
@@ -61,7 +61,7 @@ You can now create the HBase cluster. Create a file called `hbase.yaml` containi
 
 [source,yaml]
 ----
-include::example$code/hbase.yaml[]
+include::example$getting_started/hbase.yaml[]
 ----
 
 == Verify that it works
@@ -71,7 +71,7 @@ To test the cluster you will use the REST API to check its version and status, a
 First, check the cluster version with this callout:
 
 [source]
-include::example$code/getting_started.sh[tag=cluster-version]
+include::example$getting_started/getting_started.sh[tag=cluster-version]
 
 This will return the version that was specified in the HBase cluster definition:
 
@@ -81,7 +81,7 @@ This will return the version that was specified in the HBase cluster definition:
 The cluster status can be checked and formatted like this:
 
 [source]
-include::example$code/getting_started.sh[tag=cluster-status]
+include::example$getting_started/getting_started.sh[tag=cluster-status]
 
 which will display cluster metadata that looks like this (only the first region is included for the sake of readability):
 
@@ -123,12 +123,12 @@ which will display cluster metadata that looks like this (only the first region 
 You can now create a table like this:
 
 [source]
-include::example$code/getting_started.sh[tag=create-table]
+include::example$getting_started/getting_started.sh[tag=create-table]
 
 This will create a table `users` with a single column family `cf`. Its creation can be verified by listing it:
 
 [source]
-include::example$code/getting_started.sh[tag=get-table]
+include::example$getting_started/getting_started.sh[tag=get-table]
 
 [source,json]
 {
@@ -142,7 +142,7 @@ include::example$code/getting_started.sh[tag=get-table]
 An alternative way to interact with HBase is to use the https://phoenix.apache.org/index.html[Phoenix] library that is pre-installed on the Stackable HBase image (in the /stackable/phoenix directory). Use the python utility `psql.py` (found in /stackable/phoenix/bin) to create, populate and query a table called `WEB_STAT`:
 
 [source]
-include::example$code/getting_started.sh[tag=phoenix-table]
+include::example$getting_started/getting_started.sh[tag=phoenix-table]
 
 The final command will display some grouped data like this:
 
@@ -156,7 +156,7 @@ Time: 0.017 sec(s)
 Check the tables again with:
 
 [source]
-include::example$code/getting_started.sh[tag=get-table]
+include::example$getting_started/getting_started.sh[tag=get-table]
 
 This time the list includes not just `users` (created above with the REST API) and `WEB_STAT`, but several other tables too:
 
@@ -200,4 +200,4 @@ This is because Phoenix requires these `SYSTEM.` tables for its own internal map
 
 == What's next
 
-Look at the xref:ROOT:usage.adoc[Usage page] to find out more about configuring your HBase cluster.
+Look at the xref:usage.adoc[Usage page] to find out more about configuring your HBase cluster.
