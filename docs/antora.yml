@@ -1,7 +1,3 @@
-name: hbase
+---
+name: home
 version: "23.1"
-title: Stackable Operator for Apache HBase
-nav:
-  - modules/getting_started/nav.adoc
-  - modules/ROOT/nav.adoc
-prerelease: false
