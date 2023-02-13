@@ -9,9 +9,15 @@ spec:
     stackableVersion: "{{ test_scenario['values']['hbase'].split('-stackable')[1] }}"
   hdfsConfigMapName: test-hdfs-namenode-default
   zookeeperConfigMapName: test-znode
+{% if lookup('env', 'VECTOR_AGGREGATOR') %}
+  vectorAggregatorConfigMapName: vector-aggregator-discovery
+{% endif %}
   config:
     hbaseRootdir: /hbase
   masters:
+    config:
+      logging:
+        enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
     roleGroups:
       default:
         configOverrides:
@@ -20,6 +26,9 @@ spec:
             hbase.regionserver.wal.codec: "org.apache.hadoop.hbase.regionserver.wal.IndexedWALEditCodec"
         replicas: 1
   regionServers:
+    config:
+      logging:
+        enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
     roleGroups:
       default:
         configOverrides:
@@ -28,6 +37,9 @@ spec:
             hbase.regionserver.wal.codec: "org.apache.hadoop.hbase.regionserver.wal.IndexedWALEditCodec"
         replicas: 1
   restServers:
+    config:
+      logging:
+        enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
     roleGroups:
       default:
         configOverrides:
