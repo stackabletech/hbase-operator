@@ -1,0 +1,6 @@
+* xref:hbase:getting_started/index.adoc[]
+** xref:hbase:getting_started/installation.adoc[]
+** xref:hbase:getting_started/first_steps.adoc[]
+* xref:hbase:configuration.adoc[]
+* xref:hbase:usage.adoc[]
+* xref:hbase:discovery.adoc[]
