@@ -1,0 +1,3 @@
+= Stackable Operator for Apache HBase
+
+The docs can now be found at xref:home:hbase:index.adoc[]
