@@ -1,5 +1,7 @@
 :clusterName: \{clusterName\}
 :namespace: \{namespace\}
+:hdfs-cluster-name: \{hdfs-cluster-name\}
+:zookeeper-znode-name: \{zookeeper-znode-name\}
 
 = Discovery
 
