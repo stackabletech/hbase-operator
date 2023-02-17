@@ -1,5 +1,5 @@
 use stackable_operator::{
-    commons::affinities::{
+    commons::affinity::{
         affinity_between_cluster_pods, affinity_between_role_pods, StackableAffinityFragment,
     },
     k8s_openapi::api::core::v1::{PodAffinity, PodAntiAffinity},
@@ -84,7 +84,7 @@ mod tests {
 
     use crate::HbaseCluster;
     use stackable_operator::{
-        commons::affinities::{StackableAffinity, StackableNodeSelector},
+        commons::affinity::{StackableAffinity, StackableNodeSelector},
         k8s_openapi::{
             api::core::v1::{
                 NodeAffinity, NodeSelector, NodeSelectorRequirement, NodeSelectorTerm, PodAffinity,
