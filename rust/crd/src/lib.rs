@@ -1,7 +1,9 @@
+use affinities::get_affinity;
 use serde::{Deserialize, Serialize};
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
     commons::{
+        affinities::StackableAffinity,
         product_image_selection::ProductImage,
         resources::{
             CpuLimitsFragment, MemoryLimitsFragment, NoRuntimeLimits, NoRuntimeLimitsFragment,
@@ -10,7 +12,7 @@ use stackable_operator::{
     },
     config::{fragment, fragment::Fragment, fragment::ValidationError, merge::Merge},
     k8s_openapi::apimachinery::pkg::api::resource::Quantity,
-    kube::{runtime::reflector::ObjectRef, CustomResource},
+    kube::{runtime::reflector::ObjectRef, CustomResource, ResourceExt},
     product_config_utils::{ConfigError, Configuration},
     product_logging::{self, spec::Logging},
     role_utils::{Role, RoleGroup, RoleGroupRef},
@@ -18,6 +20,8 @@ use stackable_operator::{
 };
 use std::{collections::BTreeMap, str::FromStr};
 use strum::{Display, EnumIter, EnumString};
+
+mod affinities;
 
 pub const APP_NAME: &str = "hbase";
 
@@ -208,10 +212,16 @@ pub struct HbaseConfig {
     pub resources: Resources<HbaseStorageConfig, NoRuntimeLimits>,
     #[fragment_attrs(serde(default))]
     pub logging: Logging<Container>,
+    #[fragment_attrs(serde(default))]
+    pub affinity: StackableAffinity,
 }
 
 impl HbaseConfig {
-    fn default_config() -> HbaseConfigFragment {
+    fn default_config(
+        cluster_name: &str,
+        role: &HbaseRole,
+        hdfs_discovery_cm_name: &str,
+    ) -> HbaseConfigFragment {
         HbaseConfigFragment {
             hbase_rootdir: None,
             hbase_opts: None,
@@ -227,6 +237,7 @@ impl HbaseConfig {
                 storage: HbaseStorageConfigFragment {},
             },
             logging: product_logging::spec::default_logging(),
+            affinity: get_affinity(cluster_name, role, hdfs_discovery_cm_name),
         }
     }
 }
@@ -363,10 +374,12 @@ impl HbaseCluster {
     pub fn merged_config(
         &self,
         role: &HbaseRole,
-        rolegroup_ref: &RoleGroupRef<HbaseCluster>,
+        role_group: &str,
+        hdfs_discovery_cm_name: &str,
     ) -> Result<HbaseConfig, Error> {
         // Initialize the result with all default values as baseline
-        let conf_defaults = HbaseConfig::default_config();
+        let conf_defaults =
+            HbaseConfig::default_config(&self.name_any(), role, hdfs_discovery_cm_name);
 
         let role = self.get_role(role).context(MissingHbaseRoleSnafu {
             role: role.to_string(),
@@ -378,7 +391,7 @@ impl HbaseCluster {
         // Retrieve rolegroup specific resource config
         let mut conf_rolegroup = role
             .role_groups
-            .get(&rolegroup_ref.role_group)
+            .get(role_group)
             .map(|rg| rg.config.config.clone())
             .unwrap_or_default();
 

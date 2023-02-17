@@ -290,7 +290,11 @@ pub async fn reconcile_hbase(hbase: Arc<HbaseCluster>, ctx: Arc<Ctx>) -> Result<
             let rolegroup = hbase.server_rolegroup_ref(role_name, rolegroup_name);
 
             let config = hbase
-                .merged_config(&hbase_role, &rolegroup)
+                .merged_config(
+                    &hbase_role,
+                    &rolegroup.role_group,
+                    &hbase.spec.hdfs_config_map_name,
+                )
                 .context(FailedToResolveConfigSnafu)?;
 
             let rg_service = build_rolegroup_service(&hbase, &rolegroup, &resolved_product_image)?;
@@ -648,13 +652,7 @@ fn build_rolegroup_statefulset(
             ))
         })
         .image_pull_secrets_from_product_image(resolved_product_image)
-        .node_selector_opt(
-            hbase
-                .get_role_group(rolegroup_ref)
-                .context(UnidentifiedHbaseRoleGroupSnafu)?
-                .selector
-                .clone(),
-        )
+        .affinity(&config.affinity)
         .add_container(container)
         .add_volume(stackable_operator::k8s_openapi::api::core::v1::Volume {
             name: "hbase-config".to_string(),
