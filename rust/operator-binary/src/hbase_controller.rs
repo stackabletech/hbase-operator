@@ -38,7 +38,7 @@ use stackable_operator::{
     kube::{runtime::controller::Action, Resource, ResourceExt},
     labels::{role_group_selector_labels, role_selector_labels, ObjectLabels},
     logging::controller::ReconcilerError,
-    memory::{to_java_heap_value, BinaryMultiple},
+    memory::{BinaryMultiple, MemoryQuantity},
     product_config::{types::PropertyNameKind, writer, ProductConfigManager},
     product_config_utils::{transform_all_roles_to_config, validate_all_roles_and_groups_config},
     product_logging::{
@@ -418,19 +418,20 @@ fn build_rolegroup_config_map(
         .cloned()
         .unwrap_or_default();
 
-    let heap_in_mebi = to_java_heap_value(
+    let heap_in_mebi = MemoryQuantity::try_from(
         config
             .resources
             .memory
             .limit
             .as_ref()
             .context(InvalidJavaHeapConfigSnafu)?,
-        JVM_HEAP_FACTOR,
-        BinaryMultiple::Mebi,
     )
     .context(FailedToConvertJavaHeapSnafu {
         unit: BinaryMultiple::Mebi.to_java_memory_unit(),
-    })?;
+    })?
+    .scale_to(BinaryMultiple::Mebi)
+    .value
+        * JVM_HEAP_FACTOR;
 
     hbase_env_config.insert(HBASE_HEAPSIZE.to_string(), format!("{}m", heap_in_mebi));
 
