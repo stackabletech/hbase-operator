@@ -418,7 +418,7 @@ fn build_rolegroup_config_map(
         .cloned()
         .unwrap_or_default();
 
-    let heap_in_mebi = MemoryQuantity::try_from(
+    let memory_limit = MemoryQuantity::try_from(
         config
             .resources
             .memory
@@ -428,12 +428,15 @@ fn build_rolegroup_config_map(
     )
     .context(FailedToConvertJavaHeapSnafu {
         unit: BinaryMultiple::Mebi.to_java_memory_unit(),
-    })?
-    .scale_to(BinaryMultiple::Mebi)
-    .value
-        * JVM_HEAP_FACTOR;
+    })?;
+    let heap_in_mebi = (memory_limit * JVM_HEAP_FACTOR)
+        .scale_to(BinaryMultiple::Mebi)
+        .format_for_java()
+        .context(FailedToConvertJavaHeapSnafu {
+            unit: BinaryMultiple::Mebi.to_java_memory_unit(),
+        })?;
 
-    hbase_env_config.insert(HBASE_HEAPSIZE.to_string(), format!("{}m", heap_in_mebi));
+    hbase_env_config.insert(HBASE_HEAPSIZE.to_string(), heap_in_mebi);
 
     let mut builder = ConfigMapBuilder::new();
 
