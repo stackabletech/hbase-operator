@@ -4,3 +4,4 @@
 * xref:hbase:configuration.adoc[]
 * xref:hbase:usage.adoc[]
 * xref:hbase:discovery.adoc[]
+* xref:hbase:pod_placement.adoc[]
