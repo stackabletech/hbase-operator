@@ -38,7 +38,7 @@ use stackable_operator::{
     kube::{runtime::controller::Action, Resource, ResourceExt},
     labels::{role_group_selector_labels, role_selector_labels, ObjectLabels},
     logging::controller::ReconcilerError,
-    memory::{to_java_heap_value, BinaryMultiple},
+    memory::{BinaryMultiple, MemoryQuantity},
     product_config::{types::PropertyNameKind, writer, ProductConfigManager},
     product_config_utils::{transform_all_roles_to_config, validate_all_roles_and_groups_config},
     product_logging::{
@@ -290,7 +290,11 @@ pub async fn reconcile_hbase(hbase: Arc<HbaseCluster>, ctx: Arc<Ctx>) -> Result<
             let rolegroup = hbase.server_rolegroup_ref(role_name, rolegroup_name);
 
             let config = hbase
-                .merged_config(&hbase_role, &rolegroup)
+                .merged_config(
+                    &hbase_role,
+                    &rolegroup.role_group,
+                    &hbase.spec.hdfs_config_map_name,
+                )
                 .context(FailedToResolveConfigSnafu)?;
 
             let rg_service = build_rolegroup_service(&hbase, &rolegroup, &resolved_product_image)?;
@@ -414,21 +418,25 @@ fn build_rolegroup_config_map(
         .cloned()
         .unwrap_or_default();
 
-    let heap_in_mebi = to_java_heap_value(
+    let memory_limit = MemoryQuantity::try_from(
         config
             .resources
             .memory
             .limit
             .as_ref()
             .context(InvalidJavaHeapConfigSnafu)?,
-        JVM_HEAP_FACTOR,
-        BinaryMultiple::Mebi,
     )
     .context(FailedToConvertJavaHeapSnafu {
         unit: BinaryMultiple::Mebi.to_java_memory_unit(),
     })?;
+    let heap_in_mebi = (memory_limit * JVM_HEAP_FACTOR)
+        .scale_to(BinaryMultiple::Mebi)
+        .format_for_java()
+        .context(FailedToConvertJavaHeapSnafu {
+            unit: BinaryMultiple::Mebi.to_java_memory_unit(),
+        })?;
 
-    hbase_env_config.insert(HBASE_HEAPSIZE.to_string(), format!("{}m", heap_in_mebi));
+    hbase_env_config.insert(HBASE_HEAPSIZE.to_string(), heap_in_mebi);
 
     let mut builder = ConfigMapBuilder::new();
 
@@ -648,13 +656,7 @@ fn build_rolegroup_statefulset(
             ))
         })
         .image_pull_secrets_from_product_image(resolved_product_image)
-        .node_selector_opt(
-            hbase
-                .get_role_group(rolegroup_ref)
-                .context(UnidentifiedHbaseRoleGroupSnafu)?
-                .selector
-                .clone(),
-        )
+        .affinity(&config.affinity)
         .add_container(container)
         .add_volume(stackable_operator::k8s_openapi::api::core::v1::Volume {
             name: "hbase-config".to_string(),

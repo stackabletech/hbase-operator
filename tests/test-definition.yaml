@@ -2,13 +2,13 @@
 dimensions:
   - name: hbase
     values:
-      - 2.4.8-stackable23.4.0-rc1
-      - 2.4.9-stackable23.4.0-rc1
-      - 2.4.11-stackable23.4.0-rc1
-      - 2.4.12-stackable23.4.0-rc1
+      - 2.4.8-stackable23.4.0-rc2
+      - 2.4.9-stackable23.4.0-rc2
+      - 2.4.11-stackable23.4.0-rc2
+      - 2.4.12-stackable23.4.0-rc2
   - name: hbase-latest
     values:
-      - 2.4.12-stackable23.4.0-rc1
+      - 2.4.12-stackable23.4.0-rc2
   - name: hdfs
     values:
       - 3.2.2-stackable23.4.0-rc1

@@ -1,0 +1,96 @@
+= Pod Placement
+
+You can configure Pod placement for HDFS nodes as described in xref:concepts:pod_placement.adoc[].
+
+Default Pod placement constraints for master nodes:
+
+[source,yaml]
+----
+affinity:
+  podAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+    - podAffinityTerm:
+        labelSelector:
+          matchLabels:
+            app.kubernetes.io/instance: cluster-name
+            app.kubernetes.io/name: hbase
+        topologyKey: kubernetes.io/hostname
+      weight: 20
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+    - podAffinityTerm:
+        labelSelector:
+          matchLabels:
+            app.kubernetes.io/component: master
+            app.kubernetes.io/instance: cluster-name
+            app.kubernetes.io/name: hbase
+        topologyKey: kubernetes.io/hostname
+      weight: 70
+----
+
+Default Pod placement constraints for region server nodes:
+
+[source,yaml]
+----
+affinity:
+  podAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+    - podAffinityTerm:
+        labelSelector:
+          matchLabels:
+            app.kubernetes.io/instance: cluster-name
+            app.kubernetes.io/name: hbase
+        topologyKey: kubernetes.io/hostname
+      weight: 20
+    - podAffinityTerm:
+        labelSelector:
+          matchLabels:
+            app.kubernetes.io/component: datanode
+            app.kubernetes.io/instance: hdfs-cluster-name
+            app.kubernetes.io/name: hdfs
+        topologyKey: kubernetes.io/hostname
+      weight: 50
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+    - podAffinityTerm:
+        labelSelector:
+          matchLabels:
+            app.kubernetes.io/component: regionserver
+            app.kubernetes.io/instance: cluster-node
+            app.kubernetes.io/name: hbase
+        topologyKey: kubernetes.io/hostname
+      weight: 70
+
+----
+
+Default Pod placement constraints for rest server nodes:
+
+[source,yaml]
+----
+affinity:
+  podAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+    - podAffinityTerm:
+        labelSelector:
+          matchLabels:
+            app.kubernetes.io/instance: test-hbase
+            app.kubernetes.io/name: hbase
+        topologyKey: kubernetes.io/hostname
+      weight: 20
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+    - podAffinityTerm:
+        labelSelector:
+          matchLabels:
+            app.kubernetes.io/component: restserver
+            app.kubernetes.io/instance: test-hbase
+            app.kubernetes.io/name: hbase
+        topologyKey: kubernetes.io/hostname
+      weight: 70
+
+----
+
+In the examples above `cluster-name` is the name of the HBase custom resource that owns this Pod. The `hdfs-cluster-name` is the name of the HDFS cluster that was configured in the `hdfsConfigMapName` property.
+
+NOTE: It is important that the `hdfsConfigMapName` property contains the name the HDFS cluster. You could instead configure `ConfigMap`s of specific name or data roles, but for the purpose of pod placement, this will lead to faulty behavior.
+

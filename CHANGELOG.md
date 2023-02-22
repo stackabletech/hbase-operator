@@ -4,6 +4,14 @@
 
 ### Added
 
+- Deploy default and support custom affinities ([#322]).
+
+[#322]: https://github.com/stackabletech/hbase-operator/pull/322
+
+## [23.1.0] - 2023-01-23
+
+### Added
+
 - Log aggregation added ([#294]).
 
 ### Changed
