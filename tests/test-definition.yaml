@@ -18,12 +18,12 @@ dimensions:
       - 3.3.4-stackable23.4.0-rc1
   - name: zookeeper
     values:
-      - 3.6.3-stackable23.4.0-rc1
-      - 3.7.0-stackable23.4.0-rc1
-      - 3.8.0-stackable23.4.0-rc1
+      - 3.6.3-stackable23.4.0-rc2
+      - 3.7.0-stackable23.4.0-rc2
+      - 3.8.0-stackable23.4.0-rc2
   - name: zookeeper-latest
     values:
-      - 3.8.0-stackable23.4.0-rc1
+      - 3.8.0-stackable23.4.0-rc2
 tests:
   - name: smoke
     dimensions:
