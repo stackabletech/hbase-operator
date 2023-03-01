@@ -11,11 +11,11 @@ dimensions:
       - 2.4.12-stackable23.4.0-rc2
   - name: hdfs
     values:
-      - 3.2.2-stackable23.4.0-rc1
-      - 3.3.3-stackable23.4.0-rc1
+      - 3.2.2-stackable23.4.0-rc2
+      - 3.3.3-stackable23.4.0-rc2
   - name: hdfs-latest
     values:
-      - 3.3.4-stackable23.4.0-rc1
+      - 3.3.4-stackable23.4.0-rc2
   - name: zookeeper
     values:
       - 3.6.3-stackable23.4.0-rc2
