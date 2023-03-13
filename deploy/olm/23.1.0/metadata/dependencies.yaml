@@ -2,6 +2,7 @@
 # See this page for details:
 # https://docs.openshift.com/container-platform/4.10/operators/understanding/olm/olm-understanding-dependency-resolution.html#olm-dependencies_olm-understanding-dependency-resolution
 #
+---
 dependencies:
   - type: olm.package
     value:
