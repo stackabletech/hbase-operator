@@ -5,8 +5,10 @@
 ### Added
 
 - Deploy default and support custom affinities ([#322]).
+- OLM bundle files ([#333]).
 
 [#322]: https://github.com/stackabletech/hbase-operator/pull/322
+[#333]: https://github.com/stackabletech/hbase-operator/pull/333
 
 ## [23.1.0] - 2023-01-23
 
