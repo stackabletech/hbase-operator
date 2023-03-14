@@ -1,0 +1,22 @@
+#
+# See this page for details:
+# https://docs.openshift.com/container-platform/4.10/operators/understanding/olm/olm-understanding-dependency-resolution.html#olm-dependencies_olm-understanding-dependency-resolution
+#
+---
+dependencies:
+  - type: olm.package
+    value:
+      packageName: stackable-commons-operator
+      version: "23.1.0"
+  - type: olm.package
+    value:
+      packageName: stackable-secret-operator
+      version: "23.1.0"
+  - type: olm.package
+    value:
+      packageName: stackable-zookeeper-operator
+      version: "23.1.0"
+  - type: olm.package
+    value:
+      packageName: stackable-hdfs-operator
+      version: "23.1.0"
