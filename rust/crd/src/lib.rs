@@ -82,19 +82,11 @@ pub enum Error {
 )]
 #[serde(rename_all = "camelCase")]
 pub struct HbaseClusterSpec {
-    /// Emergency stop button, if `true` then all pods are stopped without affecting configuration (as setting `replicas` to `0` would)
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub stopped: Option<bool>,
     /// Desired HBase image
     pub image: ProductImage,
-    /// ZooKeeper cluster connection details from discovery config map
-    pub zookeeper_config_map_name: String,
-    /// HDFS cluster connection details from discovery config map
-    pub hdfs_config_map_name: String,
-    /// Name of the Vector aggregator discovery ConfigMap.
-    /// It must contain the key `ADDRESS` with the address of the Vector aggregator.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub vector_aggregator_config_map_name: Option<String>,
+    /// Global HBase cluster configuration
+    pub cluster_config: HbaseClusterConfig,
+    // TODO: remove?
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub config: Option<HbaseConfigFragment>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -103,6 +95,22 @@ pub struct HbaseClusterSpec {
     pub region_servers: Option<Role<HbaseConfigFragment>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rest_servers: Option<Role<HbaseConfigFragment>>,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HbaseClusterConfig {
+    /// HDFS cluster connection details from discovery config map
+    pub hdfs_config_map_name: String,
+    /// Emergency stop button, if `true` then all pods are stopped without affecting configuration (as setting `replicas` to `0` would)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stopped: Option<bool>,
+    /// Name of the Vector aggregator discovery ConfigMap.
+    /// It must contain the key `ADDRESS` with the address of the Vector aggregator.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub vector_aggregator_config_map_name: Option<String>,
+    /// ZooKeeper cluster connection details from discovery config map
+    pub zookeeper_config_map_name: String,
 }
 
 #[derive(
