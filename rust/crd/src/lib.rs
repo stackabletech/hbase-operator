@@ -37,6 +37,7 @@ pub const HBASE_CLUSTER_DISTRIBUTED: &str = "hbase.cluster.distributed";
 pub const HBASE_ROOTDIR: &str = "hbase.rootdir";
 pub const HBASE_ZOOKEEPER_QUORUM: &str = "hbase.zookeeper.quorum";
 pub const HBASE_HEAPSIZE: &str = "HBASE_HEAPSIZE";
+pub const HBASE_ROOT_DIR_DEFAULT: &str = "/hbase";
 
 pub const HBASE_UI_PORT_NAME: &str = "ui";
 pub const METRICS_PORT_NAME: &str = "metrics";
@@ -302,7 +303,7 @@ impl Configuration for HbaseConfigFragment {
                     Some(
                         self.hbase_rootdir
                             .as_deref()
-                            .unwrap_or("/hbase")
+                            .unwrap_or(HBASE_ROOTDIR)
                             .to_string(),
                     ),
                 );
