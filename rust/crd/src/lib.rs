@@ -86,9 +86,6 @@ pub struct HbaseClusterSpec {
     pub image: ProductImage,
     /// Global HBase cluster configuration
     pub cluster_config: HbaseClusterConfig,
-    // TODO: remove?
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub config: Option<HbaseConfigFragment>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub masters: Option<Role<HbaseConfigFragment>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -271,17 +268,11 @@ impl Configuration for HbaseConfigFragment {
 
     fn compute_files(
         &self,
-        resource: &Self::Configurable,
+        _resource: &Self::Configurable,
         role_name: &str,
         file: &str,
     ) -> Result<BTreeMap<String, Option<String>>, ConfigError> {
-        let mut result = if role_name.is_empty() {
-            BTreeMap::new()
-        } else if let Some(config) = &resource.spec.config {
-            config.compute_files(resource, "", file)?
-        } else {
-            BTreeMap::new()
-        };
+        let mut result = BTreeMap::new();
 
         match file {
             HBASE_ENV_SH => {
@@ -306,7 +297,15 @@ impl Configuration for HbaseConfigFragment {
                     HBASE_CLUSTER_DISTRIBUTED.to_string(),
                     Some("true".to_string()),
                 );
-                result.insert(HBASE_ROOTDIR.to_string(), Some(resource.root_dir()));
+                result.insert(
+                    HBASE_ROOTDIR.to_string(),
+                    Some(
+                        self.hbase_rootdir
+                            .as_deref()
+                            .unwrap_or("/hbase")
+                            .to_string(),
+                    ),
+                );
             }
             _ => {}
         }
@@ -367,15 +366,6 @@ impl HbaseCluster {
             .with_context(|| MissingHbaseRoleGroupSnafu {
                 role_group: rolegroup_ref.role_group.to_owned(),
             })
-    }
-
-    pub fn root_dir(&self) -> String {
-        self.spec
-            .config
-            .as_ref()
-            .and_then(|c| c.hbase_rootdir.as_deref())
-            .unwrap_or("/hbase")
-            .to_string()
     }
 
     /// Retrieve and merge resource configs for role and role groups
