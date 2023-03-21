@@ -107,11 +107,10 @@ mod tests {
         spec:
           image:
             productVersion: 2.4.12
-            stackableVersion: 0.4.0
-          hdfsConfigMapName: simple-hdfs
-          zookeeperConfigMapName: simple-znode
-          config:
-            hbaseRootdir: /hbase
+            stackableVersion: 23.4.0-rc2
+          clusterConfig:    
+            hdfsConfigMapName: simple-hdfs
+            zookeeperConfigMapName: simple-znode
           masters:
             roleGroups:
               default:
@@ -127,7 +126,11 @@ mod tests {
         "#;
         let hbase: HbaseCluster = serde_yaml::from_str(input).expect("illegal test input");
         let merged_config = hbase
-            .merged_config(&role, "default", &hbase.spec.hdfs_config_map_name)
+            .merged_config(
+                &role,
+                "default",
+                &hbase.spec.cluster_config.hdfs_config_map_name,
+            )
             .unwrap();
 
         let mut expected_affinities = vec![WeightedPodAffinityTerm {
@@ -228,11 +231,10 @@ mod tests {
         spec:
           image:
             productVersion: 2.4.12
-            stackableVersion: 0.4.0
-          hdfsConfigMapName: simple-hdfs
-          zookeeperConfigMapName: simple-znode
-          config:
-            hbaseRootdir: /hbase
+            stackableVersion: 23.4.0-rc2
+          clusterConfig:  
+            hdfsConfigMapName: simple-hdfs
+            zookeeperConfigMapName: simple-znode
           masters:
             roleGroups:
               default:
@@ -260,7 +262,7 @@ mod tests {
             .merged_config(
                 &HbaseRole::Master,
                 "default",
-                &hbase.spec.hdfs_config_map_name,
+                &hbase.spec.cluster_config.hdfs_config_map_name,
             )
             .unwrap();
 

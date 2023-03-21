@@ -208,7 +208,7 @@ pub async fn reconcile_hbase(hbase: Arc<HbaseCluster>, ctx: Arc<Ctx>) -> Result<
 
     let resolved_product_image = hbase.spec.image.resolve(DOCKER_IMAGE_BASE_NAME);
 
-    let zk_discovery_cm_name = &hbase.spec.zookeeper_config_map_name;
+    let zk_discovery_cm_name = &hbase.spec.cluster_config.zookeeper_config_map_name;
     let zk_connect_string = client
         .get::<ConfigMap>(
             zk_discovery_cm_name,
@@ -293,7 +293,7 @@ pub async fn reconcile_hbase(hbase: Arc<HbaseCluster>, ctx: Arc<Ctx>) -> Result<
                 .merged_config(
                     &hbase_role,
                     &rolegroup.role_group,
-                    &hbase.spec.hdfs_config_map_name,
+                    &hbase.spec.cluster_config.hdfs_config_map_name,
                 )
                 .context(FailedToResolveConfigSnafu)?;
 
@@ -669,7 +669,7 @@ fn build_rolegroup_statefulset(
         .add_volume(stackable_operator::k8s_openapi::api::core::v1::Volume {
             name: "hdfs-discovery".to_string(),
             config_map: Some(ConfigMapVolumeSource {
-                name: Some(hbase.spec.hdfs_config_map_name.clone()),
+                name: Some(hbase.spec.cluster_config.hdfs_config_map_name.clone()),
                 ..Default::default()
             }),
             ..Default::default()
@@ -765,7 +765,7 @@ fn rolegroup_replicas(
     hbase: &HbaseCluster,
     rolegroup_ref: &RoleGroupRef<HbaseCluster>,
 ) -> Result<i32, Error> {
-    if hbase.spec.stopped.unwrap_or(false) {
+    if hbase.spec.cluster_config.stopped.unwrap_or(false) {
         Ok(0)
     } else {
         let role =

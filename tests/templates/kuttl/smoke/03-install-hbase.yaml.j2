@@ -7,13 +7,12 @@ spec:
   image:
     productVersion: "{{ test_scenario['values']['hbase'].split('-stackable')[0] }}"
     stackableVersion: "{{ test_scenario['values']['hbase'].split('-stackable')[1] }}"
-  hdfsConfigMapName: test-hdfs
-  zookeeperConfigMapName: test-znode
+  clusterConfig:
+    hdfsConfigMapName: test-hdfs
+    zookeeperConfigMapName: test-znode
 {% if lookup('env', 'VECTOR_AGGREGATOR') %}
-  vectorAggregatorConfigMapName: vector-aggregator-discovery
+    vectorAggregatorConfigMapName: vector-aggregator-discovery
 {% endif %}
-  config:
-    hbaseRootdir: /hbase
   masters:
     config:
       logging:

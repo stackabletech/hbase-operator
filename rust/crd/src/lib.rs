@@ -37,6 +37,7 @@ pub const HBASE_CLUSTER_DISTRIBUTED: &str = "hbase.cluster.distributed";
 pub const HBASE_ROOTDIR: &str = "hbase.rootdir";
 pub const HBASE_ZOOKEEPER_QUORUM: &str = "hbase.zookeeper.quorum";
 pub const HBASE_HEAPSIZE: &str = "HBASE_HEAPSIZE";
+pub const HBASE_ROOT_DIR_DEFAULT: &str = "/hbase";
 
 pub const HBASE_UI_PORT_NAME: &str = "ui";
 pub const METRICS_PORT_NAME: &str = "metrics";
@@ -82,27 +83,32 @@ pub enum Error {
 )]
 #[serde(rename_all = "camelCase")]
 pub struct HbaseClusterSpec {
-    /// Emergency stop button, if `true` then all pods are stopped without affecting configuration (as setting `replicas` to `0` would)
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub stopped: Option<bool>,
     /// Desired HBase image
     pub image: ProductImage,
-    /// ZooKeeper cluster connection details from discovery config map
-    pub zookeeper_config_map_name: String,
-    /// HDFS cluster connection details from discovery config map
-    pub hdfs_config_map_name: String,
-    /// Name of the Vector aggregator discovery ConfigMap.
-    /// It must contain the key `ADDRESS` with the address of the Vector aggregator.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub vector_aggregator_config_map_name: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub config: Option<HbaseConfigFragment>,
+    /// Global HBase cluster configuration
+    pub cluster_config: HbaseClusterConfig,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub masters: Option<Role<HbaseConfigFragment>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub region_servers: Option<Role<HbaseConfigFragment>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rest_servers: Option<Role<HbaseConfigFragment>>,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HbaseClusterConfig {
+    /// HDFS cluster connection details from discovery config map
+    pub hdfs_config_map_name: String,
+    /// Emergency stop button, if `true` then all pods are stopped without affecting configuration (as setting `replicas` to `0` would)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stopped: Option<bool>,
+    /// Name of the Vector aggregator discovery ConfigMap.
+    /// It must contain the key `ADDRESS` with the address of the Vector aggregator.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub vector_aggregator_config_map_name: Option<String>,
+    /// ZooKeeper cluster connection details from discovery config map
+    pub zookeeper_config_map_name: String,
 }
 
 #[derive(
@@ -263,17 +269,11 @@ impl Configuration for HbaseConfigFragment {
 
     fn compute_files(
         &self,
-        resource: &Self::Configurable,
+        _resource: &Self::Configurable,
         role_name: &str,
         file: &str,
     ) -> Result<BTreeMap<String, Option<String>>, ConfigError> {
-        let mut result = if role_name.is_empty() {
-            BTreeMap::new()
-        } else if let Some(config) = &resource.spec.config {
-            config.compute_files(resource, "", file)?
-        } else {
-            BTreeMap::new()
-        };
+        let mut result = BTreeMap::new();
 
         match file {
             HBASE_ENV_SH => {
@@ -298,7 +298,15 @@ impl Configuration for HbaseConfigFragment {
                     HBASE_CLUSTER_DISTRIBUTED.to_string(),
                     Some("true".to_string()),
                 );
-                result.insert(HBASE_ROOTDIR.to_string(), Some(resource.root_dir()));
+                result.insert(
+                    HBASE_ROOTDIR.to_string(),
+                    Some(
+                        self.hbase_rootdir
+                            .as_deref()
+                            .unwrap_or(HBASE_ROOT_DIR_DEFAULT)
+                            .to_string(),
+                    ),
+                );
             }
             _ => {}
         }
@@ -359,15 +367,6 @@ impl HbaseCluster {
             .with_context(|| MissingHbaseRoleGroupSnafu {
                 role_group: rolegroup_ref.role_group.to_owned(),
             })
-    }
-
-    pub fn root_dir(&self) -> String {
-        self.spec
-            .config
-            .as_ref()
-            .and_then(|c| c.hbase_rootdir.as_deref())
-            .unwrap_or("/hbase")
-            .to_string()
     }
 
     /// Retrieve and merge resource configs for role and role groups

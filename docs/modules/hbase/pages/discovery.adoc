@@ -19,10 +19,9 @@ metadata:
   name: {cluster-name} # <1>
   namespace: {namespace} # <2>
 spec:
-  hdfsConfigMapName: {hdfs-cluster-name} #<3>
-  zookeeperConfigMapName: {zookeeper-znode-name} #<4>
-  config:
-    hbaseRootdir: /hbase
+  clusterConfig:
+    hdfsConfigMapName: {hdfs-cluster-name} #<3>
+    zookeeperConfigMapName: {zookeeper-znode-name} #<4>
 ----
 <1> The name of the HBase cluster, which is also the name of the created discovery `ConfigMap`.
 <2> The namespace of the discovery `ConfigMap`.
