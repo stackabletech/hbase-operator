@@ -303,7 +303,7 @@ impl Configuration for HbaseConfigFragment {
                     Some(
                         self.hbase_rootdir
                             .as_deref()
-                            .unwrap_or(HBASE_ROOTDIR)
+                            .unwrap_or(HBASE_ROOT_DIR_DEFAULT)
                             .to_string(),
                     ),
                 );
