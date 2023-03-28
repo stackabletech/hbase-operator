@@ -2,20 +2,19 @@
 dimensions:
   - name: hbase
     values:
-      - 2.4.8-stackable23.4.0-rc2
-      - 2.4.9-stackable23.4.0-rc2
-      - 2.4.11-stackable23.4.0-rc2
+      # - 2.4.8-stackable23.4.0-rc2
+      # - 2.4.9-stackable23.4.0-rc2
       - 2.4.12-stackable23.4.0-rc2
   - name: hbase-latest
     values:
       - 2.4.12-stackable23.4.0-rc2
   - name: hdfs
     values:
-      - 3.2.2-stackable23.4.0-rc2
-      - 3.3.3-stackable23.4.0-rc2
+      # - 3.2.2-stackable23.4.0-rc3
+      - 3.3.4-stackable23.4.0-rc3
   - name: hdfs-latest
     values:
-      - 3.3.4-stackable23.4.0-rc2
+      - 3.3.4-stackable23.4.0-rc3
   - name: zookeeper
     values:
       - 3.6.3-stackable23.4.0-rc2
@@ -24,24 +23,41 @@ dimensions:
   - name: zookeeper-latest
     values:
       - 3.8.0-stackable23.4.0-rc2
+  - name: kerberos-realm
+    values:
+      - "CLUSTER.LOCAL"
+      # - "PROD.MYCORP"
+  - name: kerberos-backend
+    values:
+      - mit
+      # Requires manual setup, see create-kerberos-secretclass.yaml
+      # This will *not* respect the kerberos-realm test attribute, but instead use a hard-coded realm
+      # - activeDirectory
 tests:
-  - name: smoke
+  # - name: smoke
+  #   dimensions:
+  #     - hbase
+  #     - zookeeper
+  #     - hdfs
+  - name: kerberos
     dimensions:
       - hbase
-      - zookeeper
       - hdfs
-  - name: orphaned_resources
-    dimensions:
-      - hbase-latest
-      - hdfs-latest
       - zookeeper-latest
-  - name: resources
-    dimensions:
-      - hbase-latest
-      - hdfs-latest
-      - zookeeper-latest
-  - name: logging
-    dimensions:
-      - hbase
-      - hdfs-latest
-      - zookeeper-latest
+      - kerberos-realm
+      - kerberos-backend
+  # - name: orphaned_resources
+  #   dimensions:
+  #     - hbase-latest
+  #     - hdfs-latest
+  #     - zookeeper-latest
+  # - name: resources
+  #   dimensions:
+  #     - hbase-latest
+  #     - hdfs-latest
+  #     - zookeeper-latest
+  # - name: logging
+  #   dimensions:
+  #     - hbase
+  #     - hdfs-latest
+  #     - zookeeper-latest
