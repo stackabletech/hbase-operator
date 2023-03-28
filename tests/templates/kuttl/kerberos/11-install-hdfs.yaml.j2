@@ -34,28 +34,16 @@ commands:
           config:
             logging:
               enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
-            resources:
-              cpu:
-                max: '1'
-                min: '300m'
-              memory:
-                limit: '512Mi'
           configOverrides: &configOverrides
             core-site.xml:
               hadoop.user.group.static.mapping.overrides: "dr.who=;nn=;nm=;jn=;testuser=supergroup;"
           roleGroups:
             default:
-              replicas: 1 # TODO: Choose 2
+              replicas: 2
         dataNodes:
           config:
             logging:
               enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
-            resources:
-              cpu:
-                max: '1'
-                min: '300m'
-              memory:
-                limit: '512Mi'
           configOverrides: *configOverrides
           roleGroups:
             default:
@@ -64,14 +52,8 @@ commands:
           config:
             logging:
               enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
-            resources:
-              cpu:
-                max: '1'
-                min: '300m'
-              memory:
-                limit: '512Mi'
           configOverrides: *configOverrides
           roleGroups:
             default:
-              replicas: 3
+              replicas: 1 # TODO: Choose 3
       EOF
