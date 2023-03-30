@@ -19,7 +19,7 @@ use stackable_operator::{
         ConfigMapBuilder, ContainerBuilder, ObjectMetaBuilder, PodBuilder,
         PodSecurityContextBuilder,
     },
-    cluster_resources::ClusterResources,
+    cluster_resources::{ClusterResourceApplyStrategy, ClusterResources},
     commons::product_image_selection::ResolvedProductImage,
     k8s_openapi::{
         api::core::v1::{EmptyDirVolumeSource, Volume},
@@ -249,13 +249,14 @@ pub async fn reconcile_hbase(hbase: Arc<HbaseCluster>, ctx: Arc<Ctx>) -> Result<
         OPERATOR_NAME,
         HBASE_CONTROLLER_NAME,
         &hbase.object_ref(&()),
+        ClusterResourceApplyStrategy::from(&hbase.spec.cluster_operation),
     )
     .context(CreateClusterResourcesSnafu)?;
 
     let region_server_role_service =
         build_region_server_role_service(&hbase, &resolved_product_image)?;
     cluster_resources
-        .add(client, &region_server_role_service)
+        .add(client, region_server_role_service)
         .await
         .context(ApplyRoleServiceSnafu)?;
 
@@ -264,7 +265,7 @@ pub async fn reconcile_hbase(hbase: Arc<HbaseCluster>, ctx: Arc<Ctx>) -> Result<
         build_discovery_configmap(&hbase, &zk_connect_string, &resolved_product_image)
             .context(BuildDiscoveryConfigMapSnafu)?;
     cluster_resources
-        .add(client, &discovery_cm)
+        .add(client, discovery_cm)
         .await
         .context(ApplyDiscoveryConfigMapSnafu)?;
 
@@ -315,19 +316,19 @@ pub async fn reconcile_hbase(hbase: Arc<HbaseCluster>, ctx: Arc<Ctx>) -> Result<
                 &resolved_product_image,
             )?;
             cluster_resources
-                .add(client, &rg_service)
+                .add(client, rg_service)
                 .await
                 .with_context(|_| ApplyRoleGroupServiceSnafu {
                     rolegroup: rolegroup.clone(),
                 })?;
             cluster_resources
-                .add(client, &rg_configmap)
+                .add(client, rg_configmap)
                 .await
                 .with_context(|_| ApplyRoleGroupConfigSnafu {
                     rolegroup: rolegroup.clone(),
                 })?;
             cluster_resources
-                .add(client, &rg_statefulset)
+                .add(client, rg_statefulset)
                 .await
                 .with_context(|_| ApplyRoleGroupStatefulSetSnafu {
                     rolegroup: rolegroup.clone(),

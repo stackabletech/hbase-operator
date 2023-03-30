@@ -6,6 +6,7 @@ use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
     commons::{
         affinity::StackableAffinity,
+        cluster_operation::ClusterOperation,
         product_image_selection::ProductImage,
         resources::{
             CpuLimitsFragment, MemoryLimitsFragment, NoRuntimeLimits, NoRuntimeLimitsFragment,
@@ -93,6 +94,9 @@ pub struct HbaseClusterSpec {
     pub region_servers: Option<Role<HbaseConfigFragment>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rest_servers: Option<Role<HbaseConfigFragment>>,
+    /// Cluster operations like pause reconciliation or cluster stop.
+    #[serde(default)]
+    pub cluster_operation: ClusterOperation,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
