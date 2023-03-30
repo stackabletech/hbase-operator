@@ -1,0 +1,27 @@
+---
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+metadata:
+  name: pause-hbase
+timeout: 180
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: test-hbase-master-default
+status:
+  replicas: 0
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: test-hbase-regionserver-default
+status:
+  replicas: 0
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: test-hbase-restserver-default
+status:
+  replicas: 0

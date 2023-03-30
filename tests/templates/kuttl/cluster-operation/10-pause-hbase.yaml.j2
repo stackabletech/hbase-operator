@@ -1,0 +1,45 @@
+---
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+metadata:
+  name: pause-hbase
+timeout: 180
+---
+apiVersion: hbase.stackable.tech/v1alpha1
+kind: HbaseCluster
+metadata:
+  name: test-hbase
+spec:
+  image:
+    productVersion: "{{ test_scenario['values']['hbase-latest'].split('-stackable')[0] }}"
+    stackableVersion: "{{ test_scenario['values']['hbase-latest'].split('-stackable')[1] }}"
+  clusterConfig:
+    hdfsConfigMapName: test-hdfs
+    zookeeperConfigMapName: test-znode
+{% if lookup('env', 'VECTOR_AGGREGATOR') %}
+    vectorAggregatorConfigMapName: vector-aggregator-discovery
+{% endif %}
+  clusterOperation:
+    stopped: false
+    reconciliationPaused: true
+  masters:
+    config:
+      logging:
+        enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
+    roleGroups:
+      default:
+        replicas: 1
+  regionServers:
+    config:
+      logging:
+        enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
+    roleGroups:
+      default:
+        replicas: 1
+  restServers:
+    config:
+      logging:
+        enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
+    roleGroups:
+      default:
+        replicas: 2 # ignored because reconciliation is paused
