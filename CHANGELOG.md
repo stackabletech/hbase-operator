@@ -6,12 +6,12 @@
 
 - Deploy default and support custom affinities ([#322]).
 - OLM bundle files ([#333]).
-- Extend cluster resources for status and cluster operation (paused, stopped) ([#xxx])
+- Extend cluster resources for status and cluster operation (paused, stopped) ([#336])
 
 
 ### Changed
 
-- [BREAKING]: Consolidated top level configuration to `clusterConfig` ([#xxx]).
+- [BREAKING]: Consolidated top level configuration to `clusterConfig` ([#334]).
 - `operator-rs` `0.36.0` -> `0.37.0` ([#334]).
 
 ### Removed
@@ -21,7 +21,7 @@
 [#322]: https://github.com/stackabletech/hbase-operator/pull/322
 [#333]: https://github.com/stackabletech/hbase-operator/pull/333
 [#334]: https://github.com/stackabletech/hbase-operator/pull/334
-[#xxx]: https://github.com/stackabletech/hbase-operator/pull/xxx
+[#336]: https://github.com/stackabletech/hbase-operator/pull/336
 
 ## [23.1.0] - 2023-01-23
 
