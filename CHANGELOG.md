@@ -8,11 +8,10 @@
 - OLM bundle files ([#333]).
 - Extend cluster resources for status and cluster operation (paused, stopped) ([#336])
 
-
 ### Changed
 
 - [BREAKING]: Consolidated top level configuration to `clusterConfig` ([#334]).
-- `operator-rs` `0.36.0` -> `0.37.0` ([#334]).
+- `operator-rs` `0.36.0` -> `0.39.0` ([#334], [#336]).
 
 ### Removed
 
