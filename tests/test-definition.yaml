@@ -45,3 +45,8 @@ tests:
       - hbase
       - hdfs-latest
       - zookeeper-latest
+  - name: cluster-operation
+    dimensions:
+      - hbase-latest
+      - hdfs-latest
+      - zookeeper-latest
