@@ -4,6 +4,8 @@ kind: TestAssert
 metadata:
   name: pause-hbase
 timeout: 180
+commands:
+  - script: kubectl -n $NAMESPACE wait --for=condition=reconciliationPaused hbaseclusters.hbase.stackable.tech/test-hbase --timeout 181s
 ---
 apiVersion: apps/v1
 kind: StatefulSet
