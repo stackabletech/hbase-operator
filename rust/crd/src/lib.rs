@@ -114,6 +114,37 @@ pub struct HbaseClusterConfig {
     pub vector_aggregator_config_map_name: Option<String>,
     /// ZooKeeper cluster connection details from discovery config map
     pub zookeeper_config_map_name: String,
+    /// In the future this setting will control, which ListenerClass <https://docs.stackable.tech/home/stable/listener-operator/listenerclass.html>
+    /// will be used to expose the service.
+    /// Currently only a subset of the ListenerClasses are supported by choosing the type of the created Services
+    /// by looking at the ListenerClass name specified,
+    /// In a future release support for custom ListenerClasses will be introduced without a breaking change:
+    ///
+    /// * cluster-internal: Use a ClusterIP service
+    ///
+    /// * external-unstable: Use a NodePort service
+    #[serde(default)]
+    pub listener_class: CurrentlySupportedListenerClasses,
+}
+
+// TODO: Temporary solution until listener-operator is finished
+#[derive(Clone, Debug, Default, Display, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
+#[serde(rename_all = "PascalCase")]
+pub enum CurrentlySupportedListenerClasses {
+    #[default]
+    #[serde(rename = "cluster-internal")]
+    ClusterInternal,
+    #[serde(rename = "external-unstable")]
+    ExternalUnstable,
+}
+
+impl CurrentlySupportedListenerClasses {
+    pub fn k8s_service_type(&self) -> String {
+        match self {
+            CurrentlySupportedListenerClasses::ClusterInternal => "ClusterIP".to_string(),
+            CurrentlySupportedListenerClasses::ExternalUnstable => "NodePort".to_string(),
+        }
+    }
 }
 
 #[derive(
