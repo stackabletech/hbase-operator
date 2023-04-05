@@ -380,9 +380,9 @@ pub fn build_region_server_role_service(
             ))
             .build(),
         spec: Some(ServiceSpec {
+            type_: Some(hbase.spec.cluster_config.listener_class.k8s_service_type()),
             ports: Some(ports),
             selector: Some(role_selector_labels(hbase, APP_NAME, &role_name)),
-            type_: Some("NodePort".to_string()),
             ..ServiceSpec::default()
         }),
         status: None,
@@ -515,6 +515,8 @@ fn build_rolegroup_service(
             .with_label("prometheus.io/scrape", "true")
             .build(),
         spec: Some(ServiceSpec {
+            // Internal communication does not need to be exposed
+            type_: Some("ClusterIP".to_string()),
             cluster_ip: Some("None".to_string()),
             ports: Some(ports),
             selector: Some(role_group_selector_labels(
