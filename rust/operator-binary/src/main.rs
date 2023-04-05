@@ -1,5 +1,6 @@
 mod discovery;
 mod hbase_controller;
+mod kerberos;
 mod product_logging;
 mod rbac;
 

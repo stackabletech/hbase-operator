@@ -1,0 +1,90 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ycsb
+  labels:
+    app: ycsb
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ycsb
+  template:
+    metadata:
+      labels:
+        app: ycsb
+    spec:
+      containers:
+      - name: ycsb
+        image: docker.stackable.tech/soenkeliebau/ycsb
+        imagePullPolicy: Always
+        # resources:
+        #   limits:
+        #     cpu: "8"
+        #     memory: 26Gi
+        #   requests:
+        #     cpu: "7"
+        #     memory: 26Gi
+        env:
+          - name: KRB5_CONFIG
+            value: /stackable/kerberos/krb5.conf
+          - name: HBASE_OPTS
+            value: -Djava.security.krb5.conf=/stackable/kerberos/krb5.conf
+          - name: JAVA_OPTS # As HBASE_OPTS does not get picked up
+            value: -Djava.security.krb5.conf=/stackable/kerberos/krb5.conf
+        command:
+          - /bin/bash
+          - -c
+          - |
+            set -ex
+            microdnf install krb5-workstation openssl
+            klist -k /stackable/kerberos/keytab
+            kinit -kt /stackable/kerberos/keytab hbase/access-hbase.kuttl-test-busy-imp.svc.cluster.local
+            klist
+
+            sleep infinity
+        volumeMounts:
+        - mountPath: /stackable/ycsb-0.17.0/conf/hdfs-site.xml
+          name: config-volume-hdfs
+          subPath: hdfs-site.xml
+        - mountPath: /stackable/ycsb-0.17.0/conf/core-site.xml
+          name: config-volume-hdfs
+          subPath: core-site.xml
+        - mountPath: /stackable/ycsb-0.17.0/conf/hbase-site.xml
+          name: config-volume-hbase
+          subPath: hbase-site.xml
+        - mountPath: /stackable/ycsb-0.17.0/conf/hbase-env.sh
+          name: config-volume-hbase
+          subPath: hbase-env.sh
+        - name: kerberos
+          mountPath: /stackable/kerberos
+      tolerations:
+        - key: "app"
+          operator: "Equal"
+          value: "ycsb"
+          effect: "NoSchedule"
+      volumes:
+      - name: config-volume-hbase
+        configMap:
+          name: hbase-master-default
+      - name: config-volume-hdfs
+        configMap:
+          name: hdfs
+      - name: kerberos
+        ephemeral:
+          volumeClaimTemplate:
+            metadata:
+              annotations:
+                secrets.stackable.tech/class: kerberos-kuttl-test-busy-imp
+                secrets.stackable.tech/scope: service=access-hbase
+                secrets.stackable.tech/kerberos.service.names: hbase # TOOD use testuser
+            spec:
+              storageClassName: secrets.stackable.tech
+              accessModes:
+                - ReadWriteOnce
+              resources:
+                requests:
+                  storage: "1"
+      securityContext:
+        runAsUser: 0

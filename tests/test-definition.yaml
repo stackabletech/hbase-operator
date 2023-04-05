@@ -2,12 +2,13 @@
 dimensions:
   - name: hbase
     values:
-      # - 2.4.8-stackable23.4.0-rc2
-      # - 2.4.9-stackable23.4.0-rc2
-      - 2.4.12-stackable23.4.0-rc2
+      # - 2.4.8-stackable23.4.0-rc3
+      # - 2.4.9-stackable23.4.0-rc3
+      # - 2.4.12-stackable23.4.0-rc3
+      - 2.5.3-hadoop3-stackable23.4.0-rc4
   - name: hbase-latest
     values:
-      - 2.4.12-stackable23.4.0-rc2
+      - 2.4.12-stackable23.4.0-rc3
   - name: hdfs
     values:
       # - 3.2.2-stackable23.4.0-rc3
@@ -17,8 +18,8 @@ dimensions:
       - 3.3.4-stackable23.4.0-rc3
   - name: zookeeper
     values:
-      - 3.6.3-stackable23.4.0-rc2
-      - 3.7.0-stackable23.4.0-rc2
+      # - 3.6.3-stackable23.4.0-rc2
+      # - 3.7.0-stackable23.4.0-rc2
       - 3.8.0-stackable23.4.0-rc2
   - name: zookeeper-latest
     values:

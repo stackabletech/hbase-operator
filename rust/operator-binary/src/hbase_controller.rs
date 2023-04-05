@@ -2,12 +2,17 @@
 
 use crate::{
     discovery::build_discovery_configmap,
+    kerberos::{
+        add_kerberos_env_vars, add_kerberos_volume_mounts, add_kerberos_volumes, kerberos_config,
+        kerberos_container_args,
+    },
     product_logging::{
         extend_role_group_config_map, resolve_vector_aggregator_address, LOG4J_CONFIG_FILE,
     },
     rbac, OPERATOR_NAME,
 };
 
+use indoc::formatdoc;
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_hbase_crd::{
     Container, HbaseCluster, HbaseConfig, HbaseConfigFragment, HbaseRole, APP_NAME, HBASE_ENV_SH,
@@ -16,7 +21,7 @@ use stackable_hbase_crd::{
 };
 use stackable_operator::{
     builder::{
-        ConfigMapBuilder, ContainerBuilder, ObjectMetaBuilder, PodBuilder,
+        ConfigMapBuilder, ContainerBuilder, FieldPathEnvVar, ObjectMetaBuilder, PodBuilder,
         PodSecurityContextBuilder,
     },
     cluster_resources::ClusterResources,
@@ -66,7 +71,7 @@ const OVERFLOW_BUFFER_ON_LOG_VOLUME_IN_MIB: u32 = 1;
 const LOG_VOLUME_SIZE_IN_MIB: u32 =
     MAX_HBASE_LOG_FILES_SIZE_IN_MIB + OVERFLOW_BUFFER_ON_LOG_VOLUME_IN_MIB;
 
-const CONFIG_DIR_NAME: &str = "/stackable/conf";
+pub const CONFIG_DIR_NAME: &str = "/stackable/conf";
 const HDFS_DISCOVERY_TMP_DIR: &str = "/stackable/tmp/hdfs";
 const HBASE_CONFIG_TMP_DIR: &str = "/stackable/tmp/hbase";
 const HBASE_LOG_CONFIG_TMP_DIR: &str = "/stackable/tmp/log_config";
@@ -354,13 +359,13 @@ pub fn build_region_server_role_service(
     let role_svc_name = hbase
         .server_role_service_name()
         .context(GlobalServiceNameNotFoundSnafu)?;
-    let ports = role
-        .port_properties()
+    let ports = hbase
+        .ports(&role)
         .into_iter()
-        .map(|(port_name, port_number, port_protocol)| ServicePort {
-            name: Some(port_name.into()),
-            port: port_number,
-            protocol: Some(port_protocol.into()),
+        .map(|(name, value)| ServicePort {
+            name: Some(name),
+            port: i32::from(value),
+            protocol: Some("TCP".to_string()),
             ..ServicePort::default()
         })
         .collect();
@@ -407,6 +412,10 @@ fn build_rolegroup_config_map(
         HBASE_ZOOKEEPER_QUORUM.to_string(),
         zk_connect_string.to_string(),
     );
+
+    if hbase.has_kerberos_enabled() {
+        hbase_site_config.extend(kerberos_config(hbase))
+    }
 
     let hbase_site_config = hbase_site_config
         .into_iter()
@@ -488,13 +497,13 @@ fn build_rolegroup_service(
     let role = HbaseRole::from_str(&rolegroup.role).context(UnidentifiedHbaseRoleSnafu {
         role: rolegroup.role.to_string(),
     })?;
-    let ports = role
-        .port_properties()
+    let ports = hbase
+        .ports(&role)
         .into_iter()
-        .map(|(port_name, port_number, port_protocol)| ServicePort {
-            name: Some(port_name.into()),
-            port: port_number,
-            protocol: Some(port_protocol.into()),
+        .map(|(name, value)| ServicePort {
+            name: Some(name),
+            port: i32::from(value),
+            protocol: Some("TCP".to_string()),
             ..ServicePort::default()
         })
         .collect();
@@ -544,13 +553,13 @@ fn build_rolegroup_statefulset(
         role: rolegroup_ref.role.to_string(),
     })?;
 
-    let ports = role
-        .port_properties()
+    let ports = hbase
+        .ports(&role)
         .into_iter()
-        .map(|(port_name, port_number, port_protocol)| ContainerPort {
-            name: Some(port_name.into()),
-            container_port: port_number,
-            protocol: Some(port_protocol.into()),
+        .map(|(name, value)| ContainerPort {
+            name: Some(name),
+            container_port: i32::from(value),
+            protocol: Some("TCP".to_string()),
             ..ContainerPort::default()
         })
         .collect();
@@ -558,21 +567,21 @@ fn build_rolegroup_statefulset(
     let probe_template = match role {
         HbaseRole::Master => Probe {
             tcp_socket: Some(TCPSocketAction {
-                port: IntOrString::Int(HBASE_MASTER_PORT),
+                port: IntOrString::Int(i32::from(HBASE_MASTER_PORT)),
                 ..TCPSocketAction::default()
             }),
             ..Probe::default()
         },
         HbaseRole::RegionServer => Probe {
             tcp_socket: Some(TCPSocketAction {
-                port: IntOrString::Int(HBASE_REGIONSERVER_PORT),
+                port: IntOrString::Int(i32::from(HBASE_REGIONSERVER_PORT)),
                 ..TCPSocketAction::default()
             }),
             ..Probe::default()
         },
         HbaseRole::RestServer => Probe {
             http_get: Some(HTTPGetAction {
-                port: IntOrString::Int(HBASE_REST_PORT),
+                port: IntOrString::Int(i32::from(HBASE_REST_PORT)),
                 ..HTTPGetAction::default()
             }),
             ..Probe::default()
@@ -599,9 +608,32 @@ fn build_rolegroup_statefulset(
         ..probe_template
     };
 
-    let container = ContainerBuilder::new("hbase")
-        .expect("ContainerBuilder not created")
-        .image_from_product_image(resolved_product_image)
+    let mut cb = ContainerBuilder::new("hbase").expect("ContainerBuilder not created");
+    let mut container_args = formatdoc!(
+        r###"
+        mkdir -p {CONFIG_DIR_NAME}
+        cp {HDFS_DISCOVERY_TMP_DIR}/hdfs-site.xml {CONFIG_DIR_NAME}
+        cp {HDFS_DISCOVERY_TMP_DIR}/core-site.xml {CONFIG_DIR_NAME}
+        cp {HBASE_CONFIG_TMP_DIR}/* {CONFIG_DIR_NAME}
+        cp {HBASE_LOG_CONFIG_TMP_DIR}/{LOG4J_CONFIG_FILE} {CONFIG_DIR_NAME}
+        "###,
+    );
+    if hbase.has_kerberos_enabled() {
+        container_args.push_str(kerberos_container_args(hbase).as_str())
+    }
+    container_args.push_str(
+        format!(
+            "bin/hbase {hbase_role} start\n",
+            hbase_role = match role {
+                HbaseRole::Master => "master",
+                HbaseRole::RegionServer => "regionserver",
+                HbaseRole::RestServer => "rest",
+            }
+        )
+        .as_str(),
+    );
+
+    cb.image_from_product_image(resolved_product_image)
         .command(vec![
             "/bin/bash".to_string(),
             "-x".to_string(),
@@ -609,31 +641,11 @@ fn build_rolegroup_statefulset(
             "pipefail".to_string(),
             "-c".to_string(),
         ])
-        .args(vec![[
-            format!("mkdir -p {}", CONFIG_DIR_NAME),
-            format!(
-                "cp {}/hdfs-site.xml {}",
-                HDFS_DISCOVERY_TMP_DIR, CONFIG_DIR_NAME
-            ),
-            format!(
-                "cp {}/core-site.xml {}",
-                HDFS_DISCOVERY_TMP_DIR, CONFIG_DIR_NAME
-            ),
-            format!("cp {}/* {}", HBASE_CONFIG_TMP_DIR, CONFIG_DIR_NAME),
-            format!("cp {HBASE_LOG_CONFIG_TMP_DIR}/{LOG4J_CONFIG_FILE} {CONFIG_DIR_NAME}",),
-            format!(
-                "bin/hbase {} start",
-                match role {
-                    HbaseRole::Master => "master",
-                    HbaseRole::RegionServer => "regionserver",
-                    HbaseRole::RestServer => "rest",
-                }
-            ),
-        ]
-        .join(" && ")])
+        .args(vec![container_args])
         .add_env_var("HBASE_CONF_DIR", CONFIG_DIR_NAME)
         // required by phoenix (for cases where Kerberos is enabled): see https://issues.apache.org/jira/browse/PHOENIX-2369
         .add_env_var("HADOOP_CONF_DIR", CONFIG_DIR_NAME)
+        .add_env_var_from_field_path("POD_NAME", FieldPathEnvVar::Name)
         .add_volume_mount("hbase-config", HBASE_CONFIG_TMP_DIR)
         .add_volume_mount("hdfs-discovery", HDFS_DISCOVERY_TMP_DIR)
         .add_volume_mount("log-config", HBASE_LOG_CONFIG_TMP_DIR)
@@ -642,54 +654,63 @@ fn build_rolegroup_statefulset(
         .resources(config.resources.clone().into())
         .startup_probe(startup_probe)
         .liveness_probe(liveness_probe)
-        .readiness_probe(readiness_probe)
-        .build();
+        .readiness_probe(readiness_probe);
 
-    let mut pod_builder = PodBuilder::new();
-    pod_builder
-        .metadata_builder(|m| {
-            m.with_recommended_labels(build_recommended_labels(
-                hbase,
-                hbase_version,
-                &rolegroup_ref.role,
-                &rolegroup_ref.role_group,
-            ))
-        })
-        .image_pull_secrets_from_product_image(resolved_product_image)
-        .affinity(&config.affinity)
-        .add_container(container)
-        .add_volume(stackable_operator::k8s_openapi::api::core::v1::Volume {
-            name: "hbase-config".to_string(),
-            config_map: Some(ConfigMapVolumeSource {
-                name: Some(rolegroup_ref.object_name()),
-                ..Default::default()
-            }),
+    if hbase.has_kerberos_enabled() {
+        add_kerberos_volume_mounts(&mut cb, hbase);
+        add_kerberos_env_vars(&mut cb, hbase);
+    }
+
+    let container = cb.build();
+
+    let mut pb = PodBuilder::new();
+    pb.metadata_builder(|m| {
+        m.with_recommended_labels(build_recommended_labels(
+            hbase,
+            hbase_version,
+            &rolegroup_ref.role,
+            &rolegroup_ref.role_group,
+        ))
+    })
+    .image_pull_secrets_from_product_image(resolved_product_image)
+    .affinity(&config.affinity)
+    .add_container(container)
+    .add_volume(stackable_operator::k8s_openapi::api::core::v1::Volume {
+        name: "hbase-config".to_string(),
+        config_map: Some(ConfigMapVolumeSource {
+            name: Some(rolegroup_ref.object_name()),
             ..Default::default()
-        })
-        .add_volume(stackable_operator::k8s_openapi::api::core::v1::Volume {
-            name: "hdfs-discovery".to_string(),
-            config_map: Some(ConfigMapVolumeSource {
-                name: Some(hbase.spec.cluster_config.hdfs_config_map_name.clone()),
-                ..Default::default()
-            }),
+        }),
+        ..Default::default()
+    })
+    .add_volume(stackable_operator::k8s_openapi::api::core::v1::Volume {
+        name: "hdfs-discovery".to_string(),
+        config_map: Some(ConfigMapVolumeSource {
+            name: Some(hbase.spec.cluster_config.hdfs_config_map_name.clone()),
             ..Default::default()
-        })
-        .add_volume(Volume {
-            name: "log".to_string(),
-            empty_dir: Some(EmptyDirVolumeSource {
-                medium: None,
-                size_limit: Some(Quantity(format!("{LOG_VOLUME_SIZE_IN_MIB}Mi"))),
-            }),
-            ..Volume::default()
-        })
-        .service_account_name(sa_name)
-        .security_context(
-            PodSecurityContextBuilder::new()
-                .run_as_user(1000)
-                .run_as_group(1000)
-                .fs_group(1000)
-                .build(),
-        );
+        }),
+        ..Default::default()
+    })
+    .add_volume(Volume {
+        name: "log".to_string(),
+        empty_dir: Some(EmptyDirVolumeSource {
+            medium: None,
+            size_limit: Some(Quantity(format!("{LOG_VOLUME_SIZE_IN_MIB}Mi"))),
+        }),
+        ..Volume::default()
+    })
+    .service_account_name(sa_name)
+    .security_context(
+        PodSecurityContextBuilder::new()
+            .run_as_user(1000)
+            .run_as_group(1000)
+            .fs_group(1000)
+            .build(),
+    );
+
+    if hbase.has_kerberos_enabled() {
+        add_kerberos_volumes(&mut pb, hbase, &role);
+    }
 
     if let Some(ContainerLogConfig {
         choice:
@@ -698,7 +719,7 @@ fn build_rolegroup_statefulset(
             })),
     }) = config.logging.containers.get(&Container::Hbase)
     {
-        pod_builder.add_volume(Volume {
+        pb.add_volume(Volume {
             name: "log-config".to_string(),
             config_map: Some(ConfigMapVolumeSource {
                 name: Some(config_map.into()),
@@ -707,7 +728,7 @@ fn build_rolegroup_statefulset(
             ..Volume::default()
         });
     } else {
-        pod_builder.add_volume(Volume {
+        pb.add_volume(Volume {
             name: "log-config".to_string(),
             config_map: Some(ConfigMapVolumeSource {
                 name: Some(rolegroup_ref.object_name()),
@@ -718,7 +739,7 @@ fn build_rolegroup_statefulset(
     }
 
     if config.logging.enable_vector_agent {
-        pod_builder.add_container(product_logging::framework::vector_container(
+        pb.add_container(product_logging::framework::vector_container(
             resolved_product_image,
             "hbase-config",
             "log",
@@ -726,7 +747,7 @@ fn build_rolegroup_statefulset(
         ));
     }
 
-    let pod_template = pod_builder.build_template();
+    let pod_template = pb.build_template();
 
     Ok(StatefulSet {
         metadata: ObjectMetaBuilder::new()
@@ -832,7 +853,7 @@ where
     T: Iterator<Item = (&'a String, &'a String)>,
 {
     properties
-        .map(|(variable, value)| format!("export {variable}={value}\n"))
+        .map(|(variable, value)| format!("export {variable}=\"{value}\"\n"))
         .collect()
 }
 

@@ -42,12 +42,12 @@ pub const HBASE_ROOT_DIR_DEFAULT: &str = "/hbase";
 pub const HBASE_UI_PORT_NAME: &str = "ui";
 pub const METRICS_PORT_NAME: &str = "metrics";
 
-pub const HBASE_MASTER_PORT: i32 = 16000;
-pub const HBASE_MASTER_UI_PORT: i32 = 16010;
-pub const HBASE_REGIONSERVER_PORT: i32 = 16020;
-pub const HBASE_REGIONSERVER_UI_PORT: i32 = 16030;
-pub const HBASE_REST_PORT: i32 = 8080;
-pub const METRICS_PORT: i32 = 8081;
+pub const HBASE_MASTER_PORT: u16 = 16000;
+pub const HBASE_MASTER_UI_PORT: u16 = 16010;
+pub const HBASE_REGIONSERVER_PORT: u16 = 16020;
+pub const HBASE_REGIONSERVER_UI_PORT: u16 = 16030;
+pub const HBASE_REST_PORT: u16 = 8080;
+pub const METRICS_PORT: u16 = 8081;
 
 pub const JVM_HEAP_FACTOR: f32 = 0.8;
 
@@ -164,24 +164,13 @@ pub enum HbaseRole {
 }
 
 impl HbaseRole {
-    /// Returns a port name, the port number, and the protocol for the given role.
-    pub fn port_properties(&self) -> Vec<(&'static str, i32, &'static str)> {
-        match self {
-            HbaseRole::Master => vec![
-                ("master", HBASE_MASTER_PORT, "TCP"),
-                (HBASE_UI_PORT_NAME, HBASE_MASTER_UI_PORT, "TCP"),
-                (METRICS_PORT_NAME, METRICS_PORT, "TCP"),
-            ],
-            HbaseRole::RegionServer => vec![
-                ("regionserver", HBASE_REGIONSERVER_PORT, "TCP"),
-                (HBASE_UI_PORT_NAME, HBASE_REGIONSERVER_UI_PORT, "TCP"),
-                (METRICS_PORT_NAME, METRICS_PORT, "TCP"),
-            ],
-            HbaseRole::RestServer => vec![
-                ("rest", HBASE_REST_PORT, "TCP"),
-                (METRICS_PORT_NAME, METRICS_PORT, "TCP"),
-            ],
-        }
+    pub fn kerberos_service_name(&self) -> &'static str {
+        // match self {
+        //     HbaseRole::Master => "hbase-master",
+        //     HbaseRole::RegionServer => "hbase-regionserver",
+        //     HbaseRole::RestServer => "hbase-restserver",
+        // }
+        "hbase"
     }
 }
 
@@ -305,7 +294,11 @@ impl Configuration for HbaseConfigFragment {
         match file {
             HBASE_ENV_SH => {
                 result.insert(HBASE_MANAGES_ZK.to_string(), Some("false".to_string()));
-                let mut all_hbase_opts = format!("-javaagent:/stackable/jmx/jmx_prometheus_javaagent-0.16.1.jar={METRICS_PORT}:/stackable/jmx/region-server.yaml");
+                result.insert(
+                    "KRB5_CONFIG".to_string(),
+                    Some("/stackable/kerberos/krb5.conf".to_string()),
+                );
+                let mut all_hbase_opts = format!("-javaagent:/stackable/jmx/jmx_prometheus_javaagent-0.16.1.jar={METRICS_PORT}:/stackable/jmx/region-server.yaml -Djava.security.krb5.conf=/stackable/kerberos/krb5.conf");
                 if let Some(hbase_opts) = &self.hbase_opts {
                     all_hbase_opts += " ";
                     all_hbase_opts += hbase_opts;
@@ -394,6 +387,59 @@ impl HbaseCluster {
             .with_context(|| MissingHbaseRoleGroupSnafu {
                 role_group: rolegroup_ref.role_group.to_owned(),
             })
+    }
+
+    pub fn has_kerberos_enabled(&self) -> bool {
+        self.kerberos_secret_class().is_some()
+    }
+
+    pub fn kerberos_request_node_principals(&self) -> Option<bool> {
+        self.spec
+            .cluster_config
+            .kerberos
+            .as_ref()
+            .map(|k| k.request_node_principals)
+    }
+
+    pub fn kerberos_secret_class(&self) -> Option<&str> {
+        self.spec
+            .cluster_config
+            .kerberos
+            .as_ref()
+            .map(|k| k.kerberos_secret_class.as_str())
+    }
+
+    pub fn has_https_enabled(&self) -> bool {
+        self.https_secret_class().is_some()
+    }
+
+    pub fn https_secret_class(&self) -> Option<&str> {
+        self.spec
+            .cluster_config
+            .kerberos
+            .as_ref()
+            .map(|k| k.tls_secret_class.as_str())
+    }
+
+    /// Returns required port name and port number tuples depending on the role.
+    pub fn ports(&self, role: &HbaseRole) -> Vec<(String, u16)> {
+        // TODO: Respect HTTPS settings
+        match role {
+            HbaseRole::Master => vec![
+                ("master".to_string(), HBASE_MASTER_PORT),
+                (HBASE_UI_PORT_NAME.to_string(), HBASE_MASTER_UI_PORT),
+                (METRICS_PORT_NAME.to_string(), METRICS_PORT),
+            ],
+            HbaseRole::RegionServer => vec![
+                ("regionserver".to_string(), HBASE_REGIONSERVER_PORT),
+                (HBASE_UI_PORT_NAME.to_string(), HBASE_REGIONSERVER_UI_PORT),
+                (METRICS_PORT_NAME.to_string(), METRICS_PORT),
+            ],
+            HbaseRole::RestServer => vec![
+                ("rest".to_string(), HBASE_REST_PORT),
+                (METRICS_PORT_NAME.to_string(), METRICS_PORT),
+            ],
+        }
     }
 
     /// Retrieve and merge resource configs for role and role groups
