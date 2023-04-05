@@ -10,9 +10,9 @@ use crate::{
 
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_hbase_crd::{
-    Container, HbaseCluster, HbaseConfig, HbaseConfigFragment, HbaseRole, APP_NAME, HBASE_ENV_SH,
-    HBASE_HEAPSIZE, HBASE_MASTER_PORT, HBASE_REGIONSERVER_PORT, HBASE_REST_PORT, HBASE_SITE_XML,
-    HBASE_ZOOKEEPER_QUORUM, JVM_HEAP_FACTOR,
+    Container, HbaseCluster, HbaseClusterStatus, HbaseConfig, HbaseConfigFragment, HbaseRole,
+    APP_NAME, HBASE_ENV_SH, HBASE_HEAPSIZE, HBASE_MASTER_PORT, HBASE_REGIONSERVER_PORT,
+    HBASE_REST_PORT, HBASE_SITE_XML, HBASE_ZOOKEEPER_QUORUM, JVM_HEAP_FACTOR,
 };
 use stackable_operator::{
     builder::{
@@ -49,6 +49,10 @@ use stackable_operator::{
         },
     },
     role_utils::{Role, RoleGroupRef},
+    status::condition::{
+        compute_conditions, operations::ClusterOperationsConditionBuilder,
+        statefulset::StatefulSetConditionBuilder,
+    },
 };
 use std::{
     collections::{BTreeMap, HashMap},
@@ -191,6 +195,10 @@ pub enum Error {
         source: crate::product_logging::Error,
         cm_name: String,
     },
+    #[snafu(display("failed to update status"))]
+    ApplyStatus {
+        source: stackable_operator::error::Error,
+    },
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -283,6 +291,8 @@ pub async fn reconcile_hbase(hbase: Arc<HbaseCluster>, ctx: Arc<Ctx>) -> Result<
             name: rbac_rolebinding.name_unchecked(),
         })?;
 
+    let mut ss_cond_builder = StatefulSetConditionBuilder::default();
+
     for (role_name, group_config) in validated_config.iter() {
         let hbase_role = HbaseRole::from_str(role_name).context(UnidentifiedHbaseRoleSnafu {
             role: role_name.to_string(),
@@ -327,19 +337,35 @@ pub async fn reconcile_hbase(hbase: Arc<HbaseCluster>, ctx: Arc<Ctx>) -> Result<
                 .with_context(|_| ApplyRoleGroupConfigSnafu {
                     rolegroup: rolegroup.clone(),
                 })?;
-            cluster_resources
-                .add(client, rg_statefulset)
-                .await
-                .with_context(|_| ApplyRoleGroupStatefulSetSnafu {
-                    rolegroup: rolegroup.clone(),
-                })?;
+            ss_cond_builder.add(
+                cluster_resources
+                    .add(client, rg_statefulset)
+                    .await
+                    .with_context(|_| ApplyRoleGroupStatefulSetSnafu {
+                        rolegroup: rolegroup.clone(),
+                    })?,
+            );
         }
     }
+
+    let cluster_operation_cond_builder =
+        ClusterOperationsConditionBuilder::new(&hbase.spec.cluster_operation);
+
+    let status = HbaseClusterStatus {
+        conditions: compute_conditions(
+            hbase.as_ref(),
+            &[&ss_cond_builder, &cluster_operation_cond_builder],
+        ),
+    };
 
     cluster_resources
         .delete_orphaned_resources(client)
         .await
         .context(DeleteOrphanedResourcesSnafu)?;
+    client
+        .apply_patch_status(OPERATOR_NAME, &*hbase, &status)
+        .await
+        .context(ApplyStatusSnafu)?;
 
     Ok(Action::await_change())
 }
