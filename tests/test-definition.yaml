@@ -27,7 +27,7 @@ dimensions:
   # Used for zookeeper, hdfs and hbase
   - name: listener-class
     values:
-      # - "cluster-internal"
+      - "cluster-internal"
       - "external-unstable"
 tests:
   - name: smoke
