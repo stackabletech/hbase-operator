@@ -24,12 +24,18 @@ dimensions:
   - name: zookeeper-latest
     values:
       - 3.8.0-stackable23.4.0-rc2
+  # Used for zookeeper, hdfs and hbase
+  - name: listener-class
+    values:
+      # - "cluster-internal"
+      - "external-unstable"
 tests:
   - name: smoke
     dimensions:
       - hbase
       - zookeeper
       - hdfs
+      - listener-class
   - name: orphaned_resources
     dimensions:
       - hbase-latest

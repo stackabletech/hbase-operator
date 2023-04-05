@@ -11,6 +11,11 @@
 ### Changed
 
 - [BREAKING]: Consolidated top level configuration to `clusterConfig` ([#334]).
+- [BREAKING] Support specifying Service type.
+  This enables us to later switch non-breaking to using `ListenerClasses` for the exposure of Services.
+  This change is breaking, because - for security reasons - we default to the `cluster-internal` `ListenerClass`.
+  If you need you cluster to be accessible from outside of Kubernetes you need to set `clusterConfig.listenerClass`
+  to `external-unstable` ([#338]).
 - `operator-rs` `0.36.0` -> `0.39.0` ([#334], [#336]).
 
 ### Removed
@@ -21,6 +26,7 @@
 [#333]: https://github.com/stackabletech/hbase-operator/pull/333
 [#334]: https://github.com/stackabletech/hbase-operator/pull/334
 [#336]: https://github.com/stackabletech/hbase-operator/pull/336
+[#338]: https://github.com/stackabletech/hbase-operator/pull/338
 
 ## [23.1.0] - 2023-01-23
 
