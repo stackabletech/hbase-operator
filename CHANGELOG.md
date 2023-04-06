@@ -19,6 +19,11 @@
   to `external-unstable` ([#338]).
 - `operator-rs` `0.36.0` -> `0.39.0` ([#334], [#336]).
 
+### Fixed
+
+- Avoid empty log events dated to 1970-01-01 and improve the precision of the
+  log event timestamps ([#339]).
+
 ### Removed
 
 - [BREAKING]: Removed top level role/role group config ([#334]).
@@ -29,6 +34,7 @@
 [#336]: https://github.com/stackabletech/hbase-operator/pull/336
 [#337]: https://github.com/stackabletech/hbase-operator/pull/337
 [#338]: https://github.com/stackabletech/hbase-operator/pull/338
+[#339]: https://github.com/stackabletech/hbase-operator/pull/339
 
 
 ## [23.1.0] - 2023-01-23
