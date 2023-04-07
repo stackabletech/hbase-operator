@@ -17,7 +17,7 @@
   This change is breaking, because - for security reasons - we default to the `cluster-internal` `ListenerClass`.
   If you need your cluster to be accessible from outside of Kubernetes you need to set `clusterConfig.listenerClass`
   to `external-unstable` ([#338]).
-- `operator-rs` `0.36.0` -> `0.39.0` ([#334], [#336]).
+- `operator-rs` `0.36.0` -> `0.39.1` ([#334], [#336], [#339]).
 
 ### Fixed
 
