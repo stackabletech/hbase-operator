@@ -20,84 +20,96 @@ customConfig:
       type: vector
       version: "2"
   transforms:
-    automaticLogConfigMasterHbase:
+    filteredAutomaticLogConfigMasterHbase:
       type: filter
       inputs: [vector]
       condition: >-
         .pod == "test-hbase-master-automatic-log-config-0" &&
         .container == "hbase"
-    automaticLogConfigMasterVector:
+    filteredAutomaticLogConfigMasterVector:
       type: filter
       inputs: [vector]
       condition: >-
         .pod == "test-hbase-master-automatic-log-config-0" &&
         .container == "vector"
-    customLogConfigMasterHbase:
+    filteredCustomLogConfigMasterHbase:
       type: filter
       inputs: [vector]
       condition: >-
         .pod == "test-hbase-master-custom-log-config-0" &&
         .container == "hbase"
-    customLogConfigMasterVector:
+    filteredCustomLogConfigMasterVector:
       type: filter
       inputs: [vector]
       condition: >-
         .pod == "test-hbase-master-custom-log-config-0" &&
         .container == "vector"
-    automaticLogConfigRegionserverHbase:
+    filteredAutomaticLogConfigRegionserverHbase:
       type: filter
       inputs: [vector]
       condition: >-
         .pod == "test-hbase-regionserver-automatic-log-config-0" &&
         .container == "hbase"
-    automaticLogConfigRegionserverVector:
+    filteredAutomaticLogConfigRegionserverVector:
       type: filter
       inputs: [vector]
       condition: >-
         .pod == "test-hbase-regionserver-automatic-log-config-0" &&
         .container == "vector"
-    customLogConfigRegionserverHbase:
+    filteredCustomLogConfigRegionserverHbase:
       type: filter
       inputs: [vector]
       condition: >-
         .pod == "test-hbase-regionserver-custom-log-config-0" &&
         .container == "hbase"
-    customLogConfigRegionserverVector:
+    filteredCustomLogConfigRegionserverVector:
       type: filter
       inputs: [vector]
       condition: >-
         .pod == "test-hbase-regionserver-custom-log-config-0" &&
         .container == "vector"
-    automaticLogConfigRestserverHbase:
+    filteredAutomaticLogConfigRestserverHbase:
       type: filter
       inputs: [vector]
       condition: >-
         .pod == "test-hbase-restserver-automatic-log-config-0" &&
         .container == "hbase"
-    automaticLogConfigRestserverVector:
+    filteredAutomaticLogConfigRestserverVector:
       type: filter
       inputs: [vector]
       condition: >-
         .pod == "test-hbase-restserver-automatic-log-config-0" &&
         .container == "vector"
-    customLogConfigRestserverHbase:
+    filteredCustomLogConfigRestserverHbase:
       type: filter
       inputs: [vector]
       condition: >-
         .pod == "test-hbase-restserver-custom-log-config-0" &&
         .container == "hbase"
-    customLogConfigRestserverVector:
+    filteredCustomLogConfigRestserverVector:
       type: filter
       inputs: [vector]
       condition: >-
         .pod == "test-hbase-restserver-custom-log-config-0" &&
         .container == "vector"
+    filteredInvalidEvents:
+      type: filter
+      inputs: [vector]
+      condition: |-
+        .timestamp == to_timestamp!(0) ||
+        is_null(.level) ||
+        is_null(.logger) ||
+        is_null(.message)
   sinks:
     out:
-      inputs: [automaticLogConfig*, customLogConfig*]
+      inputs: [filtered*]
 {% if lookup('env', 'VECTOR_AGGREGATOR') %}
       type: vector
       address: {{ lookup('env', 'VECTOR_AGGREGATOR') }}
+      buffer:
+        # Avoid back pressure from VECTOR_AGGREGATOR. The test should
+        # not fail if the aggregator is not available.
+        when_full: drop_newest
 {% else %}
       type: blackhole
 {% endif %}

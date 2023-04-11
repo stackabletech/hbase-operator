@@ -17,7 +17,12 @@
   This change is breaking, because - for security reasons - we default to the `cluster-internal` `ListenerClass`.
   If you need your cluster to be accessible from outside of Kubernetes you need to set `clusterConfig.listenerClass`
   to `external-unstable` ([#338]).
-- `operator-rs` `0.36.0` -> `0.39.0` ([#334], [#336]).
+- `operator-rs` `0.36.0` -> `0.39.1` ([#334], [#336], [#339]).
+
+### Fixed
+
+- Avoid empty log events dated to 1970-01-01 and improve the precision of the
+  log event timestamps ([#339]).
 
 ### Removed
 
@@ -29,6 +34,7 @@
 [#336]: https://github.com/stackabletech/hbase-operator/pull/336
 [#337]: https://github.com/stackabletech/hbase-operator/pull/337
 [#338]: https://github.com/stackabletech/hbase-operator/pull/338
+[#339]: https://github.com/stackabletech/hbase-operator/pull/339
 
 
 ## [23.1.0] - 2023-01-23
