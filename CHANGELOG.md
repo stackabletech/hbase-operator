@@ -17,7 +17,8 @@
   This change is breaking, because - for security reasons - we default to the `cluster-internal` `ListenerClass`.
   If you need your cluster to be accessible from outside of Kubernetes you need to set `clusterConfig.listenerClass`
   to `external-unstable` ([#338]).
-- `operator-rs` `0.36.0` -> `0.39.1` ([#334], [#336], [#339]).
+- `operator-rs` `0.36.0` -> `0.40.2` ([#334], [#336], [#339], [#340]).
+- Use `build_rbac_resources` from operator-rs. This renames the `hbase-sa` ServiceAccount to `hbase-serviceaccount` ([#340]).
 
 ### Fixed
 
@@ -35,6 +36,7 @@
 [#337]: https://github.com/stackabletech/hbase-operator/pull/337
 [#338]: https://github.com/stackabletech/hbase-operator/pull/338
 [#339]: https://github.com/stackabletech/hbase-operator/pull/339
+[#340]: https://github.com/stackabletech/hbase-operator/pull/340
 
 
 ## [23.1.0] - 2023-01-23
