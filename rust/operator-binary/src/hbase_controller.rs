@@ -5,7 +5,7 @@ use crate::{
     product_logging::{
         extend_role_group_config_map, resolve_vector_aggregator_address, LOG4J_CONFIG_FILE,
     },
-    rbac, OPERATOR_NAME,
+    OPERATOR_NAME,
 };
 
 use snafu::{OptionExt, ResultExt, Snafu};
@@ -20,7 +20,10 @@ use stackable_operator::{
         PodSecurityContextBuilder,
     },
     cluster_resources::{ClusterResourceApplyStrategy, ClusterResources},
-    commons::product_image_selection::ResolvedProductImage,
+    commons::{
+        product_image_selection::ResolvedProductImage,
+        rbac::{build_rbac_resources, service_account_name},
+    },
     k8s_openapi::{
         api::core::v1::{EmptyDirVolumeSource, Volume},
         apimachinery::pkg::api::resource::Quantity,
@@ -160,14 +163,12 @@ pub enum Error {
         entry: &'static str,
         cm_name: String,
     },
-    #[snafu(display("failed to patch service account: {source}"))]
+    #[snafu(display("failed to patch service account"))]
     ApplyServiceAccount {
-        name: String,
         source: stackable_operator::error::Error,
     },
-    #[snafu(display("failed to patch role binding: {source}"))]
+    #[snafu(display("failed to patch role binding"))]
     ApplyRoleBinding {
-        name: String,
         source: stackable_operator::error::Error,
     },
     #[snafu(display("could not parse Hbase role [{role}]"))]
@@ -197,6 +198,10 @@ pub enum Error {
     },
     #[snafu(display("failed to update status"))]
     ApplyStatus {
+        source: stackable_operator::error::Error,
+    },
+    #[snafu(display("failed to build RBAC resources"))]
+    BuildRbacResources {
         source: stackable_operator::error::Error,
     },
 }
@@ -277,19 +282,20 @@ pub async fn reconcile_hbase(hbase: Arc<HbaseCluster>, ctx: Arc<Ctx>) -> Result<
         .await
         .context(ApplyDiscoveryConfigMapSnafu)?;
 
-    let (rbac_sa, rbac_rolebinding) = rbac::build_rbac_resources(hbase.as_ref(), "hbase");
-    client
-        .apply_patch(HBASE_CONTROLLER_NAME, &rbac_sa, &rbac_sa)
+    let (rbac_sa, rbac_rolebinding) = build_rbac_resources(
+        hbase.as_ref(),
+        APP_NAME,
+        cluster_resources.get_required_labels(),
+    )
+    .context(BuildRbacResourcesSnafu)?;
+    cluster_resources
+        .add(client, rbac_sa)
         .await
-        .with_context(|_| ApplyServiceAccountSnafu {
-            name: rbac_sa.name_unchecked(),
-        })?;
-    client
-        .apply_patch(HBASE_CONTROLLER_NAME, &rbac_rolebinding, &rbac_rolebinding)
+        .context(ApplyServiceAccountSnafu)?;
+    cluster_resources
+        .add(client, rbac_rolebinding)
         .await
-        .with_context(|_| ApplyRoleBindingSnafu {
-            name: rbac_rolebinding.name_unchecked(),
-        })?;
+        .context(ApplyRoleBindingSnafu)?;
 
     let mut ss_cond_builder = StatefulSetConditionBuilder::default();
 
@@ -318,13 +324,8 @@ pub async fn reconcile_hbase(hbase: Arc<HbaseCluster>, ctx: Arc<Ctx>) -> Result<
                 &resolved_product_image,
                 vector_aggregator_address.as_deref(),
             )?;
-            let rg_statefulset = build_rolegroup_statefulset(
-                &hbase,
-                &rolegroup,
-                &rbac_sa.name_unchecked(),
-                &config,
-                &resolved_product_image,
-            )?;
+            let rg_statefulset =
+                build_rolegroup_statefulset(&hbase, &rolegroup, &config, &resolved_product_image)?;
             cluster_resources
                 .add(client, rg_service)
                 .await
@@ -363,7 +364,7 @@ pub async fn reconcile_hbase(hbase: Arc<HbaseCluster>, ctx: Arc<Ctx>) -> Result<
         .await
         .context(DeleteOrphanedResourcesSnafu)?;
     client
-        .apply_patch_status(OPERATOR_NAME, &*hbase, &status)
+        .apply_patch_status(OPERATOR_NAME, hbase.as_ref(), &status)
         .await
         .context(ApplyStatusSnafu)?;
 
@@ -564,7 +565,6 @@ fn build_rolegroup_service(
 fn build_rolegroup_statefulset(
     hbase: &HbaseCluster,
     rolegroup_ref: &RoleGroupRef<HbaseCluster>,
-    sa_name: &str,
     config: &HbaseConfig,
     resolved_product_image: &ResolvedProductImage,
 ) -> Result<StatefulSet> {
@@ -711,7 +711,7 @@ fn build_rolegroup_statefulset(
             }),
             ..Volume::default()
         })
-        .service_account_name(sa_name)
+        .service_account_name(service_account_name(APP_NAME))
         .security_context(
             PodSecurityContextBuilder::new()
                 .run_as_user(1000)
