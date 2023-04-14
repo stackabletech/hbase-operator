@@ -794,25 +794,20 @@ fn rolegroup_replicas(
     hbase: &HbaseCluster,
     rolegroup_ref: &RoleGroupRef<HbaseCluster>,
 ) -> Result<i32, Error> {
-    if hbase.spec.cluster_config.stopped.unwrap_or(false) {
-        Ok(0)
-    } else {
-        let role =
-            HbaseRole::from_str(&rolegroup_ref.role).context(UnidentifiedHbaseRoleSnafu {
-                role: rolegroup_ref.role.to_string(),
-            })?;
+    let role = HbaseRole::from_str(&rolegroup_ref.role).context(UnidentifiedHbaseRoleSnafu {
+        role: rolegroup_ref.role.to_string(),
+    })?;
 
-        let replicas = hbase
-            .get_role(&role)
-            .as_ref()
-            .map(|role| &role.role_groups)
-            .and_then(|role_group| role_group.get(&rolegroup_ref.role_group))
-            .and_then(|rg| rg.replicas)
-            .map(i32::from)
-            .unwrap_or(0);
+    let replicas = hbase
+        .get_role(&role)
+        .as_ref()
+        .map(|role| &role.role_groups)
+        .and_then(|role_group| role_group.get(&rolegroup_ref.role_group))
+        .and_then(|rg| rg.replicas)
+        .map(i32::from)
+        .unwrap_or(0);
 
-        Ok(replicas)
-    }
+    Ok(replicas)
 }
 
 type RoleConfig = HashMap<String, (Vec<PropertyNameKind>, Role<HbaseConfigFragment>)>;
