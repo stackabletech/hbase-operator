@@ -105,9 +105,6 @@ pub struct HbaseClusterSpec {
 pub struct HbaseClusterConfig {
     /// HDFS cluster connection details from discovery config map
     pub hdfs_config_map_name: String,
-    /// Emergency stop button, if `true` then all pods are stopped without affecting configuration (as setting `replicas` to `0` would)
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub stopped: Option<bool>,
     /// Name of the Vector aggregator discovery ConfigMap.
     /// It must contain the key `ADDRESS` with the address of the Vector aggregator.
     #[serde(skip_serializing_if = "Option::is_none")]
