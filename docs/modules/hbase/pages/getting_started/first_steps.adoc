@@ -200,4 +200,4 @@ This is because Phoenix requires these `SYSTEM.` tables for its own internal map
 
 == What's next
 
-Look at the xref:usage.adoc[Usage page] to find out more about configuring your HBase cluster.
+Look at the xref:usage-guide/index.adoc[] to find out more about configuring your HBase cluster.
