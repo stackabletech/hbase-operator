@@ -12,7 +12,7 @@ For a role or role group, at the same level of `config`, you can specify: `confi
 - `hbase-site.xml`
 - `hbase-env.sh`
 
-// hdfs-site.xml is not listed here. The file is always taken from the referenced hdfs cluster
+NOTE: `hdfs-site.xml` is not listed here, the file is always taken from the referenced hdfs cluster. If you want to modify it, have a look at xref:hdfs:usage-guide/configuration-environment-overrides.adoc[HDFS configuration overrides].
 
 For example, if you want to set the `hbase.rest.threads.min` to 4 and the `HBASE_HEAPSIZE` to two GB adapt the `restServers` section of the cluster resource like so:
 
