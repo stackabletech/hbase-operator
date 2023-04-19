@@ -1,1 +1,9 @@
 = Usage guide
+
+Learn about xref:usage-guide/cluster-operations.adoc[starting, stopping and pausing] your cluster.
+
+Learn about xref:usage-guide/pod-placement.adoc[configuring where Pods are scheduled] and xref:usage-guide/resource-requests.adoc[how many CPU and memory resources] your Pods consume.
+
+You can observe what's happening with your HBase using xref:usage-guide/logging.adoc[logging] and xref:usage-guide/monitoring.adoc[monitoring].
+
+Connect to HBase using xref:usage-guide/phoenix.adoc[Apache Phoenix] or use the xref:usage-guide/discovery.adoc[discovery ConfigMap] to connect other products.
