@@ -23,7 +23,7 @@ dimensions:
       - 3.8.0-stackable23.4.0-rc2
   - name: zookeeper-latest
     values:
-      - 3.8.0-stackable23.4.0
+      - 3.8.0-stackable23.4.0-rc2
   # Used for zookeeper, hdfs and hbase
   - name: listener-class
     values:
