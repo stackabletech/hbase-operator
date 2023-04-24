@@ -5,8 +5,11 @@
 ### Changed
 
 - Operator-rs: `0.40.2` -> `0.41.0` ([#349]).
+- Use 0.0.0-dev product images for tests and examples ([#351])
+- Use testing-tools 0.2.0 ([#351])
 
 [#349]: https://github.com/stackabletech/hbase-operator/pull/349
+[#351]: https://github.com/stackabletech/hbase-operator/pull/351
 
 ## [23.4.0] - 2023-04-17
 
