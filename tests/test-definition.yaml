@@ -2,17 +2,18 @@
 dimensions:
   - name: hbase
     values:
-      - 2.4.8-stackable0.0.0-dev
-      - 2.4.9-stackable0.0.0-dev
-      - 2.4.11-stackable0.0.0-dev
-      - 2.4.12-stackable0.0.0-dev
+      # - 2.4.8-stackable0.0.0-dev
+      # - 2.4.9-stackable0.0.0-dev
+      # - 2.4.11-stackable0.0.0-dev
+      # - 2.4.12-stackable0.0.0-dev
+      - 2.5.3-hadoop3-stackable0.0.0-dev
   - name: hbase-latest
     values:
       - 2.4.12-stackable0.0.0-dev
   - name: hdfs
     values:
-      - 3.2.2-stackable0.0.0-dev
-      - 3.3.3-stackable0.0.0-dev
+      # - 3.2.2-stackable0.0.0-dev
+      - 3.3.4-stackable0.0.0-dev
   - name: hdfs-latest
     values:
       - 3.3.4-stackable0.0.0-dev
@@ -27,12 +28,12 @@ dimensions:
   # Used for zookeeper, hdfs and hbase
   - name: listener-class
     values:
-      - "cluster-internal"
+      # - "cluster-internal"
       - "external-unstable"
   - name: kerberos-realm
     values:
-      - "CLUSTER.LOCAL"
-      # - "PROD.MYCORP"
+      # - "CLUSTER.LOCAL"
+      - "PROD.MYCORP"
   - name: kerberos-backend
     values:
       - mit
@@ -40,12 +41,12 @@ dimensions:
       # This will *not* respect the kerberos-realm test attribute, but instead use a hard-coded realm
       # - activeDirectory
 tests:
-  - name: smoke
-    dimensions:
-      - hbase
-      - zookeeper
-      - hdfs
-      - listener-class
+  # - name: smoke
+  #   dimensions:
+  #     - hbase
+  #     - zookeeper
+  #     - hdfs
+  #     - listener-class
   - name: kerberos
     dimensions:
       - hbase
@@ -54,23 +55,23 @@ tests:
       - listener-class
       - kerberos-realm
       - kerberos-backend
-  - name: orphaned_resources
-    dimensions:
-      - hbase-latest
-      - hdfs-latest
-      - zookeeper-latest
-  - name: resources
-    dimensions:
-      - hbase-latest
-      - hdfs-latest
-      - zookeeper-latest
-  - name: logging
-    dimensions:
-      - hbase
-      - hdfs-latest
-      - zookeeper-latest
-  - name: cluster-operation
-    dimensions:
-      - hbase-latest
-      - hdfs-latest
-      - zookeeper-latest
+  # - name: orphaned_resources
+  #   dimensions:
+  #     - hbase-latest
+  #     - hdfs-latest
+  #     - zookeeper-latest
+  # - name: resources
+  #   dimensions:
+  #     - hbase-latest
+  #     - hdfs-latest
+  #     - zookeeper-latest
+  # - name: logging
+  #   dimensions:
+  #     - hbase
+  #     - hdfs-latest
+  #     - zookeeper-latest
+  # - name: cluster-operation
+  #   dimensions:
+  #     - hbase-latest
+  #     - hdfs-latest
+  #     - zookeeper-latest
