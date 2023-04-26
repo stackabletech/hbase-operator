@@ -33,6 +33,10 @@ spec:
             value: -Djava.security.krb5.conf=/stackable/kerberos/krb5.conf
           - name: JAVA_OPTS # As HBASE_OPTS does not get picked up
             value: -Djava.security.krb5.conf=/stackable/kerberos/krb5.conf
+          - name: NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
         command:
           - /bin/bash
           - -c
@@ -40,7 +44,7 @@ spec:
             set -ex
             microdnf install krb5-workstation openssl
             klist -k /stackable/kerberos/keytab
-            kinit -kt /stackable/kerberos/keytab hbase/access-hbase.kuttl-test-busy-imp.svc.cluster.local
+            kinit -kt /stackable/kerberos/keytab hbase/access-hbase.${NAMESPACE}.svc.cluster.local
             klist
 
             sleep infinity
@@ -76,7 +80,7 @@ spec:
           volumeClaimTemplate:
             metadata:
               annotations:
-                secrets.stackable.tech/class: kerberos-kuttl-test-busy-imp
+                secrets.stackable.tech/class: kerberos-kuttl-test-assuring-mammal # TODO adopt
                 secrets.stackable.tech/scope: service=access-hbase
                 secrets.stackable.tech/kerberos.service.names: hbase # TOOD use testuser
             spec:
