@@ -4,7 +4,7 @@
 
 ### Added
 
-- Support for HBase `2.4.17`, `2.3.3` and `2.5.3-hadoop3` ([#XXX]).
+- Support for HBase `2.4.17`, `2.3.3` and `2.5.3-hadoop3` ([#353]).
 
 ### Changed
 
@@ -14,6 +14,7 @@
 
 [#349]: https://github.com/stackabletech/hbase-operator/pull/349
 [#351]: https://github.com/stackabletech/hbase-operator/pull/351
+[#353]: https://github.com/stackabletech/hbase-operator/pull/353
 
 ## [23.4.0] - 2023-04-17
 
