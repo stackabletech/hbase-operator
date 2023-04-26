@@ -2,15 +2,39 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Operator-rs: `0.40.2` -> `0.41.0` ([#349]).
+- Use 0.0.0-dev product images for tests and examples ([#351])
+- Use testing-tools 0.2.0 ([#351])
+
+[#349]: https://github.com/stackabletech/hbase-operator/pull/349
+[#351]: https://github.com/stackabletech/hbase-operator/pull/351
+
+## [23.4.0] - 2023-04-17
+
 ### Added
 
 - Deploy default and support custom affinities ([#322]).
 - OLM bundle files ([#333]).
+- Extend cluster resources for status and cluster operation (paused, stopped) ([#336]).
+- Cluster status conditions ([#337]).
 
 ### Changed
 
 - [BREAKING]: Consolidated top level configuration to `clusterConfig` ([#334]).
-- `operator-rs` `0.36.0` -> `0.37.0` ([#334]).
+- [BREAKING] Support specifying Service type.
+  This enables us to later switch non-breaking to using `ListenerClasses` for the exposure of Services.
+  This change is breaking, because - for security reasons - we default to the `cluster-internal` `ListenerClass`.
+  If you need your cluster to be accessible from outside of Kubernetes you need to set `clusterConfig.listenerClass`
+  to `external-unstable` ([#338]).
+- `operator-rs` `0.36.0` -> `0.40.2` ([#334], [#336], [#339], [#340]).
+- Use `build_rbac_resources` from operator-rs. This renames the `hbase-sa` ServiceAccount to `hbase-serviceaccount` ([#340]).
+
+### Fixed
+
+- Avoid empty log events dated to 1970-01-01 and improve the precision of the
+  log event timestamps ([#339]).
 
 ### Removed
 
@@ -19,6 +43,12 @@
 [#322]: https://github.com/stackabletech/hbase-operator/pull/322
 [#333]: https://github.com/stackabletech/hbase-operator/pull/333
 [#334]: https://github.com/stackabletech/hbase-operator/pull/334
+[#336]: https://github.com/stackabletech/hbase-operator/pull/336
+[#337]: https://github.com/stackabletech/hbase-operator/pull/337
+[#338]: https://github.com/stackabletech/hbase-operator/pull/338
+[#339]: https://github.com/stackabletech/hbase-operator/pull/339
+[#340]: https://github.com/stackabletech/hbase-operator/pull/340
+
 
 ## [23.1.0] - 2023-01-23
 

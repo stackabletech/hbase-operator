@@ -2,7 +2,6 @@ mod discovery;
 mod hbase_controller;
 mod kerberos;
 mod product_logging;
-mod rbac;
 
 use crate::hbase_controller::HBASE_CONTROLLER_NAME;
 
@@ -12,7 +11,7 @@ use stackable_hbase_crd::{HbaseCluster, APP_NAME};
 use stackable_operator::{
     cli::{Command, ProductOperatorRun},
     k8s_openapi::api::{apps::v1::StatefulSet, core::v1::Service},
-    kube::{api::ListParams, runtime::controller::Controller},
+    kube::runtime::{controller::Controller, watcher},
     logging::controller::report_controller_reconciled,
     CustomResourceExt,
 };
@@ -66,15 +65,15 @@ async fn main() -> anyhow::Result<()> {
 
             Controller::new(
                 watch_namespace.get_api::<HbaseCluster>(&client),
-                ListParams::default(),
+                watcher::Config::default(),
             )
             .owns(
                 watch_namespace.get_api::<Service>(&client),
-                ListParams::default(),
+                watcher::Config::default(),
             )
             .owns(
                 watch_namespace.get_api::<StatefulSet>(&client),
-                ListParams::default(),
+                watcher::Config::default(),
             )
             .shutdown_on_signal()
             .run(

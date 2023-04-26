@@ -9,23 +9,26 @@ use crate::{
     product_logging::{
         extend_role_group_config_map, resolve_vector_aggregator_address, LOG4J_CONFIG_FILE,
     },
-    rbac, OPERATOR_NAME,
+    OPERATOR_NAME,
 };
 
 use indoc::formatdoc;
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_hbase_crd::{
-    Container, HbaseCluster, HbaseConfig, HbaseConfigFragment, HbaseRole, APP_NAME, HBASE_ENV_SH,
-    HBASE_HEAPSIZE, HBASE_MASTER_PORT, HBASE_REGIONSERVER_PORT, HBASE_REST_PORT, HBASE_SITE_XML,
-    HBASE_ZOOKEEPER_QUORUM, JVM_HEAP_FACTOR,
+    Container, HbaseCluster, HbaseClusterStatus, HbaseConfig, HbaseConfigFragment, HbaseRole,
+    APP_NAME, HBASE_ENV_SH, HBASE_HEAPSIZE, HBASE_MASTER_PORT, HBASE_REGIONSERVER_PORT,
+    HBASE_REST_PORT, HBASE_SITE_XML, HBASE_ZOOKEEPER_QUORUM, JVM_HEAP_FACTOR,
 };
 use stackable_operator::{
     builder::{
         ConfigMapBuilder, ContainerBuilder, FieldPathEnvVar, ObjectMetaBuilder, PodBuilder,
         PodSecurityContextBuilder,
     },
-    cluster_resources::ClusterResources,
-    commons::product_image_selection::ResolvedProductImage,
+    cluster_resources::{ClusterResourceApplyStrategy, ClusterResources},
+    commons::{
+        product_image_selection::ResolvedProductImage,
+        rbac::{build_rbac_resources, service_account_name},
+    },
     k8s_openapi::{
         api::core::v1::{EmptyDirVolumeSource, Volume},
         apimachinery::pkg::api::resource::Quantity,
@@ -54,6 +57,10 @@ use stackable_operator::{
         },
     },
     role_utils::{Role, RoleGroupRef},
+    status::condition::{
+        compute_conditions, operations::ClusterOperationsConditionBuilder,
+        statefulset::StatefulSetConditionBuilder,
+    },
 };
 use std::{
     collections::{BTreeMap, HashMap},
@@ -161,14 +168,12 @@ pub enum Error {
         entry: &'static str,
         cm_name: String,
     },
-    #[snafu(display("failed to patch service account: {source}"))]
+    #[snafu(display("failed to patch service account"))]
     ApplyServiceAccount {
-        name: String,
         source: stackable_operator::error::Error,
     },
-    #[snafu(display("failed to patch role binding: {source}"))]
+    #[snafu(display("failed to patch role binding"))]
     ApplyRoleBinding {
-        name: String,
         source: stackable_operator::error::Error,
     },
     #[snafu(display("could not parse Hbase role [{role}]"))]
@@ -195,6 +200,14 @@ pub enum Error {
     InvalidLoggingConfig {
         source: crate::product_logging::Error,
         cm_name: String,
+    },
+    #[snafu(display("failed to update status"))]
+    ApplyStatus {
+        source: stackable_operator::error::Error,
+    },
+    #[snafu(display("failed to build RBAC resources"))]
+    BuildRbacResources {
+        source: stackable_operator::error::Error,
     },
 }
 
@@ -254,13 +267,14 @@ pub async fn reconcile_hbase(hbase: Arc<HbaseCluster>, ctx: Arc<Ctx>) -> Result<
         OPERATOR_NAME,
         HBASE_CONTROLLER_NAME,
         &hbase.object_ref(&()),
+        ClusterResourceApplyStrategy::from(&hbase.spec.cluster_operation),
     )
     .context(CreateClusterResourcesSnafu)?;
 
     let region_server_role_service =
         build_region_server_role_service(&hbase, &resolved_product_image)?;
     cluster_resources
-        .add(client, &region_server_role_service)
+        .add(client, region_server_role_service)
         .await
         .context(ApplyRoleServiceSnafu)?;
 
@@ -269,23 +283,26 @@ pub async fn reconcile_hbase(hbase: Arc<HbaseCluster>, ctx: Arc<Ctx>) -> Result<
         build_discovery_configmap(&hbase, &zk_connect_string, &resolved_product_image)
             .context(BuildDiscoveryConfigMapSnafu)?;
     cluster_resources
-        .add(client, &discovery_cm)
+        .add(client, discovery_cm)
         .await
         .context(ApplyDiscoveryConfigMapSnafu)?;
 
-    let (rbac_sa, rbac_rolebinding) = rbac::build_rbac_resources(hbase.as_ref(), "hbase");
-    client
-        .apply_patch(HBASE_CONTROLLER_NAME, &rbac_sa, &rbac_sa)
+    let (rbac_sa, rbac_rolebinding) = build_rbac_resources(
+        hbase.as_ref(),
+        APP_NAME,
+        cluster_resources.get_required_labels(),
+    )
+    .context(BuildRbacResourcesSnafu)?;
+    cluster_resources
+        .add(client, rbac_sa)
         .await
-        .with_context(|_| ApplyServiceAccountSnafu {
-            name: rbac_sa.name_unchecked(),
-        })?;
-    client
-        .apply_patch(HBASE_CONTROLLER_NAME, &rbac_rolebinding, &rbac_rolebinding)
+        .context(ApplyServiceAccountSnafu)?;
+    cluster_resources
+        .add(client, rbac_rolebinding)
         .await
-        .with_context(|_| ApplyRoleBindingSnafu {
-            name: rbac_rolebinding.name_unchecked(),
-        })?;
+        .context(ApplyRoleBindingSnafu)?;
+
+    let mut ss_cond_builder = StatefulSetConditionBuilder::default();
 
     for (role_name, group_config) in validated_config.iter() {
         let hbase_role = HbaseRole::from_str(role_name).context(UnidentifiedHbaseRoleSnafu {
@@ -312,38 +329,49 @@ pub async fn reconcile_hbase(hbase: Arc<HbaseCluster>, ctx: Arc<Ctx>) -> Result<
                 &resolved_product_image,
                 vector_aggregator_address.as_deref(),
             )?;
-            let rg_statefulset = build_rolegroup_statefulset(
-                &hbase,
-                &rolegroup,
-                &rbac_sa.name_unchecked(),
-                &config,
-                &resolved_product_image,
-            )?;
+            let rg_statefulset =
+                build_rolegroup_statefulset(&hbase, &rolegroup, &config, &resolved_product_image)?;
             cluster_resources
-                .add(client, &rg_service)
+                .add(client, rg_service)
                 .await
                 .with_context(|_| ApplyRoleGroupServiceSnafu {
                     rolegroup: rolegroup.clone(),
                 })?;
             cluster_resources
-                .add(client, &rg_configmap)
+                .add(client, rg_configmap)
                 .await
                 .with_context(|_| ApplyRoleGroupConfigSnafu {
                     rolegroup: rolegroup.clone(),
                 })?;
-            cluster_resources
-                .add(client, &rg_statefulset)
-                .await
-                .with_context(|_| ApplyRoleGroupStatefulSetSnafu {
-                    rolegroup: rolegroup.clone(),
-                })?;
+            ss_cond_builder.add(
+                cluster_resources
+                    .add(client, rg_statefulset)
+                    .await
+                    .with_context(|_| ApplyRoleGroupStatefulSetSnafu {
+                        rolegroup: rolegroup.clone(),
+                    })?,
+            );
         }
     }
+
+    let cluster_operation_cond_builder =
+        ClusterOperationsConditionBuilder::new(&hbase.spec.cluster_operation);
+
+    let status = HbaseClusterStatus {
+        conditions: compute_conditions(
+            hbase.as_ref(),
+            &[&ss_cond_builder, &cluster_operation_cond_builder],
+        ),
+    };
 
     cluster_resources
         .delete_orphaned_resources(client)
         .await
         .context(DeleteOrphanedResourcesSnafu)?;
+    client
+        .apply_patch_status(OPERATOR_NAME, hbase.as_ref(), &status)
+        .await
+        .context(ApplyStatusSnafu)?;
 
     Ok(Action::await_change())
 }
@@ -384,9 +412,9 @@ pub fn build_region_server_role_service(
             ))
             .build(),
         spec: Some(ServiceSpec {
+            type_: Some(hbase.spec.cluster_config.listener_class.k8s_service_type()),
             ports: Some(ports),
             selector: Some(role_selector_labels(hbase, APP_NAME, &role_name)),
-            type_: Some("NodePort".to_string()),
             ..ServiceSpec::default()
         }),
         status: None,
@@ -523,6 +551,8 @@ fn build_rolegroup_service(
             .with_label("prometheus.io/scrape", "true")
             .build(),
         spec: Some(ServiceSpec {
+            // Internal communication does not need to be exposed
+            type_: Some("ClusterIP".to_string()),
             cluster_ip: Some("None".to_string()),
             ports: Some(ports),
             selector: Some(role_group_selector_labels(
@@ -544,7 +574,6 @@ fn build_rolegroup_service(
 fn build_rolegroup_statefulset(
     hbase: &HbaseCluster,
     rolegroup_ref: &RoleGroupRef<HbaseCluster>,
-    sa_name: &str,
     config: &HbaseConfig,
     resolved_product_image: &ResolvedProductImage,
 ) -> Result<StatefulSet> {
@@ -699,7 +728,7 @@ fn build_rolegroup_statefulset(
         }),
         ..Volume::default()
     })
-    .service_account_name(sa_name)
+    .service_account_name(service_account_name(APP_NAME))
     .security_context(
         PodSecurityContextBuilder::new()
             .run_as_user(1000)
@@ -786,25 +815,20 @@ fn rolegroup_replicas(
     hbase: &HbaseCluster,
     rolegroup_ref: &RoleGroupRef<HbaseCluster>,
 ) -> Result<i32, Error> {
-    if hbase.spec.cluster_config.stopped.unwrap_or(false) {
-        Ok(0)
-    } else {
-        let role =
-            HbaseRole::from_str(&rolegroup_ref.role).context(UnidentifiedHbaseRoleSnafu {
-                role: rolegroup_ref.role.to_string(),
-            })?;
+    let role = HbaseRole::from_str(&rolegroup_ref.role).context(UnidentifiedHbaseRoleSnafu {
+        role: rolegroup_ref.role.to_string(),
+    })?;
 
-        let replicas = hbase
-            .get_role(&role)
-            .as_ref()
-            .map(|role| &role.role_groups)
-            .and_then(|role_group| role_group.get(&rolegroup_ref.role_group))
-            .and_then(|rg| rg.replicas)
-            .map(i32::from)
-            .unwrap_or(0);
+    let replicas = hbase
+        .get_role(&role)
+        .as_ref()
+        .map(|role| &role.role_groups)
+        .and_then(|role_group| role_group.get(&rolegroup_ref.role_group))
+        .and_then(|rg| rg.replicas)
+        .map(i32::from)
+        .unwrap_or(0);
 
-        Ok(replicas)
-    }
+    Ok(replicas)
 }
 
 type RoleConfig = HashMap<String, (Vec<PropertyNameKind>, Role<HbaseConfigFragment>)>;
