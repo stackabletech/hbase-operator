@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- Support for HBase `2.4.17`, `2.3.3` and `2.5.3-hadoop3` ([#XXX]).
+
 ### Changed
 
 - Operator-rs: `0.40.2` -> `0.41.0` ([#349]).
