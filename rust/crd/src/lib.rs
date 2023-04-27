@@ -461,3 +461,71 @@ impl HbaseCluster {
         fragment::validate(conf_rolegroup).context(FragmentValidationFailureSnafu)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_config_merging() {
+        let input = r#"
+        apiVersion: hbase.stackable.tech/v1alpha1
+        kind: HbaseCluster
+        metadata:
+          name: simple-hbase
+        spec:
+          image:
+            productVersion: 2.4.12
+            stackableVersion: "23.4"
+          clusterConfig:
+            hdfsConfigMapName: simple-hdfs
+            zookeeperConfigMapName: simple-znode
+          masters:
+            config:
+              logging:
+                enableVectorAgent: true
+            roleGroups:
+              default:
+                replicas: 1
+              disable-logging:
+                replicas: 1
+                config:
+                  logging:
+                    enableVectorAgent: false
+          regionServers:
+            roleGroups:
+              default:
+                replicas: 1
+          restServers:
+            roleGroups:
+              default:
+                replicas: 1
+        "#;
+        let hbase: HbaseCluster = serde_yaml::from_str(input).expect("illegal test input");
+        let master_default_config = hbase
+            .merged_config(
+                &HbaseRole::Master,
+                "default",
+                &hbase.spec.cluster_config.hdfs_config_map_name,
+            )
+            .unwrap();
+        let master_disable_logging_config = hbase
+            .merged_config(
+                &HbaseRole::Master,
+                "disable-logging",
+                &hbase.spec.cluster_config.hdfs_config_map_name,
+            )
+            .unwrap();
+        let region_server_default_config = hbase
+            .merged_config(
+                &HbaseRole::RegionServer,
+                "default",
+                &hbase.spec.cluster_config.hdfs_config_map_name,
+            )
+            .unwrap();
+
+        assert!(master_default_config.logging.enable_vector_agent);
+        assert!(!master_disable_logging_config.logging.enable_vector_agent);
+        assert!(!region_server_default_config.logging.enable_vector_agent);
+    }
+}
