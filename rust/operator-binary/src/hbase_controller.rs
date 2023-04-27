@@ -2,9 +2,7 @@
 
 use crate::{
     discovery::build_discovery_configmap,
-    product_logging::{
-        extend_role_group_config_map, resolve_vector_aggregator_address, LOG4J_CONFIG_FILE,
-    },
+    product_logging::{extend_role_group_config_map, resolve_vector_aggregator_address},
     OPERATOR_NAME,
 };
 
@@ -490,6 +488,7 @@ fn build_rolegroup_config_map(
         .add_data(HBASE_ENV_SH, write_hbase_env_sh(hbase_env_config.iter()));
 
     extend_role_group_config_map(
+        &resolved_product_image.product_version,
         rolegroup,
         vector_aggregator_address,
         &config.logging,
@@ -649,7 +648,7 @@ fn build_rolegroup_statefulset(
                 HDFS_DISCOVERY_TMP_DIR, CONFIG_DIR_NAME
             ),
             format!("cp {}/* {}", HBASE_CONFIG_TMP_DIR, CONFIG_DIR_NAME),
-            format!("cp {HBASE_LOG_CONFIG_TMP_DIR}/{LOG4J_CONFIG_FILE} {CONFIG_DIR_NAME}",),
+            format!("cp {HBASE_LOG_CONFIG_TMP_DIR}/log4j*.properties {CONFIG_DIR_NAME}"),
             format!(
                 "bin/hbase {} start",
                 match role {
