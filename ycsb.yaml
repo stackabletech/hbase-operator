@@ -1,3 +1,6 @@
+# create 'sbernauer', {NAME => 'benchmark', IN_MEMORY => false, TTL => 2147483647 , BLOOMFILTER => 'NONE', COMPRESSION => 'NONE'}, SPLITS=> ['user1000000000000000000', 'user2000000000000000000', 'user3000000000000000000', 'user4000000000000000000', 'user5000000000000000000', 'user6000000000000000000', 'user7000000000000000000', 'user8000000000000000000', 'user9000000000000000000']
+# /stackable/ycsb-0.17.0/bin/ycsb.sh load hbase20 -p table=sbernauer -p columnfamily=benchmark -p recordcount=100000 -p fieldcount=10 -p fieldlength=100 -p workload=site.ycsb.workloads.CoreWorkload -threads 10 -s
+# /stackable/ycsb-0.17.0/bin/ycsb.sh run hbase20 -p operationcount=100000 -p table=sbernauer -p columnfamily=benchmark -P /stackable/ycsb-0.17.0//workloads/workloada -s -threads 100 -target 50000
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -80,7 +83,7 @@ spec:
           volumeClaimTemplate:
             metadata:
               annotations:
-                secrets.stackable.tech/class: kerberos-kuttl-test-assuring-mammal # TODO adopt
+                secrets.stackable.tech/class: kerberos-kuttl-test-allowed-gator # TODO adopt
                 secrets.stackable.tech/scope: service=access-hbase
                 secrets.stackable.tech/kerberos.service.names: hbase # TOOD use testuser
             spec:
