@@ -94,7 +94,11 @@ impl ZookeeperConnectionInformation {
                 entry: ZOOKEEPER_DISCOVERY_CM_CLIENT_PORT_ENTRY,
             })?;
 
-        // TODO: Add /hbase to chroot. Explanation will follow
+        // IMPORTANT!
+        // Before https://github.com/stackabletech/hbase-operator/issues/354, hbase automatically added a `/hbase` suffix, ending up with a chroot of e.g. `/znode-fe51edff-8df9-43a8-ac5f-4781b071ae5f/hbase`.
+        // Because the chroot we read from the ZNode discovery CM is only `/znode-fe51edff-8df9-43a8-ac5f-4781b071ae5f`, we need to prepend the `/hbase` suffix ourselves.
+        // If we don't do so, hbase clusters created before #354 would need to be migrated to the different znode path!
+        let chroot = format!("{chroot}/hbase");
 
         Ok(Self {
             hosts,
@@ -108,6 +112,7 @@ impl ZookeeperConnectionInformation {
             // We use ZOOKEEPER_HOSTS (host1:port1,host2:port2) instead of ZOOKEEPER (host1:port1,host2:port2/znode-123) here, because HBase cannot deal with a chroot properly.
             // It is - in theory - a valid ZK connection string but HBase does its own parsing (last checked in HBase 2.5.3) which does not understand chroots properly.
             // It worked for us because we also provide a ZK port and that works but if the port is ever left out the parsing would break.
+            // See https://github.com/stackabletech/hbase-operator/issues/354 for details
             (HBASE_ZOOKEEPER_QUORUM.to_string(), self.hosts.clone()),
             // As mentioned it's a good idea to pass this explicitly as well.
             // We had some cases where hbase tried to connect to zookeeper using the wrong (default) port.
