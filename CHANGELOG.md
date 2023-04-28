@@ -8,6 +8,11 @@
 - Use 0.0.0-dev product images for tests and examples ([#351])
 - Use testing-tools 0.2.0 ([#351])
 
+### Fixed
+
+- Fix `hbase.zookeeper.quorum` to not contain the znode path, instead pass it via `zookeeper.znode.parent` ([#XXX]).
+- Add `hbase.zookeeper.property.clientPort` setting, because hbase sometimes tried to access zookeeper with the wrong port ([#XXX]).
+
 [#349]: https://github.com/stackabletech/hbase-operator/pull/349
 [#351]: https://github.com/stackabletech/hbase-operator/pull/351
 
