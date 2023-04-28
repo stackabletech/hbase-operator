@@ -5,7 +5,7 @@ use crate::{
     product_logging::{
         extend_role_group_config_map, resolve_vector_aggregator_address, LOG4J_CONFIG_FILE,
     },
-    zookeeper::{self, retrieve_zookeeper_connection_information, ZookeeperConnectionInformation},
+    zookeeper::{self, ZookeeperConnectionInformation},
     OPERATOR_NAME,
 };
 
@@ -221,10 +221,9 @@ pub async fn reconcile_hbase(hbase: Arc<HbaseCluster>, ctx: Arc<Ctx>) -> Result<
     let client = &ctx.client;
 
     let resolved_product_image = hbase.spec.image.resolve(DOCKER_IMAGE_BASE_NAME);
-    let zookeeper_connection_information =
-        retrieve_zookeeper_connection_information(&hbase, client)
-            .await
-            .context(RetrieveZookeeperConnectionInformationSnafu)?;
+    let zookeeper_connection_information = ZookeeperConnectionInformation::retrieve(&hbase, client)
+        .await
+        .context(RetrieveZookeeperConnectionInformationSnafu)?;
 
     let vector_aggregator_address = resolve_vector_aggregator_address(&hbase, client)
         .await

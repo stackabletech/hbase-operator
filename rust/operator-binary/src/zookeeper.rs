@@ -38,76 +38,85 @@ pub enum Error {
 
 type Result<T, E = Error> = std::result::Result<T, E>;
 
+/// Contains the information as exposed by the Zookeeper/Znode discovery CM (should work with both)
 pub struct ZookeeperConnectionInformation {
+    /// E.g. `simple-zk-server-default-0.simple-zk-server-default.default.svc.cluster.local:2282,simple-zk-server-default-1.simple-zk-server-default.default.svc.cluster.local:2282,simple-zk-server-default-2.simple-zk-server-default.default.svc.cluster.local:2282`
     pub hosts: String,
+    /// E.g. `/znode-123` in case of ZNode discovery CM or `/` in case of Zookeeper discovery CM directly.
     pub chroot: String,
+    /// E.g. 2282 for tls secured Zookeeper
     pub port: u16,
 }
 
 impl ZookeeperConnectionInformation {
+    pub async fn retrieve(hbase: &HbaseCluster, client: &Client) -> Result<Self> {
+        let zk_discovery_cm_name = &hbase.spec.cluster_config.zookeeper_config_map_name;
+        let mut zk_discovery_cm = client
+            .get::<ConfigMap>(
+                zk_discovery_cm_name,
+                hbase
+                    .namespace()
+                    .as_deref()
+                    .context(ObjectHasNoNamespaceSnafu)?,
+            )
+            .await
+            .context(MissingConfigMapSnafu {
+                cm_name: zk_discovery_cm_name.to_string(),
+            })?;
+
+        let hosts = zk_discovery_cm
+            .data
+            .as_mut()
+            .and_then(|data| data.remove(ZOOKEEPER_DISCOVERY_CM_HOSTS_ENTRY))
+            .context(MissingConfigMapEntrySnafu {
+                cm_name: zk_discovery_cm_name.as_str(),
+                entry: ZOOKEEPER_DISCOVERY_CM_HOSTS_ENTRY,
+            })?;
+        let chroot = zk_discovery_cm
+            .data
+            .as_mut()
+            .and_then(|data| data.remove(ZOOKEEPER_DISCOVERY_CM_CHROOT_ENTRY))
+            .context(MissingConfigMapEntrySnafu {
+                cm_name: zk_discovery_cm_name.as_str(),
+                entry: ZOOKEEPER_DISCOVERY_CM_CHROOT_ENTRY,
+            })?;
+        let port = zk_discovery_cm
+            .data
+            .as_mut()
+            .and_then(|data| data.remove(ZOOKEEPER_DISCOVERY_CM_CLIENT_PORT_ENTRY))
+            .context(MissingConfigMapEntrySnafu {
+                cm_name: zk_discovery_cm_name.as_str(),
+                entry: ZOOKEEPER_DISCOVERY_CM_CLIENT_PORT_ENTRY,
+            })?
+            .parse()
+            .context(ParseZookeeperPortSnafu {
+                cm_name: zk_discovery_cm_name.as_str(),
+                entry: ZOOKEEPER_DISCOVERY_CM_CLIENT_PORT_ENTRY,
+            })?;
+
+        // TODO: Add /hbase to chroot. Explanation will follow
+
+        Ok(Self {
+            hosts,
+            chroot,
+            port,
+        })
+    }
+
     pub fn as_hbase_settings(&self) -> BTreeMap<String, String> {
         BTreeMap::from([
+            // We use ZOOKEEPER_HOSTS (host1:port1,host2:port2) instead of ZOOKEEPER (host1:port1,host2:port2/znode-123) here, because HBase cannot deal with a chroot properly.
+            // It is - in theory - a valid ZK connection string but HBase does its own parsing (last checked in HBase 2.5.3) which does not understand chroots properly.
+            // It worked for us because we also provide a ZK port and that works but if the port is ever left out the parsing would break.
             (HBASE_ZOOKEEPER_QUORUM.to_string(), self.hosts.clone()),
+            // As mentioned it's a good idea to pass this explicitly as well.
+            // We had some cases where hbase tried to connect to zookeeper using the wrong (default) port.
             (
                 HBASE_ZOOKEEPER_PROPERTY_CLIENT_PORT.to_string(),
                 self.port.to_string(),
             ),
+            // As we only pass in the hosts (and not the znode) in the zookeeper quorum, we need to specify the znode path
             (ZOOKEEPER_ZNODE_PARENT.to_string(), self.chroot.clone()),
         ])
     }
-}
-
-pub async fn retrieve_zookeeper_connection_information(
-    hbase: &HbaseCluster,
-    client: &Client,
-) -> Result<ZookeeperConnectionInformation> {
-    let zk_discovery_cm_name = &hbase.spec.cluster_config.zookeeper_config_map_name;
-    let mut zk_discovery_cm = client
-        .get::<ConfigMap>(
-            zk_discovery_cm_name,
-            hbase
-                .namespace()
-                .as_deref()
-                .context(ObjectHasNoNamespaceSnafu)?,
-        )
-        .await
-        .context(MissingConfigMapSnafu {
-            cm_name: zk_discovery_cm_name.to_string(),
-        })?;
-
-    let hosts = zk_discovery_cm
-        .data
-        .as_mut()
-        .and_then(|data| data.remove(ZOOKEEPER_DISCOVERY_CM_HOSTS_ENTRY))
-        .context(MissingConfigMapEntrySnafu {
-            cm_name: zk_discovery_cm_name.as_str(),
-            entry: ZOOKEEPER_DISCOVERY_CM_HOSTS_ENTRY,
-        })?;
-    let chroot = zk_discovery_cm
-        .data
-        .as_mut()
-        .and_then(|data| data.remove(ZOOKEEPER_DISCOVERY_CM_CHROOT_ENTRY))
-        .context(MissingConfigMapEntrySnafu {
-            cm_name: zk_discovery_cm_name.as_str(),
-            entry: ZOOKEEPER_DISCOVERY_CM_CHROOT_ENTRY,
-        })?;
-    let port = zk_discovery_cm
-        .data
-        .as_mut()
-        .and_then(|data| data.remove(ZOOKEEPER_DISCOVERY_CM_CLIENT_PORT_ENTRY))
-        .context(MissingConfigMapEntrySnafu {
-            cm_name: zk_discovery_cm_name.as_str(),
-            entry: ZOOKEEPER_DISCOVERY_CM_CLIENT_PORT_ENTRY,
-        })?
-        .parse()
-        .context(ParseZookeeperPortSnafu {
-            cm_name: zk_discovery_cm_name.as_str(),
-            entry: ZOOKEEPER_DISCOVERY_CM_CLIENT_PORT_ENTRY,
-        })?;
-
-    Ok(ZookeeperConnectionInformation {
-        hosts,
-        chroot,
-        port,
-    })
 }
