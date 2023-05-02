@@ -3,6 +3,7 @@
 use crate::{
     discovery::build_discovery_configmap,
     product_logging::{extend_role_group_config_map, resolve_vector_aggregator_address},
+    zookeeper::{self, ZookeeperConnectionInformation},
     OPERATOR_NAME,
 };
 
@@ -10,7 +11,7 @@ use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_hbase_crd::{
     Container, HbaseCluster, HbaseClusterStatus, HbaseConfig, HbaseConfigFragment, HbaseRole,
     APP_NAME, HBASE_ENV_SH, HBASE_HEAPSIZE, HBASE_MASTER_PORT, HBASE_REGIONSERVER_PORT,
-    HBASE_REST_PORT, HBASE_SITE_XML, HBASE_ZOOKEEPER_QUORUM, JVM_HEAP_FACTOR,
+    HBASE_REST_PORT, HBASE_SITE_XML, JVM_HEAP_FACTOR,
 };
 use stackable_operator::{
     builder::{
@@ -36,7 +37,7 @@ use stackable_operator::{
         },
         apimachinery::pkg::{apis::meta::v1::LabelSelector, util::intstr::IntOrString},
     },
-    kube::{runtime::controller::Action, Resource, ResourceExt},
+    kube::{runtime::controller::Action, Resource},
     labels::{role_group_selector_labels, role_selector_labels, ObjectLabels},
     logging::controller::ReconcilerError,
     memory::{BinaryMultiple, MemoryQuantity},
@@ -75,8 +76,6 @@ const CONFIG_DIR_NAME: &str = "/stackable/conf";
 const HDFS_DISCOVERY_TMP_DIR: &str = "/stackable/tmp/hdfs";
 const HBASE_CONFIG_TMP_DIR: &str = "/stackable/tmp/hbase";
 const HBASE_LOG_CONFIG_TMP_DIR: &str = "/stackable/tmp/log_config";
-
-const ZOOKEEPER_DISCOVERY_CM_ENTRY: &str = "ZOOKEEPER";
 
 const DOCKER_IMAGE_BASE_NAME: &str = "hbase";
 
@@ -147,6 +146,8 @@ pub enum Error {
     InvalidProductConfig {
         source: stackable_operator::error::Error,
     },
+    #[snafu(display("failed to retrieve zookeeper connection information"))]
+    RetrieveZookeeperConnectionInformation { source: zookeeper::Error },
     #[snafu(display("object is missing metadata to build owner reference"))]
     ObjectMissingMetadataForOwnerRef {
         source: stackable_operator::error::Error,
@@ -218,26 +219,9 @@ pub async fn reconcile_hbase(hbase: Arc<HbaseCluster>, ctx: Arc<Ctx>) -> Result<
     let client = &ctx.client;
 
     let resolved_product_image = hbase.spec.image.resolve(DOCKER_IMAGE_BASE_NAME);
-
-    let zk_discovery_cm_name = &hbase.spec.cluster_config.zookeeper_config_map_name;
-    let zk_connect_string = client
-        .get::<ConfigMap>(
-            zk_discovery_cm_name,
-            hbase
-                .namespace()
-                .as_deref()
-                .context(ObjectHasNoNamespaceSnafu)?,
-        )
+    let zookeeper_connection_information = ZookeeperConnectionInformation::retrieve(&hbase, client)
         .await
-        .context(MissingConfigMapSnafu {
-            cm_name: zk_discovery_cm_name.to_string(),
-        })?
-        .data
-        .and_then(|mut data| data.remove(ZOOKEEPER_DISCOVERY_CM_ENTRY))
-        .context(MissingConfigMapEntrySnafu {
-            entry: ZOOKEEPER_DISCOVERY_CM_ENTRY,
-            cm_name: zk_discovery_cm_name.to_string(),
-        })?;
+        .context(RetrieveZookeeperConnectionInformationSnafu)?;
 
     let vector_aggregator_address = resolve_vector_aggregator_address(&hbase, client)
         .await
@@ -272,9 +256,12 @@ pub async fn reconcile_hbase(hbase: Arc<HbaseCluster>, ctx: Arc<Ctx>) -> Result<
         .context(ApplyRoleServiceSnafu)?;
 
     // discovery config map
-    let discovery_cm =
-        build_discovery_configmap(&hbase, &zk_connect_string, &resolved_product_image)
-            .context(BuildDiscoveryConfigMapSnafu)?;
+    let discovery_cm = build_discovery_configmap(
+        &hbase,
+        &zookeeper_connection_information,
+        &resolved_product_image,
+    )
+    .context(BuildDiscoveryConfigMapSnafu)?;
     cluster_resources
         .add(client, discovery_cm)
         .await
@@ -317,7 +304,7 @@ pub async fn reconcile_hbase(hbase: Arc<HbaseCluster>, ctx: Arc<Ctx>) -> Result<
                 &hbase,
                 &rolegroup,
                 rolegroup_config,
-                &zk_connect_string,
+                &zookeeper_connection_information,
                 &config,
                 &resolved_product_image,
                 vector_aggregator_address.as_deref(),
@@ -419,7 +406,7 @@ fn build_rolegroup_config_map(
     hbase: &HbaseCluster,
     rolegroup: &RoleGroupRef<HbaseCluster>,
     rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
-    zk_connect_string: &str,
+    zookeeper_connection_information: &ZookeeperConnectionInformation,
     config: &HbaseConfig,
     resolved_product_image: &ResolvedProductImage,
     vector_aggregator_address: Option<&str>,
@@ -429,15 +416,7 @@ fn build_rolegroup_config_map(
         .cloned()
         .unwrap_or_default();
 
-    hbase_site_config.insert(
-        HBASE_ZOOKEEPER_QUORUM.to_string(),
-        zk_connect_string.to_string(),
-    );
-
-    let hbase_site_config = hbase_site_config
-        .into_iter()
-        .map(|(k, v)| (k, Some(v)))
-        .collect::<BTreeMap<_, _>>();
+    hbase_site_config.extend(zookeeper_connection_information.as_hbase_settings());
 
     let mut hbase_env_config = rolegroup_config
         .get(&PropertyNameKind::File(HBASE_ENV_SH.to_string()))
@@ -483,7 +462,13 @@ fn build_rolegroup_config_map(
         )
         .add_data(
             HBASE_SITE_XML,
-            writer::to_hadoop_xml(hbase_site_config.iter()),
+            writer::to_hadoop_xml(
+                hbase_site_config
+                    .into_iter()
+                    .map(|(k, v)| (k, Some(v)))
+                    .collect::<BTreeMap<_, _>>()
+                    .iter(),
+            ),
         )
         .add_data(HBASE_ENV_SH, write_hbase_env_sh(hbase_env_config.iter()));
 

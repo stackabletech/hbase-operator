@@ -37,7 +37,6 @@ pub const HBASE_REST_OPTS: &str = "HBASE_REST_OPTS";
 
 pub const HBASE_CLUSTER_DISTRIBUTED: &str = "hbase.cluster.distributed";
 pub const HBASE_ROOTDIR: &str = "hbase.rootdir";
-pub const HBASE_ZOOKEEPER_QUORUM: &str = "hbase.zookeeper.quorum";
 pub const HBASE_HEAPSIZE: &str = "HBASE_HEAPSIZE";
 pub const HBASE_ROOT_DIR_DEFAULT: &str = "/hbase";
 

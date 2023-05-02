@@ -15,11 +15,14 @@
 ### Fixed
 
 - Fix missing quoting of env variables. This caused problems when env vars (e.g. from envOverrides) contained a whitespace ([#356]).
+- Fix `hbase.zookeeper.quorum` to not contain the znode path, instead pass it via `zookeeper.znode.parent` ([#357]).
+- Add `hbase.zookeeper.property.clientPort` setting, because hbase sometimes tried to access zookeeper with the (wrong) default port ([#357]).
 
 [#349]: https://github.com/stackabletech/hbase-operator/pull/349
 [#351]: https://github.com/stackabletech/hbase-operator/pull/351
 [#353]: https://github.com/stackabletech/hbase-operator/pull/353
 [#356]: https://github.com/stackabletech/hbase-operator/pull/356
+[#357]: https://github.com/stackabletech/hbase-operator/pull/357
 
 ## [23.4.0] - 2023-04-17
 
