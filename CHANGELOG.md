@@ -4,7 +4,7 @@
 
 ### Added
 
-- Support for HBase `2.4.17`, `2.3.3` and `2.5.3-hadoop3` ([#353]).
+- Support for HBase `2.4.17`, `2.5.3` and `2.5.3-hadoop3` ([#353]).
 
 ### Changed
 
