@@ -9,12 +9,17 @@
 ### Changed
 
 - Operator-rs: `0.40.2` -> `0.41.0` ([#349]).
-- Use 0.0.0-dev product images for tests and examples ([#351])
-- Use testing-tools 0.2.0 ([#351])
+- Use 0.0.0-dev product images for tests and examples ([#351]).
+- Use testing-tools 0.2.0 ([#351]).
+
+### Fixed
+
+- Fix missing quoting of env variables. This caused problems when env vars (e.g. from envOverrides) contained a whitespace ([#356]).
 
 [#349]: https://github.com/stackabletech/hbase-operator/pull/349
 [#351]: https://github.com/stackabletech/hbase-operator/pull/351
 [#353]: https://github.com/stackabletech/hbase-operator/pull/353
+[#356]: https://github.com/stackabletech/hbase-operator/pull/356
 
 ## [23.4.0] - 2023-04-17
 
@@ -53,7 +58,6 @@
 [#338]: https://github.com/stackabletech/hbase-operator/pull/338
 [#339]: https://github.com/stackabletech/hbase-operator/pull/339
 [#340]: https://github.com/stackabletech/hbase-operator/pull/340
-
 
 ## [23.1.0] - 2023-01-23
 

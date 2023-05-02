@@ -855,7 +855,7 @@ where
     T: Iterator<Item = (&'a String, &'a String)>,
 {
     properties
-        .map(|(variable, value)| format!("export {variable}={value}\n"))
+        .map(|(variable, value)| format!("export {variable}=\"{value}\"\n"))
         .collect()
 }
 
