@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- Support for HBase `2.4.17`, `2.5.3` and `2.5.3-hadoop3` ([#353]).
+
 ### Changed
 
 - Operator-rs: `0.40.2` -> `0.41.0` ([#349]).
@@ -16,6 +20,7 @@
 
 [#349]: https://github.com/stackabletech/hbase-operator/pull/349
 [#351]: https://github.com/stackabletech/hbase-operator/pull/351
+[#353]: https://github.com/stackabletech/hbase-operator/pull/353
 [#356]: https://github.com/stackabletech/hbase-operator/pull/356
 [#357]: https://github.com/stackabletech/hbase-operator/pull/357
 

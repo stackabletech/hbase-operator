@@ -2,17 +2,16 @@
 dimensions:
   - name: hbase
     values:
-      - 2.4.8-stackable0.0.0-dev
-      - 2.4.9-stackable0.0.0-dev
-      - 2.4.11-stackable0.0.0-dev
-      - 2.4.12-stackable0.0.0-dev
+      - 2.4.17-stackable0.0.0-dev
+      - 2.5.3-stackable0.0.0-dev
+      - 2.5.3-hadoop3-stackable0.0.0-dev
   - name: hbase-latest
     values:
-      - 2.4.12-stackable0.0.0-dev
+      - 2.5.3-hadoop3-stackable0.0.0-dev
   - name: hdfs
     values:
       - 3.2.2-stackable0.0.0-dev
-      - 3.3.3-stackable0.0.0-dev
+      - 3.3.4-stackable0.0.0-dev
   - name: hdfs-latest
     values:
       - 3.3.4-stackable0.0.0-dev
