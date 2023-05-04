@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- Generate OLM bundle for Release 23.4.0 ([#350]).
+
 ### Changed
 
 - Operator-rs: `0.40.2` -> `0.41.0` ([#349]).
@@ -15,6 +19,7 @@
 - Add `hbase.zookeeper.property.clientPort` setting, because hbase sometimes tried to access zookeeper with the (wrong) default port ([#357]).
 
 [#349]: https://github.com/stackabletech/hbase-operator/pull/349
+[#350]: https://github.com/stackabletech/hbase-operator/pull/350
 [#351]: https://github.com/stackabletech/hbase-operator/pull/351
 [#356]: https://github.com/stackabletech/hbase-operator/pull/356
 [#357]: https://github.com/stackabletech/hbase-operator/pull/357
