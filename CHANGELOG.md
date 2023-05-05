@@ -11,6 +11,7 @@
 - Operator-rs: `0.40.2` -> `0.41.0` ([#349]).
 - Use 0.0.0-dev product images for tests and examples ([#351]).
 - Use testing-tools 0.2.0 ([#351]).
+- Run as root group ([#359]).
 
 ### Fixed
 
@@ -23,6 +24,7 @@
 [#351]: https://github.com/stackabletech/hbase-operator/pull/351
 [#356]: https://github.com/stackabletech/hbase-operator/pull/356
 [#357]: https://github.com/stackabletech/hbase-operator/pull/357
+[#359]: https://github.com/stackabletech/hbase-operator/pull/359
 
 ## [23.4.0] - 2023-04-17
 
