@@ -81,6 +81,7 @@ const HBASE_LOG_CONFIG_TMP_DIR: &str = "/stackable/tmp/log_config";
 const ZOOKEEPER_DISCOVERY_CM_ENTRY: &str = "ZOOKEEPER";
 
 const DOCKER_IMAGE_BASE_NAME: &str = "hbase";
+const HBASE_UID: i64 = 1000;
 
 pub struct Ctx {
     pub client: stackable_operator::client::Client,
@@ -714,8 +715,8 @@ fn build_rolegroup_statefulset(
         .service_account_name(service_account_name(APP_NAME))
         .security_context(
             PodSecurityContextBuilder::new()
-                .run_as_user(1000)
-                .run_as_group(1000)
+                .run_as_user(HBASE_UID)
+                .run_as_group(0)
                 .fs_group(1000)
                 .build(),
         );

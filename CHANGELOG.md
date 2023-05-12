@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+## [23.4.1] - 2023-05-17
+
+### Changed
+
+- Run as root group ([#359]).
+
+### Fixed
+
+- Fix test assert by adding variable quoting ([#359]).
+
+[#359]: https://github.com/stackabletech/hbase-operator/pull/359
+
 ## [23.4.0] - 2023-04-17
 
 ### Added
