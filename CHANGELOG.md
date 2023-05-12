@@ -5,6 +5,7 @@
 ### Added
 
 - Generate OLM bundle for Release 23.4.0 ([#350]).
+- Missing CRD defaults for `status.conditions` field ([#360]).
 
 ### Changed
 
@@ -26,6 +27,7 @@
 [#356]: https://github.com/stackabletech/hbase-operator/pull/356
 [#357]: https://github.com/stackabletech/hbase-operator/pull/357
 [#359]: https://github.com/stackabletech/hbase-operator/pull/359
+[#360]: https://github.com/stackabletech/hbase-operator/pull/360
 
 ## [23.4.0] - 2023-04-17
 
