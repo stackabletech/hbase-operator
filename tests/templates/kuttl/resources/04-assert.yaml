@@ -4,7 +4,7 @@ kind: TestAssert
 timeout: 600
 skipLogOutput: true
 commands:
-  - script: kubectl get cm -n $NAMESPACE test-hbase-master-default -o yaml | grep -- 'HBASE_HEAPSIZE="1638m"'
-  - script: kubectl get cm -n $NAMESPACE test-hbase-regionserver-resources-from-role -o yaml | grep -- 'HBASE_HEAPSIZE="819m"'
-  - script: kubectl get cm -n $NAMESPACE test-hbase-regionserver-resources-from-role-group -o yaml | grep -- 'HBASE_HEAPSIZE="2457m"'
-  - script: kubectl get cm -n $NAMESPACE test-hbase-restserver-default -o yaml | grep -- 'HBASE_HEAPSIZE="1638m"'
+  - script: kubectl get cm -n $NAMESPACE test-hbase-master-default -o yaml | grep -- 'HBASE_HEAPSIZE=1638m'
+  - script: kubectl get cm -n $NAMESPACE test-hbase-regionserver-resources-from-role -o yaml | grep -- 'HBASE_HEAPSIZE=819m'
+  - script: kubectl get cm -n $NAMESPACE test-hbase-regionserver-resources-from-role-group -o yaml | grep -- 'HBASE_HEAPSIZE=2457m'
+  - script: kubectl get cm -n $NAMESPACE test-hbase-restserver-default -o yaml | grep -- 'HBASE_HEAPSIZE=1638m'
