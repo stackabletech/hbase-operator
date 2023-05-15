@@ -4,6 +4,10 @@
 
 ## [23.4.1] - 2023-05-17
 
+### Added
+
+- Missing CRD defaults for `status.conditions` field ([#360]).
+
 ### Changed
 
 - Run as root group ([#359]).
@@ -13,6 +17,7 @@
 - Fix test assert by adding variable quoting ([#359]).
 
 [#359]: https://github.com/stackabletech/hbase-operator/pull/359
+[#360]: https://github.com/stackabletech/hbase-operator/pull/360
 
 ## [23.4.0] - 2023-04-17
 
@@ -51,7 +56,6 @@
 [#338]: https://github.com/stackabletech/hbase-operator/pull/338
 [#339]: https://github.com/stackabletech/hbase-operator/pull/339
 [#340]: https://github.com/stackabletech/hbase-operator/pull/340
-
 
 ## [23.1.0] - 2023-01-23
 
