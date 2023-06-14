@@ -26,8 +26,8 @@ use stackable_operator::{
         rbac::{build_rbac_resources, service_account_name},
     },
     k8s_openapi::{
-        api::core::v1::{EmptyDirVolumeSource, Volume},
-        apimachinery::pkg::api::resource::Quantity,
+        api::core::v1::{EmptyDirVolumeSource, Volume, PodTemplateSpec},
+        apimachinery::pkg::api::resource::Quantity, DeepMerge,
     },
     k8s_openapi::{
         api::{
@@ -559,6 +559,14 @@ fn build_rolegroup_statefulset(
         role: rolegroup_ref.role.to_string(),
     })?;
 
+    let hbase_role = hbase
+        .get_role(&role)
+        .unwrap();
+    
+    let rolegroup = hbase
+        .get_role_group(rolegroup_ref)
+        .unwrap();
+
     let ports = role
         .port_properties()
         .into_iter()
@@ -741,7 +749,10 @@ fn build_rolegroup_statefulset(
         ));
     }
 
-    let pod_template = pod_builder.build_template();
+    let mut pod_template: PodTemplateSpec = pod_builder.build_template();
+    pod_template.merge_from(hbase_role.config.pod_overrides.clone());
+    pod_template.merge_from(rolegroup.config.pod_overrides.clone());
+    
 
     Ok(StatefulSet {
         metadata: ObjectMetaBuilder::new()
