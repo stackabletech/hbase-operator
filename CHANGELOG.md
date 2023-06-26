@@ -13,7 +13,6 @@
 - Use 0.0.0-dev product images for tests and examples ([#351]).
 - Use testing-tools 0.2.0 ([#351]).
 - Run as root group ([#359]).
-- Added kuttl test suites ([#366])
 
 ### Fixed
 
@@ -29,7 +28,6 @@
 [#357]: https://github.com/stackabletech/hbase-operator/pull/357
 [#359]: https://github.com/stackabletech/hbase-operator/pull/359
 [#360]: https://github.com/stackabletech/hbase-operator/pull/360
-[#366]: https://github.com/stackabletech/hbase-operator/pull/366
 
 ## [23.4.0] - 2023-04-17
 
