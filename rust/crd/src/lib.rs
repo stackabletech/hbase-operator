@@ -235,7 +235,7 @@ impl HbaseRole {
             hbase_opts: None,
             resources,
             logging: product_logging::spec::default_logging(),
-            affinity: get_affinity(cluster_name, &self, hdfs_discovery_cm_name),
+            affinity: get_affinity(cluster_name, self, hdfs_discovery_cm_name),
         }
     }
 }
