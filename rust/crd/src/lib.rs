@@ -188,6 +188,56 @@ impl HbaseRole {
             ],
         }
     }
+
+    pub fn default_config(
+        &self,
+        cluster_name: &str,
+        hdfs_discovery_cm_name: &str,
+    ) -> HbaseConfigFragment {
+        let resources = match &self {
+            HbaseRole::Master => ResourcesFragment {
+                cpu: CpuLimitsFragment {
+                    min: Some(Quantity("250m".to_owned())),
+                    max: Some(Quantity("1000m".to_owned())),
+                },
+                memory: MemoryLimitsFragment {
+                    limit: Some(Quantity("512Mi".to_owned())),
+                    runtime_limits: NoRuntimeLimitsFragment {},
+                },
+                storage: HbaseStorageConfigFragment {},
+            },
+            HbaseRole::RegionServer => ResourcesFragment {
+                cpu: CpuLimitsFragment {
+                    min: Some(Quantity("250m".to_owned())),
+                    max: Some(Quantity("1000m".to_owned())),
+                },
+                memory: MemoryLimitsFragment {
+                    limit: Some(Quantity("1024Mi".to_owned())),
+                    runtime_limits: NoRuntimeLimitsFragment {},
+                },
+                storage: HbaseStorageConfigFragment {},
+            },
+            HbaseRole::RestServer => ResourcesFragment {
+                cpu: CpuLimitsFragment {
+                    min: Some(Quantity("100m".to_owned())),
+                    max: Some(Quantity("400m".to_owned())),
+                },
+                memory: MemoryLimitsFragment {
+                    limit: Some(Quantity("512Mi".to_owned())),
+                    runtime_limits: NoRuntimeLimitsFragment {},
+                },
+                storage: HbaseStorageConfigFragment {},
+            },
+        };
+
+        HbaseConfigFragment {
+            hbase_rootdir: None,
+            hbase_opts: None,
+            resources,
+            logging: product_logging::spec::default_logging(),
+            affinity: get_affinity(cluster_name, self, hdfs_discovery_cm_name),
+        }
+    }
 }
 
 #[allow(clippy::derive_partial_eq_without_eq)]
@@ -252,32 +302,6 @@ pub struct HbaseConfig {
     pub logging: Logging<Container>,
     #[fragment_attrs(serde(default))]
     pub affinity: StackableAffinity,
-}
-
-impl HbaseConfig {
-    fn default_config(
-        cluster_name: &str,
-        role: &HbaseRole,
-        hdfs_discovery_cm_name: &str,
-    ) -> HbaseConfigFragment {
-        HbaseConfigFragment {
-            hbase_rootdir: None,
-            hbase_opts: None,
-            resources: ResourcesFragment {
-                cpu: CpuLimitsFragment {
-                    min: Some(Quantity("200m".to_owned())),
-                    max: Some(Quantity("4".to_owned())),
-                },
-                memory: MemoryLimitsFragment {
-                    limit: Some(Quantity("2Gi".to_owned())),
-                    runtime_limits: NoRuntimeLimitsFragment {},
-                },
-                storage: HbaseStorageConfigFragment {},
-            },
-            logging: product_logging::spec::default_logging(),
-            affinity: get_affinity(cluster_name, role, hdfs_discovery_cm_name),
-        }
-    }
 }
 
 impl Configuration for HbaseConfigFragment {
@@ -421,8 +445,7 @@ impl HbaseCluster {
         hdfs_discovery_cm_name: &str,
     ) -> Result<HbaseConfig, Error> {
         // Initialize the result with all default values as baseline
-        let conf_defaults =
-            HbaseConfig::default_config(&self.name_any(), role, hdfs_discovery_cm_name);
+        let conf_defaults = role.default_config(&self.name_any(), hdfs_discovery_cm_name);
 
         let role = self.get_role(role).context(MissingHbaseRoleSnafu {
             role: role.to_string(),

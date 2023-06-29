@@ -26,7 +26,7 @@ spec:
         enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
       resources:
         cpu:
-          min: 100m
+          min: 500m
           max: "1"
         memory:
           limit: 1Gi
@@ -37,10 +37,10 @@ spec:
         config:
           resources:
             cpu:
-              min: 300m
-              max: "3"
+              min: 600m
+              max: "2"
             memory:
-              limit: 3Gi
+              limit: 2Gi
         replicas: 1
   restServers:
     config:
