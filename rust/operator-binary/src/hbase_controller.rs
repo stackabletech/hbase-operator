@@ -28,6 +28,7 @@ use stackable_operator::{
     k8s_openapi::{
         api::core::v1::{EmptyDirVolumeSource, Volume},
         apimachinery::pkg::api::resource::Quantity,
+        DeepMerge,
     },
     k8s_openapi::{
         api::{
@@ -302,7 +303,8 @@ pub async fn reconcile_hbase(hbase: Arc<HbaseCluster>, ctx: Arc<Ctx>) -> Result<
                 )
                 .context(FailedToResolveConfigSnafu)?;
 
-            let rg_service = build_rolegroup_service(&hbase, &rolegroup, &resolved_product_image)?;
+            let rg_service =
+                build_rolegroup_service(&hbase, &hbase_role, &rolegroup, &resolved_product_image)?;
             let rg_configmap = build_rolegroup_config_map(
                 &hbase,
                 &rolegroup,
@@ -312,8 +314,13 @@ pub async fn reconcile_hbase(hbase: Arc<HbaseCluster>, ctx: Arc<Ctx>) -> Result<
                 &resolved_product_image,
                 vector_aggregator_address.as_deref(),
             )?;
-            let rg_statefulset =
-                build_rolegroup_statefulset(&hbase, &rolegroup, &config, &resolved_product_image)?;
+            let rg_statefulset = build_rolegroup_statefulset(
+                &hbase,
+                &hbase_role,
+                &rolegroup,
+                &config,
+                &resolved_product_image,
+            )?;
             cluster_resources
                 .add(client, rg_service)
                 .await
@@ -496,13 +503,11 @@ fn build_rolegroup_config_map(
 /// This is mostly useful for internal communication between peers, or for clients that perform client-side load balancing.
 fn build_rolegroup_service(
     hbase: &HbaseCluster,
+    hbase_role: &HbaseRole,
     rolegroup: &RoleGroupRef<HbaseCluster>,
     resolved_product_image: &ResolvedProductImage,
 ) -> Result<Service> {
-    let role = HbaseRole::from_str(&rolegroup.role).context(UnidentifiedHbaseRoleSnafu {
-        role: rolegroup.role.to_string(),
-    })?;
-    let ports = role
+    let ports = hbase_role
         .port_properties()
         .into_iter()
         .map(|(port_name, port_number, port_protocol)| ServicePort {
@@ -550,16 +555,18 @@ fn build_rolegroup_service(
 /// The [`Pod`](`stackable_operator::k8s_openapi::api::core::v1::Pod`)s are accessible through the corresponding [`Service`] (from [`build_rolegroup_service`]).
 fn build_rolegroup_statefulset(
     hbase: &HbaseCluster,
+    hbase_role: &HbaseRole,
     rolegroup_ref: &RoleGroupRef<HbaseCluster>,
     config: &HbaseConfig,
     resolved_product_image: &ResolvedProductImage,
 ) -> Result<StatefulSet> {
     let hbase_version = &resolved_product_image.app_version_label;
-    let role = HbaseRole::from_str(&rolegroup_ref.role).context(UnidentifiedHbaseRoleSnafu {
-        role: rolegroup_ref.role.to_string(),
-    })?;
 
-    let ports = role
+    // In hbase-op the restserver role is optional :/
+    let role = hbase.get_role(hbase_role);
+    let role_group = role.and_then(|r| r.role_groups.get(&rolegroup_ref.role_group));
+
+    let ports = hbase_role
         .port_properties()
         .into_iter()
         .map(|(port_name, port_number, port_protocol)| ContainerPort {
@@ -570,7 +577,7 @@ fn build_rolegroup_statefulset(
         })
         .collect();
 
-    let probe_template = match role {
+    let probe_template = match hbase_role {
         HbaseRole::Master => Probe {
             tcp_socket: Some(TCPSocketAction {
                 port: IntOrString::Int(HBASE_MASTER_PORT),
@@ -638,7 +645,7 @@ fn build_rolegroup_statefulset(
             format!("cp {HBASE_LOG_CONFIG_TMP_DIR}/{LOG4J_CONFIG_FILE} {CONFIG_DIR_NAME}",),
             format!(
                 "bin/hbase {} start",
-                match role {
+                match hbase_role {
                     HbaseRole::Master => "master",
                     HbaseRole::RegionServer => "regionserver",
                     HbaseRole::RestServer => "rest",
@@ -747,7 +754,13 @@ fn build_rolegroup_statefulset(
         ));
     }
 
-    let pod_template = pod_builder.build_template();
+    let mut pod_template = pod_builder.build_template();
+    if let Some(role) = role {
+        pod_template.merge_from(role.config.pod_overrides.clone());
+    }
+    if let Some(role_group) = role_group {
+        pod_template.merge_from(role_group.config.pod_overrides.clone());
+    }
 
     Ok(StatefulSet {
         metadata: ObjectMetaBuilder::new()
@@ -764,7 +777,7 @@ fn build_rolegroup_statefulset(
             .build(),
         spec: Some(StatefulSetSpec {
             pod_management_policy: Some("Parallel".to_string()),
-            replicas: Some(rolegroup_replicas(hbase, rolegroup_ref)?),
+            replicas: role_group.and_then(|rg| rg.replicas).map(i32::from),
             selector: LabelSelector {
                 match_labels: Some(role_group_selector_labels(
                     hbase,
@@ -780,26 +793,6 @@ fn build_rolegroup_statefulset(
         }),
         status: None,
     })
-}
-
-fn rolegroup_replicas(
-    hbase: &HbaseCluster,
-    rolegroup_ref: &RoleGroupRef<HbaseCluster>,
-) -> Result<i32, Error> {
-    let role = HbaseRole::from_str(&rolegroup_ref.role).context(UnidentifiedHbaseRoleSnafu {
-        role: rolegroup_ref.role.to_string(),
-    })?;
-
-    let replicas = hbase
-        .get_role(&role)
-        .as_ref()
-        .map(|role| &role.role_groups)
-        .and_then(|role_group| role_group.get(&rolegroup_ref.role_group))
-        .and_then(|rg| rg.replicas)
-        .map(i32::from)
-        .unwrap_or(0);
-
-    Ok(replicas)
 }
 
 type RoleConfig = HashMap<String, (Vec<PropertyNameKind>, Role<HbaseConfigFragment>)>;
