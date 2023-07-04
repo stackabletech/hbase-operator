@@ -75,6 +75,29 @@ status:
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
+  name: test-hbase-regionserver-resources-from-pod-overrides
+spec:
+  template:
+    spec:
+      containers:
+        - name: hbase
+          resources:
+            requests:
+              cpu: 700m
+              memory: 1Gi
+            limits:
+              cpu: "2100m"
+              memory: 1Gi
+{% if lookup('env', 'VECTOR_AGGREGATOR') %}
+        - name: vector
+{% endif %}
+status:
+  readyReplicas: 1
+  replicas: 1
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
   name: test-hbase-restserver-default
 spec:
   template:
