@@ -57,13 +57,21 @@ tests:
       - hdfs-latest
       - zookeeper-latest
 suites:
-  - name: latest
+  - name: nightly
+    patch:
+      - dimensions:
+          - name: hbase
+            expr: last
+          - name: zookeeper
+            expr: last
+          - name: hdfs
+            expr: last
+  - name: smoke-latest
+    select:
+      - smoke
     patch:
       - dimensions:
           - expr: last
-  - name: smoke
-    select:
-      - smoke
   - name: openshift
     patch:
       - dimensions:
@@ -71,3 +79,9 @@ suites:
       - dimensions:
           - name: openshift
             expr: "true"
+          - name: hbase
+            expr: last
+          - name: zookeeper
+            expr: last
+          - name: hdfs
+            expr: last
