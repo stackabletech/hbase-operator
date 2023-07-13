@@ -25,11 +25,7 @@ use stackable_operator::{
         product_image_selection::ResolvedProductImage,
         rbac::{build_rbac_resources, service_account_name},
     },
-    k8s_openapi::{
-        api::core::v1::{EmptyDirVolumeSource, Volume},
-        apimachinery::pkg::api::resource::Quantity,
-        DeepMerge,
-    },
+    k8s_openapi::{api::core::v1::Volume, DeepMerge},
     k8s_openapi::{
         api::{
             apps::v1::{StatefulSet, StatefulSetSpec},
@@ -69,11 +65,10 @@ use strum::{EnumDiscriminants, IntoStaticStr};
 
 pub const HBASE_CONTROLLER_NAME: &str = "hbasecluster";
 pub const STACKABLE_LOG_DIR: &str = "/stackable/log";
-pub const MAX_HBASE_LOG_FILES_SIZE_IN_MIB: u32 = 10;
-
-const OVERFLOW_BUFFER_ON_LOG_VOLUME_IN_MIB: u32 = 1;
-const LOG_VOLUME_SIZE_IN_MIB: u32 =
-    MAX_HBASE_LOG_FILES_SIZE_IN_MIB + OVERFLOW_BUFFER_ON_LOG_VOLUME_IN_MIB;
+pub const MAX_HBASE_LOG_FILES_SIZE: MemoryQuantity = MemoryQuantity {
+    value: 10.0,
+    unit: BinaryMultiple::Mebi,
+};
 
 const CONFIG_DIR_NAME: &str = "/stackable/conf";
 const HDFS_DISCOVERY_TMP_DIR: &str = "/stackable/tmp/hdfs";
@@ -696,14 +691,12 @@ fn build_rolegroup_statefulset(
             }),
             ..Default::default()
         })
-        .add_volume(Volume {
-            name: "log".to_string(),
-            empty_dir: Some(EmptyDirVolumeSource {
-                medium: None,
-                size_limit: Some(Quantity(format!("{LOG_VOLUME_SIZE_IN_MIB}Mi"))),
-            }),
-            ..Volume::default()
-        })
+        .add_empty_dir_volume(
+            "log",
+            Some(product_logging::framework::calculate_log_volume_size_limit(
+                &[MAX_HBASE_LOG_FILES_SIZE],
+            )),
+        )
         .service_account_name(service_account_name(APP_NAME))
         .security_context(
             PodSecurityContextBuilder::new()
