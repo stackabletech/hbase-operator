@@ -5,6 +5,7 @@ use stackable_operator::{
     client::Client,
     k8s_openapi::api::core::v1::ConfigMap,
     kube::ResourceExt,
+    memory::BinaryMultiple,
     product_logging::{
         self,
         spec::{ContainerLogConfig, ContainerLogConfigChoice, Logging},
@@ -12,7 +13,7 @@ use stackable_operator::{
     role_utils::RoleGroupRef,
 };
 
-use crate::hbase_controller::{MAX_HBASE_LOG_FILES_SIZE_IN_MIB, STACKABLE_LOG_DIR};
+use crate::hbase_controller::{MAX_HBASE_LOG_FILES_SIZE, STACKABLE_LOG_DIR};
 
 #[derive(Snafu, Debug)]
 pub enum Error {
@@ -92,7 +93,10 @@ pub fn extend_role_group_config_map(
             product_logging::framework::create_log4j_config(
                 &format!("{STACKABLE_LOG_DIR}/hbase"),
                 HBASE_LOG_FILE,
-                MAX_HBASE_LOG_FILES_SIZE_IN_MIB,
+                MAX_HBASE_LOG_FILES_SIZE
+                    .scale_to(BinaryMultiple::Mebi)
+                    .floor()
+                    .value as u32,
                 CONSOLE_CONVERSION_PATTERN,
                 log_config,
             ),

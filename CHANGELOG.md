@@ -11,7 +11,7 @@
 
 ### Changed
 
-- Operator-rs: `0.40.2` -> `0.41.0` ([#349]).
+- Operator-rs: `0.40.2` -> `0.44.0` ([#349], [#366], [#375]).
 - Use 0.0.0-dev product images for tests and examples ([#351]).
 - Use testing-tools 0.2.0 ([#351]).
 - Run as root group ([#359]).
@@ -23,6 +23,7 @@
 - Fix `hbase.zookeeper.quorum` to not contain the znode path, instead pass it via `zookeeper.znode.parent` ([#357]).
 - Add `hbase.zookeeper.property.clientPort` setting, because hbase sometimes tried to access zookeeper with the (wrong) default port ([#357]).
 - Fix test assert by adding variable quoting ([#359]).
+- Increase the size limit of the log volume ([#375]).
 
 [#349]: https://github.com/stackabletech/hbase-operator/pull/349
 [#350]: https://github.com/stackabletech/hbase-operator/pull/350
@@ -35,6 +36,7 @@
 [#369]: https://github.com/stackabletech/hbase-operator/pull/369
 [#371]: https://github.com/stackabletech/hbase-operator/pull/371
 [#373]: https://github.com/stackabletech/hbase-operator/pull/373
+[#375]: https://github.com/stackabletech/hbase-operator/pull/375
 
 ## [23.4.0] - 2023-04-17
 
