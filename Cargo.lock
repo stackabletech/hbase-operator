@@ -1885,7 +1885,7 @@ dependencies = [
 
 [[package]]
 name = "stackable-hbase-crd"
-version = "0.0.0-dev"
+version = "23.7.0"
 dependencies = [
  "rstest",
  "serde",
@@ -1899,7 +1899,7 @@ dependencies = [
 
 [[package]]
 name = "stackable-hbase-operator"
-version = "0.0.0-dev"
+version = "23.7.0"
 dependencies = [
  "anyhow",
  "built",

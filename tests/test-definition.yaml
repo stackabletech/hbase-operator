@@ -2,28 +2,28 @@
 dimensions:
   - name: hbase
     values:
-      - 2.4.8-stackable0.0.0-dev
-      - 2.4.9-stackable0.0.0-dev
-      - 2.4.11-stackable0.0.0-dev
-      - 2.4.12-stackable0.0.0-dev
+      - 2.4.8-stackable23.7
+      - 2.4.9-stackable23.7
+      - 2.4.11-stackable23.7
+      - 2.4.12-stackable23.7
   - name: hbase-latest
     values:
-      - 2.4.12-stackable0.0.0-dev
+      - 2.4.12-stackable23.7
   - name: hdfs
     values:
-      - 3.2.2-stackable0.0.0-dev
-      - 3.3.3-stackable0.0.0-dev
+      - 3.2.2-stackable23.7
+      - 3.3.3-stackable23.7
   - name: hdfs-latest
     values:
-      - 3.3.4-stackable0.0.0-dev
+      - 3.3.4-stackable23.7
   - name: zookeeper
     values:
-      - 3.6.3-stackable0.0.0-dev
-      - 3.7.0-stackable0.0.0-dev
-      - 3.8.0-stackable0.0.0-dev
+      - 3.6.3-stackable23.7
+      - 3.7.0-stackable23.7
+      - 3.8.0-stackable23.7
   - name: zookeeper-latest
     values:
-      - 3.8.0-stackable0.0.0-dev
+      - 3.8.0-stackable23.7
   # Used for zookeeper, hdfs and hbase
   - name: listener-class
     values:
