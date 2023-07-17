@@ -4,6 +4,14 @@ include::home:concepts:stackable_resource_requests.adoc[]
 
 If no resources are configured explicitly, the HBase operator uses following defaults:
 
+A minimal HA setup consisting of 2 masters, 2 regionservers and 2 restservers has the following https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/[resource requirements]:
+
+* `2700m` CPU request
+* `7800m` CPU limit
+* `5888m` memory request and limit
+
+Corresponding to the values above, the operator uses the following resource defaults:
+
 [source,yaml]
 ----
 spec:
@@ -12,17 +20,17 @@ spec:
       resources:
         cpu:
           min: 250m
-          max: 1000m
+          max: "1"
         memory:
-          limit: 512Mi
+          limit: 1Gi
   regionServers:
     config:
       resources:
         cpu:
           min: 250m
-          max: 1000m
+          max: "1"
         memory:
-          limit: 1024Mi
+          limit: 1Gi
   restServers:
     config:
       resources:
