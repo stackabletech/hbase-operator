@@ -17,5 +17,5 @@ strum = { version = "0.24", features = ["derive"] }
 tracing = "0.1"
 
 [dev-dependencies]
-rstest = "0.17"
+rstest = "0.18"
 serde_yaml = "0.9"
