@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- Default stackableVersion to operator version ([#382]).
+
 ### Changed
 
 - `vector` `0.26.0` -> `0.31.0` ([#382]).
