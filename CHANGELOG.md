@@ -4,7 +4,7 @@
 
 ### Added
 
-- Default stackableVersion to operator version ([#382]).
+- Default stackableVersion to operator version ([#385]).
 
 ### Changed
 
@@ -12,6 +12,7 @@
 - `operator-rs` `0.44.0` -> `0.45.1` ([#382]).
 
 [#382]: https://github.com/stackabletech/hbase-operator/pull/382
+[#385]: https://github.com/stackabletech/hbase-operator/pull/385
 
 ## [23.7.0] - 2023-07-14
 
