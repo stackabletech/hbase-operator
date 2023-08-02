@@ -6,7 +6,6 @@ metadata:
 spec:
   image:
     productVersion: 3.3.4
-    stackableVersion: 0.0.0-dev
   clusterConfig:
     dfsReplication: 1
     zookeeperConfigMapName: simple-znode
