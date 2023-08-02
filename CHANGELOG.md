@@ -9,7 +9,7 @@
 ### Changed
 
 - `vector` `0.26.0` -> `0.31.0` ([#382]).
-- `operator-rs` `0.44.0` -> `0.45.1` ([#382]).
+- `operator-rs` `0.44.0` -> `0.45.1` ([#385]).
 
 [#382]: https://github.com/stackabletech/hbase-operator/pull/382
 [#385]: https://github.com/stackabletech/hbase-operator/pull/385
