@@ -107,8 +107,7 @@ mod tests {
         spec:
           image:
             productVersion: 2.4.12
-            stackableVersion: 23.4.0-rc2
-          clusterConfig:    
+          clusterConfig:
             hdfsConfigMapName: simple-hdfs
             zookeeperConfigMapName: simple-znode
           masters:
@@ -231,8 +230,7 @@ mod tests {
         spec:
           image:
             productVersion: 2.4.12
-            stackableVersion: 23.4.0-rc2
-          clusterConfig:  
+          clusterConfig:
             hdfsConfigMapName: simple-hdfs
             zookeeperConfigMapName: simple-znode
           masters:

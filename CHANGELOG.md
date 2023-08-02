@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Added
+
+- Default stackableVersion to operator version ([#385]).
+
+[#385]: https://github.com/stackabletech/hbase-operator/pull/385
+
 ## [23.7.0] - 2023-07-14
 
 ### Added

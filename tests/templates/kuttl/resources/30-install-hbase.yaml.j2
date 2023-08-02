@@ -5,8 +5,7 @@ metadata:
   name: test-hbase
 spec:
   image:
-    productVersion: "{{ test_scenario['values']['hbase-latest'].split('-stackable')[0] }}"
-    stackableVersion: "{{ test_scenario['values']['hbase-latest'].split('-stackable')[1] }}"
+    productVersion: "{{ test_scenario['values']['hbase-latest'] }}"
   clusterConfig:
     hdfsConfigMapName: test-hdfs-namenode-default
     zookeeperConfigMapName: test-znode
