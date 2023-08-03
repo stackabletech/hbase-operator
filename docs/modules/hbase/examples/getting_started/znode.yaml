@@ -2,7 +2,7 @@
 apiVersion: zookeeper.stackable.tech/v1alpha1
 kind: ZookeeperZnode
 metadata:
-  name: simple-znode-hdfs
+  name: simple-hdfs-znode
 spec:
   clusterRef:
     name: simple-zk
@@ -10,7 +10,7 @@ spec:
 apiVersion: zookeeper.stackable.tech/v1alpha1
 kind: ZookeeperZnode
 metadata:
-  name: simple-znode-hbase
+  name: simple-hbase-znode
 spec:
   clusterRef:
     name: simple-zk
