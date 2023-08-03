@@ -27,7 +27,7 @@ spec:
 <1> The name of the HBase cluster, which is also the name of the created discovery ConfigMap.
 <2> The namespace of the discovery ConfigMap.
 <3> The ConfigMap name to discover the HDFS cluster.
-<4> The ConfigMap name to discover the ZooKeeper cluster.
+<4> The ConfigMap name to discover the ZooKeeper ZNode.
 
 The resulting discovery ConfigMap is located at `{namespace}/{cluster-name}`.
 

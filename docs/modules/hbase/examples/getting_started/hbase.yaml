@@ -8,7 +8,7 @@ spec:
     productVersion: 2.4.12
   clusterConfig:
     hdfsConfigMapName: simple-hdfs
-    zookeeperConfigMapName: simple-znode
+    zookeeperConfigMapName: simple-znode-hbase
   masters:
     roleGroups:
       default:

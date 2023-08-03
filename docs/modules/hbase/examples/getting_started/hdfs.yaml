@@ -8,7 +8,7 @@ spec:
     productVersion: 3.3.4
   clusterConfig:
     dfsReplication: 1
-    zookeeperConfigMapName: simple-znode
+    zookeeperConfigMapName: simple-znode-hdfs
   nameNodes:
     roleGroups:
       default:
