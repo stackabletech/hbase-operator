@@ -27,6 +27,10 @@ use strum::{Display, EnumIter, EnumString};
 
 pub const APP_NAME: &str = "hbase";
 
+pub const CONFIG_DIR_NAME: &str = "/stackable/conf";
+
+pub const JVM_SECURITY_PROPERTIES_FILE: &str = "security.properties";
+
 pub const HBASE_ENV_SH: &str = "hbase-env.sh";
 pub const HBASE_SITE_XML: &str = "hbase-site.xml";
 
@@ -334,7 +338,7 @@ impl Configuration for HbaseConfigFragment {
         match file {
             HBASE_ENV_SH => {
                 result.insert(HBASE_MANAGES_ZK.to_string(), Some("false".to_string()));
-                let mut all_hbase_opts = format!("-javaagent:/stackable/jmx/jmx_prometheus_javaagent-0.16.1.jar={METRICS_PORT}:/stackable/jmx/region-server.yaml");
+                let mut all_hbase_opts = format!("-Djava.security.properties={CONFIG_DIR_NAME}/{JVM_SECURITY_PROPERTIES_FILE} -javaagent:/stackable/jmx/jmx_prometheus_javaagent-0.16.1.jar={METRICS_PORT}:/stackable/jmx/region-server.yaml");
                 if let Some(hbase_opts) = &self.hbase_opts {
                     all_hbase_opts += " ";
                     all_hbase_opts += hbase_opts;
