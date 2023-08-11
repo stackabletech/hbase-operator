@@ -22,7 +22,11 @@ properties:
         - fromVersion: "0.0.0"
           value: "5"
       roles:
-        - name: "server"
+        - name: "master"
+          required: true
+        - name: "regionserver"
+          required: true
+        - name: "restserver"
           required: true
       asOfVersion: "0.0.0"
       comment: "TTL for successfully resolved domain names."
@@ -41,7 +45,11 @@ properties:
         - fromVersion: "0.0.0"
           value: "0"
       roles:
-        - name: "server"
+        - name: "master"
+          required: true
+        - name: "regionserver"
+          required: true
+        - name: "restserver"
           required: true
       asOfVersion: "0.0.0"
       comment: "TTL for domain names that cannot be resolved."
