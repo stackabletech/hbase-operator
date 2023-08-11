@@ -5,6 +5,7 @@
 ### Added
 
 - Default stackableVersion to operator version ([#385]).
+- Configuration overrides for the JVM security properties, such as DNS caching ([#389]).
 
 ### Changed
 
@@ -13,6 +14,7 @@
 
 [#382]: https://github.com/stackabletech/hbase-operator/pull/382
 [#385]: https://github.com/stackabletech/hbase-operator/pull/385
+[#389]: https://github.com/stackabletech/hbase-operator/pull/389
 
 ## [23.7.0] - 2023-07-14
 
