@@ -11,6 +11,7 @@ For a role or role group, at the same level of `config`, you can specify: `confi
 
 - `hbase-site.xml`
 - `hbase-env.sh`
+- `security.properties`
 
 NOTE: `hdfs-site.xml` is not listed here, the file is always taken from the referenced hdfs cluster. If you want to modify it, have a look at xref:hdfs:usage-guide/configuration-environment-overrides.adoc[HDFS configuration overrides].
 
@@ -49,6 +50,33 @@ restServers:
 All override property values must be strings. The properties will be formatted and escaped correctly into the XML file, respectively inserted as is into the `env.sh` file.
 
 For a full list of configuration options we refer to the HBase https://hbase.apache.org/book.html#config.files[Configuration Documentation].
+
+=== The security.properties file
+
+The `security.properties` file is used to configure JVM security properties. It is very seldom that users need to tweak any of these, but there is one use-case that stands out, and that users need to be aware of: the JVM DNS cache.
+
+The JVM manages it's own cache of successfully resolved host names as well as a cache of host names that cannot be resolved. Some products of the Stackable platform are very sensible to the contents of these caches and their performance is heavily affected by them. As of version 3.4.12, Apache Hbase performs poorly if the positive cache is disabled. To cache resolved host names, and thus speeding up Hbase queries you can configure the TTL of entries in the positive cache like this:
+
+[source,yaml]
+----
+  masters:
+    configOverrides:
+      security.properties:
+        networkaddress.cache.ttl: "10"
+        networkaddress.cache.negative.ttl: "0"
+  regionServers:
+    configOverrides:
+      security.properties:
+        networkaddress.cache.ttl: "10"
+        networkaddress.cache.negative.ttl: "0"
+  restServers:
+    configOverrides:
+      security.properties:
+        networkaddress.cache.ttl: "30"
+        networkaddress.cache.negative.ttl: "0"
+----
+
+For details on the JVM security see https://docs.oracle.com/en/java/javase/11/security/java-security-overview1.html
 
 // Environment configuration is not implemented. The environment is managed
 // with the hbase-env.sh configuration file
