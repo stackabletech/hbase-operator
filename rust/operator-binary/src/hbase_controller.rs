@@ -12,8 +12,9 @@ use crate::{
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_hbase_crd::{
     Container, HbaseCluster, HbaseClusterStatus, HbaseConfig, HbaseConfigFragment, HbaseRole,
-    APP_NAME, HBASE_ENV_SH, HBASE_HEAPSIZE, HBASE_MASTER_PORT, HBASE_REGIONSERVER_PORT,
-    HBASE_REST_PORT, HBASE_SITE_XML, JVM_HEAP_FACTOR,
+    APP_NAME, CONFIG_DIR_NAME, HBASE_ENV_SH, HBASE_HEAPSIZE, HBASE_MASTER_PORT,
+    HBASE_REGIONSERVER_PORT, HBASE_REST_PORT, HBASE_SITE_XML, JVM_HEAP_FACTOR,
+    JVM_SECURITY_PROPERTIES_FILE,
 };
 use stackable_operator::{
     builder::{
@@ -40,7 +41,11 @@ use stackable_operator::{
     labels::{role_group_selector_labels, role_selector_labels, ObjectLabels},
     logging::controller::ReconcilerError,
     memory::{BinaryMultiple, MemoryQuantity},
-    product_config::{types::PropertyNameKind, writer, ProductConfigManager},
+    product_config::{
+        types::PropertyNameKind,
+        writer::{self, to_java_properties_string},
+        ProductConfigManager,
+    },
     product_config_utils::{transform_all_roles_to_config, validate_all_roles_and_groups_config},
     product_logging::{
         self,
@@ -70,7 +75,6 @@ pub const MAX_HBASE_LOG_FILES_SIZE: MemoryQuantity = MemoryQuantity {
     unit: BinaryMultiple::Mebi,
 };
 
-const CONFIG_DIR_NAME: &str = "/stackable/conf";
 const HDFS_DISCOVERY_TMP_DIR: &str = "/stackable/tmp/hdfs";
 const HBASE_CONFIG_TMP_DIR: &str = "/stackable/tmp/hbase";
 const HBASE_LOG_CONFIG_TMP_DIR: &str = "/stackable/tmp/log_config";
@@ -201,6 +205,14 @@ pub enum Error {
     #[snafu(display("failed to build RBAC resources"))]
     BuildRbacResources {
         source: stackable_operator::error::Error,
+    },
+    #[snafu(display(
+        "failed to serialize [{JVM_SECURITY_PROPERTIES_FILE}] for {}",
+        rolegroup
+    ))]
+    SerializeJvmSecurity {
+        source: stackable_operator::product_config::writer::PropertiesWriterError,
+        rolegroup: RoleGroupRef<HbaseCluster>,
     },
 }
 
@@ -451,6 +463,16 @@ fn build_rolegroup_config_map(
 
     hbase_env_config.insert(HBASE_HEAPSIZE.to_string(), heap_in_mebi);
 
+    let jvm_sec_props: BTreeMap<String, Option<String>> = rolegroup_config
+        .get(&PropertyNameKind::File(
+            JVM_SECURITY_PROPERTIES_FILE.to_string(),
+        ))
+        .cloned()
+        .unwrap_or_default()
+        .into_iter()
+        .map(|(k, v)| (k, Some(v)))
+        .collect();
+
     let mut builder = ConfigMapBuilder::new();
 
     builder
@@ -478,7 +500,15 @@ fn build_rolegroup_config_map(
                     .iter(),
             ),
         )
-        .add_data(HBASE_ENV_SH, write_hbase_env_sh(hbase_env_config.iter()));
+        .add_data(HBASE_ENV_SH, write_hbase_env_sh(hbase_env_config.iter()))
+        .add_data(
+            JVM_SECURITY_PROPERTIES_FILE,
+            to_java_properties_string(jvm_sec_props.iter()).with_context(|_| {
+                SerializeJvmSecuritySnafu {
+                    rolegroup: rolegroup.clone(),
+                }
+            })?,
+        );
 
     extend_role_group_config_map(
         rolegroup,
@@ -796,6 +826,7 @@ fn build_roles(hbase: &HbaseCluster) -> Result<RoleConfig> {
     let config_types = vec![
         PropertyNameKind::File(HBASE_ENV_SH.to_string()),
         PropertyNameKind::File(HBASE_SITE_XML.to_string()),
+        PropertyNameKind::File(JVM_SECURITY_PROPERTIES_FILE.to_string()),
     ];
 
     let mut roles: RoleConfig = [
