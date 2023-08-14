@@ -76,7 +76,7 @@ The JVM manages it's own cache of successfully resolved host names as well as a 
         networkaddress.cache.negative.ttl: "0"
 ----
 
-NOTE: the example above is exactly the configuration the operator generates by default.
+NOTE: The operator configures DNS caching by default as shown in the example above.
 
 For details on the JVM security see https://docs.oracle.com/en/java/javase/11/security/java-security-overview1.html
 
