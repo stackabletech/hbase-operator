@@ -114,7 +114,7 @@ pub struct HbaseClusterConfig {
     pub vector_aggregator_config_map_name: Option<String>,
     /// ZooKeeper cluster connection details from discovery config map
     pub zookeeper_config_map_name: String,
-    /// This field controls which type of Service the Operator creates for this TrinoCluster:
+    /// This field controls which type of Service the Operator creates for this HbaseCluster:
     ///
     /// * cluster-internal: Use a ClusterIP service
     ///
