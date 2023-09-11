@@ -14,11 +14,12 @@
 
 ### Fixed
 
-- Fix Zookeeper hbase.rootdir when users point to discovery ConfigMap of ZookeeperCluster rather than ZNode. Print a warning in that case ([#XXX]).
+- Fix Zookeeper hbase.rootdir when users point to discovery ConfigMap of ZookeeperCluster rather than ZNode. Print a warning in that case ([#394]).
 
 [#382]: https://github.com/stackabletech/hbase-operator/pull/382
 [#385]: https://github.com/stackabletech/hbase-operator/pull/385
 [#389]: https://github.com/stackabletech/hbase-operator/pull/389
+[#394]: https://github.com/stackabletech/hbase-operator/pull/394
 
 ## [23.7.0] - 2023-07-14
 
