@@ -6,6 +6,7 @@ use stackable_operator::{
     client::Client, k8s_openapi::api::core::v1::ConfigMap, kube::ResourceExt,
 };
 use strum::{EnumDiscriminants, IntoStaticStr};
+use tracing::warn;
 
 const ZOOKEEPER_DISCOVERY_CM_HOSTS_ENTRY: &str = "ZOOKEEPER_HOSTS";
 const ZOOKEEPER_DISCOVERY_CM_CHROOT_ENTRY: &str = "ZOOKEEPER_CHROOT";
@@ -72,7 +73,7 @@ impl ZookeeperConnectionInformation {
                 cm_name: zk_discovery_cm_name.as_str(),
                 entry: ZOOKEEPER_DISCOVERY_CM_HOSTS_ENTRY,
             })?;
-        let chroot = zk_discovery_cm
+        let mut chroot = zk_discovery_cm
             .data
             .as_mut()
             .and_then(|data| data.remove(ZOOKEEPER_DISCOVERY_CM_CHROOT_ENTRY))
@@ -98,7 +99,16 @@ impl ZookeeperConnectionInformation {
         // Before https://github.com/stackabletech/hbase-operator/issues/354, hbase automatically added a `/hbase` suffix, ending up with a chroot of e.g. `/znode-fe51edff-8df9-43a8-ac5f-4781b071ae5f/hbase`.
         // Because the chroot we read from the ZNode discovery CM is only `/znode-fe51edff-8df9-43a8-ac5f-4781b071ae5f`, we need to prepend the `/hbase` suffix ourselves.
         // If we don't do so, hbase clusters created before #354 would need to be migrated to the different znode path!
-        let chroot = format!("{chroot}/hbase");
+
+        // Check if a user points to a discovery CM of a HBaseCluster rather than a ZNode.
+        if chroot == "/" {
+            warn!("It is recommended to let the HBase cluster point to a discovery ConfigMap of a ZNode rater than a ZookeeperCluster. \
+            This prevents accidental reuse of the same Zookeeper path for multiple product instances. \
+            See https://docs.stackable.tech/home/stable/zookeeper/getting_started/first_steps for details");
+            chroot = "/hbase".to_string();
+        } else {
+            chroot = format!("{chroot}/hbase");
+        }
 
         Ok(Self {
             hosts,

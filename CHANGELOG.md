@@ -12,6 +12,10 @@
 - `vector` `0.26.0` -> `0.31.0` ([#382]).
 - `operator-rs` `0.44.0` -> `0.45.1` ([#385]).
 
+### Fixed
+
+- Fix Zookeeper hbase.rootdir when users point to discovery ConfigMap of ZookeeperCluster rather than ZNode. Print a warning in that case ([#XXX]).
+
 [#382]: https://github.com/stackabletech/hbase-operator/pull/382
 [#385]: https://github.com/stackabletech/hbase-operator/pull/385
 [#389]: https://github.com/stackabletech/hbase-operator/pull/389
