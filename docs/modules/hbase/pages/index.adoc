@@ -2,37 +2,47 @@
 :description: The Stackable Operator for Apache HBase is a Kubernetes operator that can manage Apache HBase clusters. Learn about its features, resources, dependencies, and demos, and see the list of supported HBase versions.
 :keywords: Stackable Operator, Apache HBase, Kubernetes, operator, engineer, CRD, StatefulSet, ConfigMap, Service, ZooKeeper, HDFS
 
-This is an Operator for Kubernetes that manages https://hbase.apache.org/[Apache HBase] clusters.
-Apache HBase is an open-source, distributed, non-relational database that runs on top of the Hadoop Distributed File System (HDFS).
+This is an Operator for Kubernetes that manages https://hbase.apache.org/[Apache HBase] clusters. Apache HBase is an
+open-source, distributed, non-relational database that runs on top of the Hadoop Distributed File System (HDFS).
 
 == Getting started
 
-Follow the xref:getting_started/index.adoc[] guide to learn how to xref:getting_started/installation.adoc[install] the Stackable Operator for Apache HBase as well as the dependencies. The Guide will also show you how to xref:getting_started/first_steps.adoc[interact] with HBase running on Kubernetes by creating tables and some data using the REST API or Apache Phoenix. 
+Follow the xref:getting_started/index.adoc[] guide to learn how to xref:getting_started/installation.adoc[install] the
+Stackable Operator for Apache HBase as well as the dependencies. The Guide will also show you how to
+xref:getting_started/first_steps.adoc[interact] with HBase running on Kubernetes by creating tables and some data using
+the REST API or Apache Phoenix. 
 
-The xref:usage-guide/index.adoc[] contains more information on xref:usage-guide/phoenix.adoc[] as well as other topics such as xref:usage-guide/resource-requests.adoc[CPU and memory configuration], xref:usage-guide/monitoring.adoc[] and xref:usage-guide/logging.adoc[].
+The xref:usage-guide/index.adoc[] contains more information on xref:usage-guide/phoenix.adoc[] as well as other topics
+such as xref:usage-guide/resource-requests.adoc[CPU and memory configuration], xref:usage-guide/monitoring.adoc[] and
+xref:usage-guide/logging.adoc[].
 
 == Operator model
 
-The Operator manages the _HbaseCluster_ custom resource. You configure your HBase instance using this resource, and the Operator creates Kubernetes resources such as StatefulSets, ConfigMaps and Services accordingly.
+The Operator manages the _HbaseCluster_ custom resource. You configure your HBase instance using this resource, and the
+Operator creates Kubernetes resources such as StatefulSets, ConfigMaps and Services accordingly.
 
 HBase uses three xref:concepts:roles-and-role-groups.adoc[roles]: `masters`, `regionServers` and `restServers`.
 
 image::hbase_overview.drawio.svg[A diagram depicting the Kubernetes resources created by the operator]
 
-For every RoleGroup a **StatefulSet** is created. Each StatefulSet can contain multiple replicas (Pods).
-For every RoleGroup a **Service** is created, as well as one for the whole cluster that references the `regionServers`.
-For every Role and RoleGroup the Operator creates a **Service**.
+For every RoleGroup a **StatefulSet** is created. Each StatefulSet can contain multiple replicas (Pods). For every
+RoleGroup a **Service** is created, as well as one for the whole cluster that references the `regionServers`. For every
+Role and RoleGroup the Operator creates a **Service**.
 
-A **ConfigMap** is created for each RoleGroup containing 3 files: `hbase-env.sh` and `hbase-site.xml` files generated from the HbaseCluster configuration (See xref:usage-guide/index.adoc[] for more information), plus a `log4j.properties` file used for xref:usage-guide/logging.adoc[].
-The Operator creates a **xref:usage-guide/discovery.adoc[discovery ConfigMap]** for the whole HbaseCluster a which contains information on how to connect to the HBase cluster.
+A **ConfigMap** is created for each RoleGroup containing 3 files: `hbase-env.sh` and `hbase-site.xml` files generated
+from the HbaseCluster configuration (See xref:usage-guide/index.adoc[] for more information), plus a `log4j.properties`
+file used for xref:usage-guide/logging.adoc[]. The Operator creates a
+**xref:usage-guide/discovery.adoc[discovery ConfigMap]** for the whole HbaseCluster a which contains information on how
+to connect to the HBase cluster.
 
 == Dependencies
 
-A distributed Apache HBase installation depends on a running Apache ZooKeeper and HDFS cluster. See the documentation for the xref:hdfs:index.adoc[Stackable Operator for Apache HDFS] how to set up these clusters.
+A distributed Apache HBase installation depends on a running Apache ZooKeeper and HDFS cluster. See the documentation
+for the xref:hdfs:index.adoc[Stackable Operator for Apache HDFS] how to set up these clusters.
 
 == Demo
 
-The xref:stackablectl::demos/hbase-hdfs-load-cycling-data.adoc[] demo shows how you can use HBase together with HDFS.
+The xref:demos:hbase-hdfs-load-cycling-data.adoc[] demo shows how you can use HBase together with HDFS.
 
 == Supported Versions
 
