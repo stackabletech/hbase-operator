@@ -23,7 +23,7 @@ pub enum Error {
 
 pub async fn add_pdbs(
     pdb: &PdbConfig,
-    zookeeper: &HbaseCluster,
+    hbase: &HbaseCluster,
     role: &HbaseRole,
     client: &Client,
     cluster_resources: &mut ClusterResources,
@@ -37,7 +37,7 @@ pub async fn add_pdbs(
         HbaseRole::RestServer => max_unavailable_rest_servers(),
     });
     let pdb = PodDisruptionBudgetBuilder::new_with_role(
-        zookeeper,
+        hbase,
         APP_NAME,
         &role.to_string(),
         OPERATOR_NAME,
