@@ -69,7 +69,7 @@ fn max_unavailable_region_servers() -> u16 {
 fn max_unavailable_rest_servers() -> u16 {
     // RestServers are stateless, we only need to make sure we have two available, so we don't have a single point of failure.
     // However, users probably deploy multiple rest servers for both - availability and performance. As there is the use-case
-    // of having multiple RestServers for availability reasons, we need to be restrictive and stick to our `maxUnavailable: 0`
+    // of having multiple RestServers for availability reasons, we need to be restrictive and stick to our `maxUnavailable: 1`
     // for `Multiple replicas to increase availability` rolegroups guideline.
     1
 }
