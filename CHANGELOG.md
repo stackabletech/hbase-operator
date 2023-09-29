@@ -6,12 +6,12 @@
 
 - Default stackableVersion to operator version ([#385]).
 - Configuration overrides for the JVM security properties, such as DNS caching ([#389]).
-- Support PodDisruptionBudgets ([#XXX]).
+- Support PodDisruptionBudgets ([#399]).
 
 ### Changed
 
 - `vector` `0.26.0` -> `0.31.0` ([#382]).
-- `operator-rs` `0.44.0` -> `0.51.1` ([#385], [#XXX]).
+- `operator-rs` `0.44.0` -> `0.51.1` ([#385], [#399]).
 
 ### Fixed
 
@@ -21,6 +21,7 @@
 [#385]: https://github.com/stackabletech/hbase-operator/pull/385
 [#389]: https://github.com/stackabletech/hbase-operator/pull/389
 [#394]: https://github.com/stackabletech/hbase-operator/pull/394
+[#399]: https://github.com/stackabletech/hbase-operator/pull/399
 
 ## [23.7.0] - 2023-07-14
 
