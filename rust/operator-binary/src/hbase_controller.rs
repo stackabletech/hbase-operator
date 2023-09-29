@@ -2,6 +2,7 @@
 
 use crate::{
     discovery::build_discovery_configmap,
+    operations::pdb::add_pdbs,
     product_logging::{
         extend_role_group_config_map, resolve_vector_aggregator_address, LOG4J_CONFIG_FILE,
     },
@@ -54,7 +55,7 @@ use stackable_operator::{
             CustomContainerLogConfig,
         },
     },
-    role_utils::{Role, RoleGroupRef},
+    role_utils::{Role, RoleConfig, RoleGroupRef},
     status::condition::{
         compute_conditions, operations::ClusterOperationsConditionBuilder,
         statefulset::StatefulSetConditionBuilder,
@@ -214,6 +215,10 @@ pub enum Error {
         source: stackable_operator::product_config::writer::PropertiesWriterError,
         rolegroup: RoleGroupRef<HbaseCluster>,
     },
+    #[snafu(display("failed to create PodDisruptionBudget"))]
+    FailedToCreatePdb {
+        source: crate::operations::pdb::Error,
+    },
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -351,6 +356,16 @@ pub async fn reconcile_hbase(hbase: Arc<HbaseCluster>, ctx: Arc<Ctx>) -> Result<
                         rolegroup: rolegroup.clone(),
                     })?,
             );
+        }
+
+        let role_config = hbase.role_config(&hbase_role);
+        if let Some(RoleConfig {
+            pod_disruption_budget: pdb,
+        }) = role_config
+        {
+            add_pdbs(pdb, &hbase, &hbase_role, client, &mut cluster_resources)
+                .await
+                .context(FailedToCreatePdbSnafu)?;
         }
     }
 
@@ -821,15 +836,18 @@ fn build_rolegroup_statefulset(
     })
 }
 
-type RoleConfig = HashMap<String, (Vec<PropertyNameKind>, Role<HbaseConfigFragment>)>;
-fn build_roles(hbase: &HbaseCluster) -> Result<RoleConfig> {
+// The result type is only defined once, there is no value in extracting it into a type definition.
+#[allow(clippy::type_complexity)]
+fn build_roles(
+    hbase: &HbaseCluster,
+) -> Result<HashMap<String, (Vec<PropertyNameKind>, Role<HbaseConfigFragment>)>> {
     let config_types = vec![
         PropertyNameKind::File(HBASE_ENV_SH.to_string()),
         PropertyNameKind::File(HBASE_SITE_XML.to_string()),
         PropertyNameKind::File(JVM_SECURITY_PROPERTIES_FILE.to_string()),
     ];
 
-    let mut roles: RoleConfig = [
+    let mut roles = HashMap::from([
         (
             HbaseRole::Master.to_string(),
             (
@@ -850,8 +868,7 @@ fn build_roles(hbase: &HbaseCluster) -> Result<RoleConfig> {
                     .context(NoRegionServerRoleSnafu)?,
             ),
         ),
-    ]
-    .into();
+    ]);
 
     if let Some(rest_servers) = hbase.get_role(&HbaseRole::RestServer) {
         roles.insert(
