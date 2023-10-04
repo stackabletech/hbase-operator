@@ -62,7 +62,6 @@ fn max_unavailable_masters() -> u16 {
 }
 
 fn max_unavailable_region_servers() -> u16 {
-    // TODO: Let our expert Lars decide :)
     1
 }
 
