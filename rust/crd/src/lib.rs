@@ -18,7 +18,7 @@ use stackable_operator::{
     kube::{runtime::reflector::ObjectRef, CustomResource, ResourceExt},
     product_config_utils::{ConfigError, Configuration},
     product_logging::{self, spec::Logging},
-    role_utils::{Role, RoleConfig, RoleGroup, RoleGroupRef},
+    role_utils::{GenericRoleConfig, Role, RoleGroup, RoleGroupRef},
     schemars::{self, JsonSchema},
     status::condition::{ClusterCondition, HasStatusCondition},
 };
@@ -441,7 +441,7 @@ impl HbaseCluster {
             })
     }
 
-    pub fn role_config(&self, role: &HbaseRole) -> Option<&RoleConfig> {
+    pub fn role_config(&self, role: &HbaseRole) -> Option<&GenericRoleConfig> {
         match role {
             HbaseRole::Master => self.spec.masters.as_ref().map(|m| &m.role_config),
             HbaseRole::RegionServer => self.spec.region_servers.as_ref().map(|rs| &rs.role_config),

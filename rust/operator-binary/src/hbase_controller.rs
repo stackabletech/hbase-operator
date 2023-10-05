@@ -55,7 +55,7 @@ use stackable_operator::{
             CustomContainerLogConfig,
         },
     },
-    role_utils::{Role, RoleConfig, RoleGroupRef},
+    role_utils::{GenericRoleConfig, Role, RoleGroupRef},
     status::condition::{
         compute_conditions, operations::ClusterOperationsConditionBuilder,
         statefulset::StatefulSetConditionBuilder,
@@ -359,7 +359,7 @@ pub async fn reconcile_hbase(hbase: Arc<HbaseCluster>, ctx: Arc<Ctx>) -> Result<
         }
 
         let role_config = hbase.role_config(&hbase_role);
-        if let Some(RoleConfig {
+        if let Some(GenericRoleConfig {
             pod_disruption_budget: pdb,
         }) = role_config
         {
