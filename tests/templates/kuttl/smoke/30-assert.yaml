@@ -28,3 +28,30 @@ metadata:
 status:
   readyReplicas: 1
   replicas: 1
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: test-hbase-master
+status:
+  expectedPods: 1
+  currentHealthy: 1
+  disruptionsAllowed: 1
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: test-hbase-regionserver
+status:
+  expectedPods: 1
+  currentHealthy: 1
+  disruptionsAllowed: 1
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: test-hbase-restserver
+status:
+  expectedPods: 1
+  currentHealthy: 1
+  disruptionsAllowed: 1
