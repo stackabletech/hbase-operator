@@ -2,8 +2,5 @@
 // This is a separate file, since it is used by both the direct HBase-Operator documentation, and the overarching
 // Stackable Platform documentation.
 
-- 2.4.6
-- 2.4.8
-- 2.4.9
-- 2.4.11
-- 2.4.12
+- 2.4.17
+- 2.4.12 (deprecated)
