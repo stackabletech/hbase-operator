@@ -4,12 +4,38 @@ You can configure the graceful shutdown as described in xref:concepts:operations
 
 == Masters
 
-As a default, masters have `15` minutes to terminate gracefully.
+As a default, masters have `20` minutes to terminate gracefully.
+
+The HBase master process will always run as PID `1` and will get a `SIGTERM` once Kubernetes wants to terminate the Pod.
+After the graceful shutdown timeout is passed and the master process still didn't exit, Kubernetes will issue an `SIGKILL`.
+
+This is equivalent to executing the `bin/hbase-daemon.sh stop master` command, which will internally also just `kill <master-pid>` (https://github.com/apache/hbase/blob/8382f55b15be6ae190f8d202a5e6a40af177ec76/bin/hbase-daemon.sh#L338[code]), wait for a configurable timeout (defaults to 20 minutes) after which `kill -9 <master-pid>` is used to `SIGKILL` the master (https://github.com/apache/hbase/blob/8382f55b15be6ae190f8d202a5e6a40af177ec76/bin/hbase-common.sh#L20-L41[code]).
+
+However, it is expected, that there is no acknowledge message in the log indicating a graceful shutdown.
 
 == RegionServers
 
 As a default, RegionServers have `60` minutes to terminate gracefully.
 
+They go through the same mechanism as documented for the <<_masters>> above.
+They will also acknowledge the graceful shutdown with a message in the logs:
+
+[source,text]
+----
+2023-10-11 12:38:05,059 INFO  [shutdown-hook-0] regionserver.ShutdownHook: Shutdown hook starting; hbase.shutdown.hook=true; fsShutdownHook=org.apache.hadoop.fs.FileSystem$Cache$ClientFinalizer@5875de6a
+2023-10-11 12:38:05,060 INFO  [shutdown-hook-0] regionserver.HRegionServer: ***** STOPPING region server 'test-hbase-regionserver-default-0.test-hbase-regionserver-default.kuttl-test-topical-parakeet.svc.cluster.local,16020,1697027870348' *****
+----
+
 == RestServers
 
 As a default, RestServers have `5` minutes to terminate gracefully.
+
+They go through the same mechanism as documented for the <<_masters>> above.
+They will also acknowledge the graceful shutdown with a message in the logs:
+
+[source,text]
+----
+2023-10-11 12:40:42,309 INFO  [JettyShutdownThread] server.AbstractConnector: Stopped ServerConnector@62dae540{HTTP/1.1, (http/1.1)}{0.0.0.0:8080}
+2023-10-11 12:40:42,309 INFO  [JettyShutdownThread] server.session: node0 Stopped scavenging
+2023-10-11 12:40:42,316 INFO  [main] RESTServer: ***** STOPPING service 'RESTServer' *****
+----
