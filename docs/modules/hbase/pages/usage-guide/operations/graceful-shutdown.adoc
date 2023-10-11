@@ -1,7 +1,15 @@
 = Graceful shutdown
 
-Graceful shutdown of HBase nodes is either not supported by the product itself
-or we have not implemented it yet.
+You can configure the graceful shutdown as described in xref:concepts:operations/pod_placement.adoc[].
 
-Outstanding implementation work for the graceful shutdowns of all products where this functionality is relevant is tracked in
-https://github.com/stackabletech/issues/issues/357
+== Masters
+
+As a default, masters have `15` minutes to terminate gracefully.
+
+== RegionServers
+
+As a default, RegionServers have `60` minutes to terminate gracefully.
+
+== RestServers
+
+As a default, RestServers have `5` minutes to terminate gracefully.

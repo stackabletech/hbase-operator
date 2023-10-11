@@ -7,11 +7,11 @@
 - Default stackableVersion to operator version ([#385]).
 - Configuration overrides for the JVM security properties, such as DNS caching ([#389]).
 - Support PodDisruptionBudgets ([#399]).
+- Support graceful shutdown ([#XXX]).
 
 ### Changed
 
 - `vector` `0.26.0` -> `0.31.0` ([#382]).
-- `operator-rs` `0.44.0` -> `0.52.1` ([#385], [#399]).
 
 ### Fixed
 

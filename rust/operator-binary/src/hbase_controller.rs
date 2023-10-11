@@ -2,7 +2,7 @@
 
 use crate::{
     discovery::build_discovery_configmap,
-    operations::pdb::add_pdbs,
+    operations::{graceful_shutdown::add_graceful_shutdown_config, pdb::add_pdbs},
     product_logging::{
         extend_role_group_config_map, resolve_vector_aggregator_address, LOG4J_CONFIG_FILE,
     },
@@ -310,7 +310,7 @@ pub async fn reconcile_hbase(hbase: Arc<HbaseCluster>, ctx: Arc<Ctx>) -> Result<
         for (rolegroup_name, rolegroup_config) in group_config.iter() {
             let rolegroup = hbase.server_rolegroup_ref(role_name, rolegroup_name);
 
-            let config = hbase
+            let merged_config = hbase
                 .merged_config(
                     &hbase_role,
                     &rolegroup.role_group,
@@ -325,7 +325,7 @@ pub async fn reconcile_hbase(hbase: Arc<HbaseCluster>, ctx: Arc<Ctx>) -> Result<
                 &rolegroup,
                 rolegroup_config,
                 &zookeeper_connection_information,
-                &config,
+                &merged_config,
                 &resolved_product_image,
                 vector_aggregator_address.as_deref(),
             )?;
@@ -333,7 +333,7 @@ pub async fn reconcile_hbase(hbase: Arc<HbaseCluster>, ctx: Arc<Ctx>) -> Result<
                 &hbase,
                 &hbase_role,
                 &rolegroup,
-                &config,
+                &merged_config,
                 &resolved_product_image,
             )?;
             cluster_resources
@@ -794,6 +794,8 @@ fn build_rolegroup_statefulset(
                 .build(),
         ));
     }
+
+    add_graceful_shutdown_config(config, &mut pod_builder);
 
     let mut pod_template = pod_builder.build_template();
     if let Some(role) = role {

@@ -14,6 +14,7 @@ use stackable_operator::{
         },
     },
     config::{fragment, fragment::Fragment, fragment::ValidationError, merge::Merge},
+    duration::Duration,
     k8s_openapi::apimachinery::pkg::api::resource::Quantity,
     kube::{runtime::reflector::ObjectRef, CustomResource, ResourceExt},
     product_config_utils::{ConfigError, Configuration},
@@ -233,6 +234,11 @@ impl HbaseRole {
                 storage: HbaseStorageConfigFragment {},
             },
         };
+        let graceful_shutdown_timeout = match &self {
+            HbaseRole::Master => Duration::from_minutes_unchecked(15),
+            HbaseRole::RegionServer => Duration::from_minutes_unchecked(60),
+            HbaseRole::RestServer => Duration::from_minutes_unchecked(5),
+        };
 
         HbaseConfigFragment {
             hbase_rootdir: None,
@@ -240,6 +246,7 @@ impl HbaseRole {
             resources,
             logging: product_logging::spec::default_logging(),
             affinity: get_affinity(cluster_name, self, hdfs_discovery_cm_name),
+            graceful_shutdown_timeout: Some(graceful_shutdown_timeout),
         }
     }
 }
@@ -306,6 +313,11 @@ pub struct HbaseConfig {
     pub logging: Logging<Container>,
     #[fragment_attrs(serde(default))]
     pub affinity: StackableAffinity,
+    #[fragment_attrs(serde(default))]
+    #[fragment_attrs(schemars(
+        description = "Time period Pods have to gracefully shut down, e.g. `30m`, `1h` or `2d`. Consult the operator documentation for details."
+    ))]
+    pub graceful_shutdown_timeout: Option<Duration>,
 }
 
 impl Configuration for HbaseConfigFragment {
