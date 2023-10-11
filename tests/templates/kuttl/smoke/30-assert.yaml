@@ -12,7 +12,7 @@ metadata:
 spec:
   template:
     spec:
-      terminationGracePeriodSeconds: 900
+      terminationGracePeriodSeconds: 1200
 status:
   readyReplicas: 1
   replicas: 1

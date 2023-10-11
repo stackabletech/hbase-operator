@@ -235,7 +235,7 @@ impl HbaseRole {
             },
         };
         let graceful_shutdown_timeout = match &self {
-            HbaseRole::Master => Duration::from_minutes_unchecked(15),
+            HbaseRole::Master => Duration::from_minutes_unchecked(20),
             HbaseRole::RegionServer => Duration::from_minutes_unchecked(60),
             HbaseRole::RestServer => Duration::from_minutes_unchecked(5),
         };
