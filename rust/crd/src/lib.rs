@@ -338,7 +338,7 @@ impl Configuration for HbaseConfigFragment {
         match file {
             HBASE_ENV_SH => {
                 result.insert(HBASE_MANAGES_ZK.to_string(), Some("false".to_string()));
-                let mut all_hbase_opts = format!("-Djava.security.properties={CONFIG_DIR_NAME}/{JVM_SECURITY_PROPERTIES_FILE} -javaagent:/stackable/jmx/jmx_prometheus_javaagent.jar={METRICS_PORT}:/stackable/jmx/region-server.yaml");
+                let mut all_hbase_opts = format!("-Djava.security.properties={CONFIG_DIR_NAME}/{JVM_SECURITY_PROPERTIES_FILE} -javaagent:/stackable/jmx/jmx_prometheus_javaagent.jar={METRICS_PORT}:/stackable/jmx/{role_name}.yaml");
                 if let Some(hbase_opts) = &self.hbase_opts {
                     all_hbase_opts += " ";
                     all_hbase_opts += hbase_opts;
