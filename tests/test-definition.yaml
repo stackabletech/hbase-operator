@@ -16,10 +16,10 @@ dimensions:
       - 3.3.6
   - name: zookeeper
     values:
-      - 3.8.2
+      - 3.8.3
   - name: zookeeper-latest
     values:
-      - 3.8.2
+      - 3.8.3
   # Used for zookeeper, hdfs and hbase
   - name: listener-class
     values:
