@@ -27,6 +27,7 @@ use stackable_operator::{
         product_image_selection::ResolvedProductImage,
         rbac::{build_rbac_resources, service_account_name},
     },
+    duration::Duration,
     k8s_openapi::{api::core::v1::Volume, DeepMerge},
     k8s_openapi::{
         api::{
@@ -65,7 +66,6 @@ use std::{
     collections::{BTreeMap, HashMap},
     str::FromStr,
     sync::Arc,
-    time::Duration,
 };
 use strum::{EnumDiscriminants, IntoStaticStr};
 
@@ -892,7 +892,7 @@ where
 }
 
 pub fn error_policy(_obj: Arc<HbaseCluster>, _error: &Error, _ctx: Arc<Ctx>) -> Action {
-    Action::requeue(Duration::from_secs(5))
+    Action::requeue(*Duration::from_secs(5))
 }
 
 pub fn build_recommended_labels<'a>(
