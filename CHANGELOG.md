@@ -12,7 +12,7 @@
 ### Changed
 
 - `vector` `0.26.0` -> `0.33.0` ([#382]).
-- `operator-rs` `0.44.0` -> `0.52.1` ([#385], [#399]).
+- `operator-rs` `0.44.0` -> `0.55.0` ([#385], [#399], [#403]).
 - Use jmx_exporter soft link instead of hardcoded version ([#403]).
 
 ### Fixed
