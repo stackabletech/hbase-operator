@@ -27,7 +27,6 @@ use stackable_operator::{
         product_image_selection::ResolvedProductImage,
         rbac::{build_rbac_resources, service_account_name},
     },
-    duration::Duration,
     k8s_openapi::{api::core::v1::Volume, DeepMerge},
     k8s_openapi::{
         api::{
@@ -61,6 +60,7 @@ use stackable_operator::{
         compute_conditions, operations::ClusterOperationsConditionBuilder,
         statefulset::StatefulSetConditionBuilder,
     },
+    time::Duration,
 };
 use std::{
     collections::{BTreeMap, HashMap},
@@ -218,6 +218,10 @@ pub enum Error {
     #[snafu(display("failed to create PodDisruptionBudget"))]
     FailedToCreatePdb {
         source: crate::operations::pdb::Error,
+    },
+    #[snafu(display("failed to configure graceful shutdown"), context(false))]
+    GracefulShutdown {
+        source: crate::operations::graceful_shutdown::Error,
     },
 }
 
@@ -795,7 +799,7 @@ fn build_rolegroup_statefulset(
         ));
     }
 
-    add_graceful_shutdown_config(config, &mut pod_builder);
+    add_graceful_shutdown_config(config, &mut pod_builder)?;
 
     let mut pod_template = pod_builder.build_template();
     if let Some(role) = role {
