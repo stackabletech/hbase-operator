@@ -4,10 +4,10 @@ You can configure the graceful shutdown as described in xref:concepts:operations
 
 == Masters
 
-As a default, masters have `20 minutes` to terminate gracefully.
+As a default, masters have `20 minutes` to shut down gracefully.
 
-The HBase master process will always run as PID `1` and will get a `SIGTERM` once Kubernetes wants to terminate the Pod.
-After the graceful shutdown timeout is passed and the master process still didn't exit, Kubernetes will issue an `SIGKILL`.
+The HBase master process will always run as PID `1` and will receive a `SIGTERM` signal when Kubernetes wants to terminate the Pod.
+After the graceful shutdown timeout runs out, and the process still didn't exit, Kubernetes will issue a `SIGKILL` signal.
 
 This is equivalent to executing the `bin/hbase-daemon.sh stop master` command, which will internally also just `kill <master-pid>` (https://github.com/apache/hbase/blob/8382f55b15be6ae190f8d202a5e6a40af177ec76/bin/hbase-daemon.sh#L338[code]), wait for a configurable timeout (defaults to 20 minutes) after which `kill -9 <master-pid>` is used to `SIGKILL` the master (https://github.com/apache/hbase/blob/8382f55b15be6ae190f8d202a5e6a40af177ec76/bin/hbase-common.sh#L20-L41[code]).
 
@@ -15,10 +15,10 @@ However, there is no acknowledge message in the log indicating a graceful shutdo
 
 == RegionServers
 
-As a default, RegionServers have `60 minutes` to terminate gracefully.
+As a default, RegionServers have `60 minutes` to shut down gracefully.
 
-They go through the same mechanism as documented for the <<_masters>> above.
-They will also acknowledge the graceful shutdown with a message in the logs:
+They use the same mechanism described above.
+In contrast to the Master servers, they will, however, acknowledge the graceful shutdown with a message in the logs:
 
 [source,text]
 ----
@@ -28,10 +28,10 @@ They will also acknowledge the graceful shutdown with a message in the logs:
 
 == RestServers
 
-As a default, RestServers have `5 minutes` to terminate gracefully.
+As a default, RestServers have `5 minutes` to shut down gracefully.
 
-They go through the same mechanism as documented for the <<_masters>> above.
-They will also acknowledge the graceful shutdown with a message in the logs:
+They use the same mechanism described above.
+In contrast to the Master servers, they will, however, acknowledge the graceful shutdown with a message in the logs:
 
 [source,text]
 ----
