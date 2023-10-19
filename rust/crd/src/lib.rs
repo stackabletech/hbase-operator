@@ -239,6 +239,7 @@ impl HbaseRole {
                 storage: HbaseStorageConfigFragment {},
             },
         };
+
         let graceful_shutdown_timeout = match &self {
             HbaseRole::Master => DEFAULT_MASTER_GRACEFUL_SHUTDOWN_TIMEOUT,
             HbaseRole::RegionServer => DEFAULT_REGION_SERVER_GRACEFUL_SHUTDOWN_TIMEOUT,
