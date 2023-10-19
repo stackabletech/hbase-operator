@@ -219,7 +219,7 @@ pub enum Error {
     FailedToCreatePdb {
         source: crate::operations::pdb::Error,
     },
-    #[snafu(display("failed to configure graceful shutdown"), context(false))]
+    #[snafu(display("failed to configure graceful shutdown"))]
     GracefulShutdown {
         source: crate::operations::graceful_shutdown::Error,
     },
@@ -799,7 +799,7 @@ fn build_rolegroup_statefulset(
         ));
     }
 
-    add_graceful_shutdown_config(config, &mut pod_builder)?;
+    add_graceful_shutdown_config(config, &mut pod_builder).context(GracefulShutdownSnafu)?;
 
     let mut pod_template = pod_builder.build_template();
     if let Some(role) = role {

@@ -57,6 +57,11 @@ pub const METRICS_PORT: i32 = 8081;
 
 pub const JVM_HEAP_FACTOR: f32 = 0.8;
 
+const DEFAULT_MASTER_GRACEFUL_SHUTDOWN_TIMEOUT: Duration = Duration::from_minutes_unchecked(20);
+const DEFAULT_REGION_SERVER_GRACEFUL_SHUTDOWN_TIMEOUT: Duration =
+    Duration::from_minutes_unchecked(60);
+const DEFAULT_REST_SERVER_GRACEFUL_SHUTDOWN_TIMEOUT: Duration = Duration::from_minutes_unchecked(5);
+
 #[derive(Snafu, Debug)]
 pub enum Error {
     #[snafu(display("the role [{role}] is invalid and does not exist in HBase"))]
@@ -235,9 +240,9 @@ impl HbaseRole {
             },
         };
         let graceful_shutdown_timeout = match &self {
-            HbaseRole::Master => Duration::from_minutes_unchecked(20),
-            HbaseRole::RegionServer => Duration::from_minutes_unchecked(60),
-            HbaseRole::RestServer => Duration::from_minutes_unchecked(5),
+            HbaseRole::Master => DEFAULT_MASTER_GRACEFUL_SHUTDOWN_TIMEOUT,
+            HbaseRole::RegionServer => DEFAULT_REGION_SERVER_GRACEFUL_SHUTDOWN_TIMEOUT,
+            HbaseRole::RestServer => DEFAULT_REST_SERVER_GRACEFUL_SHUTDOWN_TIMEOUT,
         };
 
         HbaseConfigFragment {
@@ -313,10 +318,8 @@ pub struct HbaseConfig {
     pub logging: Logging<Container>,
     #[fragment_attrs(serde(default))]
     pub affinity: StackableAffinity,
+    /// Time period Pods have to gracefully shut down, e.g. `30m`, `1h` or `2d`. Consult the operator documentation for details.
     #[fragment_attrs(serde(default))]
-    #[fragment_attrs(schemars(
-        description = "Time period Pods have to gracefully shut down, e.g. `30m`, `1h` or `2d`. Consult the operator documentation for details."
-    ))]
     pub graceful_shutdown_timeout: Option<Duration>,
 }
 
