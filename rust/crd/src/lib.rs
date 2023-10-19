@@ -318,6 +318,7 @@ pub struct HbaseConfig {
     pub logging: Logging<Container>,
     #[fragment_attrs(serde(default))]
     pub affinity: StackableAffinity,
+
     /// Time period Pods have to gracefully shut down, e.g. `30m`, `1h` or `2d`. Consult the operator documentation for details.
     #[fragment_attrs(serde(default))]
     pub graceful_shutdown_timeout: Option<Duration>,
