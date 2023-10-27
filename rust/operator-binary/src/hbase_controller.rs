@@ -27,16 +27,16 @@ use stackable_operator::{
         product_image_selection::ResolvedProductImage,
         rbac::{build_rbac_resources, service_account_name},
     },
-    k8s_openapi::{api::core::v1::Volume, DeepMerge},
     k8s_openapi::{
         api::{
             apps::v1::{StatefulSet, StatefulSetSpec},
             core::v1::{
                 ConfigMap, ConfigMapVolumeSource, ContainerPort, HTTPGetAction, Probe, Service,
-                ServicePort, ServiceSpec, TCPSocketAction,
+                ServicePort, ServiceSpec, TCPSocketAction, Volume,
             },
         },
         apimachinery::pkg::{apis::meta::v1::LabelSelector, util::intstr::IntOrString},
+        DeepMerge,
     },
     kube::{runtime::controller::Action, Resource},
     labels::{role_group_selector_labels, role_selector_labels, ObjectLabels},
@@ -50,6 +50,7 @@ use stackable_operator::{
     product_config_utils::{transform_all_roles_to_config, validate_all_roles_and_groups_config},
     product_logging::{
         self,
+        framework::{create_vector_shutdown_file_command, remove_vector_shutdown_file_command},
         spec::{
             ConfigMapLogConfig, ContainerLogConfig, ContainerLogConfigChoice,
             CustomContainerLogConfig,
@@ -61,6 +62,7 @@ use stackable_operator::{
         statefulset::StatefulSetConditionBuilder,
     },
     time::Duration,
+    utils::COMMON_BASH_TRAP_FUNCTIONS,
 };
 use std::{
     collections::{BTreeMap, HashMap},
@@ -679,28 +681,33 @@ fn build_rolegroup_statefulset(
             "pipefail".to_string(),
             "-c".to_string(),
         ])
-        .args(vec![[
-            format!("mkdir -p {}", CONFIG_DIR_NAME),
-            format!(
-                "cp {}/hdfs-site.xml {}",
-                HDFS_DISCOVERY_TMP_DIR, CONFIG_DIR_NAME
-            ),
-            format!(
-                "cp {}/core-site.xml {}",
-                HDFS_DISCOVERY_TMP_DIR, CONFIG_DIR_NAME
-            ),
-            format!("cp {}/* {}", HBASE_CONFIG_TMP_DIR, CONFIG_DIR_NAME),
-            format!("cp {HBASE_LOG_CONFIG_TMP_DIR}/{LOG4J_CONFIG_FILE} {CONFIG_DIR_NAME}",),
-            format!(
-                "bin/hbase {} start",
-                match hbase_role {
-                    HbaseRole::Master => "master",
-                    HbaseRole::RegionServer => "regionserver",
-                    HbaseRole::RestServer => "rest",
-                }
-            ),
-        ]
-        .join(" && ")])
+        .args(vec![format!(
+            "\
+mkdir -p {CONFIG_DIR_NAME}
+cp {HDFS_DISCOVERY_TMP_DIR}/hdfs-site.xml {CONFIG_DIR_NAME}
+cp {HDFS_DISCOVERY_TMP_DIR}/core-site.xml {CONFIG_DIR_NAME}
+cp {HBASE_CONFIG_TMP_DIR}/* {CONFIG_DIR_NAME}
+cp {HBASE_LOG_CONFIG_TMP_DIR}/{LOG4J_CONFIG_FILE} {CONFIG_DIR_NAME}
+
+{COMMON_BASH_TRAP_FUNCTIONS}
+{remove_vector_shutdown_file_command}
+prepare_signal_handlers
+bin/hbase {hbase_role_name_in_command} start &
+wait_for_termination
+{create_vector_shutdown_file_command}
+",
+            hbase_role_name_in_command = match hbase_role {
+                HbaseRole::Master => "master",
+                HbaseRole::RegionServer => "regionserver",
+                // Of course it is not called "restserver", so we need to have this match
+                // instead of just letting the Display impl do it's thing ;P
+                HbaseRole::RestServer => "rest",
+            },
+            remove_vector_shutdown_file_command =
+                remove_vector_shutdown_file_command(STACKABLE_LOG_DIR),
+            create_vector_shutdown_file_command =
+                create_vector_shutdown_file_command(STACKABLE_LOG_DIR),
+        )])
         .add_env_var("HBASE_CONF_DIR", CONFIG_DIR_NAME)
         // required by phoenix (for cases where Kerberos is enabled): see https://issues.apache.org/jira/browse/PHOENIX-2369
         .add_env_var("HADOOP_CONF_DIR", CONFIG_DIR_NAME)
