@@ -1,6 +1,5 @@
-pub mod affinity;
+use std::{collections::BTreeMap, str::FromStr};
 
-use affinity::get_affinity;
 use serde::{Deserialize, Serialize};
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
@@ -22,8 +21,11 @@ use stackable_operator::{
     schemars::{self, JsonSchema},
     status::condition::{ClusterCondition, HasStatusCondition},
 };
-use std::{collections::BTreeMap, str::FromStr};
 use strum::{Display, EnumIter, EnumString};
+
+use crate::affinity::get_affinity;
+
+pub mod affinity;
 
 pub const APP_NAME: &str = "hbase";
 

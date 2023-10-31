@@ -1,14 +1,16 @@
 use std::collections::BTreeMap;
 
-use crate::{
-    hbase_controller::build_recommended_labels, zookeeper::ZookeeperConnectionInformation,
-};
+use product_config::writer::to_hadoop_xml;
 use stackable_hbase_crd::{HbaseCluster, HbaseRole, HBASE_SITE_XML};
 use stackable_operator::{
     builder::{ConfigMapBuilder, ObjectMetaBuilder},
     commons::product_image_selection::ResolvedProductImage,
     error::OperatorResult,
     k8s_openapi::api::core::v1::ConfigMap,
+};
+
+use crate::{
+    hbase_controller::build_recommended_labels, zookeeper::ZookeeperConnectionInformation,
 };
 
 /// Creates a discovery config map containing the `hbase-site.xml` for clients.
@@ -34,7 +36,7 @@ pub fn build_discovery_configmap(
         )
         .add_data(
             HBASE_SITE_XML,
-            stackable_operator::product_config::writer::to_hadoop_xml(
+            to_hadoop_xml(
                 hbase_site
                     .into_iter()
                     .map(|(k, v)| (k, Some(v)))
