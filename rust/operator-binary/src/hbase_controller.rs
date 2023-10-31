@@ -1,15 +1,15 @@
 //! Ensures that `Pod`s are configured and running for each [`HbaseCluster`]
-
-use crate::{
-    discovery::build_discovery_configmap,
-    operations::{graceful_shutdown::add_graceful_shutdown_config, pdb::add_pdbs},
-    product_logging::{
-        extend_role_group_config_map, resolve_vector_aggregator_address, LOG4J_CONFIG_FILE,
-    },
-    zookeeper::{self, ZookeeperConnectionInformation},
-    OPERATOR_NAME,
+use std::{
+    collections::{BTreeMap, HashMap},
+    str::FromStr,
+    sync::Arc,
 };
 
+use product_config::{
+    types::PropertyNameKind,
+    writer::{to_hadoop_xml, to_java_properties_string, PropertiesWriterError},
+    ProductConfigManager,
+};
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_hbase_crd::{
     Container, HbaseCluster, HbaseClusterStatus, HbaseConfig, HbaseConfigFragment, HbaseRole,
@@ -42,11 +42,6 @@ use stackable_operator::{
     labels::{role_group_selector_labels, role_selector_labels, ObjectLabels},
     logging::controller::ReconcilerError,
     memory::{BinaryMultiple, MemoryQuantity},
-    product_config::{
-        types::PropertyNameKind,
-        writer::{self, to_java_properties_string},
-        ProductConfigManager,
-    },
     product_config_utils::{transform_all_roles_to_config, validate_all_roles_and_groups_config},
     product_logging::{
         self,
@@ -64,12 +59,17 @@ use stackable_operator::{
     time::Duration,
     utils::COMMON_BASH_TRAP_FUNCTIONS,
 };
-use std::{
-    collections::{BTreeMap, HashMap},
-    str::FromStr,
-    sync::Arc,
-};
 use strum::{EnumDiscriminants, IntoStaticStr};
+
+use crate::{
+    discovery::build_discovery_configmap,
+    operations::{graceful_shutdown::add_graceful_shutdown_config, pdb::add_pdbs},
+    product_logging::{
+        extend_role_group_config_map, resolve_vector_aggregator_address, LOG4J_CONFIG_FILE,
+    },
+    zookeeper::{self, ZookeeperConnectionInformation},
+    OPERATOR_NAME,
+};
 
 pub const HBASE_CONTROLLER_NAME: &str = "hbasecluster";
 pub const STACKABLE_LOG_DIR: &str = "/stackable/log";
@@ -214,7 +214,7 @@ pub enum Error {
         rolegroup
     ))]
     SerializeJvmSecurity {
-        source: stackable_operator::product_config::writer::PropertiesWriterError,
+        source: PropertiesWriterError,
         rolegroup: RoleGroupRef<HbaseCluster>,
     },
     #[snafu(display("failed to create PodDisruptionBudget"))]
@@ -514,7 +514,7 @@ fn build_rolegroup_config_map(
         )
         .add_data(
             HBASE_SITE_XML,
-            writer::to_hadoop_xml(
+            to_hadoop_xml(
                 hbase_site_config
                     .into_iter()
                     .map(|(k, v)| (k, Some(v)))
