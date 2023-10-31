@@ -693,7 +693,7 @@ cp {HBASE_LOG_CONFIG_TMP_DIR}/{LOG4J_CONFIG_FILE} {CONFIG_DIR_NAME}
 {remove_vector_shutdown_file_command}
 prepare_signal_handlers
 bin/hbase {hbase_role_name_in_command} start &
-wait_for_termination
+wait_for_termination $?
 {create_vector_shutdown_file_command}
 ",
             hbase_role_name_in_command = match hbase_role {
