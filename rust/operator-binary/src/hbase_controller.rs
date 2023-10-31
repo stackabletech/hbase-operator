@@ -10,6 +10,11 @@ use crate::{
     OPERATOR_NAME,
 };
 
+use product_config::{
+    types::PropertyNameKind,
+    writer::{self, to_java_properties_string},
+    ProductConfigManager,
+};
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_hbase_crd::{
     Container, HbaseCluster, HbaseClusterStatus, HbaseConfig, HbaseConfigFragment, HbaseRole,
@@ -42,11 +47,6 @@ use stackable_operator::{
     labels::{role_group_selector_labels, role_selector_labels, ObjectLabels},
     logging::controller::ReconcilerError,
     memory::{BinaryMultiple, MemoryQuantity},
-    product_config::{
-        types::PropertyNameKind,
-        writer::{self, to_java_properties_string},
-        ProductConfigManager,
-    },
     product_config_utils::{transform_all_roles_to_config, validate_all_roles_and_groups_config},
     product_logging::{
         self,
@@ -214,7 +214,7 @@ pub enum Error {
         rolegroup
     ))]
     SerializeJvmSecurity {
-        source: stackable_operator::product_config::writer::PropertiesWriterError,
+        source: product_config::writer::PropertiesWriterError,
         rolegroup: RoleGroupRef<HbaseCluster>,
     },
     #[snafu(display("failed to create PodDisruptionBudget"))]

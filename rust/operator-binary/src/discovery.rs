@@ -34,7 +34,7 @@ pub fn build_discovery_configmap(
         )
         .add_data(
             HBASE_SITE_XML,
-            stackable_operator::product_config::writer::to_hadoop_xml(
+            product_config::writer::to_hadoop_xml(
                 hbase_site
                     .into_iter()
                     .map(|(k, v)| (k, Some(v)))

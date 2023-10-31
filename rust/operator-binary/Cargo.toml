@@ -15,6 +15,7 @@ anyhow.workspace = true
 clap.workspace = true
 fnv.workspace = true
 futures.workspace = true
+product-config.workspace = true
 serde.workspace = true
 snafu.workspace = true
 stackable-operator.workspace = true
