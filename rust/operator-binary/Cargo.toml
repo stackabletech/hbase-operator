@@ -18,6 +18,7 @@ futures.workspace = true
 serde.workspace = true
 snafu.workspace = true
 stackable-operator.workspace = true
+product-config.workspace = true
 strum.workspace = true
 tokio.workspace = true
 tracing.workspace = true

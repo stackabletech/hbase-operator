@@ -1,7 +1,41 @@
 = Graceful shutdown
 
-Graceful shutdown of HBase nodes is either not supported by the product itself
-or we have not implemented it yet.
+You can configure the graceful shutdown as described in xref:concepts:operations/graceful_shutdown.adoc[].
 
-Outstanding implementation work for the graceful shutdowns of all products where this functionality is relevant is tracked in
-https://github.com/stackabletech/issues/issues/357
+== Masters
+
+As a default, masters have `20 minutes` to shut down gracefully.
+
+The HBase master process will always run as PID `1` and will receive a `SIGTERM` signal when Kubernetes wants to terminate the Pod.
+After the graceful shutdown timeout runs out, and the process still didn't exit, Kubernetes will issue a `SIGKILL` signal.
+
+This is equivalent to executing the `bin/hbase-daemon.sh stop master` command, which internally executes `kill <master-pid>` (https://github.com/apache/hbase/blob/8382f55b15be6ae190f8d202a5e6a40af177ec76/bin/hbase-daemon.sh#L338[code]), waits for a configurable period of time (defaults to 20 minutes), and finally executes `kill -9 <master-pid>` to `SIGKILL` the master (https://github.com/apache/hbase/blob/8382f55b15be6ae190f8d202a5e6a40af177ec76/bin/hbase-common.sh#L20-L41[code]).
+
+However, there is no acknowledge message in the log indicating a graceful shutdown.
+
+== RegionServers
+
+As a default, RegionServers have `60 minutes` to shut down gracefully.
+
+They use the same mechanism described above.
+In contrast to the Master servers, they will, however, acknowledge the graceful shutdown with a message in the logs:
+
+[source,text]
+----
+2023-10-11 12:38:05,059 INFO  [shutdown-hook-0] regionserver.ShutdownHook: Shutdown hook starting; hbase.shutdown.hook=true; fsShutdownHook=org.apache.hadoop.fs.FileSystem$Cache$ClientFinalizer@5875de6a
+2023-10-11 12:38:05,060 INFO  [shutdown-hook-0] regionserver.HRegionServer: ***** STOPPING region server 'test-hbase-regionserver-default-0.test-hbase-regionserver-default.kuttl-test-topical-parakeet.svc.cluster.local,16020,1697027870348' *****
+----
+
+== RestServers
+
+As a default, RestServers have `5 minutes` to shut down gracefully.
+
+They use the same mechanism described above.
+In contrast to the Master servers, they will, however, acknowledge the graceful shutdown with a message in the logs:
+
+[source,text]
+----
+2023-10-11 12:40:42,309 INFO  [JettyShutdownThread] server.AbstractConnector: Stopped ServerConnector@62dae540{HTTP/1.1, (http/1.1)}{0.0.0.0:8080}
+2023-10-11 12:40:42,309 INFO  [JettyShutdownThread] server.session: node0 Stopped scavenging
+2023-10-11 12:40:42,316 INFO  [main] RESTServer: ***** STOPPING service 'RESTServer' *****
+----

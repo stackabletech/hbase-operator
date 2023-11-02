@@ -23,7 +23,7 @@ spec:
           hbase-site.xml:
             phoenix.log.saltBuckets: "2"
             hbase.regionserver.wal.codec: "org.apache.hadoop.hbase.regionserver.wal.IndexedWALEditCodec"
-        replicas: 1
+        replicas: 2
   regionServers:
     config:
       logging:
@@ -34,7 +34,7 @@ spec:
           hbase-site.xml:
             phoenix.log.saltBuckets: "2"
             hbase.regionserver.wal.codec: "org.apache.hadoop.hbase.regionserver.wal.IndexedWALEditCodec"
-        replicas: 1
+        replicas: 2
   restServers:
     config:
       logging:
@@ -45,4 +45,4 @@ spec:
           hbase-site.xml:
             phoenix.log.saltBuckets: "2"
             hbase.regionserver.wal.codec: "org.apache.hadoop.hbase.regionserver.wal.IndexedWALEditCodec"
-        replicas: 1
+        replicas: 2

@@ -596,6 +596,10 @@ spec:
                                   type: array
                               type: object
                           type: object
+                        gracefulShutdownTimeout:
+                          description: Time period Pods have to gracefully shut down, e.g. `30m`, `1h` or `2d`. Consult the operator documentation for details.
+                          nullable: true
+                          type: string
                         hbaseOpts:
                           nullable: true
                           type: string
@@ -4040,6 +4044,10 @@ spec:
                                         type: array
                                     type: object
                                 type: object
+                              gracefulShutdownTimeout:
+                                description: Time period Pods have to gracefully shut down, e.g. `30m`, `1h` or `2d`. Consult the operator documentation for details.
+                                nullable: true
+                                type: string
                               hbaseOpts:
                                 nullable: true
                                 type: string
@@ -7501,6 +7509,10 @@ spec:
                                   type: array
                               type: object
                           type: object
+                        gracefulShutdownTimeout:
+                          description: Time period Pods have to gracefully shut down, e.g. `30m`, `1h` or `2d`. Consult the operator documentation for details.
+                          nullable: true
+                          type: string
                         hbaseOpts:
                           nullable: true
                           type: string
@@ -10945,6 +10957,10 @@ spec:
                                         type: array
                                     type: object
                                 type: object
+                              gracefulShutdownTimeout:
+                                description: Time period Pods have to gracefully shut down, e.g. `30m`, `1h` or `2d`. Consult the operator documentation for details.
+                                nullable: true
+                                type: string
                               hbaseOpts:
                                 nullable: true
                                 type: string
@@ -14406,6 +14422,10 @@ spec:
                                   type: array
                               type: object
                           type: object
+                        gracefulShutdownTimeout:
+                          description: Time period Pods have to gracefully shut down, e.g. `30m`, `1h` or `2d`. Consult the operator documentation for details.
+                          nullable: true
+                          type: string
                         hbaseOpts:
                           nullable: true
                           type: string
@@ -17850,6 +17870,10 @@ spec:
                                         type: array
                                     type: object
                                 type: object
+                              gracefulShutdownTimeout:
+                                description: Time period Pods have to gracefully shut down, e.g. `30m`, `1h` or `2d`. Consult the operator documentation for details.
+                                nullable: true
+                                type: string
                               hbaseOpts:
                                 nullable: true
                                 type: string

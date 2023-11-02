@@ -1,15 +1,15 @@
 //! Ensures that `Pod`s are configured and running for each [`HbaseCluster`]
-
-use crate::{
-    discovery::build_discovery_configmap,
-    operations::pdb::add_pdbs,
-    product_logging::{
-        extend_role_group_config_map, resolve_vector_aggregator_address, LOG4J_CONFIG_FILE,
-    },
-    zookeeper::{self, ZookeeperConnectionInformation},
-    OPERATOR_NAME,
+use std::{
+    collections::{BTreeMap, HashMap},
+    str::FromStr,
+    sync::Arc,
 };
 
+use product_config::{
+    types::PropertyNameKind,
+    writer::{to_hadoop_xml, to_java_properties_string, PropertiesWriterError},
+    ProductConfigManager,
+};
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_hbase_crd::{
     Container, HbaseCluster, HbaseClusterStatus, HbaseConfig, HbaseConfigFragment, HbaseRole,
@@ -27,29 +27,25 @@ use stackable_operator::{
         product_image_selection::ResolvedProductImage,
         rbac::{build_rbac_resources, service_account_name},
     },
-    k8s_openapi::{api::core::v1::Volume, DeepMerge},
     k8s_openapi::{
         api::{
             apps::v1::{StatefulSet, StatefulSetSpec},
             core::v1::{
                 ConfigMap, ConfigMapVolumeSource, ContainerPort, HTTPGetAction, Probe, Service,
-                ServicePort, ServiceSpec, TCPSocketAction,
+                ServicePort, ServiceSpec, TCPSocketAction, Volume,
             },
         },
         apimachinery::pkg::{apis::meta::v1::LabelSelector, util::intstr::IntOrString},
+        DeepMerge,
     },
     kube::{runtime::controller::Action, Resource},
     labels::{role_group_selector_labels, role_selector_labels, ObjectLabels},
     logging::controller::ReconcilerError,
     memory::{BinaryMultiple, MemoryQuantity},
-    product_config::{
-        types::PropertyNameKind,
-        writer::{self, to_java_properties_string},
-        ProductConfigManager,
-    },
     product_config_utils::{transform_all_roles_to_config, validate_all_roles_and_groups_config},
     product_logging::{
         self,
+        framework::{create_vector_shutdown_file_command, remove_vector_shutdown_file_command},
         spec::{
             ConfigMapLogConfig, ContainerLogConfig, ContainerLogConfigChoice,
             CustomContainerLogConfig,
@@ -61,13 +57,19 @@ use stackable_operator::{
         statefulset::StatefulSetConditionBuilder,
     },
     time::Duration,
-};
-use std::{
-    collections::{BTreeMap, HashMap},
-    str::FromStr,
-    sync::Arc,
+    utils::COMMON_BASH_TRAP_FUNCTIONS,
 };
 use strum::{EnumDiscriminants, IntoStaticStr};
+
+use crate::{
+    discovery::build_discovery_configmap,
+    operations::{graceful_shutdown::add_graceful_shutdown_config, pdb::add_pdbs},
+    product_logging::{
+        extend_role_group_config_map, resolve_vector_aggregator_address, LOG4J_CONFIG_FILE,
+    },
+    zookeeper::{self, ZookeeperConnectionInformation},
+    OPERATOR_NAME,
+};
 
 pub const HBASE_CONTROLLER_NAME: &str = "hbasecluster";
 pub const STACKABLE_LOG_DIR: &str = "/stackable/log";
@@ -212,12 +214,17 @@ pub enum Error {
         rolegroup
     ))]
     SerializeJvmSecurity {
-        source: stackable_operator::product_config::writer::PropertiesWriterError,
+        source: PropertiesWriterError,
         rolegroup: RoleGroupRef<HbaseCluster>,
     },
     #[snafu(display("failed to create PodDisruptionBudget"))]
     FailedToCreatePdb {
         source: crate::operations::pdb::Error,
+    },
+
+    #[snafu(display("failed to configure graceful shutdown"))]
+    GracefulShutdown {
+        source: crate::operations::graceful_shutdown::Error,
     },
 }
 
@@ -310,7 +317,7 @@ pub async fn reconcile_hbase(hbase: Arc<HbaseCluster>, ctx: Arc<Ctx>) -> Result<
         for (rolegroup_name, rolegroup_config) in group_config.iter() {
             let rolegroup = hbase.server_rolegroup_ref(role_name, rolegroup_name);
 
-            let config = hbase
+            let merged_config = hbase
                 .merged_config(
                     &hbase_role,
                     &rolegroup.role_group,
@@ -325,7 +332,7 @@ pub async fn reconcile_hbase(hbase: Arc<HbaseCluster>, ctx: Arc<Ctx>) -> Result<
                 &rolegroup,
                 rolegroup_config,
                 &zookeeper_connection_information,
-                &config,
+                &merged_config,
                 &resolved_product_image,
                 vector_aggregator_address.as_deref(),
             )?;
@@ -333,7 +340,7 @@ pub async fn reconcile_hbase(hbase: Arc<HbaseCluster>, ctx: Arc<Ctx>) -> Result<
                 &hbase,
                 &hbase_role,
                 &rolegroup,
-                &config,
+                &merged_config,
                 &resolved_product_image,
             )?;
             cluster_resources
@@ -507,7 +514,7 @@ fn build_rolegroup_config_map(
         )
         .add_data(
             HBASE_SITE_XML,
-            writer::to_hadoop_xml(
+            to_hadoop_xml(
                 hbase_site_config
                     .into_iter()
                     .map(|(k, v)| (k, Some(v)))
@@ -674,28 +681,33 @@ fn build_rolegroup_statefulset(
             "pipefail".to_string(),
             "-c".to_string(),
         ])
-        .args(vec![[
-            format!("mkdir -p {}", CONFIG_DIR_NAME),
-            format!(
-                "cp {}/hdfs-site.xml {}",
-                HDFS_DISCOVERY_TMP_DIR, CONFIG_DIR_NAME
-            ),
-            format!(
-                "cp {}/core-site.xml {}",
-                HDFS_DISCOVERY_TMP_DIR, CONFIG_DIR_NAME
-            ),
-            format!("cp {}/* {}", HBASE_CONFIG_TMP_DIR, CONFIG_DIR_NAME),
-            format!("cp {HBASE_LOG_CONFIG_TMP_DIR}/{LOG4J_CONFIG_FILE} {CONFIG_DIR_NAME}",),
-            format!(
-                "bin/hbase {} start",
-                match hbase_role {
-                    HbaseRole::Master => "master",
-                    HbaseRole::RegionServer => "regionserver",
-                    HbaseRole::RestServer => "rest",
-                }
-            ),
-        ]
-        .join(" && ")])
+        .args(vec![format!(
+            "\
+mkdir -p {CONFIG_DIR_NAME}
+cp {HDFS_DISCOVERY_TMP_DIR}/hdfs-site.xml {CONFIG_DIR_NAME}
+cp {HDFS_DISCOVERY_TMP_DIR}/core-site.xml {CONFIG_DIR_NAME}
+cp {HBASE_CONFIG_TMP_DIR}/* {CONFIG_DIR_NAME}
+cp {HBASE_LOG_CONFIG_TMP_DIR}/{LOG4J_CONFIG_FILE} {CONFIG_DIR_NAME}
+
+{COMMON_BASH_TRAP_FUNCTIONS}
+{remove_vector_shutdown_file_command}
+prepare_signal_handlers
+bin/hbase {hbase_role_name_in_command} start &
+wait_for_termination $!
+{create_vector_shutdown_file_command}
+",
+            hbase_role_name_in_command = match hbase_role {
+                HbaseRole::Master => "master",
+                HbaseRole::RegionServer => "regionserver",
+                // Of course it is not called "restserver", so we need to have this match
+                // instead of just letting the Display impl do it's thing ;P
+                HbaseRole::RestServer => "rest",
+            },
+            remove_vector_shutdown_file_command =
+                remove_vector_shutdown_file_command(STACKABLE_LOG_DIR),
+            create_vector_shutdown_file_command =
+                create_vector_shutdown_file_command(STACKABLE_LOG_DIR),
+        )])
         .add_env_var("HBASE_CONF_DIR", CONFIG_DIR_NAME)
         // required by phoenix (for cases where Kerberos is enabled): see https://issues.apache.org/jira/browse/PHOENIX-2369
         .add_env_var("HADOOP_CONF_DIR", CONFIG_DIR_NAME)
@@ -794,6 +806,8 @@ fn build_rolegroup_statefulset(
                 .build(),
         ));
     }
+
+    add_graceful_shutdown_config(config, &mut pod_builder).context(GracefulShutdownSnafu)?;
 
     let mut pod_template = pod_builder.build_template();
     if let Some(role) = role {
