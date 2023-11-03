@@ -128,7 +128,7 @@ for compression in compression_opts:
     ==================''')
     hbase.delete_scanner(scanner_location)
 
-    #print('''
-    #Delete the table
-    #================''')
-    #hbase.delete_table(table_schema_location)
+    print('''
+    Delete the table
+    ================''')
+    hbase.delete_table(table_schema_location)
