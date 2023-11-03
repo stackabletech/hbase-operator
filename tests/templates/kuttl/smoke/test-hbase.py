@@ -78,7 +78,8 @@ hbase_rest_url = sys.argv[1]
 
 hbase = HbaseClient()
 
-compression_opts = ['none', 'snappy']
+# Valid compression types are snappy, lzo, gz, bzip2, lz4 or zstd
+compression_opts = ['none', 'snappy', 'lzo', 'gz', 'bzip2', 'lz4', 'zstd']
 
 for compression in compression_opts:
     print(f'''
@@ -127,7 +128,7 @@ for compression in compression_opts:
     ==================''')
     hbase.delete_scanner(scanner_location)
 
-    print('''
-    Delete the table
-    ================''')
-    hbase.delete_table(table_schema_location)
+    #print('''
+    #Delete the table
+    #================''')
+    #hbase.delete_table(table_schema_location)
