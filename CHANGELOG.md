@@ -12,7 +12,7 @@
 
 ### Changed
 
-- `vector` `0.26.0` -> `0.33.0` ([#382]).
+- `vector` `0.26.0` -> `0.33.0` ([#382], [#403]).
 - Use jmx_exporter soft link instead of hardcoded version ([#403]).
 
 ### Fixed
