@@ -1,7 +1,7 @@
 = Pod placement
 :page-aliases: pod_placement.adoc
 
-You can configure Pod placement for HDFS nodes as described in xref:concepts:operations/pod_placement.adoc[].
+You can configure Pod placement for HBase nodes as described in xref:concepts:operations/pod_placement.adoc[].
 
 Default Pod placement constraints for master nodes:
 
@@ -94,4 +94,3 @@ affinity:
 In the examples above `cluster-name` is the name of the HBase custom resource that owns this Pod. The `hdfs-cluster-name` is the name of the HDFS cluster that was configured in the `hdfsConfigMapName` property.
 
 NOTE: It is important that the `hdfsConfigMapName` property contains the name the HDFS cluster. You could instead configure ConfigMaps of specific name or data roles, but for the purpose of pod placement, this will lead to faulty behavior.
-
