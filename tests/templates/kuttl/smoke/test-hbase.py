@@ -22,11 +22,11 @@ class HbaseClient:
     def decode_value(base64_string):
         return base64.b64decode(base64_string).decode('utf-8')
 
-    def create_table(self, rest_url, name, column_family):
+    def create_table(self, rest_url, name, column_family, compression):
         response = self.session.put(
             f'{rest_url}/{name}/schema',
             data=f'''
-                    <TableSchema name="{name}">
+                    <TableSchema name="{name}" compression="{compression}">
                         <ColumnSchema name="{column_family}" />
                     </TableSchema>
                 '''
@@ -78,52 +78,57 @@ hbase_rest_url = sys.argv[1]
 
 hbase = HbaseClient()
 
-print('''
-Create a table
-==============''')
-column_family = 'cf'
-(table_location, table_schema_location) = hbase.create_table(
-    rest_url=hbase_rest_url,
-    name='companies',
-    column_family=column_family
-)
+# Valid compression types are snappy, lzo, gz, bzip2, lz4 or zstd
+compression_opts = ['none', 'snappy', 'lzo', 'gz', 'bzip2', 'lz4', 'zstd']
 
-print('''
-Write a row to the table
-========================''')
-cell_value = 'Stackable GmbH'
-hbase.put_row(
-    table_location=table_location,
-    row_key='stackable',
-    column_family=column_family,
-    column='name',
-    cell_value=cell_value
-)
+for compression in compression_opts:
+    print(f'''
+    Create a table with compression={compression}
+    ==============''')
+    column_family = 'cf'
+    (table_location, table_schema_location) = hbase.create_table(
+        rest_url=hbase_rest_url,
+        name='companies',
+        column_family=column_family,
+        compression=compression
+    )
 
-print('''
-Get a scanner object
-====================''')
-scanner_location = hbase.put_scanner(table_location)
+    print('''
+    Write a row to the table
+    ========================''')
+    cell_value = 'Stackable GmbH'
+    hbase.put_row(
+        table_location=table_location,
+        row_key='stackable',
+        column_family=column_family,
+        column='name',
+        cell_value=cell_value
+    )
 
-print('''
-Get the next batch from the scanner
-===================================''')
-scan = hbase.get_scanner(scanner_location)
+    print('''
+    Get a scanner object
+    ====================''')
+    scanner_location = hbase.put_scanner(table_location)
 
-print('''
-Verify table content
-====================''')
-parser = ET.fromstring(scan)
-actual_cell_value = hbase.decode_value(parser.findtext('./Row/Cell'))
-print(f'assert "{actual_cell_value}" == "{cell_value}"')
-assert actual_cell_value == cell_value
+    print('''
+    Get the next batch from the scanner
+    ===================================''')
+    scan = hbase.get_scanner(scanner_location)
 
-print('''
-Delete the scanner
-==================''')
-hbase.delete_scanner(scanner_location)
+    print('''
+    Verify table content
+    ====================''')
+    parser = ET.fromstring(scan)
+    actual_cell_value = hbase.decode_value(parser.findtext('./Row/Cell'))
+    print(f'assert "{actual_cell_value}" == "{cell_value}"')
+    assert actual_cell_value == cell_value
 
-print('''
-Delete the table
-================''')
-hbase.delete_table(table_schema_location)
+    print('''
+    Delete the scanner
+    ==================''')
+    hbase.delete_scanner(scanner_location)
+
+    print('''
+    Delete the table
+    ================''')
+    hbase.delete_table(table_schema_location)

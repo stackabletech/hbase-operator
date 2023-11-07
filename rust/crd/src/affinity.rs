@@ -106,7 +106,7 @@ mod tests {
           name: simple-hbase
         spec:
           image:
-            productVersion: 2.4.12
+            productVersion: 2.4.17
           clusterConfig:
             hdfsConfigMapName: simple-hdfs
             zookeeperConfigMapName: simple-znode
@@ -229,7 +229,7 @@ mod tests {
           name: simple-hbase
         spec:
           image:
-            productVersion: 2.4.12
+            productVersion: 2.4.17
           clusterConfig:
             hdfsConfigMapName: simple-hdfs
             zookeeperConfigMapName: simple-znode

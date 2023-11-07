@@ -8,14 +8,20 @@
 - Configuration overrides for the JVM security properties, such as DNS caching ([#389]).
 - Support PodDisruptionBudgets ([#399]).
 - Support graceful shutdown ([#402]).
+- Added support for version 2.4.17 ([#403]).
 
 ### Changed
 
 - `vector` `0.26.0` -> `0.31.0` ([#382]).
+- Use jmx_exporter soft link instead of hardcoded version ([#403]).
 
 ### Fixed
 
 - Fix Zookeeper hbase.rootdir when users point to discovery ConfigMap of ZookeeperCluster rather than ZNode. Print a warning in that case ([#394]).
+
+### Removed
+
+- Removed support for 2.4.6, 2.4.8, 2.4.9, 2.4.11 ([#403]).
 
 [#382]: https://github.com/stackabletech/hbase-operator/pull/382
 [#385]: https://github.com/stackabletech/hbase-operator/pull/385
@@ -23,6 +29,7 @@
 [#394]: https://github.com/stackabletech/hbase-operator/pull/394
 [#399]: https://github.com/stackabletech/hbase-operator/pull/399
 [#402]: https://github.com/stackabletech/hbase-operator/pull/402
+[#403]: https://github.com/stackabletech/hbase-operator/pull/403
 
 ## [23.7.0] - 2023-07-14
 
