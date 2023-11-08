@@ -26,8 +26,8 @@ class HbaseClient:
         response = self.session.put(
             f'{rest_url}/{name}/schema',
             data=f'''
-                    <TableSchema name="{name}" compression="{compression}">
-                        <ColumnSchema name="{column_family}" />
+                    <TableSchema name="{name}">
+                        <ColumnSchema name="{column_family}" COMPRESSION="{compression}" />
                     </TableSchema>
                 '''
         )
@@ -78,8 +78,8 @@ hbase_rest_url = sys.argv[1]
 
 hbase = HbaseClient()
 
-# Valid compression types are snappy, lzo, gz, bzip2, lz4 or zstd
-compression_opts = ['none', 'snappy', 'lzo', 'gz', 'bzip2', 'lz4', 'zstd']
+# supported compression algorithms: SNAPPY, GZ
+compression_opts = ['NONE', 'SNAPPY', 'GZ']
 
 for compression in compression_opts:
     print(f'''
