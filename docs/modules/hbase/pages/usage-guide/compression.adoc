@@ -1,0 +1,27 @@
+= Compression support
+
+Our images of Apache HBase support compressed tables.
+We support the following compression algorithms for all HBase 2.4 versions:
+
+- GZip
+- Snappy
+
+Later versions of HBase might support a different set of compression algorithms.
+
+See the https://hbase.apache.org/book.html#changing.compression[HBase documentation] for the details on how to enable compression for specific column families.
+
+Here is one example on how to use the HBase Shell to create a table with a single column family that uses the Snappy algorithm for compression:
+
+----
+hbase:014:0> create 'COMPRESSION_TEST', {NAME => 'cf1', COMPRESSION => 'SNAPPY'}
+Created table COMPRESSION_TEST
+Took 1.1206 seconds
+=> Hbase::Table - COMPRESSION_TEST
+hbase:015:0> put 'COMPRESSION_TEST', 'row_XYZ', 'cf1', 'abc123'
+Took 0.0087 seconds
+hbase:016:0> scan 'COMPRESSION_TEST'
+ROW                                           COLUMN+CELL
+ row_XYZ                                      column=cf1:, timestamp=2023-10-20T10:46:03.509, value=abc123
+1 row(s)
+Took 0.0047 seconds
+----
