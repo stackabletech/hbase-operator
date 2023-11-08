@@ -104,7 +104,7 @@ In the examples above `cluster-name` is the name of the HBase custom resource th
 NOTE: It is important that the `hdfsConfigMapName` property contains the name the HDFS cluster. You could instead configure ConfigMaps of specific name or data roles, but for the purpose of pod placement, this will lead to faulty behavior.
 
 == Use custom pod placement
-xref:concepts:operations/pod_placement.adoc[] describes how you can configure pod placement in general.
+xref:concepts:operations/pod_placement.adoc[The concepts page on Pod Placement] describes how you can configure pod placement in general.
 One example use-case for HBase would be to *require* the HBase masters to run on different Kubernetes nodes as follows:
 
 [source,yaml]
