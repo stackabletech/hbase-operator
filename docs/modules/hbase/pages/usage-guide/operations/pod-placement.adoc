@@ -7,8 +7,8 @@ You can configure Pod placement for HBase nodes as described in xref:concepts:op
 
 The default affinities created by the operator are:
 
-1. Co-locate all the Hbase Pods (weight 20)
-2. Co-locate Hbase regionservers with the underlying HDFS datanodes (weight 50)
+1. Co-locate all the HBase Pods (weight 20)
+2. Co-locate HBase regionservers with the underlying HDFS datanodes (weight 50)
 3. Distribute all Pods within the same role (masters, region servers, rest servers) (weight 70)
 
 Default Pod placement constraints for master nodes:
