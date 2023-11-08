@@ -6,6 +6,7 @@
 ** xref:hbase:usage-guide/listenerclass.adoc[]
 ** xref:hbase:usage-guide/resource-requests.adoc[]
 ** xref:hbase:usage-guide/phoenix.adoc[]
+** xref:hbase:usage-guide/compression.adoc[]
 ** xref:hbase:usage-guide/discovery.adoc[]
 ** xref:hbase:usage-guide/logging.adoc[]
 ** xref:hbase:usage-guide/monitoring.adoc[]
