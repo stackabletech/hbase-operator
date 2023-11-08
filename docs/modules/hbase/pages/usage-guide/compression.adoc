@@ -1,6 +1,6 @@
 = Compression support
 
-Our images of Apache HBase support compressed tables.
+Our images of Apache HBase support compressed column families.
 We support the following compression algorithms for all HBase 2.4 versions:
 
 - GZip
