@@ -126,6 +126,7 @@ mod tests {
         let hbase: HbaseCluster = serde_yaml::from_str(input).expect("illegal test input");
         let merged_config = hbase
             .merged_config(
+                "simple-hbase",
                 &role,
                 "default",
                 &hbase.spec.cluster_config.hdfs_config_map_name,
@@ -258,6 +259,7 @@ mod tests {
         let hbase: HbaseCluster = serde_yaml::from_str(input).expect("illegal test input");
         let merged_config = hbase
             .merged_config(
+                "simple-hbase",
                 &HbaseRole::Master,
                 "default",
                 &hbase.spec.cluster_config.hdfs_config_map_name,

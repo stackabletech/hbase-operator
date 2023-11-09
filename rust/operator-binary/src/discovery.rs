@@ -10,16 +10,24 @@ use stackable_operator::{
 };
 
 use crate::{
-    hbase_controller::build_recommended_labels, zookeeper::ZookeeperConnectionInformation,
+    hbase_controller::build_recommended_labels, kerberos::kerberos_discovery_config_properties,
+    zookeeper::ZookeeperConnectionInformation,
 };
 
 /// Creates a discovery config map containing the `hbase-site.xml` for clients.
 pub fn build_discovery_configmap(
     hbase: &HbaseCluster,
+    hbase_name: &str,
+    hbase_namespace: &str,
     zookeeper_connection_information: &ZookeeperConnectionInformation,
     resolved_product_image: &ResolvedProductImage,
 ) -> OperatorResult<ConfigMap> {
-    let hbase_site = zookeeper_connection_information.as_hbase_settings();
+    let mut hbase_site = zookeeper_connection_information.as_hbase_settings();
+    hbase_site.extend(kerberos_discovery_config_properties(
+        hbase,
+        hbase_name,
+        hbase_namespace,
+    ));
 
     ConfigMapBuilder::new()
         .metadata(
