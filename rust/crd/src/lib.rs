@@ -44,6 +44,8 @@ pub const HBASE_REST_OPTS: &str = "HBASE_REST_OPTS";
 
 pub const HBASE_CLUSTER_DISTRIBUTED: &str = "hbase.cluster.distributed";
 pub const HBASE_ROOTDIR: &str = "hbase.rootdir";
+pub const HBASE_UNSAFE_REGIONSERVER_HOSTNAME_DISABLE_MASTER_REVERSEDNS: &str =
+    "hbase.unsafe.regionserver.hostname.disable.master.reversedns";
 pub const HBASE_HEAPSIZE: &str = "HBASE_HEAPSIZE";
 pub const HBASE_ROOT_DIR_DEFAULT: &str = "/hbase";
 
@@ -375,6 +377,10 @@ impl Configuration for HbaseConfigFragment {
             HBASE_SITE_XML => {
                 result.insert(
                     HBASE_CLUSTER_DISTRIBUTED.to_string(),
+                    Some("true".to_string()),
+                );
+                result.insert(
+                    HBASE_UNSAFE_REGIONSERVER_HOSTNAME_DISABLE_MASTER_REVERSEDNS.to_string(),
                     Some("true".to_string()),
                 );
                 result.insert(
