@@ -2,28 +2,24 @@
 dimensions:
   - name: hbase
     values:
-      - 2.4.8
-      - 2.4.9
-      - 2.4.11
       - 2.4.12
+      - 2.4.17
   - name: hbase-latest
     values:
-      - 2.4.12
+      - 2.4.17
   - name: hdfs
     values:
-      - 3.2.2
-      - 3.3.3
+      - 3.2.4
+      - 3.3.6
   - name: hdfs-latest
     values:
-      - 3.3.4
+      - 3.3.6
   - name: zookeeper
     values:
-      - 3.6.3
-      - 3.7.0
-      - 3.8.0
+      - 3.8.3
   - name: zookeeper-latest
     values:
-      - 3.8.0
+      - 3.8.3
   # Used for zookeeper, hdfs and hbase
   - name: listener-class
     values:
