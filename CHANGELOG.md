@@ -18,6 +18,9 @@
 ### Fixed
 
 - Fix Zookeeper hbase.rootdir when users point to discovery ConfigMap of ZookeeperCluster rather than ZNode. Print a warning in that case ([#394]).
+- Default `hbase.unsafe.regionserver.hostname.disable.master.reversedns` to
+  `true`, to ensure the names of RegionServers are resolved to their hostnames
+  instead of IP addresses ([#418]).
 
 ### Removed
 
@@ -30,6 +33,7 @@
 [#399]: https://github.com/stackabletech/hbase-operator/pull/399
 [#402]: https://github.com/stackabletech/hbase-operator/pull/402
 [#403]: https://github.com/stackabletech/hbase-operator/pull/403
+[#418]: https://github.com/stackabletech/hbase-operator/pull/418
 
 ## [23.7.0] - 2023-07-14
 
