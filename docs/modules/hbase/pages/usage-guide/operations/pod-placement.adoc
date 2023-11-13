@@ -11,6 +11,8 @@ The default affinities created by the operator are:
 2. Co-locate HBase regionservers with the underlying HDFS datanodes (weight 50)
 3. Distribute all Pods within the same role across nodes so multiple instances don't end up on the same Kubernetes node (masters, regionservers, rest servers) (weight 70)
 
+NOTE: All default affinities are only preferred and not enforced, as we can not expect all setups to have multiple Kubernetes nodes. If you want to have them enforced, you need to specify you own `requiredDuringSchedulingIgnoredDuringExecution` affinities.
+
 Default Pod placement constraints for master nodes:
 
 [source,yaml]
