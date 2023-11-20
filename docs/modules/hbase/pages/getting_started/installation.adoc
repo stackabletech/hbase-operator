@@ -1,7 +1,7 @@
 = Installation
 
 On this page you will install the Stackable HBase operator and its dependencies, the ZooKeeper and HDFS operators, as
-well as the commons and secret operators which are required by all Stackable operators.
+well as the commons, secret and listener operators which are required by all Stackable operators.
 
 == Stackable Operators
 

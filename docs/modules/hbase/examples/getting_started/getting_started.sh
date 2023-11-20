@@ -28,6 +28,7 @@ helm install --wait zookeeper-operator stackable-dev/zookeeper-operator --versio
 helm install --wait hdfs-operator stackable-dev/hdfs-operator --version 0.0.0-dev
 helm install --wait commons-operator stackable-dev/commons-operator --version 0.0.0-dev
 helm install --wait secret-operator stackable-dev/secret-operator --version 0.0.0-dev
+helm install --wait listener-operator stackable-dev/listener-operator --version 0.0.0-dev
 helm install --wait hbase-operator stackable-dev/hbase-operator --version 0.0.0-dev
 # end::helm-install-operators[]
 ;;
@@ -37,6 +38,7 @@ echo "installing Operators with stackablectl"
 stackablectl operator install \
   commons=0.0.0-dev \
   secret=0.0.0-dev \
+  listener=0.0.0-dev \
   zookeeper=0.0.0-dev \
   hdfs=0.0.0-dev \
   hbase=0.0.0-dev
