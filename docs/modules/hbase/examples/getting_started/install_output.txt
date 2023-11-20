@@ -1,5 +1,6 @@
 [INFO ] Installing commons operator in version 0.0.0-dev
 [INFO ] Installing secret operator in version 0.0.0-dev
+[INFO ] Installing listener operator in version 0.0.0-dev
 [INFO ] Installing zookeeper operator in version 0.0.0-dev
 [INFO ] Installing hdfs operator 0.0.0-dev
 [INFO ] Installing hbase operator 0.0.0-dev
