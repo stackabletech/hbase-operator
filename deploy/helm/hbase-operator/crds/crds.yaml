@@ -32,7 +32,7 @@ spec:
                   description: Configuration that applies to all roles and role groups. This includes settings for logging, ZooKeeper and HDFS connection, among other things.
                   properties:
                     hdfsConfigMapName:
-                      description: HDFS cluster connection details from discovery config map
+                      description: Name of the [discovery ConfigMap](https://docs.stackable.tech/home/nightly/concepts/service_discovery) for an HDFS cluster.
                       type: string
                     listenerClass:
                       default: cluster-internal
@@ -43,17 +43,17 @@ spec:
 
                         * external-unstable: Use a NodePort service
 
-                        This is a temporary solution with the goal to keep yaml manifests forward compatible. In the future, this setting will control which ListenerClass <https://docs.stackable.tech/home/stable/listener-operator/listenerclass.html> will be used to expose the service, and ListenerClass names will stay the same, allowing for a non-breaking change.
+                        This is a temporary solution with the goal to keep yaml manifests forward compatible. In the future, this setting will control which [ListenerClass](https://docs.stackable.tech/home/nightly/listener-operator/listenerclass.html) will be used to expose the service, and ListenerClass names will stay the same, allowing for a non-breaking change.
                       enum:
                         - cluster-internal
                         - external-unstable
                       type: string
                     vectorAggregatorConfigMapName:
-                      description: Name of the Vector aggregator discovery ConfigMap. It must contain the key `ADDRESS` with the address of the Vector aggregator.
+                      description: Name of the Vector aggregator [discovery ConfigMap](https://docs.stackable.tech/home/nightly/concepts/service_discovery). It must contain the key `ADDRESS` with the address of the Vector aggregator. Follow the [logging tutorial](https://docs.stackable.tech/home/nightly/tutorials/logging-vector-aggregator) to learn how to configure log aggregation with Vector.
                       nullable: true
                       type: string
                     zookeeperConfigMapName:
-                      description: ZooKeeper cluster connection details from discovery config map
+                      description: Name of the [discovery ConfigMap](https://docs.stackable.tech/home/nightly/concepts/service_discovery) for a ZooKeeper cluster.
                       type: string
                   required:
                     - hdfsConfigMapName
@@ -121,7 +121,7 @@ spec:
                       type: string
                   type: object
                 masters:
-                  description: This struct represents a role - e.g. HDFS datanodes or Trino workers. It has a [`HashMap`] containing all the roleGroups that are part of this role. Additionally, there is a `config`, which is configurable at the role *and* roleGroup level. Everything at roleGroup level is merged on top of what is configured on role level using the [`Merge`] trait. There is also a second form of config, which can only be configured at role level, the `roleConfig`.
+                  description: The HBase master process is responsible for assigning regions to region servers and manages the cluster.
                   nullable: true
                   properties:
                     cliOverrides:
@@ -7049,7 +7049,7 @@ spec:
                     - roleGroups
                   type: object
                 regionServers:
-                  description: This struct represents a role - e.g. HDFS datanodes or Trino workers. It has a [`HashMap`] containing all the roleGroups that are part of this role. Additionally, there is a `config`, which is configurable at the role *and* roleGroup level. Everything at roleGroup level is merged on top of what is configured on role level using the [`Merge`] trait. There is also a second form of config, which can only be configured at role level, the `roleConfig`.
+                  description: Region servers hold the data and handle requests from clients for their region.
                   nullable: true
                   properties:
                     cliOverrides:
@@ -13977,7 +13977,7 @@ spec:
                     - roleGroups
                   type: object
                 restServers:
-                  description: This struct represents a role - e.g. HDFS datanodes or Trino workers. It has a [`HashMap`] containing all the roleGroups that are part of this role. Additionally, there is a `config`, which is configurable at the role *and* roleGroup level. Everything at roleGroup level is merged on top of what is configured on role level using the [`Merge`] trait. There is also a second form of config, which can only be configured at role level, the `roleConfig`.
+                  description: Rest servers provide a REST API to interact with.
                   nullable: true
                   properties:
                     cliOverrides:
