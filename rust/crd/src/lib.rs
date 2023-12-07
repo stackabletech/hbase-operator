@@ -81,6 +81,11 @@ pub enum Error {
     FragmentValidationFailure { source: ValidationError },
 }
 
+/// An HBase cluster stacklet. This resource is managed by the Stackable operator for Apache HBase.
+/// Find more information on how to use it and the resources that the operator generates in the
+/// [operator documentation](DOCS_BASE_URL_PLACEHOLDER/hbase/).
+///
+/// The CRD contains three roles: `masters`, `regionServers` and `restServers`.
 #[derive(Clone, CustomResource, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[kube(
     group = "hbase.stackable.tech",
@@ -98,19 +103,25 @@ pub enum Error {
 )]
 #[serde(rename_all = "camelCase")]
 pub struct HbaseClusterSpec {
-    /// Desired HBase image
+    // no doc string - See ProductImage struct
     pub image: ProductImage,
-    /// Global HBase cluster configuration
+
+    /// Configuration that applies to all roles and role groups.
+    /// This includes settings for logging, ZooKeeper and HDFS connection, among other things.
     pub cluster_config: HbaseClusterConfig,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub masters: Option<Role<HbaseConfigFragment>>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub region_servers: Option<Role<HbaseConfigFragment>>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub rest_servers: Option<Role<HbaseConfigFragment>>,
-    /// Cluster operations like pause reconciliation or cluster stop.
+
+    // no doc string - See ClusterOperation struct
     #[serde(default)]
     pub cluster_operation: ClusterOperation,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub masters: Option<Role<HbaseConfigFragment>>,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub region_servers: Option<Role<HbaseConfigFragment>>,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rest_servers: Option<Role<HbaseConfigFragment>>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
