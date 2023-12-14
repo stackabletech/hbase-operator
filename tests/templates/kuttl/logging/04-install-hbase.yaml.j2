@@ -17,6 +17,7 @@ metadata:
 spec:
   image:
     productVersion: "{{ test_scenario['values']['hbase'] }}"
+    pullPolicy: IfNotPresent
   clusterConfig:
     hdfsConfigMapName: test-hdfs-namenode-default
     zookeeperConfigMapName: test-znode
