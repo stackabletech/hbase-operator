@@ -6,6 +6,7 @@ metadata:
 spec:
   image:
     productVersion: "{{ test_scenario['values']['hdfs-latest'] }}"
+    pullPolicy: IfNotPresent
   clusterConfig:
     zookeeperConfigMapName: test-znode
 {% if lookup('env', 'VECTOR_AGGREGATOR') %}
