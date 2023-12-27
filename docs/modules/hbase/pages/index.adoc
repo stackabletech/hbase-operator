@@ -32,7 +32,7 @@ Role and RoleGroup the Operator creates a **Service**.
 A **ConfigMap** is created for each RoleGroup containing 3 files: `hbase-env.sh` and `hbase-site.xml` files generated
 from the HbaseCluster configuration (See xref:usage-guide/index.adoc[] for more information), plus a `log4j.properties`
 file used for xref:usage-guide/logging.adoc[]. The Operator creates a
-**xref:usage-guide/discovery.adoc[discovery ConfigMap]** for the whole HbaseCluster a which contains information on how
+**xref:reference/discovery.adoc[discovery ConfigMap]** for the whole HbaseCluster a which contains information on how
 to connect to the HBase cluster.
 
 == Dependencies
