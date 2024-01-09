@@ -50,6 +50,8 @@ pub const HBASE_REST_OPTS: &str = "HBASE_REST_OPTS";
 
 pub const HBASE_CLUSTER_DISTRIBUTED: &str = "hbase.cluster.distributed";
 pub const HBASE_ROOTDIR: &str = "hbase.rootdir";
+pub const HBASE_UNSAFE_REGIONSERVER_HOSTNAME_DISABLE_MASTER_REVERSEDNS: &str =
+    "hbase.unsafe.regionserver.hostname.disable.master.reversedns";
 pub const HBASE_HEAPSIZE: &str = "HBASE_HEAPSIZE";
 pub const HBASE_ROOT_DIR_DEFAULT: &str = "/hbase";
 
@@ -90,6 +92,11 @@ pub enum Error {
     FragmentValidationFailure { source: ValidationError },
 }
 
+/// An HBase cluster stacklet. This resource is managed by the Stackable operator for Apache HBase.
+/// Find more information on how to use it and the resources that the operator generates in the
+/// [operator documentation](DOCS_BASE_URL_PLACEHOLDER/hbase/).
+///
+/// The CRD contains three roles: `masters`, `regionServers` and `restServers`.
 #[derive(Clone, CustomResource, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[kube(
     group = "hbase.stackable.tech",
@@ -107,34 +114,49 @@ pub enum Error {
 )]
 #[serde(rename_all = "camelCase")]
 pub struct HbaseClusterSpec {
-    /// Desired HBase image
+    // no doc string - See ProductImage struct
     pub image: ProductImage,
-    /// Global HBase cluster configuration
+
+    /// Configuration that applies to all roles and role groups.
+    /// This includes settings for logging, ZooKeeper and HDFS connection, among other things.
     pub cluster_config: HbaseClusterConfig,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub masters: Option<Role<HbaseConfigFragment>>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub region_servers: Option<Role<HbaseConfigFragment>>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub rest_servers: Option<Role<HbaseConfigFragment>>,
-    /// Cluster operations like pause reconciliation or cluster stop.
+
+    // no doc string - See ClusterOperation struct
     #[serde(default)]
     pub cluster_operation: ClusterOperation,
+
+    /// The HBase master process is responsible for assigning regions to region servers and
+    /// manages the cluster.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub masters: Option<Role<HbaseConfigFragment>>,
+
+    /// Region servers hold the data and handle requests from clients for their region.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub region_servers: Option<Role<HbaseConfigFragment>>,
+
+    /// Rest servers provide a REST API to interact with.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rest_servers: Option<Role<HbaseConfigFragment>>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct HbaseClusterConfig {
-    /// HDFS cluster connection details from discovery config map
+    /// Name of the [discovery ConfigMap](DOCS_BASE_URL_PLACEHOLDER/concepts/service_discovery)
+    /// for an HDFS cluster.
     pub hdfs_config_map_name: String,
-    /// Name of the Vector aggregator discovery ConfigMap.
+
+    /// Name of the Vector aggregator [discovery ConfigMap](DOCS_BASE_URL_PLACEHOLDER/concepts/service_discovery).
     /// It must contain the key `ADDRESS` with the address of the Vector aggregator.
+    /// Follow the [logging tutorial](DOCS_BASE_URL_PLACEHOLDER/tutorials/logging-vector-aggregator)
+    /// to learn how to configure log aggregation with Vector.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub vector_aggregator_config_map_name: Option<String>,
-    /// ZooKeeper cluster connection details from discovery config map
+
+    /// Name of the [discovery ConfigMap](DOCS_BASE_URL_PLACEHOLDER/concepts/service_discovery)
+    /// for a ZooKeeper cluster.
     pub zookeeper_config_map_name: String,
-    /// Configuration to set up a cluster secured using Kerberos.
-    pub kerberos: Option<KerberosConfig>,
+
     /// This field controls which type of Service the Operator creates for this HbaseCluster:
     ///
     /// * cluster-internal: Use a ClusterIP service
@@ -142,10 +164,13 @@ pub struct HbaseClusterConfig {
     /// * external-unstable: Use a NodePort service
     ///
     /// This is a temporary solution with the goal to keep yaml manifests forward compatible.
-    /// In the future, this setting will control which ListenerClass <https://docs.stackable.tech/home/stable/listener-operator/listenerclass.html>
+    /// In the future, this setting will control which [ListenerClass](DOCS_BASE_URL_PLACEHOLDER/listener-operator/listenerclass.html)
     /// will be used to expose the service, and ListenerClass names will stay the same, allowing for a non-breaking change.
     #[serde(default)]
     pub listener_class: CurrentlySupportedListenerClasses,
+
+    /// Configuration to set up a cluster secured using Kerberos.
+    pub kerberos: Option<KerberosConfig>,
 }
 
 // TODO: Temporary solution until listener-operator is finished
@@ -430,6 +455,10 @@ impl Configuration for HbaseConfigFragment {
             HBASE_SITE_XML => {
                 result.insert(
                     HBASE_CLUSTER_DISTRIBUTED.to_string(),
+                    Some("true".to_string()),
+                );
+                result.insert(
+                    HBASE_UNSAFE_REGIONSERVER_HOSTNAME_DISABLE_MASTER_REVERSEDNS.to_string(),
                     Some("true".to_string()),
                 );
                 result.insert(

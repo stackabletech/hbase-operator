@@ -6,4 +6,4 @@ Learn about xref:usage-guide/operations/pod-placement.adoc[configuring where Pod
 
 You can observe what's happening with your HBase using xref:usage-guide/logging.adoc[logging] and xref:usage-guide/monitoring.adoc[monitoring].
 
-Connect to HBase using xref:usage-guide/phoenix.adoc[Apache Phoenix] or use the xref:usage-guide/discovery.adoc[discovery ConfigMap] to connect other products.
+Connect to HBase using xref:usage-guide/phoenix.adoc[Apache Phoenix].

@@ -1,0 +1,33 @@
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: hbck2-recover-unknown
+spec:
+  template:
+    spec:
+      containers:
+      - name: hbck2
+        image: docker.stackable.tech/stackable/hbase:2.4.17-stackable{{ versions.hbase }}
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: HBASE_CONF_DIR
+          value: /stackable/conf
+        - name: HADOOP_CONF_DIR
+          value: /stackable/conf
+        volumeMounts:
+        - name: hbase-config
+          mountPath: /stackable/conf
+        command:
+        - hbck2
+        args:
+        - recoverUnknown
+      volumes:
+      - name: hbase-config
+        projected:
+          sources:
+          - configMap:
+              name: simple-hdfs
+          - configMap:
+              name: simple-hbase-master-default
+      restartPolicy: Never

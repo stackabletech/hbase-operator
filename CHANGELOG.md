@@ -4,6 +4,18 @@
 
 ### Added
 
+- More CRD documentation ([#425]).
+
+### Changed
+
+- `operator-rs` `0.56.1` -> `0.57.0` ([#425]).
+
+[#425]: https://github.com/stackabletech/hbase-operator/pull/425
+
+## [23.11.0] - 2023-11-24
+
+### Added
+
 - Default stackableVersion to operator version ([#385]).
 - Configuration overrides for the JVM security properties, such as DNS caching ([#389]).
 - Support PodDisruptionBudgets ([#399]).
@@ -18,6 +30,9 @@
 ### Fixed
 
 - Fix Zookeeper hbase.rootdir when users point to discovery ConfigMap of ZookeeperCluster rather than ZNode. Print a warning in that case ([#394]).
+- Default `hbase.unsafe.regionserver.hostname.disable.master.reversedns` to
+  `true`, to ensure the names of RegionServers are resolved to their hostnames
+  instead of IP addresses ([#418]).
 
 ### Removed
 
@@ -30,6 +45,7 @@
 [#399]: https://github.com/stackabletech/hbase-operator/pull/399
 [#402]: https://github.com/stackabletech/hbase-operator/pull/402
 [#403]: https://github.com/stackabletech/hbase-operator/pull/403
+[#418]: https://github.com/stackabletech/hbase-operator/pull/418
 
 ## [23.7.0] - 2023-07-14
 

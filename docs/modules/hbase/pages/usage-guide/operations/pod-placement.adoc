@@ -3,6 +3,16 @@
 
 You can configure Pod placement for HBase nodes as described in xref:concepts:operations/pod_placement.adoc[].
 
+== Defaults
+
+The default affinities created by the operator are:
+
+1. Co-locate all the HBase Pods (weight 20)
+2. Co-locate HBase regionservers with the underlying HDFS datanodes (weight 50)
+3. Distribute all Pods within the same role across nodes so multiple instances don't end up on the same Kubernetes node (masters, regionservers, rest servers) (weight 70)
+
+NOTE: All default affinities are only preferred and not enforced, as we can not expect all setups to have multiple Kubernetes nodes. If you want to have them enforced, you need to specify you own `requiredDuringSchedulingIgnoredDuringExecution` affinities.
+
 Default Pod placement constraints for master nodes:
 
 [source,yaml]
@@ -94,3 +104,28 @@ affinity:
 In the examples above `cluster-name` is the name of the HBase custom resource that owns this Pod. The `hdfs-cluster-name` is the name of the HDFS cluster that was configured in the `hdfsConfigMapName` property.
 
 NOTE: It is important that the `hdfsConfigMapName` property contains the name the HDFS cluster. You could instead configure ConfigMaps of specific name or data roles, but for the purpose of pod placement, this will lead to faulty behavior.
+
+== Use custom pod placement
+For general configuration of Pod placement, see the xref:concepts:operations/pod_placement.adoc[Pod placement concepts] page.
+One example use-case for HBase would be to *require* the HBase masters to run on different Kubernetes nodes as follows:
+
+[source,yaml]
+----
+spec:
+  masters:
+    config:
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchLabels:
+                app.kubernetes.io/name: hbase
+                app.kubernetes.io/instance: cluster-name # Replace with you HbaseCluster name!
+                app.kubernetes.io/component: master
+            topologyKey: kubernetes.io/hostname
+    roleGroups:
+      default:
+        replicas: 2
+----
+
+WARNING: Please note that the Pods will be stuck in `Pending`, when your Kubernetes cluster does not have any node without a masters already running on it and sufficient compute resources.
