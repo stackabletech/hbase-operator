@@ -4,6 +4,18 @@
 
 ### Added
 
+- More CRD documentation ([#425]).
+
+### Changed
+
+- `operator-rs` `0.56.1` -> `0.57.0` ([#425]).
+
+[#425]: https://github.com/stackabletech/hbase-operator/pull/425
+
+## [23.11.0] - 2023-11-24
+
+### Added
+
 - Default stackableVersion to operator version ([#385]).
 - Configuration overrides for the JVM security properties, such as DNS caching ([#389]).
 - Support PodDisruptionBudgets ([#399]).
