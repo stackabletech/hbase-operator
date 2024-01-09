@@ -1,0 +1,6 @@
+---
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  - script: kubectl exec -n $NAMESPACE -it hbase-master-default-0 -- bash -c 'klist -kt /stackable/kerberos/keytab && kinit -kt /stackable/kerberos/keytab hbase/hbase.'"$NAMESPACE"'.svc.cluster.local && klist'
+  - script: kubectl exec -n $NAMESPACE -it hbase-master-default-0 -- bash -c "echo -e \"grant 'testuser', 'C';\nexit;\" | bin/hbase shell"
