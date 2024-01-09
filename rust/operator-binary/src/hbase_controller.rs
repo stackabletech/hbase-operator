@@ -1,6 +1,7 @@
 //! Ensures that `Pod`s are configured and running for each [`HbaseCluster`]
 use std::{
     collections::{BTreeMap, HashMap},
+    fmt::Write,
     str::FromStr,
     sync::Arc,
 };
@@ -990,9 +991,12 @@ fn write_hbase_env_sh<'a, T>(properties: T) -> String
 where
     T: Iterator<Item = (&'a String, &'a String)>,
 {
-    properties
-        .map(|(variable, value)| format!("export {variable}=\"{value}\"\n"))
-        .collect()
+    let mut env_sh = String::new();
+    properties.for_each(|(variable, value)| {
+        let _ = writeln!(env_sh, "export {variable}=\"{value}\"");
+    });
+
+    env_sh
 }
 
 pub fn error_policy(_obj: Arc<HbaseCluster>, _error: &Error, _ctx: Arc<Ctx>) -> Action {
