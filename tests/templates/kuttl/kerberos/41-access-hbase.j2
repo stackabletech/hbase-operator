@@ -100,14 +100,13 @@ data:
     put 'test', 'row3', 'cf1', 44;
     scan 'test';
     count 'test';
+    exit;
     EOF
 
-    if bin/hbase shell /tmp/hbase-script | grep -q '=> 3'; then
-      echo "test passed"
+    if bin/hbase shell /tmp/hbase-script | tee /dev/stderr | grep -q '=> 3'; then
+      echo "Test passed"
       exit 0
     else
-      echo "test failed"
-      echo "Lets re-run to get command output:"
-      bin/hbase shell /tmp/hbase-script
+      echo "Test failed"
       exit 1
     fi
