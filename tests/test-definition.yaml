@@ -2,14 +2,14 @@
 dimensions:
   - name: hbase
     values:
-      # - 2.4.12
+      - 2.4.12
       - 2.4.17
   - name: hbase-latest
     values:
       - 2.4.17
   - name: hdfs
     values:
-      # - 3.2.4
+      - 3.2.4
       - 3.3.6
   - name: hdfs-latest
     values:
@@ -23,12 +23,12 @@ dimensions:
   # Used for zookeeper, hdfs and hbase
   - name: listener-class
     values:
-      # - "cluster-internal"
+      - "cluster-internal"
       - "external-unstable"
   - name: kerberos-realm
     values:
       - "CLUSTER.LOCAL"
-      # - "PROD.MYCORP"
+      - "PROD.MYCORP"
   - name: kerberos-backend
     values:
       - mit
@@ -36,12 +36,12 @@ dimensions:
       # This will *not* respect the kerberos-realm test attribute, but instead use a hard-coded realm
       # - activeDirectory
 tests:
-  # - name: smoke
-  #   dimensions:
-  #     - hbase
-  #     - hdfs
-  #     - zookeeper
-  #     - listener-class
+  - name: smoke
+    dimensions:
+      - hbase
+      - hdfs
+      - zookeeper
+      - listener-class
   - name: kerberos
     dimensions:
       - hbase
@@ -50,26 +50,26 @@ tests:
       - listener-class
       - kerberos-realm
       - kerberos-backend
-  # - name: orphaned_resources
-  #   dimensions:
-  #     - hbase-latest
-  #     - hdfs-latest
-  #     - zookeeper-latest
-  # - name: resources
-  #   dimensions:
-  #     - hbase-latest
-  #     - hdfs-latest
-  #     - zookeeper-latest
-  # - name: logging
-  #   dimensions:
-  #     - hbase
-  #     - hdfs-latest
-  #     - zookeeper-latest
-  # - name: cluster-operation
-  #   dimensions:
-  #     - hbase-latest
-  #     - hdfs-latest
-  #     - zookeeper-latest
+  - name: orphaned_resources
+    dimensions:
+      - hbase-latest
+      - hdfs-latest
+      - zookeeper-latest
+  - name: resources
+    dimensions:
+      - hbase-latest
+      - hdfs-latest
+      - zookeeper-latest
+  - name: logging
+    dimensions:
+      - hbase
+      - hdfs-latest
+      - zookeeper-latest
+  - name: cluster-operation
+    dimensions:
+      - hbase-latest
+      - hdfs-latest
+      - zookeeper-latest
 suites:
   - name: nightly
     patch:
@@ -79,6 +79,8 @@ suites:
           - name: zookeeper
             expr: last
           - name: hdfs
+            expr: last
+          - name: kerberos-realm
             expr: last
   - name: smoke-latest
     select:
