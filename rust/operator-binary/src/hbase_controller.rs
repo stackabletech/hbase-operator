@@ -20,7 +20,7 @@ use stackable_hbase_crd::{
 use stackable_operator::{
     builder::{
         resources::ResourceRequirementsBuilder, ConfigMapBuilder, ContainerBuilder,
-        ObjectMetaBuilder, PodBuilder, PodSecurityContextBuilder,
+        ObjectMetaBuilder, ObjectMetaBuilderError, PodBuilder, PodSecurityContextBuilder,
     },
     cluster_resources::{ClusterResourceApplyStrategy, ClusterResources},
     commons::{
@@ -39,7 +39,7 @@ use stackable_operator::{
         DeepMerge,
     },
     kube::{runtime::controller::Action, Resource},
-    labels::{role_group_selector_labels, role_selector_labels, ObjectLabels},
+    kvp::{Label, LabelError, Labels, ObjectLabels},
     logging::controller::ReconcilerError,
     memory::{BinaryMultiple, MemoryQuantity},
     product_config_utils::{transform_all_roles_to_config, validate_all_roles_and_groups_config},
@@ -126,9 +126,7 @@ pub enum Error {
         source: stackable_operator::error::Error,
     },
     #[snafu(display("failed to build discovery configmap"))]
-    BuildDiscoveryConfigMap {
-        source: stackable_operator::error::Error,
-    },
+    BuildDiscoveryConfigMap { source: super::discovery::Error },
     #[snafu(display("failed to build ConfigMap for {}", rolegroup))]
     BuildRoleGroupConfig {
         source: stackable_operator::error::Error,
@@ -226,6 +224,12 @@ pub enum Error {
     GracefulShutdown {
         source: crate::operations::graceful_shutdown::Error,
     },
+
+    #[snafu(display("failed to build label"))]
+    BuildLabel { source: LabelError },
+
+    #[snafu(display("failed to build object  meta data"))]
+    ObjectMeta { source: ObjectMetaBuilderError },
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -296,7 +300,9 @@ pub async fn reconcile_hbase(hbase: Arc<HbaseCluster>, ctx: Arc<Ctx>) -> Result<
     let (rbac_sa, rbac_rolebinding) = build_rbac_resources(
         hbase.as_ref(),
         APP_NAME,
-        cluster_resources.get_required_labels(),
+        cluster_resources
+            .get_required_labels()
+            .context(BuildLabelSnafu)?,
     )
     .context(BuildRbacResourcesSnafu)?;
     cluster_resources
@@ -420,25 +426,33 @@ pub fn build_region_server_role_service(
         })
         .collect();
 
+    let metadata = ObjectMetaBuilder::new()
+        .name_and_namespace(hbase)
+        .name(&role_svc_name)
+        .ownerreference_from_resource(hbase, None, Some(true))
+        .context(ObjectMissingMetadataForOwnerRefSnafu)?
+        .with_recommended_labels(build_recommended_labels(
+            hbase,
+            &resolved_product_image.app_version_label,
+            &role_name,
+            "global",
+        ))
+        .context(ObjectMetaSnafu)?
+        .build();
+
+    let service_selector_labels =
+        Labels::role_selector(hbase, APP_NAME, &role_name).context(BuildLabelSnafu)?;
+
+    let service_spec = ServiceSpec {
+        type_: Some(hbase.spec.cluster_config.listener_class.k8s_service_type()),
+        ports: Some(ports),
+        selector: Some(service_selector_labels.into()),
+        ..ServiceSpec::default()
+    };
+
     Ok(Service {
-        metadata: ObjectMetaBuilder::new()
-            .name_and_namespace(hbase)
-            .name(&role_svc_name)
-            .ownerreference_from_resource(hbase, None, Some(true))
-            .context(ObjectMissingMetadataForOwnerRefSnafu)?
-            .with_recommended_labels(build_recommended_labels(
-                hbase,
-                &resolved_product_image.app_version_label,
-                &role_name,
-                "global",
-            ))
-            .build(),
-        spec: Some(ServiceSpec {
-            type_: Some(hbase.spec.cluster_config.listener_class.k8s_service_type()),
-            ports: Some(ports),
-            selector: Some(role_selector_labels(hbase, APP_NAME, &role_name)),
-            ..ServiceSpec::default()
-        }),
+        metadata,
+        spec: Some(service_spec),
         status: None,
     })
 }
@@ -497,21 +511,22 @@ fn build_rolegroup_config_map(
 
     let mut builder = ConfigMapBuilder::new();
 
+    let cm_metadata = ObjectMetaBuilder::new()
+        .name_and_namespace(hbase)
+        .name(rolegroup.object_name())
+        .ownerreference_from_resource(hbase, None, Some(true))
+        .context(ObjectMissingMetadataForOwnerRefSnafu)?
+        .with_recommended_labels(build_recommended_labels(
+            hbase,
+            &resolved_product_image.app_version_label,
+            &rolegroup.role,
+            &rolegroup.role_group,
+        ))
+        .context(ObjectMetaSnafu)?
+        .build();
+
     builder
-        .metadata(
-            ObjectMetaBuilder::new()
-                .name_and_namespace(hbase)
-                .name(rolegroup.object_name())
-                .ownerreference_from_resource(hbase, None, Some(true))
-                .context(ObjectMissingMetadataForOwnerRefSnafu)?
-                .with_recommended_labels(build_recommended_labels(
-                    hbase,
-                    &resolved_product_image.app_version_label,
-                    &rolegroup.role,
-                    &rolegroup.role_group,
-                ))
-                .build(),
-        )
+        .metadata(cm_metadata)
         .add_data(
             HBASE_SITE_XML,
             to_hadoop_xml(
@@ -568,34 +583,41 @@ fn build_rolegroup_service(
         })
         .collect();
 
+    let prometheus_label =
+        Label::try_from(("prometheus.io/scrape", "true")).context(BuildLabelSnafu)?;
+
+    let metadata = ObjectMetaBuilder::new()
+        .name_and_namespace(hbase)
+        .name(&rolegroup.object_name())
+        .ownerreference_from_resource(hbase, None, Some(true))
+        .context(ObjectMissingMetadataForOwnerRefSnafu)?
+        .with_recommended_labels(build_recommended_labels(
+            hbase,
+            &resolved_product_image.app_version_label,
+            &rolegroup.role,
+            &rolegroup.role_group,
+        ))
+        .context(ObjectMetaSnafu)?
+        .with_label(prometheus_label)
+        .build();
+
+    let service_selector =
+        Labels::role_group_selector(hbase, APP_NAME, &rolegroup.role, &rolegroup.role_group)
+            .context(BuildLabelSnafu)?;
+
+    let service_spec = ServiceSpec {
+        // Internal communication does not need to be exposed
+        type_: Some("ClusterIP".to_string()),
+        cluster_ip: Some("None".to_string()),
+        ports: Some(ports),
+        selector: Some(service_selector.into()),
+        publish_not_ready_addresses: Some(true),
+        ..ServiceSpec::default()
+    };
+
     Ok(Service {
-        metadata: ObjectMetaBuilder::new()
-            .name_and_namespace(hbase)
-            .name(&rolegroup.object_name())
-            .ownerreference_from_resource(hbase, None, Some(true))
-            .context(ObjectMissingMetadataForOwnerRefSnafu)?
-            .with_recommended_labels(build_recommended_labels(
-                hbase,
-                &resolved_product_image.app_version_label,
-                &rolegroup.role,
-                &rolegroup.role_group,
-            ))
-            .with_label("prometheus.io/scrape", "true")
-            .build(),
-        spec: Some(ServiceSpec {
-            // Internal communication does not need to be exposed
-            type_: Some("ClusterIP".to_string()),
-            cluster_ip: Some("None".to_string()),
-            ports: Some(ports),
-            selector: Some(role_group_selector_labels(
-                hbase,
-                APP_NAME,
-                &rolegroup.role,
-                &rolegroup.role_group,
-            )),
-            publish_not_ready_addresses: Some(true),
-            ..ServiceSpec::default()
-        }),
+        metadata,
+        spec: Some(service_spec),
         status: None,
     })
 }
@@ -723,15 +745,19 @@ wait_for_termination $!
         .build();
 
     let mut pod_builder = PodBuilder::new();
+
+    let pb_metadata = ObjectMetaBuilder::new()
+        .with_recommended_labels(build_recommended_labels(
+            hbase,
+            hbase_version,
+            &rolegroup_ref.role,
+            &rolegroup_ref.role_group,
+        ))
+        .context(ObjectMetaSnafu)?
+        .build();
+
     pod_builder
-        .metadata_builder(|m| {
-            m.with_recommended_labels(build_recommended_labels(
-                hbase,
-                hbase_version,
-                &rolegroup_ref.role,
-                &rolegroup_ref.role_group,
-            ))
-        })
+        .metadata(pb_metadata)
         .image_pull_secrets_from_product_image(resolved_product_image)
         .affinity(&config.affinity)
         .add_container(container)
@@ -817,35 +843,43 @@ wait_for_termination $!
         pod_template.merge_from(role_group.config.pod_overrides.clone());
     }
 
+    let metadata = ObjectMetaBuilder::new()
+        .name_and_namespace(hbase)
+        .name(&rolegroup_ref.object_name())
+        .ownerreference_from_resource(hbase, None, Some(true))
+        .context(ObjectMissingMetadataForOwnerRefSnafu)?
+        .with_recommended_labels(build_recommended_labels(
+            hbase,
+            hbase_version,
+            &rolegroup_ref.role,
+            &rolegroup_ref.role_group,
+        ))
+        .context(ObjectMetaSnafu)?
+        .build();
+
+    let statefulset_match_labels = Labels::role_group_selector(
+        hbase,
+        APP_NAME,
+        &rolegroup_ref.role,
+        &rolegroup_ref.role_group,
+    )
+    .context(BuildLabelSnafu)?;
+
+    let statefulset_spec = StatefulSetSpec {
+        pod_management_policy: Some("Parallel".to_string()),
+        replicas: role_group.and_then(|rg| rg.replicas).map(i32::from),
+        selector: LabelSelector {
+            match_labels: Some(statefulset_match_labels.into()),
+            ..LabelSelector::default()
+        },
+        service_name: rolegroup_ref.object_name(),
+        template: pod_template,
+        ..StatefulSetSpec::default()
+    };
+
     Ok(StatefulSet {
-        metadata: ObjectMetaBuilder::new()
-            .name_and_namespace(hbase)
-            .name(&rolegroup_ref.object_name())
-            .ownerreference_from_resource(hbase, None, Some(true))
-            .context(ObjectMissingMetadataForOwnerRefSnafu)?
-            .with_recommended_labels(build_recommended_labels(
-                hbase,
-                hbase_version,
-                &rolegroup_ref.role,
-                &rolegroup_ref.role_group,
-            ))
-            .build(),
-        spec: Some(StatefulSetSpec {
-            pod_management_policy: Some("Parallel".to_string()),
-            replicas: role_group.and_then(|rg| rg.replicas).map(i32::from),
-            selector: LabelSelector {
-                match_labels: Some(role_group_selector_labels(
-                    hbase,
-                    APP_NAME,
-                    &rolegroup_ref.role,
-                    &rolegroup_ref.role_group,
-                )),
-                ..LabelSelector::default()
-            },
-            service_name: rolegroup_ref.object_name(),
-            template: pod_template,
-            ..StatefulSetSpec::default()
-        }),
+        metadata,
+        spec: Some(statefulset_spec),
         status: None,
     })
 }
