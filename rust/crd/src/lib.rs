@@ -73,10 +73,13 @@ pub enum Error {
         source: strum::ParseError,
         role: String,
     },
+
     #[snafu(display("the HBase role [{role}] is missing from spec"))]
     MissingHbaseRole { role: String },
+
     #[snafu(display("the HBase role group [{role_group}] is missing from spec"))]
     MissingHbaseRoleGroup { role_group: String },
+
     #[snafu(display("fragment validation failure"))]
     FragmentValidationFailure { source: ValidationError },
 }
@@ -166,6 +169,7 @@ pub enum CurrentlySupportedListenerClasses {
     #[default]
     #[serde(rename = "cluster-internal")]
     ClusterInternal,
+
     #[serde(rename = "external-unstable")]
     ExternalUnstable,
 }
@@ -196,9 +200,11 @@ pub enum HbaseRole {
     #[serde(rename = "master")]
     #[strum(serialize = "master")]
     Master,
+
     #[serde(rename = "regionserver")]
     #[strum(serialize = "regionserver")]
     RegionServer,
+
     #[serde(rename = "restserver")]
     #[strum(serialize = "restserver")]
     RestServer,
