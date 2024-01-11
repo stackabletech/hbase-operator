@@ -9,8 +9,16 @@
 ### Changed
 
 - `operator-rs` `0.56.1` -> `0.57.0` ([#425]).
+- Use new label builders ([#438]).
+- Use Snafu instead of thiserror ([#438]).
+
+### Removed
+
+- [BREAKING] Removed legacy node selector on roleGroups ([#438]).
+
 
 [#425]: https://github.com/stackabletech/hbase-operator/pull/425
+[#438]: https://github.com/stackabletech/hbase-operator/pull/438
 
 ## [23.11.0] - 2023-11-24
 
