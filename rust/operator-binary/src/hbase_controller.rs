@@ -261,7 +261,7 @@ pub enum Error {
     #[snafu(display("failed to build label"))]
     BuildLabel { source: LabelError },
 
-    #[snafu(display("failed to build object  meta data"))]
+    #[snafu(display("failed to build object meta data"))]
     ObjectMeta { source: ObjectMetaBuilderError },
 }
 
