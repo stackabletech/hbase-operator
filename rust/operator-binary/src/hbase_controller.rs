@@ -15,8 +15,9 @@ use product_config::{
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_hbase_crd::{
     Container, HbaseCluster, HbaseClusterStatus, HbaseConfig, HbaseConfigFragment, HbaseRole,
-    APP_NAME, CONFIG_DIR_NAME, HBASE_ENV_SH, HBASE_HEAPSIZE, HBASE_SITE_XML, JVM_HEAP_FACTOR,
-    JVM_SECURITY_PROPERTIES_FILE, SSL_CLIENT_XML, SSL_SERVER_XML,
+    APP_NAME, CONFIG_DIR_NAME, HBASE_ENV_SH, HBASE_HEAPSIZE, HBASE_REST_PORT_NAME_HTTP,
+    HBASE_REST_PORT_NAME_HTTPS, HBASE_SITE_XML, JVM_HEAP_FACTOR, JVM_SECURITY_PROPERTIES_FILE,
+    SSL_CLIENT_XML, SSL_SERVER_XML,
 };
 use stackable_operator::{
     builder::{
@@ -761,9 +762,9 @@ fn build_rolegroup_statefulset(
             tcp_socket: Some(TCPSocketAction {
                 port: IntOrString::String(
                     if hbase.has_https_enabled() {
-                        "rest-https"
+                        HBASE_REST_PORT_NAME_HTTPS
                     } else {
-                        "rest"
+                        HBASE_REST_PORT_NAME_HTTP
                     }
                     .to_string(),
                 ),
