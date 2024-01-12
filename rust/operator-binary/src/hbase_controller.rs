@@ -65,8 +65,9 @@ use strum::{EnumDiscriminants, IntoStaticStr};
 use crate::{
     discovery::build_discovery_configmap,
     kerberos::{
-        add_kerberos_pod_config, kerberos_config_properties, kerberos_container_start_commands,
-        kerberos_ssl_client_settings, kerberos_ssl_server_settings,
+        self, add_kerberos_pod_config, kerberos_config_properties,
+        kerberos_container_start_commands, kerberos_ssl_client_settings,
+        kerberos_ssl_server_settings,
     },
     operations::{graceful_shutdown::add_graceful_shutdown_config, pdb::add_pdbs},
     product_logging::{
@@ -232,6 +233,9 @@ pub enum Error {
         source: crate::product_logging::Error,
         cm_name: String,
     },
+
+    #[snafu(display("failed to add kerberos config"))]
+    AddKerberosConfig { source: kerberos::Error },
 
     #[snafu(display("failed to update status"))]
     ApplyStatus {
@@ -516,7 +520,8 @@ fn build_rolegroup_config_map(
             PropertyNameKind::File(file_name) if file_name == HBASE_SITE_XML => {
                 let mut hbase_site_config = BTreeMap::new();
                 hbase_site_config.extend(zookeeper_connection_information.as_hbase_settings());
-                hbase_site_config.extend(kerberos_config_properties(hbase));
+                hbase_site_config
+                    .extend(kerberos_config_properties(hbase).context(AddKerberosConfigSnafu)?);
 
                 // configOverride come last
                 hbase_site_config.extend(config.clone());
@@ -931,7 +936,8 @@ fn build_rolegroup_statefulset(
 
     add_graceful_shutdown_config(config, &mut pod_builder).context(GracefulShutdownSnafu)?;
     if hbase.has_kerberos_enabled() {
-        add_kerberos_pod_config(hbase, hbase_role, &mut container_builder, &mut pod_builder);
+        add_kerberos_pod_config(hbase, hbase_role, &mut container_builder, &mut pod_builder)
+            .context(AddKerberosConfigSnafu)?;
     }
 
     pod_builder.add_container(container_builder.build());
