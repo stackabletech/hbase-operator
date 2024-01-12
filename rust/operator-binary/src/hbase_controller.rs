@@ -755,18 +755,18 @@ fn build_rolegroup_statefulset(
             ..Probe::default()
         },
         HbaseRole::RestServer => Probe {
-            // We cant use this, as it returns a 401 in case kerberos is enabled.
-            // http_get: Some(HTTPGetAction {
-            //     port: IntOrString::String("rest".to_string()),
-            //     scheme: Some(if hbase.has_https_enabled() {
-            //         "HTTPS".to_string()
-            //     } else {
-            //         "HTTP".to_string()
-            //     }),
-            //     ..HTTPGetAction::default()
-            // }),
+            // We cant use HTTPGetAction, as it returns a 401 in case kerberos is enabled, and there is currently no way
+            // to tell Kubernetes an 401 is healthy. As an alternative we run curl ourselves and check the http status
+            // code there.
             tcp_socket: Some(TCPSocketAction {
-                port: IntOrString::String("rest".to_string()),
+                port: IntOrString::String(
+                    if hbase.has_https_enabled() {
+                        "rest-https"
+                    } else {
+                        "rest"
+                    }
+                    .to_string(),
+                ),
                 ..TCPSocketAction::default()
             }),
             ..Probe::default()

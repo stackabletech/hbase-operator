@@ -55,20 +55,25 @@ pub const HBASE_UNSAFE_REGIONSERVER_HOSTNAME_DISABLE_MASTER_REVERSEDNS: &str =
 pub const HBASE_HEAPSIZE: &str = "HBASE_HEAPSIZE";
 pub const HBASE_ROOT_DIR_DEFAULT: &str = "/hbase";
 
-pub const HBASE_UI_PORT_NAME_HTTP: &str = "ui";
+pub const HBASE_UI_PORT_NAME_HTTP: &str = "ui-http";
 pub const HBASE_UI_PORT_NAME_HTTPS: &str = "ui-https";
+pub const HBASE_REST_PORT_NAME_HTTP: &str = "rest-http";
+pub const HBASE_REST_PORT_NAME_HTTPS: &str = "rest-https";
 pub const METRICS_PORT_NAME: &str = "metrics";
 
-// TODO: Find sane port numbers for https
 pub const HBASE_MASTER_PORT: u16 = 16000;
+// HBase always uses 16010, regardless of http or https. As most products use different ports for http and https, we
+// stick to that to be consistent within the SDP.
 pub const HBASE_MASTER_UI_PORT_HTTP: u16 = 16010;
 pub const HBASE_MASTER_UI_PORT_HTTPS: u16 = 16011;
 pub const HBASE_REGIONSERVER_PORT: u16 = 16020;
 pub const HBASE_REGIONSERVER_UI_PORT_HTTP: u16 = 16030;
 pub const HBASE_REGIONSERVER_UI_PORT_HTTPS: u16 = 16031;
-// TODO: Think about https
-pub const HBASE_REST_PORT: u16 = 8080;
-pub const METRICS_PORT: u16 = 8081;
+pub const HBASE_REST_PORT_HTTP: u16 = 8080;
+pub const HBASE_REST_PORT_HTTPS: u16 = 8081;
+pub const HBASE_REST_UI_PORT_HTTP: u16 = 8085;
+pub const HBASE_REST_UI_PORT_HTTPS: u16 = 8086;
+pub const METRICS_PORT: u16 = 9100;
 
 pub const JVM_HEAP_FACTOR: f32 = 0.8;
 
@@ -623,9 +628,23 @@ impl HbaseCluster {
                 },
                 (METRICS_PORT_NAME.to_string(), METRICS_PORT),
             ],
-            // TODO: Respect HTTPS settings
             HbaseRole::RestServer => vec![
-                ("rest".to_string(), HBASE_REST_PORT),
+                if self.has_https_enabled() {
+                    (
+                        HBASE_REST_PORT_NAME_HTTPS.to_string(),
+                        HBASE_REST_PORT_HTTPS,
+                    )
+                } else {
+                    (HBASE_REST_PORT_NAME_HTTP.to_string(), HBASE_REST_PORT_HTTP)
+                },
+                if self.has_https_enabled() {
+                    (
+                        HBASE_UI_PORT_NAME_HTTPS.to_string(),
+                        HBASE_REST_UI_PORT_HTTPS,
+                    )
+                } else {
+                    (HBASE_UI_PORT_NAME_HTTP.to_string(), HBASE_REST_UI_PORT_HTTP)
+                },
                 (METRICS_PORT_NAME.to_string(), METRICS_PORT),
             ],
         }
