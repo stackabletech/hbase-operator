@@ -5,20 +5,20 @@ use stackable_hbase_crd::{
     HbaseCluster, HbaseRole, CONFIG_DIR_NAME, HBASE_MASTER_UI_PORT_HTTPS,
     HBASE_REGIONSERVER_UI_PORT_HTTPS, TLS_STORE_DIR, TLS_STORE_PASSWORD, TLS_STORE_VOLUME_NAME,
 };
-use stackable_operator::builder::{
-    ContainerBuilder, PodBuilder, SecretFormat, SecretOperatorVolumeSourceBuilder, VolumeBuilder,
+use stackable_operator::{
+    builder::{
+        ContainerBuilder, PodBuilder, SecretFormat, SecretOperatorVolumeSourceBuilder,
+        VolumeBuilder,
+    },
+    kube::ResourceExt,
 };
 
-pub fn kerberos_config_properties(
-    hbase: &HbaseCluster,
-    hbase_name: &str,
-    hbase_namespace: &str,
-) -> BTreeMap<String, String> {
+pub fn kerberos_config_properties(hbase: &HbaseCluster) -> BTreeMap<String, String> {
     if !hbase.has_kerberos_enabled() {
         return BTreeMap::new();
     }
 
-    let principal_host_part = principal_host_part(hbase_name, hbase_namespace);
+    let principal_host_part = principal_host_part(hbase);
 
     BTreeMap::from([
         // Kerberos settings
@@ -109,16 +109,12 @@ pub fn kerberos_config_properties(
     ])
 }
 
-pub fn kerberos_discovery_config_properties(
-    hbase: &HbaseCluster,
-    hbase_name: &str,
-    hbase_namespace: &str,
-) -> BTreeMap<String, String> {
+pub fn kerberos_discovery_config_properties(hbase: &HbaseCluster) -> BTreeMap<String, String> {
     if !hbase.has_kerberos_enabled() {
         return BTreeMap::new();
     }
 
-    let principal_host_part = principal_host_part(hbase_name, hbase_namespace);
+    let principal_host_part = principal_host_part(hbase);
 
     BTreeMap::from([
         (
@@ -204,7 +200,6 @@ pub fn kerberos_ssl_client_settings(hbase: &HbaseCluster) -> BTreeMap<String, St
 
 pub fn add_kerberos_pod_config(
     hbase: &HbaseCluster,
-    hbase_name: &str,
     role: &HbaseRole,
     cb: &mut ContainerBuilder,
     pb: &mut PodBuilder,
@@ -214,7 +209,7 @@ pub fn add_kerberos_pod_config(
         let mut kerberos_secret_operator_volume_builder =
             SecretOperatorVolumeSourceBuilder::new(kerberos_secret_class);
         kerberos_secret_operator_volume_builder
-            .with_service_scope(hbase_name)
+            .with_service_scope(hbase.name_any())
             .with_kerberos_service_name(role.kerberos_service_name())
             .with_kerberos_service_name("HTTP");
         if let Some(true) = hbase.kerberos_request_node_principals() {
@@ -222,7 +217,7 @@ pub fn add_kerberos_pod_config(
         }
         pb.add_volume(
             VolumeBuilder::new("kerberos")
-                .ephemeral(kerberos_secret_operator_volume_builder.build())
+                .ephemeral(kerberos_secret_operator_volume_builder.build().unwrap()) // FIXME unwrap
                 .build(),
         );
         cb.add_volume_mount("kerberos", "/stackable/kerberos");
@@ -246,7 +241,8 @@ pub fn add_kerberos_pod_config(
                         .with_node_scope()
                         .with_format(SecretFormat::TlsPkcs12)
                         .with_tls_pkcs12_password(TLS_STORE_PASSWORD)
-                        .build(),
+                        .build()
+                        .unwrap(), // FIXME unwrap,
                 )
                 .build(),
         );
@@ -265,6 +261,8 @@ pub fn kerberos_container_start_commands(hbase: &HbaseCluster) -> String {
     }
 }
 
-fn principal_host_part(hbase_name: &str, hbase_namespace: &str) -> String {
+fn principal_host_part(hbase: &HbaseCluster) -> String {
+    let hbase_name = hbase.name_any();
+    let hbase_namespace = hbase.namespace().unwrap(); // FIXME unwrap
     format!("{hbase_name}.{hbase_namespace}.svc.cluster.local@${{env.KERBEROS_REALM}}")
 }

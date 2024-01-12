@@ -22,13 +22,16 @@ const ZOOKEEPER_ZNODE_PARENT: &str = "zookeeper.znode.parent";
 pub enum Error {
     #[snafu(display("object defines no namespace"))]
     ObjectHasNoNamespace,
+
     #[snafu(display("failed to retrieve ConfigMap {cm_name}"))]
     MissingConfigMap {
         source: stackable_operator::error::Error,
         cm_name: String,
     },
+
     #[snafu(display("failed to retrieve the entry {entry} for ConfigMap {cm_name}"))]
     MissingConfigMapEntry { cm_name: String, entry: String },
+
     #[snafu(display("failed to parse the zookeeper port from ConfigMap {cm_name} entry {entry}"))]
     ParseZookeeperPort {
         source: ParseIntError,
