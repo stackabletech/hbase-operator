@@ -793,9 +793,8 @@ fn build_rolegroup_statefulset(
         ..probe_template
     };
 
-    let mut container_builder =
-        ContainerBuilder::new("hbase").expect("ContainerBuilder not created");
-    container_builder
+    let mut hbase_container = ContainerBuilder::new("hbase").expect("ContainerBuilder not created");
+    hbase_container
         .image_from_product_image(resolved_product_image)
         .command(vec![
             "/bin/bash".to_string(),
@@ -919,6 +918,14 @@ fn build_rolegroup_statefulset(
         });
     }
 
+    add_graceful_shutdown_config(config, &mut pod_builder).context(GracefulShutdownSnafu)?;
+    if hbase.has_kerberos_enabled() {
+        add_kerberos_pod_config(hbase, hbase_role, &mut hbase_container, &mut pod_builder)
+            .context(AddKerberosConfigSnafu)?;
+    }
+    pod_builder.add_container(hbase_container.build());
+
+    // Vector sidecar shall be the last container in the list
     if config.logging.enable_vector_agent {
         pod_builder.add_container(product_logging::framework::vector_container(
             resolved_product_image,
@@ -934,14 +941,8 @@ fn build_rolegroup_statefulset(
         ));
     }
 
-    add_graceful_shutdown_config(config, &mut pod_builder).context(GracefulShutdownSnafu)?;
-    if hbase.has_kerberos_enabled() {
-        add_kerberos_pod_config(hbase, hbase_role, &mut container_builder, &mut pod_builder)
-            .context(AddKerberosConfigSnafu)?;
-    }
-
-    pod_builder.add_container(container_builder.build());
     let mut pod_template = pod_builder.build_template();
+
     if let Some(role) = role {
         pod_template.merge_from(role.config.pod_overrides.clone());
     }
