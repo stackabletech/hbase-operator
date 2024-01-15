@@ -99,7 +99,7 @@ pub fn kerberos_config_properties(hbase: &HbaseCluster) -> Result<BTreeMap<Strin
             "org.apache.hadoop.hbase.security.token.TokenProvider,org.apache.hadoop.hbase.security.access.AccessController".to_string(),
         ),
 
-        // Rest
+        // Rest server
         ("hbase.rest.authentication.type".to_string(), "kerberos".to_string()),
         ("hbase.rest.authentication.kerberos.principal".to_string(), format!(
             "HTTP/{principal_host_part}"
@@ -111,15 +111,13 @@ pub fn kerberos_config_properties(hbase: &HbaseCluster) -> Result<BTreeMap<Strin
         ("hbase.http.policy".to_string(), "HTTPS_ONLY".to_string()),
         // Recommended by the docs https://hbase.apache.org/book.html#hbase.ui.cache
         ("hbase.http.filter.no-store.enable".to_string(), "true".to_string()),
-        // key and truststore come from ssl-server.xml and ssl-client.xml
+        // Ḱey- and truststore come from ssl-server.xml and ssl-client.xml
 
-        // Rest
+        // Https for rest server
         ("hbase.rest.ssl.enabled".to_string(), "true".to_string()),
         ("hbase.rest.ssl.keystore.store".to_string(), format!("{TLS_STORE_DIR}/keystore.p12")),
         ("hbase.rest.ssl.keystore.password".to_string(), TLS_STORE_PASSWORD.to_string()),
         ("hbase.rest.ssl.keystore.type".to_string(), "pkcs12".to_string()),
-        // TODO: Check if needed
-        // ("hbase.rest.support.proxyuser".to_string(), "true".to_string()),
 
         // Set non-default ports when https is enabled
         ("hbase.rest.port".to_string(), HBASE_REST_PORT_HTTPS.to_string()),
@@ -227,7 +225,7 @@ pub fn add_kerberos_pod_config(
     pb: &mut PodBuilder,
 ) -> Result<(), Error> {
     if let Some(kerberos_secret_class) = hbase.kerberos_secret_class() {
-        // Keytab
+        // Mount keytab
         let mut kerberos_secret_operator_volume_builder =
             SecretOperatorVolumeSourceBuilder::new(kerberos_secret_class);
         kerberos_secret_operator_volume_builder
@@ -258,7 +256,7 @@ pub fn add_kerberos_pod_config(
     }
 
     if let Some(https_secret_class) = hbase.https_secret_class() {
-        // TLS certs
+        // Mount TLS keystore
         pb.add_volume(
             VolumeBuilder::new(TLS_STORE_VOLUME_NAME)
                 .ephemeral(
@@ -284,7 +282,9 @@ pub fn kerberos_container_start_commands(hbase: &HbaseCluster) -> String {
 
     formatdoc! {"
         export KERBEROS_REALM=$(grep -oP 'default_realm = \\K.*' /stackable/kerberos/krb5.conf)
-        sed -i -e 's/${{env.KERBEROS_REALM}}/'\"$KERBEROS_REALM/g\" {CONFIG_DIR_NAME}/hbase-site.xml",
+        sed -i -e 's/${{env.KERBEROS_REALM}}/'\"$KERBEROS_REALM/g\" {CONFIG_DIR_NAME}/core-site.xml
+        sed -i -e 's/${{env.KERBEROS_REALM}}/'\"$KERBEROS_REALM/g\" {CONFIG_DIR_NAME}/hbase-site.xml
+        sed -i -e 's/${{env.KERBEROS_REALM}}/'\"$KERBEROS_REALM/g\" {CONFIG_DIR_NAME}/hdfs-site.xml",
     }
 }
 
