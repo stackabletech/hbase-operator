@@ -14,7 +14,7 @@ use stackable_operator::{
     },
     config::{fragment, fragment::Fragment, fragment::ValidationError, merge::Merge},
     k8s_openapi::apimachinery::pkg::api::resource::Quantity,
-    kube::{runtime::reflector::ObjectRef, CustomResource},
+    kube::{runtime::reflector::ObjectRef, CustomResource, ResourceExt},
     product_config_utils::{ConfigError, Configuration},
     product_logging::{self, spec::Logging},
     role_utils::{GenericRoleConfig, Role, RoleGroup, RoleGroupRef},
@@ -312,22 +312,17 @@ impl HbaseRole {
         }
     }
 
+    /// We could have different service names depended on the role (e.g. "hbase-master", "hbase-regionserver" and
+    /// "hbase-restserver"). However this produces error messages such as
+    /// [RpcServer.priority.RWQ.Fifo.write.handler=0,queue=0,port=16020] security.ShellBasedUnixGroupsMapping: unable to return groups for user hbase-master PartialGroupNameException The user name 'hbase-master' is not found. id: 'hbase-master': no such user
+    /// or
+    /// Caused by: org.apache.hadoop.hbase.ipc.RemoteWithExtrasException(org.apache.hadoop.hbase.security.AccessDeniedException): org.apache.hadoop.hbase.security.AccessDeniedException: Insufficient permissions (user=hbase-master/hbase-master-default-1.hbase-master-default.kuttl-test-poetic-sunbeam.svc.cluster.local@CLUSTER.LOCAL, scope=hbase:meta, family=table:state, params=[table=hbase:meta,family=table:state],action=WRITE)
+    ///
+    /// Also the documentation states:
+    /// > A Kerberos principal has three parts, with the form username/fully.qualified.domain.name@YOUR-REALM.COM. We recommend using hbase as the username portion.
+    ///
+    /// As a result we use "hbase" everywhere (which e.g. differs from the current hdfs implementation)
     pub fn kerberos_service_name(&self) -> &'static str {
-        // FIXME: Use the names below and fix the following errors
-        //
-        // 2023-11-08 13:36:58,530 WARN  [RpcServer.priority.RWQ.Fifo.write.handler=0,queue=0,port=16020] security.ShellBasedUnixGroupsMapping: unable to return groups for user hbase-master PartialGroupNameException The user name 'hbase-master' is not found. id: 'hbase-master': no such user
-        // or
-        // Caused by: org.apache.hadoop.hbase.ipc.RemoteWithExtrasException(org.apache.hadoop.hbase.security.AccessDeniedException): org.apache.hadoop.hbase.security.AccessDeniedException: Insufficient permissions (user=hbase-master/hbase-master-default-1.hbase-master-default.kuttl-test-poetic-sunbeam.svc.cluster.local@CLUSTER.LOCAL, scope=hbase:meta, family=table:state, params=[table=hbase:meta,family=table:state],action=WRITE)
-        //
-        // match self {
-        //     HbaseRole::Master => "hbase-master",
-        //     HbaseRole::RegionServer => "hbase-regionserver",
-        //     HbaseRole::RestServer => "hbase-restserver",
-        // }
-
-        // On the other hand, according to docs:
-        // > A Kerberos principal has three parts, with the form username/fully.qualified.domain.name@YOUR-REALM.COM. We recommend using hbase as the username portion.
-
         "hbase"
     }
 }
@@ -430,20 +425,9 @@ impl Configuration for HbaseConfigFragment {
         match file {
             HBASE_ENV_SH => {
                 result.insert(HBASE_MANAGES_ZK.to_string(), Some("false".to_string()));
-                // result.insert(
-                //     "KRB5_CONFIG".to_string(),
-                //     Some("/stackable/kerberos/krb5.conf".to_string()),
-                // );
 
                 // As we don't have access to the clusterConfig, we always enable the `-Djava.security.krb5.conf`
                 // config, besides it is not always being used.
-
-                // -Djavax.net.ssl.trustStore={TLS_STORE_DIR}/truststore.p12 \
-                // -Djavax.net.ssl.trustStorePassword={TLS_STORE_PASSWORD} \
-                // -Djavax.net.ssl.trustStoreType=pkcs12 \
-                // -Djavax.net.ssl.keyStore={TLS_STORE_DIR}/keystore.p12 \
-                // -Djavax.net.ssl.keyStorePassword={TLS_STORE_PASSWORD} \
-                // -Djavax.net.ssl.keyStoreType=pkcs12 \
                 let mut all_hbase_opts = format!(
                     "-Djava.security.properties={CONFIG_DIR_NAME}/{JVM_SECURITY_PROPERTIES_FILE} \
                     -Djava.security.krb5.conf=/stackable/kerberos/krb5.conf \
@@ -453,7 +437,7 @@ impl Configuration for HbaseConfigFragment {
                     all_hbase_opts += " ";
                     all_hbase_opts += hbase_opts;
                 }
-                // set the jmx exporter in HBASE_MASTER_OPTS, HBASE_REGIONSERVER_OPTS and HBASE_REST_OPTS instead of HBASE_OPTS
+                // Set the jmx exporter in HBASE_MASTER_OPTS, HBASE_REGIONSERVER_OPTS and HBASE_REST_OPTS instead of HBASE_OPTS
                 // to prevent a port-conflict i.e. CLI tools read HBASE_OPTS and may then try to re-start the exporter
                 if role_name == HbaseRole::Master.to_string() {
                     result.insert(HBASE_MASTER_OPTS.to_string(), Some(all_hbase_opts));
@@ -653,13 +637,12 @@ impl HbaseCluster {
     /// Retrieve and merge resource configs for role and role groups
     pub fn merged_config(
         &self,
-        hbase_name: &str,
         role: &HbaseRole,
         role_group: &str,
         hdfs_discovery_cm_name: &str,
     ) -> Result<HbaseConfig, Error> {
         // Initialize the result with all default values as baseline
-        let conf_defaults = role.default_config(hbase_name, hdfs_discovery_cm_name);
+        let conf_defaults = role.default_config(&self.name_any(), hdfs_discovery_cm_name);
 
         let role = self.get_role(role).context(MissingHbaseRoleSnafu {
             role: role.to_string(),

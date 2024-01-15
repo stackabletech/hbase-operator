@@ -40,7 +40,7 @@ use stackable_operator::{
         apimachinery::pkg::{apis::meta::v1::LabelSelector, util::intstr::IntOrString},
         DeepMerge,
     },
-    kube::{runtime::controller::Action, Resource, ResourceExt},
+    kube::{runtime::controller::Action, Resource},
     kvp::{Label, LabelError, Labels, ObjectLabels},
     logging::controller::ReconcilerError,
     memory::{BinaryMultiple, MemoryQuantity},
@@ -367,7 +367,6 @@ pub async fn reconcile_hbase(hbase: Arc<HbaseCluster>, ctx: Arc<Ctx>) -> Result<
 
             let merged_config = hbase
                 .merged_config(
-                    &hbase.name_any(),
                     &hbase_role,
                     &rolegroup.role_group,
                     &hbase.spec.cluster_config.hdfs_config_map_name,
