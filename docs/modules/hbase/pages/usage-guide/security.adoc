@@ -10,12 +10,12 @@ To configure HDFS to use Kerberos you first need to collect information about yo
 Additionally you need a service-user, which the secret-operator uses to create create principals for the HDFS services.
 
 === 2. Create Kerberos SecretClass
-Afterwards you need to enter all the needed information into a SecretClass, as described in  xref:home:secret-operator:secretclass.adoc#backend-kerberoskeytab[secret-operator documentation].
+Afterwards you need to enter all the needed information into a SecretClass, as described in xref:home:secret-operator:secretclass.adoc#backend-kerberoskeytab[secret-operator documentation].
 The following guide assumes you have named your SecretClass `kerberos`.
 
 === 3. Configure HDFS to use SecretClass
 The next step is to configure your HdfsCluster to use the newly created SecretClass.
-Please follow the xref:home:hdfs-operator:usage-guide/security.adoc[HDFS security guide] to set up and test this.
+Please follow the xref:hdfs:usage-guide/security.adoc[HDFS security guide] to set up and test this.
 Please watch out to use the SecretClass named `kerberos`.
 
 === 4. Configure HBase to use SecretClass
