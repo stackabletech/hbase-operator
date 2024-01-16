@@ -4,6 +4,7 @@
 
 ### Added
 
+- Support user authentication using Kerberos ([#436]).
 - More CRD documentation ([#425]).
 
 ### Changed
@@ -18,6 +19,7 @@
 
 
 [#425]: https://github.com/stackabletech/hbase-operator/pull/425
+[#436]: https://github.com/stackabletech/hbase-operator/pull/436
 [#438]: https://github.com/stackabletech/hbase-operator/pull/438
 
 ## [23.11.0] - 2023-11-24
