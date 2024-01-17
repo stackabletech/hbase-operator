@@ -62,17 +62,18 @@ pub const HBASE_REST_PORT_NAME_HTTPS: &str = "rest-https";
 pub const METRICS_PORT_NAME: &str = "metrics";
 
 pub const HBASE_MASTER_PORT: u16 = 16000;
-// HBase always uses 16010, regardless of http or https. As most products use different ports for http and https, we
-// stick to that to be consistent within the SDP.
+// HBase always uses 16010, regardless of http or https. On 2024-01-17 we decided in Arch-meeting that we want to stick
+// the port numbers to what the product is doing, so we get the least surprise for users - even when this means we have
+// inconsistency between Stackable products.
 pub const HBASE_MASTER_UI_PORT_HTTP: u16 = 16010;
-pub const HBASE_MASTER_UI_PORT_HTTPS: u16 = 16011;
+pub const HBASE_MASTER_UI_PORT_HTTPS: u16 = HBASE_MASTER_UI_PORT_HTTP;
 pub const HBASE_REGIONSERVER_PORT: u16 = 16020;
 pub const HBASE_REGIONSERVER_UI_PORT_HTTP: u16 = 16030;
-pub const HBASE_REGIONSERVER_UI_PORT_HTTPS: u16 = 16031;
+pub const HBASE_REGIONSERVER_UI_PORT_HTTPS: u16 = HBASE_REGIONSERVER_UI_PORT_HTTP;
 pub const HBASE_REST_PORT_HTTP: u16 = 8080;
-pub const HBASE_REST_PORT_HTTPS: u16 = 8081;
+pub const HBASE_REST_PORT_HTTPS: u16 = HBASE_REST_PORT_HTTP;
 pub const HBASE_REST_UI_PORT_HTTP: u16 = 8085;
-pub const HBASE_REST_UI_PORT_HTTPS: u16 = 8086;
+pub const HBASE_REST_UI_PORT_HTTPS: u16 = HBASE_REST_UI_PORT_HTTP;
 pub const METRICS_PORT: u16 = 9100;
 
 pub const JVM_HEAP_FACTOR: f32 = 0.8;
