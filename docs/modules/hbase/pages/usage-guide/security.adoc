@@ -7,7 +7,7 @@ The xref:home:secret-operator:secretclass.adoc#backend-kerberoskeytab[secret-ope
 
 === 1. Prepare Kerberos server
 To configure HDFS to use Kerberos you first need to collect information about your Kerberos server, e.g. hostname and port.
-Additionally you need a service-user, which the secret-operator uses to create create principals for the HDFS services.
+Additionally, you need a service-user which the secret-operator uses to create principals for the HDFS services.
 
 === 2. Create Kerberos SecretClass
 Afterwards you need to enter all the needed information into a SecretClass, as described in xref:home:secret-operator:secretclass.adoc#backend-kerberoskeytab[secret-operator documentation].
@@ -37,7 +37,7 @@ The `kerberos.secretClass` is used to give HBase the possibility to request keyt
 
 The `tlsSecretClass` is needed to request TLS certificates, used e.g. for the Web UIs.
 
-=== 4. Verify that Kerberos authentication is required
+=== 5. Verify that Kerberos authentication is required
 Shell into the `hbase-master-default-0` Pod and execute the following commands:
 
 1. `kdestroy` (just in case you run `kinit` in the Pod already in the past)
@@ -46,7 +46,7 @@ Shell into the `hbase-master-default-0` Pod and execute the following commands:
 The last command should fail with the error message `ERROR: Found no valid authentication method from options`.
 You can also check the RestServer by calling `curl -v --insecure https://hbase-restserver-default:8081`, which should return `HTTP ERROR 401 Authentication required`.
 
-=== 5. Access HBase
+=== 6. Access HBase
 In case you want to access your HBase it is recommended to start up a client Pod that connects to HBase, rather than shelling into the master.
 We have an https://github.com/stackabletech/hbase-operator/blob/main/tests/templates/kuttl/kerberos/41-access-hbase.j2[integration test] for this exact purpose, where you can see how to connect and get a valid keytab.
 
