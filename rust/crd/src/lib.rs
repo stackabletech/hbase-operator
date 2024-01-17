@@ -312,6 +312,16 @@ impl HbaseRole {
         }
     }
 
+    /// Returns the name of the role as it is needed by the `bin/hbase {cli_role_name} start` command.
+    pub fn cli_role_name(&self) -> String {
+        match self {
+            HbaseRole::Master | HbaseRole::RegionServer => self.to_string(),
+            // Of course it is not called "restserver", so we need to have this match
+            // instead of just letting the Display impl do it's thing ;P
+            HbaseRole::RestServer => "rest".to_string(),
+        }
+    }
+
     /// We could have different service names depended on the role (e.g. "hbase-master", "hbase-regionserver" and
     /// "hbase-restserver"). However this produces error messages such as
     /// [RpcServer.priority.RWQ.Fifo.write.handler=0,queue=0,port=16020] security.ShellBasedUnixGroupsMapping: unable to return groups for user hbase-master PartialGroupNameException The user name 'hbase-master' is not found. id: 'hbase-master': no such user

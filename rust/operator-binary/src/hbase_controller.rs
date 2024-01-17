@@ -819,13 +819,7 @@ fn build_rolegroup_statefulset(
             wait_for_termination $!
             {create_vector_shutdown_file_command}
             ",
-            hbase_role_name_in_command = match hbase_role {
-                HbaseRole::Master => "master",
-                HbaseRole::RegionServer => "regionserver",
-                // Of course it is not called "restserver", so we need to have this match
-                // instead of just letting the Display impl do it's thing ;P
-                HbaseRole::RestServer => "rest",
-            },
+            hbase_role_name_in_command = hbase_role.cli_role_name(),
             kerberos_container_start_commands = kerberos_container_start_commands(hbase),
             remove_vector_shutdown_file_command =
                 remove_vector_shutdown_file_command(STACKABLE_LOG_DIR),
