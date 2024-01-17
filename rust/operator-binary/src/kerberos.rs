@@ -3,9 +3,8 @@ use std::collections::BTreeMap;
 use indoc::formatdoc;
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_hbase_crd::{
-    HbaseCluster, HbaseRole, CONFIG_DIR_NAME, HBASE_MASTER_UI_PORT_HTTPS,
-    HBASE_REGIONSERVER_UI_PORT_HTTPS, HBASE_REST_PORT_HTTPS, HBASE_REST_UI_PORT_HTTPS,
-    TLS_STORE_DIR, TLS_STORE_PASSWORD, TLS_STORE_VOLUME_NAME,
+    HbaseCluster, HbaseRole, CONFIG_DIR_NAME, TLS_STORE_DIR, TLS_STORE_PASSWORD,
+    TLS_STORE_VOLUME_NAME,
 };
 use stackable_operator::{
     builder::{
@@ -118,12 +117,6 @@ pub fn kerberos_config_properties(hbase: &HbaseCluster) -> Result<BTreeMap<Strin
         ("hbase.rest.ssl.keystore.store".to_string(), format!("{TLS_STORE_DIR}/keystore.p12")),
         ("hbase.rest.ssl.keystore.password".to_string(), TLS_STORE_PASSWORD.to_string()),
         ("hbase.rest.ssl.keystore.type".to_string(), "pkcs12".to_string()),
-
-        // Set non-default ports when https is enabled
-        ("hbase.rest.port".to_string(), HBASE_REST_PORT_HTTPS.to_string()),
-        ("hbase.master.info.port".to_string(), HBASE_MASTER_UI_PORT_HTTPS.to_string()),
-        ("hbase.regionserver.info.port".to_string(), HBASE_REGIONSERVER_UI_PORT_HTTPS.to_string()),
-        ("hbase.rest.info.port".to_string(), HBASE_REST_UI_PORT_HTTPS.to_string()),
     ]))
 }
 

@@ -65,15 +65,11 @@ pub const HBASE_MASTER_PORT: u16 = 16000;
 // HBase always uses 16010, regardless of http or https. On 2024-01-17 we decided in Arch-meeting that we want to stick
 // the port numbers to what the product is doing, so we get the least surprise for users - even when this means we have
 // inconsistency between Stackable products.
-pub const HBASE_MASTER_UI_PORT_HTTP: u16 = 16010;
-pub const HBASE_MASTER_UI_PORT_HTTPS: u16 = HBASE_MASTER_UI_PORT_HTTP;
+pub const HBASE_MASTER_UI_PORT: u16 = 16010;
 pub const HBASE_REGIONSERVER_PORT: u16 = 16020;
-pub const HBASE_REGIONSERVER_UI_PORT_HTTP: u16 = 16030;
-pub const HBASE_REGIONSERVER_UI_PORT_HTTPS: u16 = HBASE_REGIONSERVER_UI_PORT_HTTP;
-pub const HBASE_REST_PORT_HTTP: u16 = 8080;
-pub const HBASE_REST_PORT_HTTPS: u16 = HBASE_REST_PORT_HTTP;
-pub const HBASE_REST_UI_PORT_HTTP: u16 = 8085;
-pub const HBASE_REST_UI_PORT_HTTPS: u16 = HBASE_REST_UI_PORT_HTTP;
+pub const HBASE_REGIONSERVER_UI_PORT: u16 = 16030;
+pub const HBASE_REST_PORT: u16 = 8080;
+pub const HBASE_REST_UI_PORT: u16 = 8085;
 pub const METRICS_PORT: u16 = 9100;
 
 pub const JVM_HEAP_FACTOR: f32 = 0.8;
@@ -595,51 +591,49 @@ impl HbaseCluster {
         match role {
             HbaseRole::Master => vec![
                 ("master".to_string(), HBASE_MASTER_PORT),
-                if self.has_https_enabled() {
-                    (
-                        HBASE_UI_PORT_NAME_HTTPS.to_string(),
-                        HBASE_MASTER_UI_PORT_HTTPS,
-                    )
-                } else {
-                    (
-                        HBASE_UI_PORT_NAME_HTTP.to_string(),
-                        HBASE_MASTER_UI_PORT_HTTP,
-                    )
-                },
+                (
+                    if self.has_https_enabled() {
+                        HBASE_UI_PORT_NAME_HTTPS
+                    } else {
+                        HBASE_UI_PORT_NAME_HTTP
+                    }
+                    .to_string(),
+                    HBASE_MASTER_UI_PORT,
+                ),
                 (METRICS_PORT_NAME.to_string(), METRICS_PORT),
             ],
             HbaseRole::RegionServer => vec![
                 ("regionserver".to_string(), HBASE_REGIONSERVER_PORT),
-                if self.has_https_enabled() {
-                    (
-                        HBASE_UI_PORT_NAME_HTTPS.to_string(),
-                        HBASE_REGIONSERVER_UI_PORT_HTTPS,
-                    )
-                } else {
-                    (
-                        HBASE_UI_PORT_NAME_HTTP.to_string(),
-                        HBASE_REGIONSERVER_UI_PORT_HTTP,
-                    )
-                },
+                (
+                    if self.has_https_enabled() {
+                        HBASE_UI_PORT_NAME_HTTPS
+                    } else {
+                        HBASE_UI_PORT_NAME_HTTP
+                    }
+                    .to_string(),
+                    HBASE_REGIONSERVER_UI_PORT,
+                ),
                 (METRICS_PORT_NAME.to_string(), METRICS_PORT),
             ],
             HbaseRole::RestServer => vec![
-                if self.has_https_enabled() {
-                    (
-                        HBASE_REST_PORT_NAME_HTTPS.to_string(),
-                        HBASE_REST_PORT_HTTPS,
-                    )
-                } else {
-                    (HBASE_REST_PORT_NAME_HTTP.to_string(), HBASE_REST_PORT_HTTP)
-                },
-                if self.has_https_enabled() {
-                    (
-                        HBASE_UI_PORT_NAME_HTTPS.to_string(),
-                        HBASE_REST_UI_PORT_HTTPS,
-                    )
-                } else {
-                    (HBASE_UI_PORT_NAME_HTTP.to_string(), HBASE_REST_UI_PORT_HTTP)
-                },
+                (
+                    if self.has_https_enabled() {
+                        HBASE_REST_PORT_NAME_HTTPS
+                    } else {
+                        HBASE_REST_PORT_NAME_HTTP
+                    }
+                    .to_string(),
+                    HBASE_REST_PORT,
+                ),
+                (
+                    if self.has_https_enabled() {
+                        HBASE_UI_PORT_NAME_HTTPS
+                    } else {
+                        HBASE_UI_PORT_NAME_HTTP
+                    }
+                    .to_string(),
+                    HBASE_REST_UI_PORT,
+                ),
                 (METRICS_PORT_NAME.to_string(), METRICS_PORT),
             ],
         }
