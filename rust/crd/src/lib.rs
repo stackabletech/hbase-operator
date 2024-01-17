@@ -427,7 +427,7 @@ impl Configuration for HbaseConfigFragment {
                 result.insert(HBASE_MANAGES_ZK.to_string(), Some("false".to_string()));
 
                 // As we don't have access to the clusterConfig, we always enable the `-Djava.security.krb5.conf`
-                // config, besides it is not always being used.
+                // config, besides it not always being used.
                 let mut all_hbase_opts = format!(
                     "-Djava.security.properties={CONFIG_DIR_NAME}/{JVM_SECURITY_PROPERTIES_FILE} \
                     -Djava.security.krb5.conf=/stackable/kerberos/krb5.conf \
