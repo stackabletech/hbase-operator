@@ -48,7 +48,7 @@ You can also check the RestServer by calling `curl -v --insecure https://hbase-r
 
 === 6. Access HBase
 In case you want to access your HBase it is recommended to start up a client Pod that connects to HBase, rather than shelling into the master.
-We have an https://github.com/stackabletech/hbase-operator/blob/main/tests/templates/kuttl/kerberos/41-access-hbase.j2[integration test] for this exact purpose, where you can see how to connect and get a valid keytab.
+We have an https://github.com/stackabletech/hbase-operator/blob/main/tests/templates/kuttl/kerberos/41-access-hbase.yaml.j2[integration test] for this exact purpose, where you can see how to connect and get a valid keytab.
 
 == Authorization
 Together with Kerberos authorization is enabled.
