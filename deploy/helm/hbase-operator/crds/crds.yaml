@@ -31,26 +31,29 @@ spec:
                 clusterConfig:
                   description: Configuration that applies to all roles and role groups. This includes settings for logging, ZooKeeper and HDFS connection, among other things.
                   properties:
-                    hdfsConfigMapName:
-                      description: Name of the [discovery ConfigMap](https://docs.stackable.tech/home/nightly/concepts/service_discovery) for an HDFS cluster.
-                      type: string
-                    kerberos:
-                      description: Configuration to set up a cluster secured using Kerberos.
+                    authentication:
+                      description: Settings related to user [authentication](https://docs.stackable.tech/home/nightly/usage-guide/security).
                       nullable: true
                       properties:
-                        kerberosSecretClass:
-                          default: kerberos
-                          description: Name of the SecretClass providing the keytab for the HDFS services.
-                          type: string
-                        requestNodePrincipals:
-                          default: false
-                          description: Wether a principal including the Kubernetes node name should be requested. The principal could e.g. be `HTTP/my-k8s-worker-0.mycorp.lan`. This feature is disabled by default, as the resulting principals can already by existent e.g. in Active Directory which can cause problems.
-                          type: boolean
+                        kerberos:
+                          description: Kerberos configuration.
+                          properties:
+                            secretClass:
+                              description: Name of the SecretClass providing the keytab for the HBase services.
+                              type: string
+                          required:
+                            - secretClass
+                          type: object
                         tlsSecretClass:
                           default: tls
                           description: Name of the SecretClass providing the tls certificates for the WebUIs.
                           type: string
+                      required:
+                        - kerberos
                       type: object
+                    hdfsConfigMapName:
+                      description: Name of the [discovery ConfigMap](https://docs.stackable.tech/home/nightly/concepts/service_discovery) for an HDFS cluster.
+                      type: string
                     listenerClass:
                       default: cluster-internal
                       description: |-

@@ -1,5 +1,6 @@
 use std::{collections::BTreeMap, str::FromStr};
 
+use security::AuthenticationConfig;
 use serde::{Deserialize, Serialize};
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
@@ -27,6 +28,7 @@ use strum::{Display, EnumIter, EnumString};
 use crate::affinity::get_affinity;
 
 pub mod affinity;
+pub mod security;
 
 pub const APP_NAME: &str = "hbase";
 
@@ -174,8 +176,8 @@ pub struct HbaseClusterConfig {
     #[serde(default)]
     pub listener_class: CurrentlySupportedListenerClasses,
 
-    /// Configuration to set up a cluster secured using Kerberos.
-    pub kerberos: Option<KerberosConfig>,
+    /// Settings related to user [authentication](DOCS_BASE_URL_PLACEHOLDER/usage-guide/security).
+    pub authentication: Option<AuthenticationConfig>,
 }
 
 // TODO: Temporary solution until listener-operator is finished
@@ -558,32 +560,26 @@ impl HbaseCluster {
         self.kerberos_secret_class().is_some()
     }
 
-    pub fn kerberos_request_node_principals(&self) -> Option<bool> {
+    pub fn kerberos_secret_class(&self) -> Option<String> {
         self.spec
             .cluster_config
-            .kerberos
+            .authentication
             .as_ref()
-            .map(|k| k.request_node_principals)
-    }
-
-    pub fn kerberos_secret_class(&self) -> Option<&str> {
-        self.spec
-            .cluster_config
-            .kerberos
-            .as_ref()
-            .map(|k| k.kerberos_secret_class.as_str())
+            .map(|a| &a.kerberos)
+            .map(|k| k.secret_class.clone())
     }
 
     pub fn has_https_enabled(&self) -> bool {
         self.https_secret_class().is_some()
     }
 
-    pub fn https_secret_class(&self) -> Option<&str> {
+    pub fn https_secret_class(&self) -> Option<String> {
         self.spec
             .cluster_config
-            .kerberos
+            .authentication
             .as_ref()
-            .map(|k| k.tls_secret_class.as_str())
+            .map(|a| &a.kerberos)
+            .map(|k| k.secret_class.clone())
     }
 
     /// Returns required port name and port number tuples depending on the role.

@@ -23,9 +23,10 @@ commands:
           hdfsConfigMapName: hdfs
           zookeeperConfigMapName: hbase-znode
           listenerClass: {{ test_scenario['values']['listener-class'] }}
-          kerberos:
+          authentication:
             tlsSecretClass: tls
-            kerberosSecretClass: kerberos-$NAMESPACE
+            kerberos:
+              secretClass: kerberos-$NAMESPACE
 {% if lookup('env', 'VECTOR_AGGREGATOR') %}
           vectorAggregatorConfigMapName: vector-aggregator-discovery
 {% endif %}

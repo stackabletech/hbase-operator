@@ -219,22 +219,16 @@ pub fn add_kerberos_pod_config(
 ) -> Result<(), Error> {
     if let Some(kerberos_secret_class) = hbase.kerberos_secret_class() {
         // Mount keytab
-        let mut kerberos_secret_operator_volume_builder =
-            SecretOperatorVolumeSourceBuilder::new(kerberos_secret_class);
-        kerberos_secret_operator_volume_builder
-            .with_service_scope(hbase.name_any())
-            .with_kerberos_service_name(role.kerberos_service_name())
-            .with_kerberos_service_name("HTTP");
-        if let Some(true) = hbase.kerberos_request_node_principals() {
-            kerberos_secret_operator_volume_builder.with_node_scope();
-        }
+        let kerberos_secret_operator_volume =
+            SecretOperatorVolumeSourceBuilder::new(kerberos_secret_class)
+                .with_service_scope(hbase.name_any())
+                .with_kerberos_service_name(role.kerberos_service_name())
+                .with_kerberos_service_name("HTTP")
+                .build()
+                .context(AddKerberosSecretVolumeSnafu)?;
         pb.add_volume(
             VolumeBuilder::new("kerberos")
-                .ephemeral(
-                    kerberos_secret_operator_volume_builder
-                        .build()
-                        .context(AddKerberosSecretVolumeSnafu)?,
-                )
+                .ephemeral(kerberos_secret_operator_volume)
                 .build(),
         );
         cb.add_volume_mount("kerberos", "/stackable/kerberos");
