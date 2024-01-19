@@ -1,0 +1,54 @@
+---
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  - script: |
+      kubectl apply -n $NAMESPACE -f - <<EOF
+      apiVersion: zookeeper.stackable.tech/v1alpha1
+      kind: ZookeeperZnode
+      metadata:
+        name: hbase-znode
+      spec:
+        clusterRef:
+          name: zookeeper
+      ---
+      apiVersion: hbase.stackable.tech/v1alpha1
+      kind: HbaseCluster
+      metadata:
+        name: hbase
+      spec:
+        image:
+          productVersion: "{{ test_scenario['values']['hbase'] }}"
+        clusterConfig:
+          hdfsConfigMapName: hdfs
+          zookeeperConfigMapName: hbase-znode
+          listenerClass: {{ test_scenario['values']['listener-class'] }}
+          authentication:
+            tlsSecretClass: tls
+            kerberos:
+              secretClass: kerberos-$NAMESPACE
+{% if lookup('env', 'VECTOR_AGGREGATOR') %}
+          vectorAggregatorConfigMapName: vector-aggregator-discovery
+{% endif %}
+        masters:
+          config:
+            logging:
+              enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
+          roleGroups:
+            default:
+              replicas: 2
+        regionServers:
+          config:
+            logging:
+              enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
+          roleGroups:
+            default:
+              replicas: 2
+        restServers:
+          config:
+            logging:
+              enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
+          roleGroups:
+            default:
+              replicas: 1
+      EOF

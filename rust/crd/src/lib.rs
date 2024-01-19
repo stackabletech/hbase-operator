@@ -1,5 +1,6 @@
 use std::{collections::BTreeMap, str::FromStr};
 
+use security::AuthenticationConfig;
 use serde::{Deserialize, Serialize};
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
@@ -27,15 +28,22 @@ use strum::{Display, EnumIter, EnumString};
 use crate::affinity::get_affinity;
 
 pub mod affinity;
+pub mod security;
 
 pub const APP_NAME: &str = "hbase";
 
 pub const CONFIG_DIR_NAME: &str = "/stackable/conf";
 
+pub const TLS_STORE_DIR: &str = "/stackable/tls";
+pub const TLS_STORE_VOLUME_NAME: &str = "tls";
+pub const TLS_STORE_PASSWORD: &str = "changeit";
+
 pub const JVM_SECURITY_PROPERTIES_FILE: &str = "security.properties";
 
 pub const HBASE_ENV_SH: &str = "hbase-env.sh";
 pub const HBASE_SITE_XML: &str = "hbase-site.xml";
+pub const SSL_SERVER_XML: &str = "ssl-server.xml";
+pub const SSL_CLIENT_XML: &str = "ssl-client.xml";
 
 pub const HBASE_MANAGES_ZK: &str = "HBASE_MANAGES_ZK";
 pub const HBASE_MASTER_OPTS: &str = "HBASE_MASTER_OPTS";
@@ -49,15 +57,22 @@ pub const HBASE_UNSAFE_REGIONSERVER_HOSTNAME_DISABLE_MASTER_REVERSEDNS: &str =
 pub const HBASE_HEAPSIZE: &str = "HBASE_HEAPSIZE";
 pub const HBASE_ROOT_DIR_DEFAULT: &str = "/hbase";
 
-pub const HBASE_UI_PORT_NAME: &str = "ui";
+pub const HBASE_UI_PORT_NAME_HTTP: &str = "ui-http";
+pub const HBASE_UI_PORT_NAME_HTTPS: &str = "ui-https";
+pub const HBASE_REST_PORT_NAME_HTTP: &str = "rest-http";
+pub const HBASE_REST_PORT_NAME_HTTPS: &str = "rest-https";
 pub const METRICS_PORT_NAME: &str = "metrics";
 
-pub const HBASE_MASTER_PORT: i32 = 16000;
-pub const HBASE_MASTER_UI_PORT: i32 = 16010;
-pub const HBASE_REGIONSERVER_PORT: i32 = 16020;
-pub const HBASE_REGIONSERVER_UI_PORT: i32 = 16030;
-pub const HBASE_REST_PORT: i32 = 8080;
-pub const METRICS_PORT: i32 = 8081;
+pub const HBASE_MASTER_PORT: u16 = 16000;
+// HBase always uses 16010, regardless of http or https. On 2024-01-17 we decided in Arch-meeting that we want to stick
+// the port numbers to what the product is doing, so we get the least surprise for users - even when this means we have
+// inconsistency between Stackable products.
+pub const HBASE_MASTER_UI_PORT: u16 = 16010;
+pub const HBASE_REGIONSERVER_PORT: u16 = 16020;
+pub const HBASE_REGIONSERVER_UI_PORT: u16 = 16030;
+pub const HBASE_REST_PORT: u16 = 8080;
+pub const HBASE_REST_UI_PORT: u16 = 8085;
+pub const METRICS_PORT: u16 = 9100;
 
 pub const JVM_HEAP_FACTOR: f32 = 0.8;
 
@@ -160,6 +175,9 @@ pub struct HbaseClusterConfig {
     /// will be used to expose the service, and ListenerClass names will stay the same, allowing for a non-breaking change.
     #[serde(default)]
     pub listener_class: CurrentlySupportedListenerClasses,
+
+    /// Settings related to user [authentication](DOCS_BASE_URL_PLACEHOLDER/usage-guide/security).
+    pub authentication: Option<AuthenticationConfig>,
 }
 
 // TODO: Temporary solution until listener-operator is finished
@@ -181,6 +199,31 @@ impl CurrentlySupportedListenerClasses {
             CurrentlySupportedListenerClasses::ExternalUnstable => "NodePort".to_string(),
         }
     }
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, Hash, JsonSchema, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct KerberosConfig {
+    /// Name of the SecretClass providing the keytab for the HDFS services.
+    #[serde(default = "default_kerberos_kerberos_secret_class")]
+    kerberos_secret_class: String,
+    /// Name of the SecretClass providing the tls certificates for the WebUIs.
+    #[serde(default = "default_kerberos_tls_secret_class")]
+    tls_secret_class: String,
+    /// Wether a principal including the Kubernetes node name should be requested.
+    /// The principal could e.g. be `HTTP/my-k8s-worker-0.mycorp.lan`.
+    /// This feature is disabled by default, as the resulting principals can already by existent
+    /// e.g. in Active Directory which can cause problems.
+    #[serde(default)]
+    request_node_principals: bool,
+}
+
+fn default_kerberos_tls_secret_class() -> String {
+    "tls".to_string()
+}
+
+fn default_kerberos_kerberos_secret_class() -> String {
+    "kerberos".to_string()
 }
 
 #[derive(
@@ -211,26 +254,6 @@ pub enum HbaseRole {
 }
 
 impl HbaseRole {
-    /// Returns a port name, the port number, and the protocol for the given role.
-    pub fn port_properties(&self) -> Vec<(&'static str, i32, &'static str)> {
-        match self {
-            HbaseRole::Master => vec![
-                ("master", HBASE_MASTER_PORT, "TCP"),
-                (HBASE_UI_PORT_NAME, HBASE_MASTER_UI_PORT, "TCP"),
-                (METRICS_PORT_NAME, METRICS_PORT, "TCP"),
-            ],
-            HbaseRole::RegionServer => vec![
-                ("regionserver", HBASE_REGIONSERVER_PORT, "TCP"),
-                (HBASE_UI_PORT_NAME, HBASE_REGIONSERVER_UI_PORT, "TCP"),
-                (METRICS_PORT_NAME, METRICS_PORT, "TCP"),
-            ],
-            HbaseRole::RestServer => vec![
-                ("rest", HBASE_REST_PORT, "TCP"),
-                (METRICS_PORT_NAME, METRICS_PORT, "TCP"),
-            ],
-        }
-    }
-
     pub fn default_config(
         &self,
         cluster_name: &str,
@@ -286,6 +309,30 @@ impl HbaseRole {
             affinity: get_affinity(cluster_name, self, hdfs_discovery_cm_name),
             graceful_shutdown_timeout: Some(graceful_shutdown_timeout),
         }
+    }
+
+    /// Returns the name of the role as it is needed by the `bin/hbase {cli_role_name} start` command.
+    pub fn cli_role_name(&self) -> String {
+        match self {
+            HbaseRole::Master | HbaseRole::RegionServer => self.to_string(),
+            // Of course it is not called "restserver", so we need to have this match
+            // instead of just letting the Display impl do it's thing ;P
+            HbaseRole::RestServer => "rest".to_string(),
+        }
+    }
+
+    /// We could have different service names depended on the role (e.g. "hbase-master", "hbase-regionserver" and
+    /// "hbase-restserver"). However this produces error messages such as
+    /// [RpcServer.priority.RWQ.Fifo.write.handler=0,queue=0,port=16020] security.ShellBasedUnixGroupsMapping: unable to return groups for user hbase-master PartialGroupNameException The user name 'hbase-master' is not found. id: 'hbase-master': no such user
+    /// or
+    /// Caused by: org.apache.hadoop.hbase.ipc.RemoteWithExtrasException(org.apache.hadoop.hbase.security.AccessDeniedException): org.apache.hadoop.hbase.security.AccessDeniedException: Insufficient permissions (user=hbase-master/hbase-master-default-1.hbase-master-default.kuttl-test-poetic-sunbeam.svc.cluster.local@CLUSTER.LOCAL, scope=hbase:meta, family=table:state, params=[table=hbase:meta,family=table:state],action=WRITE)
+    ///
+    /// Also the documentation states:
+    /// > A Kerberos principal has three parts, with the form username/fully.qualified.domain.name@YOUR-REALM.COM. We recommend using hbase as the username portion.
+    ///
+    /// As a result we use "hbase" everywhere (which e.g. differs from the current hdfs implementation)
+    pub fn kerberos_service_name(&self) -> &'static str {
+        "hbase"
     }
 }
 
@@ -387,12 +434,19 @@ impl Configuration for HbaseConfigFragment {
         match file {
             HBASE_ENV_SH => {
                 result.insert(HBASE_MANAGES_ZK.to_string(), Some("false".to_string()));
-                let mut all_hbase_opts = format!("-Djava.security.properties={CONFIG_DIR_NAME}/{JVM_SECURITY_PROPERTIES_FILE} -javaagent:/stackable/jmx/jmx_prometheus_javaagent.jar={METRICS_PORT}:/stackable/jmx/{role_name}.yaml");
+
+                // As we don't have access to the clusterConfig, we always enable the `-Djava.security.krb5.conf`
+                // config, besides it not always being used.
+                let mut all_hbase_opts = format!(
+                    "-Djava.security.properties={CONFIG_DIR_NAME}/{JVM_SECURITY_PROPERTIES_FILE} \
+                    -Djava.security.krb5.conf=/stackable/kerberos/krb5.conf \
+                    -javaagent:/stackable/jmx/jmx_prometheus_javaagent.jar={METRICS_PORT}:/stackable/jmx/{role_name}.yaml",
+                );
                 if let Some(hbase_opts) = &self.hbase_opts {
                     all_hbase_opts += " ";
                     all_hbase_opts += hbase_opts;
                 }
-                // set the jmx exporter in HBASE_MASTER_OPTS, HBASE_REGIONSERVER_OPTS and HBASE_REST_OPTS instead of HBASE_OPTS
+                // Set the jmx exporter in HBASE_MASTER_OPTS, HBASE_REGIONSERVER_OPTS and HBASE_REST_OPTS instead of HBASE_OPTS
                 // to prevent a port-conflict i.e. CLI tools read HBASE_OPTS and may then try to re-start the exporter
                 if role_name == HbaseRole::Master.to_string() {
                     result.insert(HBASE_MASTER_OPTS.to_string(), Some(all_hbase_opts));
@@ -500,6 +554,70 @@ impl HbaseCluster {
             HbaseRole::RegionServer => self.spec.region_servers.as_ref().map(|rs| &rs.role_config),
             HbaseRole::RestServer => self.spec.rest_servers.as_ref().map(|rs| &rs.role_config),
         }
+    }
+
+    pub fn has_kerberos_enabled(&self) -> bool {
+        self.kerberos_secret_class().is_some()
+    }
+
+    pub fn kerberos_secret_class(&self) -> Option<String> {
+        self.spec
+            .cluster_config
+            .authentication
+            .as_ref()
+            .map(|a| &a.kerberos)
+            .map(|k| k.secret_class.clone())
+    }
+
+    pub fn has_https_enabled(&self) -> bool {
+        self.https_secret_class().is_some()
+    }
+
+    pub fn https_secret_class(&self) -> Option<String> {
+        self.spec
+            .cluster_config
+            .authentication
+            .as_ref()
+            .map(|a| a.tls_secret_class.clone())
+    }
+
+    /// Returns required port name and port number tuples depending on the role.
+    pub fn ports(&self, role: &HbaseRole) -> Vec<(String, u16)> {
+        match role {
+            HbaseRole::Master => vec![
+                ("master".to_string(), HBASE_MASTER_PORT),
+                (self.ui_port_name(), HBASE_MASTER_UI_PORT),
+                (METRICS_PORT_NAME.to_string(), METRICS_PORT),
+            ],
+            HbaseRole::RegionServer => vec![
+                ("regionserver".to_string(), HBASE_REGIONSERVER_PORT),
+                (self.ui_port_name(), HBASE_REGIONSERVER_UI_PORT),
+                (METRICS_PORT_NAME.to_string(), METRICS_PORT),
+            ],
+            HbaseRole::RestServer => vec![
+                (
+                    if self.has_https_enabled() {
+                        HBASE_REST_PORT_NAME_HTTPS
+                    } else {
+                        HBASE_REST_PORT_NAME_HTTP
+                    }
+                    .to_string(),
+                    HBASE_REST_PORT,
+                ),
+                (self.ui_port_name(), HBASE_REST_UI_PORT),
+                (METRICS_PORT_NAME.to_string(), METRICS_PORT),
+            ],
+        }
+    }
+
+    /// Name of the port used by the Web UI, which depends on HTTPS usage
+    fn ui_port_name(&self) -> String {
+        if self.has_https_enabled() {
+            HBASE_UI_PORT_NAME_HTTPS
+        } else {
+            HBASE_UI_PORT_NAME_HTTP
+        }
+        .to_string()
     }
 
     /// Retrieve and merge resource configs for role and role groups

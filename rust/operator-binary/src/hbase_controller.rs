@@ -6,6 +6,7 @@ use std::{
     sync::Arc,
 };
 
+use indoc::formatdoc;
 use product_config::{
     types::PropertyNameKind,
     writer::{to_hadoop_xml, to_java_properties_string, PropertiesWriterError},
@@ -14,9 +15,9 @@ use product_config::{
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_hbase_crd::{
     Container, HbaseCluster, HbaseClusterStatus, HbaseConfig, HbaseConfigFragment, HbaseRole,
-    APP_NAME, CONFIG_DIR_NAME, HBASE_ENV_SH, HBASE_HEAPSIZE, HBASE_MASTER_PORT,
-    HBASE_REGIONSERVER_PORT, HBASE_REST_PORT, HBASE_SITE_XML, JVM_HEAP_FACTOR,
-    JVM_SECURITY_PROPERTIES_FILE,
+    APP_NAME, CONFIG_DIR_NAME, HBASE_ENV_SH, HBASE_HEAPSIZE, HBASE_REST_PORT_NAME_HTTP,
+    HBASE_REST_PORT_NAME_HTTPS, HBASE_SITE_XML, JVM_HEAP_FACTOR, JVM_SECURITY_PROPERTIES_FILE,
+    SSL_CLIENT_XML, SSL_SERVER_XML,
 };
 use stackable_operator::{
     builder::{
@@ -32,8 +33,8 @@ use stackable_operator::{
         api::{
             apps::v1::{StatefulSet, StatefulSetSpec},
             core::v1::{
-                ConfigMap, ConfigMapVolumeSource, ContainerPort, HTTPGetAction, Probe, Service,
-                ServicePort, ServiceSpec, TCPSocketAction, Volume,
+                ConfigMap, ConfigMapVolumeSource, ContainerPort, Probe, Service, ServicePort,
+                ServiceSpec, TCPSocketAction, Volume,
             },
         },
         apimachinery::pkg::{apis::meta::v1::LabelSelector, util::intstr::IntOrString},
@@ -64,6 +65,11 @@ use strum::{EnumDiscriminants, IntoStaticStr};
 
 use crate::{
     discovery::build_discovery_configmap,
+    kerberos::{
+        self, add_kerberos_pod_config, kerberos_config_properties,
+        kerberos_container_start_commands, kerberos_ssl_client_settings,
+        kerberos_ssl_server_settings,
+    },
     operations::{graceful_shutdown::add_graceful_shutdown_config, pdb::add_pdbs},
     product_logging::{
         extend_role_group_config_map, resolve_vector_aggregator_address, LOG4J_CONFIG_FILE,
@@ -228,6 +234,9 @@ pub enum Error {
         source: crate::product_logging::Error,
         cm_name: String,
     },
+
+    #[snafu(display("failed to add kerberos config"))]
+    AddKerberosConfig { source: kerberos::Error },
 
     #[snafu(display("failed to update status"))]
     ApplyStatus {
@@ -448,13 +457,13 @@ pub fn build_region_server_role_service(
     let role_svc_name = hbase
         .server_role_service_name()
         .context(GlobalServiceNameNotFoundSnafu)?;
-    let ports = role
-        .port_properties()
+    let ports = hbase
+        .ports(&role)
         .into_iter()
-        .map(|(port_name, port_number, port_protocol)| ServicePort {
-            name: Some(port_name.into()),
-            port: port_number,
-            protocol: Some(port_protocol.into()),
+        .map(|(name, value)| ServicePort {
+            name: Some(name),
+            port: i32::from(value),
+            protocol: Some("TCP".to_string()),
             ..ServicePort::default()
         })
         .collect();
@@ -491,46 +500,96 @@ pub fn build_region_server_role_service(
 }
 
 /// The rolegroup [`ConfigMap`] configures the rolegroup based on the configuration given by the administrator
+#[allow(clippy::too_many_arguments)]
 fn build_rolegroup_config_map(
     hbase: &HbaseCluster,
     rolegroup: &RoleGroupRef<HbaseCluster>,
     rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
     zookeeper_connection_information: &ZookeeperConnectionInformation,
-    config: &HbaseConfig,
+    hbase_config: &HbaseConfig,
     resolved_product_image: &ResolvedProductImage,
     vector_aggregator_address: Option<&str>,
 ) -> Result<ConfigMap, Error> {
-    let mut hbase_site_config = rolegroup_config
-        .get(&PropertyNameKind::File(HBASE_SITE_XML.to_string()))
-        .cloned()
-        .unwrap_or_default();
+    let mut hbase_site_xml = String::new();
+    let mut hbase_env_sh = String::new();
+    let mut ssl_server_xml = String::new();
+    let mut ssl_client_xml = String::new();
 
-    hbase_site_config.extend(zookeeper_connection_information.as_hbase_settings());
+    for (property_name_kind, config) in rolegroup_config {
+        match property_name_kind {
+            PropertyNameKind::File(file_name) if file_name == HBASE_SITE_XML => {
+                let mut hbase_site_config = BTreeMap::new();
+                hbase_site_config.extend(zookeeper_connection_information.as_hbase_settings());
+                hbase_site_config
+                    .extend(kerberos_config_properties(hbase).context(AddKerberosConfigSnafu)?);
 
-    let mut hbase_env_config = rolegroup_config
-        .get(&PropertyNameKind::File(HBASE_ENV_SH.to_string()))
-        .cloned()
-        .unwrap_or_default();
+                // configOverride come last
+                hbase_site_config.extend(config.clone());
+                hbase_site_xml = to_hadoop_xml(
+                    hbase_site_config
+                        .into_iter()
+                        .map(|(k, v)| (k, Some(v)))
+                        .collect::<BTreeMap<_, _>>()
+                        .iter(),
+                );
+            }
+            PropertyNameKind::File(file_name) if file_name == HBASE_ENV_SH => {
+                let mut hbase_env_config = BTreeMap::new();
 
-    let memory_limit = MemoryQuantity::try_from(
-        config
-            .resources
-            .memory
-            .limit
-            .as_ref()
-            .context(InvalidJavaHeapConfigSnafu)?,
-    )
-    .context(FailedToConvertJavaHeapSnafu {
-        unit: BinaryMultiple::Mebi.to_java_memory_unit(),
-    })?;
-    let heap_in_mebi = (memory_limit * JVM_HEAP_FACTOR)
-        .scale_to(BinaryMultiple::Mebi)
-        .format_for_java()
-        .context(FailedToConvertJavaHeapSnafu {
-            unit: BinaryMultiple::Mebi.to_java_memory_unit(),
-        })?;
+                let memory_limit = MemoryQuantity::try_from(
+                    hbase_config
+                        .resources
+                        .memory
+                        .limit
+                        .as_ref()
+                        .context(InvalidJavaHeapConfigSnafu)?,
+                )
+                .context(FailedToConvertJavaHeapSnafu {
+                    unit: BinaryMultiple::Mebi.to_java_memory_unit(),
+                })?;
+                let heap_in_mebi = (memory_limit * JVM_HEAP_FACTOR)
+                    .scale_to(BinaryMultiple::Mebi)
+                    .format_for_java()
+                    .context(FailedToConvertJavaHeapSnafu {
+                        unit: BinaryMultiple::Mebi.to_java_memory_unit(),
+                    })?;
+                hbase_env_config.insert(HBASE_HEAPSIZE.to_string(), heap_in_mebi);
 
-    hbase_env_config.insert(HBASE_HEAPSIZE.to_string(), heap_in_mebi);
+                // configOverride come last
+                hbase_env_config.extend(config.clone());
+                hbase_env_sh = write_hbase_env_sh(hbase_env_config.iter());
+            }
+            PropertyNameKind::File(file_name) if file_name == SSL_SERVER_XML => {
+                let mut config_opts = BTreeMap::new();
+                config_opts.extend(kerberos_ssl_server_settings(hbase));
+
+                // configOverride come last
+                config_opts.extend(config.clone());
+                ssl_server_xml = to_hadoop_xml(
+                    config_opts
+                        .into_iter()
+                        .map(|(k, v)| (k, Some(v)))
+                        .collect::<BTreeMap<_, _>>()
+                        .iter(),
+                );
+            }
+            PropertyNameKind::File(file_name) if file_name == SSL_CLIENT_XML => {
+                let mut config_opts = BTreeMap::new();
+                config_opts.extend(kerberos_ssl_client_settings(hbase));
+
+                // configOverride come last
+                config_opts.extend(config.clone());
+                ssl_client_xml = to_hadoop_xml(
+                    config_opts
+                        .into_iter()
+                        .map(|(k, v)| (k, Some(v)))
+                        .collect::<BTreeMap<_, _>>()
+                        .iter(),
+                );
+            }
+            _ => {}
+        }
+    }
 
     let jvm_sec_props: BTreeMap<String, Option<String>> = rolegroup_config
         .get(&PropertyNameKind::File(
@@ -541,6 +600,11 @@ fn build_rolegroup_config_map(
         .into_iter()
         .map(|(k, v)| (k, Some(v)))
         .collect();
+    let jvm_sec_props = to_java_properties_string(jvm_sec_props.iter()).with_context(|_| {
+        SerializeJvmSecuritySnafu {
+            rolegroup: rolegroup.clone(),
+        }
+    })?;
 
     let mut builder = ConfigMapBuilder::new();
 
@@ -560,30 +624,23 @@ fn build_rolegroup_config_map(
 
     builder
         .metadata(cm_metadata)
-        .add_data(
-            HBASE_SITE_XML,
-            to_hadoop_xml(
-                hbase_site_config
-                    .into_iter()
-                    .map(|(k, v)| (k, Some(v)))
-                    .collect::<BTreeMap<_, _>>()
-                    .iter(),
-            ),
-        )
-        .add_data(HBASE_ENV_SH, write_hbase_env_sh(hbase_env_config.iter()))
-        .add_data(
-            JVM_SECURITY_PROPERTIES_FILE,
-            to_java_properties_string(jvm_sec_props.iter()).with_context(|_| {
-                SerializeJvmSecuritySnafu {
-                    rolegroup: rolegroup.clone(),
-                }
-            })?,
-        );
+        .add_data(HBASE_SITE_XML, hbase_site_xml)
+        .add_data(HBASE_ENV_SH, hbase_env_sh)
+        .add_data(JVM_SECURITY_PROPERTIES_FILE, jvm_sec_props);
+
+    // HBase does not like empty config files:
+    // Caused by: com.ctc.wstx.exc.WstxEOFException: Unexpected EOF in prolog at [row,col,system-id]: [1,0,"file:/stackable/conf/ssl-server.xml"]
+    if !ssl_server_xml.is_empty() {
+        builder.add_data(SSL_SERVER_XML, ssl_server_xml);
+    }
+    if !ssl_client_xml.is_empty() {
+        builder.add_data(SSL_CLIENT_XML, ssl_client_xml);
+    }
 
     extend_role_group_config_map(
         rolegroup,
         vector_aggregator_address,
-        &config.logging,
+        &hbase_config.logging,
         &mut builder,
     )
     .context(InvalidLoggingConfigSnafu {
@@ -605,13 +662,13 @@ fn build_rolegroup_service(
     rolegroup: &RoleGroupRef<HbaseCluster>,
     resolved_product_image: &ResolvedProductImage,
 ) -> Result<Service> {
-    let ports = hbase_role
-        .port_properties()
+    let ports = hbase
+        .ports(hbase_role)
         .into_iter()
-        .map(|(port_name, port_number, port_protocol)| ServicePort {
-            name: Some(port_name.into()),
-            port: port_number,
-            protocol: Some(port_protocol.into()),
+        .map(|(name, value)| ServicePort {
+            name: Some(name),
+            port: i32::from(value),
+            protocol: Some("TCP".to_string()),
             ..ServicePort::default()
         })
         .collect();
@@ -671,13 +728,13 @@ fn build_rolegroup_statefulset(
     let role = hbase.get_role(hbase_role);
     let role_group = role.and_then(|r| r.role_groups.get(&rolegroup_ref.role_group));
 
-    let ports = hbase_role
-        .port_properties()
+    let ports = hbase
+        .ports(hbase_role)
         .into_iter()
-        .map(|(port_name, port_number, port_protocol)| ContainerPort {
-            name: Some(port_name.into()),
-            container_port: port_number,
-            protocol: Some(port_protocol.into()),
+        .map(|(name, value)| ContainerPort {
+            name: Some(name),
+            container_port: i32::from(value),
+            protocol: Some("TCP".to_string()),
             ..ContainerPort::default()
         })
         .collect();
@@ -685,22 +742,32 @@ fn build_rolegroup_statefulset(
     let probe_template = match hbase_role {
         HbaseRole::Master => Probe {
             tcp_socket: Some(TCPSocketAction {
-                port: IntOrString::Int(HBASE_MASTER_PORT),
+                port: IntOrString::String("master".to_string()),
                 ..TCPSocketAction::default()
             }),
             ..Probe::default()
         },
         HbaseRole::RegionServer => Probe {
             tcp_socket: Some(TCPSocketAction {
-                port: IntOrString::Int(HBASE_REGIONSERVER_PORT),
+                port: IntOrString::String("regionserver".to_string()),
                 ..TCPSocketAction::default()
             }),
             ..Probe::default()
         },
         HbaseRole::RestServer => Probe {
-            http_get: Some(HTTPGetAction {
-                port: IntOrString::Int(HBASE_REST_PORT),
-                ..HTTPGetAction::default()
+            // We cant use HTTPGetAction, as it returns a 401 in case kerberos is enabled, and there is currently no way
+            // to tell Kubernetes an 401 is healthy. As an alternative we run curl ourselves and check the http status
+            // code there.
+            tcp_socket: Some(TCPSocketAction {
+                port: IntOrString::String(
+                    if hbase.has_https_enabled() {
+                        HBASE_REST_PORT_NAME_HTTPS
+                    } else {
+                        HBASE_REST_PORT_NAME_HTTP
+                    }
+                    .to_string(),
+                ),
+                ..TCPSocketAction::default()
             }),
             ..Probe::default()
         },
@@ -726,8 +793,8 @@ fn build_rolegroup_statefulset(
         ..probe_template
     };
 
-    let container = ContainerBuilder::new("hbase")
-        .expect("ContainerBuilder not created")
+    let mut hbase_container = ContainerBuilder::new("hbase").expect("ContainerBuilder not created");
+    hbase_container
         .image_from_product_image(resolved_product_image)
         .command(vec![
             "/bin/bash".to_string(),
@@ -736,33 +803,29 @@ fn build_rolegroup_statefulset(
             "pipefail".to_string(),
             "-c".to_string(),
         ])
-        .args(vec![format!(
-            "\
-mkdir -p {CONFIG_DIR_NAME}
-cp {HDFS_DISCOVERY_TMP_DIR}/hdfs-site.xml {CONFIG_DIR_NAME}
-cp {HDFS_DISCOVERY_TMP_DIR}/core-site.xml {CONFIG_DIR_NAME}
-cp {HBASE_CONFIG_TMP_DIR}/* {CONFIG_DIR_NAME}
-cp {HBASE_LOG_CONFIG_TMP_DIR}/{LOG4J_CONFIG_FILE} {CONFIG_DIR_NAME}
+        .args(vec![formatdoc! {"
+            mkdir -p {CONFIG_DIR_NAME}
+            cp {HDFS_DISCOVERY_TMP_DIR}/hdfs-site.xml {CONFIG_DIR_NAME}
+            cp {HDFS_DISCOVERY_TMP_DIR}/core-site.xml {CONFIG_DIR_NAME}
+            cp {HBASE_CONFIG_TMP_DIR}/* {CONFIG_DIR_NAME}
+            cp {HBASE_LOG_CONFIG_TMP_DIR}/{LOG4J_CONFIG_FILE} {CONFIG_DIR_NAME}
 
-{COMMON_BASH_TRAP_FUNCTIONS}
-{remove_vector_shutdown_file_command}
-prepare_signal_handlers
-bin/hbase {hbase_role_name_in_command} start &
-wait_for_termination $!
-{create_vector_shutdown_file_command}
-",
-            hbase_role_name_in_command = match hbase_role {
-                HbaseRole::Master => "master",
-                HbaseRole::RegionServer => "regionserver",
-                // Of course it is not called "restserver", so we need to have this match
-                // instead of just letting the Display impl do it's thing ;P
-                HbaseRole::RestServer => "rest",
-            },
+            {kerberos_container_start_commands}
+
+            {COMMON_BASH_TRAP_FUNCTIONS}
+            {remove_vector_shutdown_file_command}
+            prepare_signal_handlers
+            bin/hbase {hbase_role_name_in_command} start &
+            wait_for_termination $!
+            {create_vector_shutdown_file_command}
+            ",
+            hbase_role_name_in_command = hbase_role.cli_role_name(),
+            kerberos_container_start_commands = kerberos_container_start_commands(hbase),
             remove_vector_shutdown_file_command =
                 remove_vector_shutdown_file_command(STACKABLE_LOG_DIR),
             create_vector_shutdown_file_command =
                 create_vector_shutdown_file_command(STACKABLE_LOG_DIR),
-        )])
+        }])
         .add_env_var("HBASE_CONF_DIR", CONFIG_DIR_NAME)
         // required by phoenix (for cases where Kerberos is enabled): see https://issues.apache.org/jira/browse/PHOENIX-2369
         .add_env_var("HADOOP_CONF_DIR", CONFIG_DIR_NAME)
@@ -774,8 +837,7 @@ wait_for_termination $!
         .resources(config.resources.clone().into())
         .startup_probe(startup_probe)
         .liveness_probe(liveness_probe)
-        .readiness_probe(readiness_probe)
-        .build();
+        .readiness_probe(readiness_probe);
 
     let mut pod_builder = PodBuilder::new();
 
@@ -793,7 +855,6 @@ wait_for_termination $!
         .metadata(pb_metadata)
         .image_pull_secrets_from_product_image(resolved_product_image)
         .affinity(&config.affinity)
-        .add_container(container)
         .add_volume(stackable_operator::k8s_openapi::api::core::v1::Volume {
             name: "hbase-config".to_string(),
             config_map: Some(ConfigMapVolumeSource {
@@ -851,6 +912,14 @@ wait_for_termination $!
         });
     }
 
+    add_graceful_shutdown_config(config, &mut pod_builder).context(GracefulShutdownSnafu)?;
+    if hbase.has_kerberos_enabled() {
+        add_kerberos_pod_config(hbase, hbase_role, &mut hbase_container, &mut pod_builder)
+            .context(AddKerberosConfigSnafu)?;
+    }
+    pod_builder.add_container(hbase_container.build());
+
+    // Vector sidecar shall be the last container in the list
     if config.logging.enable_vector_agent {
         pod_builder.add_container(product_logging::framework::vector_container(
             resolved_product_image,
@@ -866,9 +935,8 @@ wait_for_termination $!
         ));
     }
 
-    add_graceful_shutdown_config(config, &mut pod_builder).context(GracefulShutdownSnafu)?;
-
     let mut pod_template = pod_builder.build_template();
+
     if let Some(role) = role {
         pod_template.merge_from(role.config.pod_overrides.clone());
     }
@@ -925,6 +993,8 @@ fn build_roles(
     let config_types = vec![
         PropertyNameKind::File(HBASE_ENV_SH.to_string()),
         PropertyNameKind::File(HBASE_SITE_XML.to_string()),
+        PropertyNameKind::File(SSL_SERVER_XML.to_string()),
+        PropertyNameKind::File(SSL_CLIENT_XML.to_string()),
         PropertyNameKind::File(JVM_SECURITY_PROPERTIES_FILE.to_string()),
     ];
 

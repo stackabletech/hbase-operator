@@ -31,6 +31,26 @@ spec:
                 clusterConfig:
                   description: Configuration that applies to all roles and role groups. This includes settings for logging, ZooKeeper and HDFS connection, among other things.
                   properties:
+                    authentication:
+                      description: Settings related to user [authentication](https://docs.stackable.tech/home/nightly/usage-guide/security).
+                      nullable: true
+                      properties:
+                        kerberos:
+                          description: Kerberos configuration.
+                          properties:
+                            secretClass:
+                              description: Name of the SecretClass providing the keytab for the HBase services.
+                              type: string
+                          required:
+                            - secretClass
+                          type: object
+                        tlsSecretClass:
+                          default: tls
+                          description: Name of the SecretClass providing the tls certificates for the WebUIs.
+                          type: string
+                      required:
+                        - kerberos
+                      type: object
                     hdfsConfigMapName:
                       description: Name of the [discovery ConfigMap](https://docs.stackable.tech/home/nightly/concepts/service_discovery) for an HDFS cluster.
                       type: string

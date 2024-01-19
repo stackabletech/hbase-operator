@@ -3,6 +3,7 @@
 ** xref:hbase:getting_started/first_steps.adoc[]
 * xref:hbase:usage-guide/index.adoc[]
 ** xref:hbase:usage-guide/listenerclass.adoc[]
+** xref:hbase:usage-guide/security.adoc[]
 ** xref:hbase:usage-guide/resource-requests.adoc[]
 ** xref:hbase:usage-guide/phoenix.adoc[]
 ** xref:hbase:usage-guide/compression.adoc[]

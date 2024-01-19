@@ -1,5 +1,6 @@
 mod discovery;
 mod hbase_controller;
+mod kerberos;
 mod operations;
 mod product_logging;
 mod zookeeper;

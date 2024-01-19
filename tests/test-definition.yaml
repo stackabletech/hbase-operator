@@ -25,13 +25,31 @@ dimensions:
     values:
       - "cluster-internal"
       - "external-unstable"
+  - name: kerberos-realm
+    values:
+      - "CLUSTER.LOCAL"
+      - "PROD.MYCORP"
+  - name: kerberos-backend
+    values:
+      - mit
+      # Requires manual setup, see create-kerberos-secretclass.yaml
+      # This will *not* respect the kerberos-realm test attribute, but instead use a hard-coded realm
+      # - activeDirectory
 tests:
   - name: smoke
     dimensions:
       - hbase
-      - zookeeper
       - hdfs
+      - zookeeper
       - listener-class
+  - name: kerberos
+    dimensions:
+      - hbase
+      - hdfs
+      - zookeeper-latest
+      - listener-class
+      - kerberos-realm
+      - kerberos-backend
   - name: orphaned_resources
     dimensions:
       - hbase-latest
@@ -61,6 +79,8 @@ suites:
           - name: zookeeper
             expr: last
           - name: hdfs
+            expr: last
+          - name: kerberos-realm
             expr: last
   - name: smoke-latest
     select:
