@@ -586,28 +586,12 @@ impl HbaseCluster {
         match role {
             HbaseRole::Master => vec![
                 ("master".to_string(), HBASE_MASTER_PORT),
-                (
-                    if self.has_https_enabled() {
-                        HBASE_UI_PORT_NAME_HTTPS
-                    } else {
-                        HBASE_UI_PORT_NAME_HTTP
-                    }
-                    .to_string(),
-                    HBASE_MASTER_UI_PORT,
-                ),
+                (self.ui_port_name(), HBASE_MASTER_UI_PORT),
                 (METRICS_PORT_NAME.to_string(), METRICS_PORT),
             ],
             HbaseRole::RegionServer => vec![
                 ("regionserver".to_string(), HBASE_REGIONSERVER_PORT),
-                (
-                    if self.has_https_enabled() {
-                        HBASE_UI_PORT_NAME_HTTPS
-                    } else {
-                        HBASE_UI_PORT_NAME_HTTP
-                    }
-                    .to_string(),
-                    HBASE_REGIONSERVER_UI_PORT,
-                ),
+                (self.ui_port_name(), HBASE_REGIONSERVER_UI_PORT),
                 (METRICS_PORT_NAME.to_string(), METRICS_PORT),
             ],
             HbaseRole::RestServer => vec![
@@ -620,18 +604,20 @@ impl HbaseCluster {
                     .to_string(),
                     HBASE_REST_PORT,
                 ),
-                (
-                    if self.has_https_enabled() {
-                        HBASE_UI_PORT_NAME_HTTPS
-                    } else {
-                        HBASE_UI_PORT_NAME_HTTP
-                    }
-                    .to_string(),
-                    HBASE_REST_UI_PORT,
-                ),
+                (self.ui_port_name(), HBASE_REST_UI_PORT),
                 (METRICS_PORT_NAME.to_string(), METRICS_PORT),
             ],
         }
+    }
+
+    /// Name of the port used by the Web UI, which depends on HTTPS usage
+    fn ui_port_name(&self) -> String {
+        if self.has_https_enabled() {
+            HBASE_UI_PORT_NAME_HTTPS
+        } else {
+            HBASE_UI_PORT_NAME_HTTP
+        }
+        .to_string()
     }
 
     /// Retrieve and merge resource configs for role and role groups
