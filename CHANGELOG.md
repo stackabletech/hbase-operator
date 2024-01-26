@@ -6,6 +6,7 @@
 
 - Support user authentication using Kerberos ([#436]).
 - More CRD documentation ([#425]).
+- Helm: support labels in values.yaml ([#441]).
 
 ### Changed
 
@@ -21,6 +22,7 @@
 [#425]: https://github.com/stackabletech/hbase-operator/pull/425
 [#436]: https://github.com/stackabletech/hbase-operator/pull/436
 [#438]: https://github.com/stackabletech/hbase-operator/pull/438
+[#441]: https://github.com/stackabletech/hbase-operator/pull/441
 
 ## [23.11.0] - 2023-11-24
 
