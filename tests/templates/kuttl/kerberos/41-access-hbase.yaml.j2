@@ -14,7 +14,7 @@ commands:
           spec:
             containers:
               - name: access-hbase
-                image: docker.stackable.tech/stackable/hbase:{{ test_scenario['values']['hbase'] }}-stackable0.0.0-dev
+                image: docker.stackable.tech/sandbox/docker-images-pr540-5212814/hbase:{{ test_scenario['values']['hbase'] }}-stackable0.0.0-dev
                 env:
                   - name: HBASE_CONF_DIR
                     value: /stackable/conf/hbase
