@@ -5,8 +5,10 @@ import time
 EVENT_TYPE = "itimer"
 PROFILING_DURATION_IN_SEC = 1
 
+
 def start_profiling_and_get_refresh_header(service_url):
-    prof_page = requests.get(f"{service_url}/prof"
+    prof_page = requests.get(
+        f"{service_url}/prof"
         f"?event={EVENT_TYPE}&duration={PROFILING_DURATION_IN_SEC}")
 
     assert prof_page.ok, \
@@ -15,6 +17,7 @@ def start_profiling_and_get_refresh_header(service_url):
         Status Code: {prof_page.status_code}"""
 
     return prof_page.headers['Refresh']
+
 
 def parse_refresh_header(refresh_header):
     refresh_time_in_sec, refresh_path = refresh_header.split(';', 1)
@@ -34,9 +37,11 @@ def parse_refresh_header(refresh_header):
 
     return refresh_time_in_sec, refresh_path
 
+
 def wait_for_profiling_to_finish(refresh_time_in_sec):
     additional_sleep_time_in_sec = 2
     time.sleep(refresh_time_in_sec + additional_sleep_time_in_sec)
+
 
 def fetch_flamegraph(service_url, refresh_path):
     flamegraph_page = requests.get(f"{service_url}{refresh_path}")
@@ -46,9 +51,11 @@ def fetch_flamegraph(service_url, refresh_path):
         URL: {flamegraph_page.request.url}
         Status Code: {flamegraph_page.status_code}"""
 
+
 def test_profiling(role, port):
-    service_url = ("http://"
-        f"test-hbase-{role}-default-0.test-hbase-{role}-default:{port}")
+    service_url = (
+        f"http://test-hbase-{role}-default-0.test-hbase-{role}-default"
+        f":{port}")
 
     print(f"Test profiling on {service_url}")
 
@@ -61,6 +68,7 @@ def test_profiling(role, port):
 
     fetch_flamegraph(service_url, refresh_path)
 
-test_profiling(role = "master", port = 16010)
-test_profiling(role = "regionserver", port = 16030)
-test_profiling(role = "restserver", port = 8085)
+
+test_profiling(role="master", port=16010)
+test_profiling(role="regionserver", port=16030)
+test_profiling(role="restserver", port=8085)
