@@ -45,7 +45,7 @@ tests:
   - name: kerberos
     dimensions:
       - hbase
-      - hdfs
+      - hdfs-latest
       - zookeeper-latest
       - listener-class
       - kerberos-realm

@@ -18,7 +18,7 @@ commands:
         name: hdfs
       spec:
         image:
-          productVersion: "{{ test_scenario['values']['hdfs'] }}"
+          productVersion: "{{ test_scenario['values']['hdfs-latest'] }}"
         clusterConfig:
           zookeeperConfigMapName: hdfs-znode
           dfsReplication: 1
