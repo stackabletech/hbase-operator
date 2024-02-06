@@ -19,7 +19,6 @@ commands:
       spec:
         image:
           productVersion: "{{ test_scenario['values']['hbase'] }}"
-          repo: docker.stackable.tech/sandbox/docker-images-pr540-4e13c28
         clusterConfig:
           hdfsConfigMapName: hdfs
           zookeeperConfigMapName: hbase-znode
