@@ -45,7 +45,7 @@ tests:
   - name: kerberos
     dimensions:
       - hbase
-      - hdfs
+      - hdfs-latest
       - zookeeper-latest
       - listener-class
       - kerberos-realm
@@ -68,6 +68,11 @@ tests:
   - name: cluster-operation
     dimensions:
       - hbase-latest
+      - hdfs-latest
+      - zookeeper-latest
+  - name: profiling
+    dimensions:
+      - hbase
       - hdfs-latest
       - zookeeper-latest
 suites:
