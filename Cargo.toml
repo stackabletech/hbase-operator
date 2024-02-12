@@ -11,7 +11,7 @@ repository = "https://github.com/stackabletech/hbase-operator"
 
 [workspace.dependencies]
 anyhow = "1.0"
-built = { version = "0.6", features = ["chrono", "git2"] }
+built = { version = "0.7", features = ["chrono", "git2"] }
 clap = "4.3"
 fnv = "1.0"
 futures = { version = "0.3", features = ["compat"] }
@@ -26,6 +26,15 @@ product-config = { git = "https://github.com/stackabletech/product-config.git", 
 strum = { version = "0.25", features = ["derive"] }
 tokio = { version = "1.29", features = ["full"] }
 tracing = "0.1"
+
+[patch.crates-io]
+# We need this override, because built in version 0.7 onwards doesn't have a config setting to
+# suppress writing the environment anymore.
+# This breaks our Tilt workflow with the following error:
+#   `Missing expected environment variable "CARGO_PKG_LICENSE"`
+# We patch this dependency with a fork which removes this feature and have openend an issue upstream:
+# https://github.com/lukaslueg/built/issues/62
+built = { git = "https://github.com/stackabletech/built.git", branch = "feat/skip-environment", features = ["chrono", "git2", "skip-environment"] }
 
 # [patch."https://github.com/stackabletech/operator-rs.git"]
 # stackable-operator = { git = "https://github.com/stackabletech//operator-rs.git", branch = "main" }
