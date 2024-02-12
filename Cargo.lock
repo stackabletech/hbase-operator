@@ -202,7 +202,7 @@ dependencies = [
 [[package]]
 name = "built"
 version = "0.7.1"
-source = "git+https://github.com/stackabletech/built.git?branch=fix/0.7.1-dont-write-env#79e7078961159e2c19c25b87c0575e5bd9af283e"
+source = "git+https://github.com/stackabletech/built.git?branch=feat/skip-environment#8df51061dc78041ada22350be273f9c7ef1ae935"
 dependencies = [
  "chrono",
  "git2",

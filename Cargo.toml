@@ -34,7 +34,7 @@ tracing = "0.1"
 # We patch this dependency with a fork which removes this feature and have openend an issue upstream:
 # https://github.com/lukaslueg/built/issues/62
 [patch.crates-io]
-built = { git = "https://github.com/stackabletech/built.git", branch = "fix/0.7.1-dont-write-env", features = ["chrono", "git2", "environment"] }
+built = { git = "https://github.com/stackabletech/built.git", branch = "feat/skip-environment", features = ["chrono", "git2", "skip-environment"] }
 
 # [patch."https://github.com/stackabletech/operator-rs.git"]
 # stackable-operator = { git = "https://github.com/stackabletech//operator-rs.git", branch = "main" }
