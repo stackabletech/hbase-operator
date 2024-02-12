@@ -27,8 +27,14 @@ strum = { version = "0.25", features = ["derive"] }
 tokio = { version = "1.29", features = ["full"] }
 tracing = "0.1"
 
+# We need this override, because built in version 0.7 onwards doesn't have a config setting to
+# suppress writing the environment anymore.
+# This breaks our Tilt workflow with the following error:
+#   `Missing expected environment variable "CARGO_PKG_LICENSE"`
+# We patch this dependency with a fork which removes this feature and have openend an issue upstream:
+# https://github.com/lukaslueg/built/issues/62
 [patch.crates-io]
-built = { git = "https://github.com/stackabletech/built.git", branch = "fix/0.7.1-dont-write-env" }
+built = { git = "https://github.com/stackabletech/built.git", branch = "fix/0.7.1-dont-write-env", features = ["chrono", "git2", "environment"] }
 
 # [patch."https://github.com/stackabletech/operator-rs.git"]
 # stackable-operator = { git = "https://github.com/stackabletech//operator-rs.git", branch = "main" }
