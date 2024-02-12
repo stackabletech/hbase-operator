@@ -27,5 +27,8 @@ strum = { version = "0.25", features = ["derive"] }
 tokio = { version = "1.29", features = ["full"] }
 tracing = "0.1"
 
+[patch.crates-io]
+built = { git = "https://github.com/stackabletech/built.git", branch = "fix/dont-write-env" }
+
 # [patch."https://github.com/stackabletech/operator-rs.git"]
 # stackable-operator = { git = "https://github.com/stackabletech//operator-rs.git", branch = "main" }

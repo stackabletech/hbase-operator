@@ -202,8 +202,7 @@ dependencies = [
 [[package]]
 name = "built"
 version = "0.7.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "38d17f4d6e4dc36d1a02fbedc2753a096848e7c1b0772f7654eab8e2c927dd53"
+source = "git+https://github.com/stackabletech/built.git?branch=fix/dont-write-env#79e7078961159e2c19c25b87c0575e5bd9af283e"
 dependencies = [
  "chrono",
  "git2",
