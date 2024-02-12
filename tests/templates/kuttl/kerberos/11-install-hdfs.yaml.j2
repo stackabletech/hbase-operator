@@ -18,11 +18,10 @@ commands:
         name: hdfs
       spec:
         image:
-          productVersion: "{{ test_scenario['values']['hdfs'] }}"
+          productVersion: "{{ test_scenario['values']['hdfs-latest'] }}"
         clusterConfig:
           zookeeperConfigMapName: hdfs-znode
           dfsReplication: 1
-          listenerClass: {{ test_scenario['values']['listener-class'] }}
           authentication:
             tlsSecretClass: tls
             kerberos:
@@ -32,6 +31,7 @@ commands:
 {% endif %}
         nameNodes:
           config:
+            listenerClass: {{ test_scenario['values']['listener-class'] }}
             logging:
               enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
           configOverrides: &configOverrides
@@ -43,6 +43,7 @@ commands:
               replicas: 2
         dataNodes:
           config:
+            listenerClass: {{ test_scenario['values']['listener-class'] }}
             logging:
               enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
           configOverrides: *configOverrides

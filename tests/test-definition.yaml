@@ -35,6 +35,9 @@ dimensions:
       # Requires manual setup, see create-kerberos-secretclass.yaml
       # This will *not* respect the kerberos-realm test attribute, but instead use a hard-coded realm
       # - activeDirectory
+  - name: openshift
+    values:
+      - "false"
 tests:
   - name: smoke
     dimensions:
@@ -45,7 +48,7 @@ tests:
   - name: kerberos
     dimensions:
       - hbase
-      - hdfs
+      - hdfs-latest
       - zookeeper-latest
       - listener-class
       - kerberos-realm
@@ -70,6 +73,12 @@ tests:
       - hbase-latest
       - hdfs-latest
       - zookeeper-latest
+  - name: profiling
+    dimensions:
+      - hbase
+      - hdfs-latest
+      - zookeeper-latest
+      - openshift
 suites:
   - name: nightly
     patch:
