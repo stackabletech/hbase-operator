@@ -2,7 +2,6 @@
 dimensions:
   - name: hbase
     values:
-      - 2.4.12
       - 2.4.17
   - name: hbase-latest
     values:
