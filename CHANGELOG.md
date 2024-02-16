@@ -17,12 +17,14 @@
 ### Removed
 
 - [BREAKING] Removed legacy node selector on roleGroups ([#438]).
+- Remove support for version `2.4.12` ([#454]).
 
 
 [#425]: https://github.com/stackabletech/hbase-operator/pull/425
 [#436]: https://github.com/stackabletech/hbase-operator/pull/436
 [#438]: https://github.com/stackabletech/hbase-operator/pull/438
 [#441]: https://github.com/stackabletech/hbase-operator/pull/441
+[#454]: https://github.com/stackabletech/hbase-operator/pull/454
 
 ## [23.11.0] - 2023-11-24
 
