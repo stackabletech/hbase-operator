@@ -290,7 +290,7 @@ pub async fn reconcile_hbase(hbase: Arc<HbaseCluster>, ctx: Arc<Ctx>) -> Result<
     let resolved_product_image = hbase
         .spec
         .image
-        .resolve(DOCKER_IMAGE_BASE_NAME, crate::built_info::CARGO_PKG_VERSION);
+        .resolve(DOCKER_IMAGE_BASE_NAME, crate::built_info::PKG_VERSION);
     let zookeeper_connection_information = ZookeeperConnectionInformation::retrieve(&hbase, client)
         .await
         .context(RetrieveZookeeperConnectionInformationSnafu)?;
