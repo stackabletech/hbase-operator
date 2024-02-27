@@ -2,6 +2,8 @@
   <img width="150" src="./.readme/static/borrowed/Icon_Stackable.svg" alt="Stackable Logo"/>
 </p>
 
+Testing PR from fork
+
 <h1 align="center">Stackable Operator for Apache HBase</h1>
 
 ![Build Actions Status](https://ci.stackable.tech/buildStatus/icon?job=hbase%2doperator%2dit%2dnightly&subject=Integration%20Tests)
