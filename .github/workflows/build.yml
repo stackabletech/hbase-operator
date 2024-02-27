@@ -37,6 +37,12 @@ jobs:
     env:
       RUSTC_BOOTSTRAP: 1
     steps:
+      - name: Is a fork
+        if: "github.event.pull_request.head.repo.fork"
+        run: echo hello world
+      - name: Is not a fork
+        if: "!github.event.pull_request.head.repo.fork"
+        run: echo hello world
       - name: Install host dependencies
         uses: awalsh128/cache-apt-pkgs-action@44c33b32f808cdddd5ac0366d70595ed63661ed8 # v1.3.1
         with:
