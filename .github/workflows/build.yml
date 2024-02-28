@@ -352,14 +352,17 @@ jobs:
       - name: Install syft
         uses: anchore/sbom-action/download-syft@24b0d5238516480139aa8bc6f92eeb7b54a9eb0a # tag=v0.15.5
       - name: Publish Docker image and Helm chart
+        if: ${{ !github.event.pull_request.head.repo.fork }}
         run: make -e publish
         # Output the name of the published image to the Job output for later use
       - id: printtag
+        if: ${{ !github.event.pull_request.head.repo.fork }}
         name: Output image name and tag
         run: echo "IMAGE_TAG=$(make -e print-docker-tag)" >> $GITHUB_OUTPUT
 
   openshift_preflight:
     name: Run the OpenShift Preflight check on the published images
+    if: ${{ !github.event.pull_request.head.repo.fork }}
     needs:
       - package_and_publish
     runs-on: ubuntu-latest
