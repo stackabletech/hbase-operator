@@ -137,7 +137,7 @@ regenerate-nix:
 
 build: regenerate-charts regenerate-nix helm-package docker-build
 
-publish: build docker-publish helm-publish
+publish: docker-publish helm-publish
 
 run-dev:
 	kubectl apply -f deploy/stackable-operators-ns.yaml
