@@ -12,6 +12,7 @@ commands:
       spec:
         template:
           spec:
+            serviceAccountName: test-sa
             containers:
               - name: access-hbase
                 image: docker.stackable.tech/stackable/hbase:{{ test_scenario['values']['hbase'] }}-stackable0.0.0-dev
