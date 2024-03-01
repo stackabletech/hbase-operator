@@ -52,6 +52,7 @@ tests:
       - listener-class
       - kerberos-realm
       - kerberos-backend
+      - openshift
   - name: orphaned_resources
     dimensions:
       - hbase-latest
