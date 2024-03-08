@@ -8,7 +8,7 @@ dimensions:
       - 2.4.17
   - name: hdfs
     values:
-      - 3.2.4
+      - 3.3.4
       - 3.3.6
   - name: hdfs-latest
     values:
