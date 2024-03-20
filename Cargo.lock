@@ -1906,7 +1906,7 @@ checksum = "6e63cff320ae2c57904679ba7cb63280a3dc4613885beafb148ee7bf9aa9042d"
 
 [[package]]
 name = "stackable-hbase-crd"
-version = "0.0.0-dev"
+version = "24.3.0"
 dependencies = [
  "rstest",
  "serde",
@@ -1920,7 +1920,7 @@ dependencies = [
 
 [[package]]
 name = "stackable-hbase-operator"
-version = "0.0.0-dev"
+version = "24.3.0"
 dependencies = [
  "anyhow",
  "built",
