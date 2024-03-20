@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [24.3.0] - 2024-03-20
+
 ### Added
 
 - Support user authentication using Kerberos ([#436]).
