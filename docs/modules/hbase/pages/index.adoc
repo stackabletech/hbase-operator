@@ -58,3 +58,9 @@ To use a specific HBase version in your HBaseCluster, you have to specify an ima
 The operator also supports running images from a custom registry or running entirely customized images; both of these cases are explained under xref:concepts:product-image-selection.adoc[] as well.
 
 include::partial$supported-versions.adoc[]
+
+== Useful links
+
+* The {github}[hbase-operator {external-link-icon}^] GitHub repository
+* The operator feature overview in the {feature-tracker}[feature tracker {external-link-icon}^]
+* The {crd-docs}/hbase.stackable.tech/hbasecluster/v1alpha1/[HbaseCluster {external-link-icon}^] CRD documentation
