@@ -1,8 +1,17 @@
 = Stackable Operator for Apache HBase
 :description: The Stackable Operator for Apache HBase is a Kubernetes operator that can manage Apache HBase clusters. Learn about its features, resources, dependencies, and demos, and see the list of supported HBase versions.
 :keywords: Stackable Operator, Apache HBase, Kubernetes, operator, engineer, CRD, StatefulSet, ConfigMap, Service, ZooKeeper, HDFS
+:hbase: https://hbase.apache.org/
+:github: https://github.com/stackabletech/hbase-operator/
+:crd: {crd-docs}/hbase.stackable.tech/hbasecluster/v1alpha1/
+:feature-tracker: https://features.stackable.tech/unified
 
-This is an Operator for Kubernetes that manages https://hbase.apache.org/[Apache HBase] clusters. Apache HBase is an
+[.link-bar]
+* {github}[GitHub {external-link-icon}^]
+* {feature-tracker}[Feature Tracker {external-link-icon}^]
+* {crd}[CRD documentation {external-link-icon}^]
+
+This is an Operator for Kubernetes that manages {hbase}[Apache HBase] clusters. Apache HBase is an
 open-source, distributed, non-relational database that runs on top of the Hadoop Distributed File System (HDFS).
 
 == Getting started
@@ -37,8 +46,8 @@ to connect to the HBase cluster.
 
 == Dependencies
 
-A distributed Apache HBase installation depends on a running Apache ZooKeeper and HDFS cluster. See the documentation
-for the xref:hdfs:index.adoc[Stackable Operator for Apache HDFS] how to set up these clusters.
+A distributed Apache HBase installation depends on a running Apache ZooKeeper and HDFS cluster.
+See the documentation for the xref:hdfs:index.adoc[Stackable Operator for Apache HDFS] how to set up these clusters.
 
 == Demo
 
