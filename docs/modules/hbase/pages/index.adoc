@@ -3,7 +3,8 @@
 :keywords: Stackable Operator, Apache HBase, Kubernetes, operator, engineer, CRD, StatefulSet, ConfigMap, Service, ZooKeeper, HDFS
 :hbase: https://hbase.apache.org/
 :github: https://github.com/stackabletech/hbase-operator/
-:crd: {crd-docs}/hbase.stackable.tech/hbasecluster/v1alpha1/
+:crd: {crd-docs-base-url}/hbase-operator/{crd-docs-version}/
+:crd-hbasecluster: {crd-docs}/hbase.stackable.tech/hbasecluster/v1alpha1/
 :feature-tracker: https://features.stackable.tech/unified
 
 [.link-bar]
@@ -63,4 +64,4 @@ include::partial$supported-versions.adoc[]
 
 * The {github}[hbase-operator {external-link-icon}^] GitHub repository
 * The operator feature overview in the {feature-tracker}[feature tracker {external-link-icon}^]
-* The {crd-docs}/hbase.stackable.tech/hbasecluster/v1alpha1/[HbaseCluster {external-link-icon}^] CRD documentation
+* The {crd-hbasecluster}[HbaseCluster {external-link-icon}^] CRD documentation
