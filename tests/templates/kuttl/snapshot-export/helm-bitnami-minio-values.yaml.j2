@@ -1,0 +1,23 @@
+---
+persistence:
+  size: 64Mi
+
+provisioning:
+  enabled: true
+  buckets:
+    - name: hbase
+  users:
+    - username: hbase
+      password: hbasehbase
+      policies:
+        - readwrite
+        - consoleAdmin
+        - diagnostics
+  extraCommands:
+    - >-
+      mc admin user svcacct add
+      --access-key hbaseAccessKey
+      --secret-key hbaseSecretKey
+      provisioning hbase
+
+resourcesPreset: small
