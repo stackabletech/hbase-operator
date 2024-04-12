@@ -7,7 +7,7 @@ spec:
     spec:
       containers:
         - name: hbase
-          image: docker.stackable.tech/sandbox/hbase:{{ test_scenario['values']['hbase'] }}-stackable0.0.0-pr614-4
+          image: docker.stackable.tech/sandbox/hbase:{{ test_scenario['values']['hbase'] }}-stackable0.0.0-pr621
           workingDir: /stackable/test
           command:
             - ./test-export.sh
