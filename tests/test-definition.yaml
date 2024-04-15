@@ -44,6 +44,7 @@ tests:
       - hdfs
       - zookeeper
       - listener-class
+      - openshift
   - name: kerberos
     dimensions:
       - hbase
@@ -58,21 +59,25 @@ tests:
       - hbase-latest
       - hdfs-latest
       - zookeeper-latest
+      - openshift
   - name: resources
     dimensions:
       - hbase-latest
       - hdfs-latest
       - zookeeper-latest
+      - openshift
   - name: logging
     dimensions:
       - hbase
       - hdfs-latest
       - zookeeper-latest
+      - openshift
   - name: cluster-operation
     dimensions:
       - hbase-latest
       - hdfs-latest
       - zookeeper-latest
+      - openshift
   - name: profiling
     dimensions:
       - hbase
