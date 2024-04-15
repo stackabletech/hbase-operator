@@ -1,0 +1,59 @@
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: export-hbase-snapshot
+spec:
+  template:
+    spec:
+      containers:
+      - name: hbase
+        image: docker.stackable.tech/stackable/hbase:2.4.17-stackable{{ versions.hbase }}
+        volumeMounts:
+        - name: hbase-config
+          mountPath: /stackable/conf
+        env:
+        - name: HBASE_CONF_DIR
+          value: /stackable/conf
+        - name: HADOOP_CONF_DIR
+          value: /stackable/conf
+        - name: AWS_ENDPOINT
+          value: https://s3endpoint:9000/
+        - name: AWS_SSL_ENABLED
+          value: true
+        - name: AWS_PATH_STYLE_ACCESS
+          value: true
+        - name: AWS_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: s3-credentials
+              key: access-key-id
+        - name: AWS_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: s3-credentials
+              key: secret-key
+        command:
+        - export-snapshot-to-s3
+        args:
+        - --snapshot
+        - my-snapshot
+        - --copy-to
+        - s3a://hbase/my-snapshot
+      volumes:
+      - name: hbase-config
+        projected:
+          sources:
+          - configMap:
+              name: simple-hdfs
+          - configMap:
+              name: simple-hbase-master-default
+      restartPolicy: Never
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: s3-credentials
+data:
+  access-key-id: myS3AccessKeyId
+  secret-key: myS3SecretKey
