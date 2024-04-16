@@ -3,7 +3,7 @@
 HBase snapshots can be exported with the command `hbase snapshot export`.
 To be able to export to S3, the AWS libraries from Hadoop must be on the classpath.
 These libraries are contained in the HBase image at `/stackable/hadoop/share/hadoop/tools/lib/`.
-The script `export-snapshot-to-s3` facilitates the export, by providing the according classpath, extending the Hadoop configuration with the S3 configuration, and calling `hbase snapshot export`.
+The script `export-snapshot-to-s3` facilitates the export, by providing the associated classpath, extending the Hadoop configuration with the S3 configuration, and calling `hbase snapshot export`.
 The S3 configuration is read from environment variables.
 The script can be directly called on the HBase master container:
 
