@@ -1,41 +1,13 @@
-apiVersion: batch/v1
-kind: Job
-metadata:
-  name: test-snapshot-export
-spec:
-  template:
-    spec:
-      containers:
-        - name: hbase
-          image: docker.stackable.tech/sandbox/hbase:{{ test_scenario['values']['hbase'] }}-stackable0.0.0-pr621
-          workingDir: /stackable/test
-          command:
-            - ./test-export.sh
-          env:
-            - name: HBASE_CONF_DIR
-              value: /stackable/conf
-            - name: HADOOP_CONF_DIR
-              value: /stackable/conf
-          volumeMounts:
-            - name: test-scripts
-              mountPath: /stackable/test
-            - name: config
-              mountPath: /stackable/conf
-      volumes:
-        - name: test-scripts
-          configMap:
-            name: test-scripts
-            defaultMode: 0777
-        - name: config
-          projected:
-            sources:
-              - configMap:
-                  name: test-hbase-master-default
-              - configMap:
-                  name: test-hdfs
-      securityContext:
-        fsGroup: 1000
-        runAsGroup: 1000
-        runAsUser: 1000
-      serviceAccountName: test-sa
-      restartPolicy: OnFailure
+---
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  # Use the same HBase image in the test Job as in the HBase master StatefulSet
+  - script: >-
+      HBASE_IMAGE=$(
+      kubectl get statefulsets.apps test-hbase-master-default
+      --namespace $NAMESPACE
+      --output=jsonpath='{.spec.template.spec.containers[?(.name=="hbase")].image}'
+      )
+      envsubst < 31_test-snapshot-export-job.yaml |
+      kubectl apply --namespace $NAMESPACE --filename -
