@@ -49,4 +49,5 @@ However, the better approach is to create a Job:
 [source,yaml]
 ----
 include::example$usage-guide/snapshot-export-job.yaml[]
+include::example$usage-guide/snapshot-export-secret.yaml[]
 ----
