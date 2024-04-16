@@ -1,0 +1,53 @@
+= Exporting a snapshot to S3
+
+HBase snapshots can be exported with the command `hbase snapshot export`.
+To be able to export to S3, the AWS libraries from Hadoop must be on the classpath.
+These libraries are contained in the HBase image at `/stackable/hadoop/share/hadoop/tools/lib/`.
+The script `export-snapshot-to-s3` facilitates the export, by providing the associated classpath, extending the Hadoop configuration with the S3 configuration, and calling `hbase snapshot export`.
+The S3 configuration is read from environment variables.
+The script can be directly called on the HBase master container:
+
+```shell
+$ export-snapshot-to-s3  --help
+Options:
+    --snapshot <arg>       Snapshot to restore.
+    --copy-to <arg>        Remote destination hdfs://
+    --copy-from <arg>      Input folder hdfs:// (default hbase.rootdir)
+    --target <arg>         Target name for the snapshot.
+    --no-checksum-verify   Do not verify checksum, use name+length only.
+    --no-target-verify     Do not verify the integrity of the exported snapshot.
+    --no-source-verify     Do not verify the source of the snapshot.
+    --overwrite            Rewrite the snapshot manifest if already exists.
+    --chuser <arg>         Change the owner of the files to the specified one.
+    --chgroup <arg>        Change the group of the files to the specified one.
+    --chmod <arg>          Change the permission of the files to the specified one.
+    --mappers <arg>        Number of mappers to use during the copy (mapreduce.job.maps).
+    --bandwidth <arg>      Limit bandwidth to this value in MB/second.
+
+$ export \
+    AWS_ACCESS_KEY_ID=myS3AccessKeyId \
+    AWS_SECRET_KEY=myS3SecretKey \
+    AWS_ENDPOINT=https://s3endpoint:9000/ \
+    AWS_SSL_ENABLED=true \
+    AWS_PATH_STYLE_ACCESS=true
+$ export-snapshot-to-s3 \
+    --snapshot my-snapshot \
+    --copy-to s3a://my-bucket/my-snapshot
+```
+
+Snapshots can also be imported from S3 into HDFS:
+
+```shell
+$ export-snapshot-to-s3 \
+    --snapshot snap \
+    --copy-from s3a://my-bucket/my-snapshot \
+    --copy-to hdfs://simple-hdfs/hbase
+```
+
+However, the better approach is to create a Job:
+
+[source,yaml]
+----
+include::example$usage-guide/snapshot-export-job.yaml[]
+include::example$usage-guide/snapshot-export-secret.yaml[]
+----

@@ -1,0 +1,14 @@
+= Repairing a cluster with HBCK2
+
+https://github.com/apache/hbase-operator-tools/tree/master/hbase-hbck2[HBCK2] is the repair tool for Apache HBase clusters.
+It is contained in the https://github.com/apache/hbase-operator-tools/[hbase-operator-tools].
+The hbase-operator-tools are installed in the Docker image provided by Stackable in the directory `/stackable/hbase-operator-tools/`.
+HBCK2 can be easily executed via the wrapper script `hbck2`.
+
+For instance, if you followed the xref:getting_started/first_steps.adoc[] then you have a cluster called `simple-hbase` running.
+Let us assume that the HBase user interface reports unknown RegionServers, then you can schedule the ServerCrashProcedure for these RegionServers by applying the following Job:
+
+[source,yaml]
+----
+include::example$usage-guide/hbck2-job.yaml[]
+----
