@@ -1,0 +1,5 @@
+delete_snapshot 'snap';
+
+list_snapshots;
+
+exit;

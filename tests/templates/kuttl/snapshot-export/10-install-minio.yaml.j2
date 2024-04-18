@@ -1,0 +1,10 @@
+---
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  - script: >-
+      helm install minio oci://registry-1.docker.io/bitnamicharts/minio
+      --version 14.1.7
+      --values 10_helm-bitnami-minio-values.yaml
+      --namespace $NAMESPACE
+    timeout: 240

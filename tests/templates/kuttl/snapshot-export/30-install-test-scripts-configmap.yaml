@@ -1,0 +1,11 @@
+---
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  - script: |
+      kubectl create configmap test-scripts \
+        --namespace $NAMESPACE \
+        --from-file=test-export.sh=30_test-export.sh \
+        --from-file=create-snapshot.hbase=30_create-snapshot.hbase \
+        --from-file=delete-snapshot.hbase=30_delete-snapshot.hbase \
+        --from-file=restore-snapshot.hbase=30_restore-snapshot.hbase

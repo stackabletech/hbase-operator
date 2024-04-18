@@ -1,0 +1,13 @@
+---
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  # Use the same HBase image in the test Job as in the HBase master StatefulSet
+  - script: >-
+      HBASE_IMAGE=$(
+      kubectl get statefulsets.apps test-hbase-master-default
+      --namespace $NAMESPACE
+      --output=jsonpath='{.spec.template.spec.containers[?(.name=="hbase")].image}'
+      )
+      envsubst < 31_test-snapshot-export-job.yaml |
+      kubectl apply --namespace $NAMESPACE --filename -

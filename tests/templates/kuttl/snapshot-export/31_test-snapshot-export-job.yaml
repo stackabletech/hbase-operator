@@ -1,0 +1,42 @@
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: test-snapshot-export
+spec:
+  template:
+    spec:
+      containers:
+        - name: hbase
+          image: ${HBASE_IMAGE}
+          workingDir: /stackable/test
+          command:
+            - ./test-export.sh
+          env:
+            - name: HBASE_CONF_DIR
+              value: /stackable/conf
+            - name: HADOOP_CONF_DIR
+              value: /stackable/conf
+          volumeMounts:
+            - name: test-scripts
+              mountPath: /stackable/test
+            - name: config
+              mountPath: /stackable/conf
+      volumes:
+        - name: test-scripts
+          configMap:
+            name: test-scripts
+            defaultMode: 0777
+        - name: config
+          projected:
+            sources:
+              - configMap:
+                  name: test-hbase-master-default
+              - configMap:
+                  name: test-hdfs
+      securityContext:
+        fsGroup: 1000
+        runAsGroup: 1000
+        runAsUser: 1000
+      serviceAccountName: test-sa
+      restartPolicy: OnFailure

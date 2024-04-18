@@ -1,0 +1,5 @@
+restore_snapshot 'snap';
+
+get 'test', 'r1'
+
+exit;
