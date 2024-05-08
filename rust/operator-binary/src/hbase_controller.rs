@@ -21,8 +21,12 @@ use stackable_hbase_crd::{
 };
 use stackable_operator::{
     builder::{
-        resources::ResourceRequirementsBuilder, ConfigMapBuilder, ContainerBuilder,
-        ObjectMetaBuilder, ObjectMetaBuilderError, PodBuilder, PodSecurityContextBuilder,
+        configmap::ConfigMapBuilder,
+        meta::ObjectMetaBuilder,
+        pod::{
+            container::ContainerBuilder, resources::ResourceRequirementsBuilder,
+            security::PodSecurityContextBuilder, PodBuilder,
+        },
     },
     cluster_resources::{ClusterResourceApplyStrategy, ClusterResources},
     commons::{
@@ -118,28 +122,28 @@ pub enum Error {
 
     #[snafu(display("failed to create cluster resources"))]
     CreateClusterResources {
-        source: stackable_operator::error::Error,
+        source: stackable_operator::cluster_resources::Error,
     },
 
     #[snafu(display("failed to delete orphaned resources"))]
     DeleteOrphanedResources {
-        source: stackable_operator::error::Error,
+        source: stackable_operator::cluster_resources::Error,
     },
 
     #[snafu(display("failed to apply global Service"))]
     ApplyRoleService {
-        source: stackable_operator::error::Error,
+        source: stackable_operator::cluster_resources::Error,
     },
 
     #[snafu(display("failed to apply Service for {}", rolegroup))]
     ApplyRoleGroupService {
-        source: stackable_operator::error::Error,
+        source: stackable_operator::cluster_resources::Error,
         rolegroup: RoleGroupRef<HbaseCluster>,
     },
 
     #[snafu(display("failed to apply discovery configmap"))]
     ApplyDiscoveryConfigMap {
-        source: stackable_operator::error::Error,
+        source: stackable_operator::cluster_resources::Error,
     },
 
     #[snafu(display("failed to build discovery configmap"))]
@@ -147,30 +151,30 @@ pub enum Error {
 
     #[snafu(display("failed to build ConfigMap for {}", rolegroup))]
     BuildRoleGroupConfig {
-        source: stackable_operator::error::Error,
+        source: stackable_operator::builder::configmap::Error,
         rolegroup: RoleGroupRef<HbaseCluster>,
     },
 
     #[snafu(display("failed to apply ConfigMap for {}", rolegroup))]
     ApplyRoleGroupConfig {
-        source: stackable_operator::error::Error,
+        source: stackable_operator::cluster_resources::Error,
         rolegroup: RoleGroupRef<HbaseCluster>,
     },
 
     #[snafu(display("failed to apply StatefulSet for {}", rolegroup))]
     ApplyRoleGroupStatefulSet {
-        source: stackable_operator::error::Error,
+        source: stackable_operator::cluster_resources::Error,
         rolegroup: RoleGroupRef<HbaseCluster>,
     },
 
     #[snafu(display("failed to generate product config"))]
     GenerateProductConfig {
-        source: stackable_operator::product_config_utils::ConfigError,
+        source: stackable_operator::product_config_utils::Error,
     },
 
     #[snafu(display("invalid product config"))]
     InvalidProductConfig {
-        source: stackable_operator::error::Error,
+        source: stackable_operator::product_config_utils::Error,
     },
 
     #[snafu(display("failed to retrieve zookeeper connection information"))]
@@ -178,12 +182,12 @@ pub enum Error {
 
     #[snafu(display("object is missing metadata to build owner reference"))]
     ObjectMissingMetadataForOwnerRef {
-        source: stackable_operator::error::Error,
+        source: stackable_operator::builder::meta::Error,
     },
 
     #[snafu(display("no configmap_name for {cm_name} discovery is configured"))]
     MissingConfigMap {
-        source: stackable_operator::error::Error,
+        source: stackable_operator::builder::meta::Error,
         cm_name: String,
     },
 
@@ -195,12 +199,12 @@ pub enum Error {
 
     #[snafu(display("failed to patch service account"))]
     ApplyServiceAccount {
-        source: stackable_operator::error::Error,
+        source: stackable_operator::cluster_resources::Error,
     },
 
     #[snafu(display("failed to patch role binding"))]
     ApplyRoleBinding {
-        source: stackable_operator::error::Error,
+        source: stackable_operator::cluster_resources::Error,
     },
 
     #[snafu(display("could not parse Hbase role [{role}]"))]
@@ -220,7 +224,7 @@ pub enum Error {
 
     #[snafu(display("failed to convert java heap config to unit [{unit}]"))]
     FailedToConvertJavaHeap {
-        source: stackable_operator::error::Error,
+        source: stackable_operator::memory::Error,
         unit: String,
     },
 
@@ -240,12 +244,12 @@ pub enum Error {
 
     #[snafu(display("failed to update status"))]
     ApplyStatus {
-        source: stackable_operator::error::Error,
+        source: stackable_operator::client::Error,
     },
 
     #[snafu(display("failed to build RBAC resources"))]
     BuildRbacResources {
-        source: stackable_operator::error::Error,
+        source: stackable_operator::commons::rbac::Error,
     },
 
     #[snafu(display(
@@ -271,7 +275,9 @@ pub enum Error {
     BuildLabel { source: LabelError },
 
     #[snafu(display("failed to build object meta data"))]
-    ObjectMeta { source: ObjectMetaBuilderError },
+    ObjectMeta {
+        source: stackable_operator::builder::meta::Error,
+    },
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;

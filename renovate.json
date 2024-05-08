@@ -10,9 +10,6 @@
     "team:developers"
   ],
   "rollbackPrs": true,
-  "schedule": [
-    "after 5:00 and before 6:00 every weekday"
-  ],
   "timezone": "Europe/Berlin",
   "packageRules": [
     {
@@ -23,10 +20,7 @@
     }
   ],
   "lockFileMaintenance": {
-    "enabled": true,
-    "schedule": [
-      "after 5:00 and before 6:00 every weekday"
-    ]
+    "enabled": true
   },
   "ignorePaths": [".github/workflows/build.yml", ".github/workflows/general_daily_security.yml", ".github/workflows/pr_reviewdog.yaml"]
 }

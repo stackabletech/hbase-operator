@@ -4,7 +4,7 @@ use product_config::writer::to_hadoop_xml;
 use snafu::{ResultExt, Snafu};
 use stackable_hbase_crd::{HbaseCluster, HbaseRole, HBASE_SITE_XML};
 use stackable_operator::{
-    builder::{ConfigMapBuilder, ObjectMetaBuilder, ObjectMetaBuilderError},
+    builder::{configmap::ConfigMapBuilder, meta::ObjectMetaBuilder},
     commons::product_image_selection::ResolvedProductImage,
     k8s_openapi::api::core::v1::ConfigMap,
     kube::runtime::reflector::ObjectRef,
@@ -22,17 +22,19 @@ type Result<T, E = Error> = std::result::Result<T, E>;
 pub enum Error {
     #[snafu(display("object {hbase} is missing metadata to build owner reference"))]
     ObjectMissingMetadataForOwnerRef {
-        source: stackable_operator::error::Error,
+        source: stackable_operator::builder::meta::Error,
         hbase: ObjectRef<HbaseCluster>,
     },
 
     #[snafu(display("failed to build ConfigMap"))]
     BuildConfigMap {
-        source: stackable_operator::error::Error,
+        source: stackable_operator::builder::configmap::Error,
     },
 
     #[snafu(display("failed to build object meta data"))]
-    ObjectMeta { source: ObjectMetaBuilderError },
+    ObjectMeta {
+        source: stackable_operator::builder::meta::Error,
+    },
 
     #[snafu(display("failed to add Kerberos discovery"))]
     AddKerberosDiscovery { source: kerberos::Error },
