@@ -18,7 +18,7 @@ Apache HBase is an open-source, distributed, non-relational database that runs o
 == Getting started
 
 Follow the xref:getting_started/index.adoc[] guide to learn how to xref:getting_started/installation.adoc[install] the Stackable operator for Apache HBase as well as the dependencies.
-The guide will also show you how to xref:getting_started/first_steps.adoc[interact] with HBase running on Kubernetes by creating tables and some data using the REST API or Apache Phoenix. 
+The guide will also show you how to xref:getting_started/first_steps.adoc[interact] with HBase running on Kubernetes by creating tables and some data using the REST API or Apache Phoenix.
 
 The xref:usage-guide/index.adoc[] contains more information on xref:usage-guide/phoenix.adoc[] as well as other topics
 such as xref:usage-guide/resource-requests.adoc[CPU and memory configuration], xref:usage-guide/monitoring.adoc[] and
