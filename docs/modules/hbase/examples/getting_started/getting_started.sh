@@ -192,6 +192,3 @@ else
   echo "...an unexpected number: $tables_count"
   exit 1
 fi
-
-
-
