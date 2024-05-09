@@ -2,12 +2,6 @@
 
 ## [Unreleased]
 
-### Changed
-
-- `operator-rs` `0.64.0` -> `0.67.1` ([#499]).
-
-[#499]: https://github.com/stackabletech/hbase-operator/pull/499
-
 ## [24.3.0] - 2024-03-20
 
 ### Added
