@@ -7,9 +7,10 @@ use stackable_hbase_crd::{
     TLS_STORE_VOLUME_NAME,
 };
 use stackable_operator::{
-    builder::{
-        ContainerBuilder, PodBuilder, SecretFormat, SecretOperatorVolumeSourceBuilder,
-        SecretOperatorVolumeSourceBuilderError, VolumeBuilder,
+    builder::pod::{
+        container::ContainerBuilder,
+        volume::{SecretFormat, SecretOperatorVolumeSourceBuilder, VolumeBuilder},
+        PodBuilder,
     },
     kube::{runtime::reflector::ObjectRef, ResourceExt},
 };
@@ -21,12 +22,12 @@ pub enum Error {
 
     #[snafu(display("failed to add Kerberos secret volume"))]
     AddKerberosSecretVolume {
-        source: SecretOperatorVolumeSourceBuilderError,
+        source: stackable_operator::builder::pod::volume::SecretOperatorVolumeSourceBuilderError,
     },
 
     #[snafu(display("failed to add TLS secret volume"))]
     AddTlsSecretVolume {
-        source: SecretOperatorVolumeSourceBuilderError,
+        source: stackable_operator::builder::pod::volume::SecretOperatorVolumeSourceBuilderError,
     },
 }
 

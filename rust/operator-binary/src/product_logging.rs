@@ -1,7 +1,7 @@
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_hbase_crd::{Container, HbaseCluster};
 use stackable_operator::{
-    builder::ConfigMapBuilder,
+    builder::configmap::ConfigMapBuilder,
     client::Client,
     k8s_openapi::api::core::v1::ConfigMap,
     kube::ResourceExt,
@@ -22,7 +22,7 @@ pub enum Error {
 
     #[snafu(display("failed to retrieve the ConfigMap [{cm_name}]"))]
     ConfigMapNotFound {
-        source: stackable_operator::error::Error,
+        source: stackable_operator::client::Error,
         cm_name: String,
     },
 

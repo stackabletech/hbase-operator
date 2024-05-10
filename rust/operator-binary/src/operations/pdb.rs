@@ -11,13 +11,13 @@ use crate::{hbase_controller::HBASE_CONTROLLER_NAME, OPERATOR_NAME};
 pub enum Error {
     #[snafu(display("Cannot create PodDisruptionBudget for role [{role}]"))]
     CreatePdb {
-        source: stackable_operator::error::Error,
+        source: stackable_operator::builder::pdb::Error,
         role: String,
     },
 
     #[snafu(display("Cannot apply PodDisruptionBudget [{name}]"))]
     ApplyPdb {
-        source: stackable_operator::error::Error,
+        source: stackable_operator::cluster_resources::Error,
         name: String,
     },
 }
