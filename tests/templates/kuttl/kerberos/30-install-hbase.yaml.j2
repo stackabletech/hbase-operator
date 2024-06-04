@@ -40,12 +40,9 @@ commands:
           configOverrides: &configOverrides
             hbase-site.xml:
               hbase.security.authorization: "true"
-              #hbase.coprocessor.region.classes: tech.stackable.hbase.OpenPolicyAgentAccessController
-              #hbase.coprocessor.master.classes: tech.stackable.hbase.OpenPolicyAgentAccessController
-              #hbase.coprocessor.regionserver.classes: tech.stackable.hbase.OpenPolicyAgentAccessController
-              hbase.coprocessor.region.classes: org.apache.hadoop.hbase.security.access.AccessController
-              hbase.coprocessor.master.classes: org.apache.hadoop.hbase.security.access.AccessController
-              hbase.coprocessor.regionserver.classes: org.apache.hadoop.hbase.security.access.AccessController
+              hbase.coprocessor.region.classes: tech.stackable.hbase.AllowAccessController
+              hbase.coprocessor.master.classes: tech.stackable.hbase.AllowAccessController
+              hbase.coprocessor.regionserver.classes: tech.stackable.hbase.AllowAccessController
               hbase.security.exec.permission.checks: "true"
           config:
             logging:
