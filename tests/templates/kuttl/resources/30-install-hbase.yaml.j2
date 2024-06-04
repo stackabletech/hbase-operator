@@ -5,7 +5,12 @@ metadata:
   name: test-hbase
 spec:
   image:
-    productVersion: "{{ test_scenario['values']['hbase-latest'] }}"
+{% if test_scenario['values']['hbase'].find(",") > 0 %}
+    custom: "{{ test_scenario['values']['hbase'].split(',')[1] }}"
+    productVersion: "{{ test_scenario['values']['hbase'].split(',')[0] }}"
+{% else %}
+    productVersion: "{{ test_scenario['values']['hbase'] }}"
+{% endif %}
     pullPolicy: IfNotPresent
   clusterConfig:
     hdfsConfigMapName: test-hdfs-namenode-default
