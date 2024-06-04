@@ -26,6 +26,10 @@ commands:
             tlsSecretClass: tls
             kerberos:
               secretClass: kerberos-$NAMESPACE
+          authorization:
+            opa:
+              configMapName: opa
+              package: hdfs
 {% if lookup('env', 'VECTOR_AGGREGATOR') %}
           vectorAggregatorConfigMapName: vector-aggregator-discovery
 {% endif %}
@@ -34,9 +38,20 @@ commands:
             listenerClass: {{ test_scenario['values']['listener-class'] }}
             logging:
               enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
+              containers:
+                hdfs:
+                  console:
+                    level: DEBUG
+                  loggers:
+                    ROOT:
+                      level: INFO
+                    tech.stackable.hadoop:
+                      level: DEBUG
           configOverrides: &configOverrides
             core-site.xml:
-              # hadoop.user.group.static.mapping.overrides: "dr.who=;nn=;nm=;jn=;testuser=supergroup;hbase-master=supergroup;hbase-regionserver=supergroup;hbase-restserver=supergroup;"
+              #hadoop.user.group.static.mapping.overrides: "dr.who=;nn=;nm=;jn=;testuser=supergroup;hbase=supergroup"
+              #hadoop.security.group.mapping: tech.stackable.hadoop.StackableGroupMapper
+              #hadoop.security.group.mapping.opa.policy.url: http://opa.$NAMESPACE.svc.cluster.local:8081/v1/data/hdfs/groups
               hadoop.user.group.static.mapping.overrides: "dr.who=;nn=;nm=;jn=;testuser=supergroup;hbase=supergroup"
           roleGroups:
             default:

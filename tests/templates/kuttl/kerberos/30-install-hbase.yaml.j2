@@ -19,6 +19,8 @@ commands:
       spec:
         image:
           productVersion: "{{ test_scenario['values']['hbase'] }}"
+          custom: docker.stackable.tech/stackable/hbase:2.4.17-stackable0.0.0-dev-opa7
+          pullPolicy: IfNotPresent
         clusterConfig:
           hdfsConfigMapName: hdfs
           zookeeperConfigMapName: hbase-znode
@@ -31,6 +33,16 @@ commands:
           vectorAggregatorConfigMapName: vector-aggregator-discovery
 {% endif %}
         masters:
+          configOverrides: &configOverrides
+            hbase-site.xml:
+              hbase.security.authorization: "true"
+              #hbase.coprocessor.region.classes: tech.stackable.hbase.OpenPolicyAgentAccessController
+              #hbase.coprocessor.master.classes: tech.stackable.hbase.OpenPolicyAgentAccessController
+              #hbase.coprocessor.regionserver.classes: tech.stackable.hbase.OpenPolicyAgentAccessController
+              hbase.coprocessor.region.classes: org.apache.hadoop.hbase.security.access.AccessController
+              hbase.coprocessor.master.classes: org.apache.hadoop.hbase.security.access.AccessController
+              hbase.coprocessor.regionserver.classes: org.apache.hadoop.hbase.security.access.AccessController
+              hbase.security.exec.permission.checks: "true"
           config:
             logging:
               enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
@@ -38,6 +50,7 @@ commands:
             default:
               replicas: 2
         regionServers:
+          configOverrides: *configOverrides
           config:
             logging:
               enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
@@ -45,6 +58,7 @@ commands:
             default:
               replicas: 2
         restServers:
+          configOverrides: *configOverrides
           config:
             logging:
               enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
