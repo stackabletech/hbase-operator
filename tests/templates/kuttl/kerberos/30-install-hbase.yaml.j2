@@ -4,6 +4,7 @@ kind: TestStep
 commands:
   - script: |
       kubectl apply -n $NAMESPACE -f - <<EOF
+      ---
       apiVersion: zookeeper.stackable.tech/v1alpha1
       kind: ZookeeperZnode
       metadata:
@@ -11,6 +12,25 @@ commands:
       spec:
         clusterRef:
           name: zookeeper
+      ---
+      apiVersion: v1
+      kind: ConfigMap
+      metadata:
+        name: hbase-log-config
+      data:
+        log4j.properties: |
+          # Define loggers
+          log4j.rootLogger=INFO, FILE
+          log4j.logger.tech.stackable.hbase=DEBUG, CONSOLE
+          # Define file appender
+          log4j.appender.FILE=org.apache.log4j.FileAppender
+          log4j.appender.FILE.File=/stackable/log/hbase/hbase.log4j.xml
+          log4j.appender.FILE.layout=org.apache.log4j.xml.XMLLayout
+          # Define console appender
+          log4j.appender.CONSOLE=org.apache.log4j.ConsoleAppender
+          log4j.appender.CONSOLE.Target=System.out
+          log4j.appender.CONSOLE.layout=org.apache.log4j.PatternLayout
+          log4j.appender.CONSOLE.layout.ConversionPattern=%-5p %c{1} - %m%n
       ---
       apiVersion: hbase.stackable.tech/v1alpha1
       kind: HbaseCluster
@@ -50,6 +70,13 @@ commands:
           roleGroups:
             default:
               replicas: 2
+              config:
+                logging:
+                  enableVectorAgent: false
+                  containers:
+                    hbase:
+                      custom:
+                        configMap: hbase-log-config
         regionServers:
           configOverrides: *configOverrides
           config:
@@ -58,6 +85,13 @@ commands:
           roleGroups:
             default:
               replicas: 2
+              config:
+                logging:
+                  enableVectorAgent: false
+                  containers:
+                    hbase:
+                      custom:
+                        configMap: hbase-log-config
         restServers:
           configOverrides: *configOverrides
           config:
@@ -66,4 +100,11 @@ commands:
           roleGroups:
             default:
               replicas: 1
+              config:
+                logging:
+                  enableVectorAgent: false
+                  containers:
+                    hbase:
+                      custom:
+                        configMap: hbase-log-config
       EOF
