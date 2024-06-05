@@ -18,19 +18,17 @@ commands:
       metadata:
         name: hbase-log-config
       data:
-        log4j.properties: |
-          # Define loggers
-          log4j.rootLogger=INFO, FILE
-          log4j.logger.tech.stackable.hbase=DEBUG, CONSOLE
-          # Define file appender
-          log4j.appender.FILE=org.apache.log4j.FileAppender
-          log4j.appender.FILE.File=/stackable/log/hbase/hbase.log4j.xml
-          log4j.appender.FILE.layout=org.apache.log4j.xml.XMLLayout
-          # Define console appender
-          log4j.appender.CONSOLE=org.apache.log4j.ConsoleAppender
-          log4j.appender.CONSOLE.Target=System.out
-          log4j.appender.CONSOLE.layout=org.apache.log4j.PatternLayout
-          log4j.appender.CONSOLE.layout.ConversionPattern=%-5p %c{1} - %m%n
+       log4j2.properties: |
+         appenders = FILE
+
+         appender.FILE.type = File
+         appender.FILE.name = FILE
+         appender.FILE.fileName = /stackable/log/hbase/hbase.log4j2.xml
+         # appender.FILE.layout.type = XMLLayout - not installed in the image
+
+         rootLogger.level = INFO
+         rootLogger.appenderRefs = FILE
+         rootLogger.appenderRef.FILE.ref = FILE
       ---
       apiVersion: hbase.stackable.tech/v1alpha1
       kind: HbaseCluster
