@@ -47,6 +47,7 @@ const CONSOLE_CONVERSION_PATTERN: &str = "%d{ISO8601} %-5p [%t] %c{2}: %.1000m%n
 const HBASE_LOG_FILE: &str = "hbase.log4j.xml";
 pub const LOG4J_CONFIG_FILE: &str = "log4j.properties";
 pub const LOG4J2_CONFIG_FILE: &str = "log4j2.properties";
+pub const STACKABLE_LOG_DIR: &str = "/stackable/log";
 
 /// Return the address of the Vector aggregator if the corresponding ConfigMap name is given in the
 /// cluster spec
@@ -92,8 +93,8 @@ pub fn extend_role_group_config_map(
     hbase_version: &str,
 ) -> Result<()> {
     if let Some(ContainerLogConfig {
-                    choice: Some(ContainerLogConfigChoice::Automatic(log_config)),
-                }) = logging.containers.get(&Container::Hbase)
+        choice: Some(ContainerLogConfigChoice::Automatic(log_config)),
+    }) = logging.containers.get(&Container::Hbase)
     {
         cm_builder.add_data(
             log4j_properties_file_name(hbase_version),
@@ -102,8 +103,8 @@ pub fn extend_role_group_config_map(
     }
 
     let vector_log_config = if let Some(ContainerLogConfig {
-                                            choice: Some(ContainerLogConfigChoice::Automatic(log_config)),
-                                        }) = logging.containers.get(&Container::Vector)
+        choice: Some(ContainerLogConfigChoice::Automatic(log_config)),
+    }) = logging.containers.get(&Container::Vector)
     {
         Some(log_config)
     } else {

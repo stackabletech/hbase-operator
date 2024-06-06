@@ -67,6 +67,7 @@ use stackable_operator::{
 };
 use strum::{EnumDiscriminants, IntoStaticStr};
 
+use crate::product_logging::STACKABLE_LOG_DIR;
 use crate::{
     discovery::build_discovery_configmap,
     kerberos::{
@@ -83,7 +84,6 @@ use crate::{
 };
 
 pub const HBASE_CONTROLLER_NAME: &str = "hbasecluster";
-pub const STACKABLE_LOG_DIR: &str = "/stackable/log";
 pub const MAX_HBASE_LOG_FILES_SIZE: MemoryQuantity = MemoryQuantity {
     value: 10.0,
     unit: BinaryMultiple::Mebi,
