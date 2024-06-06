@@ -4,7 +4,6 @@ kind: TestStep
 commands:
   - script: |
       kubectl apply -n $NAMESPACE -f - <<EOF
-      ---
       apiVersion: zookeeper.stackable.tech/v1alpha1
       kind: ZookeeperZnode
       metadata:
@@ -13,41 +12,13 @@ commands:
         clusterRef:
           name: zookeeper
       ---
-      apiVersion: v1
-      kind: ConfigMap
-      metadata:
-        name: hbase-log-config
-      data:
-       log4j2.properties: |
-         # Used by HBase 2.6 upwards
-         # Root Logger
-         rootLogger=INFO, STDOUT
-
-         # Direct log messages to stdout
-         appender.console.type = Console
-         appender.console.name = STDOUT
-         appender.console.layout.type = PatternLayout
-         appender.console.layout.pattern = [%-5level] %d{yyyy-MM-dd HH:mm:ss.SSS} [%t] %c{1} - %msg%n
-       log4j.properties: |
-         # Used by HBase 2.4
-         log4j.rootLogger=INFO, FILE
-         log4j.appender.FILE=org.apache.log4j.FileAppender
-         log4j.appender.FILE.File=/stackable/log/hbase/hbase.log4j.xml
-         log4j.appender.FILE.layout=org.apache.log4j.xml.XMLLayout
-      ---
       apiVersion: hbase.stackable.tech/v1alpha1
       kind: HbaseCluster
       metadata:
         name: hbase
       spec:
         image:
-{% if test_scenario['values']['hbase'].find(",") > 0 %}
-          custom: "{{ test_scenario['values']['hbase'].split(',')[1] }}"
-          productVersion: "{{ test_scenario['values']['hbase'].split(',')[0] }}"
-{% else %}
           productVersion: "{{ test_scenario['values']['hbase'] }}"
-{% endif %}
-          pullPolicy: IfNotPresent
         clusterConfig:
           hdfsConfigMapName: hdfs
           zookeeperConfigMapName: hbase-znode
@@ -60,56 +31,24 @@ commands:
           vectorAggregatorConfigMapName: vector-aggregator-discovery
 {% endif %}
         masters:
-          configOverrides: &configOverrides
-            hbase-site.xml:
-              hbase.security.authorization: "true"
-              hbase.security.exec.permission.checks: "true"
-              hbase.security.authorization.opa.policy.dryrun: "true"
-              hbase.security.authorization.opa.policy.url: "http://opa:8081"
-              hbase.coprocessor.region.classes: tech.stackable.hbase.OpenPolicyAgentAccessController
-              hbase.coprocessor.master.classes: tech.stackable.hbase.OpenPolicyAgentAccessController
-              hbase.coprocessor.regionserver.classes: tech.stackable.hbase.OpenPolicyAgentAccessController
           config:
             logging:
               enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
           roleGroups:
             default:
               replicas: 2
-              config:
-                logging:
-                  enableVectorAgent: false
-                  containers:
-                    hbase:
-                      custom:
-                        configMap: hbase-log-config
         regionServers:
-          configOverrides: *configOverrides
           config:
             logging:
               enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
           roleGroups:
             default:
               replicas: 2
-              config:
-                logging:
-                  enableVectorAgent: false
-                  containers:
-                    hbase:
-                      custom:
-                        configMap: hbase-log-config
         restServers:
-          configOverrides: *configOverrides
           config:
             logging:
               enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
           roleGroups:
             default:
               replicas: 1
-              config:
-                logging:
-                  enableVectorAgent: false
-                  containers:
-                    hbase:
-                      custom:
-                        configMap: hbase-log-config
       EOF

@@ -15,11 +15,7 @@ commands:
             serviceAccountName: test-sa
             containers:
               - name: access-hbase
-{% if test_scenario['values']['hbase'].find(",") > 0 %}
-                image: "{{ test_scenario['values']['hbase'].split(',')[1] }}"
-{% else %}
                 image: docker.stackable.tech/stackable/hbase:{{ test_scenario['values']['hbase'] }}-stackable0.0.0-dev
-{% endif %}
                 env:
                   - name: HBASE_CONF_DIR
                     value: /stackable/conf/hbase
