@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Added
+
+- Configure log4j2 starting with HBase 2.6 upwards ([#506]).
+
+[#506]: https://github.com/stackabletech/hbase-operator/pull/506
+
 ## [24.3.0] - 2024-03-20
 
 ### Added

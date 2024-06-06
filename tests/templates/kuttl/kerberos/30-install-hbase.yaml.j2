@@ -19,16 +19,14 @@ commands:
         name: hbase-log-config
       data:
        log4j2.properties: |
-         appenders = FILE
+         # Root Logger
+         rootLogger=INFO, STDOUT
 
-         appender.FILE.type = File
-         appender.FILE.name = FILE
-         appender.FILE.fileName = /stackable/log/hbase/hbase.log4j2.xml
-         # appender.FILE.layout.type = XMLLayout - not installed in the image
-
-         rootLogger.level = INFO
-         rootLogger.appenderRefs = FILE
-         rootLogger.appenderRef.FILE.ref = FILE
+         # Direct log messages to stdout
+         appender.console.type = Console
+         appender.console.name = STDOUT
+         appender.console.layout.type = PatternLayout
+         appender.console.layout.pattern = [%-5level] %d{yyyy-MM-dd HH:mm:ss.SSS} [%t] %c{1} - %msg%n
       ---
       apiVersion: hbase.stackable.tech/v1alpha1
       kind: HbaseCluster
@@ -58,10 +56,11 @@ commands:
           configOverrides: &configOverrides
             hbase-site.xml:
               hbase.security.authorization: "true"
-              hbase.coprocessor.region.classes: tech.stackable.hbase.AllowAccessController
-              hbase.coprocessor.master.classes: tech.stackable.hbase.AllowAccessController
-              hbase.coprocessor.regionserver.classes: tech.stackable.hbase.AllowAccessController
+              hbase.coprocessor.region.classes: tech.stackable.hbase.OpenPolicyAgentAccessController
+              hbase.coprocessor.master.classes: tech.stackable.hbase.OpenPolicyAgentAccessController
+              hbase.coprocessor.regionserver.classes: tech.stackable.hbase.OpenPolicyAgentAccessController
               hbase.security.exec.permission.checks: "true"
+              hbase.security.authorization.opa.policy.url: "http://opa:8081"
           config:
             logging:
               enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}

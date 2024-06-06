@@ -76,7 +76,7 @@ use crate::{
     },
     operations::{graceful_shutdown::add_graceful_shutdown_config, pdb::add_pdbs},
     product_logging::{
-        extend_role_group_config_map, resolve_vector_aggregator_address, LOG4J_CONFIG_FILE,
+        extend_role_group_config_map, log4j_properties_file_name, resolve_vector_aggregator_address,
     },
     zookeeper::{self, ZookeeperConnectionInformation},
     OPERATOR_NAME,
@@ -648,6 +648,7 @@ fn build_rolegroup_config_map(
         vector_aggregator_address,
         &hbase_config.logging,
         &mut builder,
+        &resolved_product_image.product_version,
     )
     .context(InvalidLoggingConfigSnafu {
         cm_name: rolegroup.object_name(),
@@ -799,6 +800,8 @@ fn build_rolegroup_statefulset(
         ..probe_template
     };
 
+    let log4j_properties_file_name =
+        log4j_properties_file_name(&resolved_product_image.product_version);
     let mut hbase_container = ContainerBuilder::new("hbase").expect("ContainerBuilder not created");
     hbase_container
         .image_from_product_image(resolved_product_image)
@@ -814,7 +817,7 @@ fn build_rolegroup_statefulset(
             cp {HDFS_DISCOVERY_TMP_DIR}/hdfs-site.xml {CONFIG_DIR_NAME}
             cp {HDFS_DISCOVERY_TMP_DIR}/core-site.xml {CONFIG_DIR_NAME}
             cp {HBASE_CONFIG_TMP_DIR}/* {CONFIG_DIR_NAME}
-            cp {HBASE_LOG_CONFIG_TMP_DIR}/{LOG4J_CONFIG_FILE} {CONFIG_DIR_NAME}
+            cp {HBASE_LOG_CONFIG_TMP_DIR}/{log4j_properties_file_name} {CONFIG_DIR_NAME}
 
             {kerberos_container_start_commands}
 

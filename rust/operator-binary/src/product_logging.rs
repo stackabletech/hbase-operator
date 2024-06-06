@@ -1,5 +1,6 @@
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_hbase_crd::{Container, HbaseCluster};
+use stackable_operator::product_logging::spec::AutomaticContainerLogConfig;
 use stackable_operator::{
     builder::configmap::ConfigMapBuilder,
     client::Client,
@@ -13,7 +14,7 @@ use stackable_operator::{
     role_utils::RoleGroupRef,
 };
 
-use crate::hbase_controller::{MAX_HBASE_LOG_FILES_SIZE, STACKABLE_LOG_DIR};
+use crate::hbase_controller::MAX_HBASE_LOG_FILES_SIZE;
 
 #[derive(Snafu, Debug)]
 pub enum Error {
@@ -45,6 +46,7 @@ const VECTOR_AGGREGATOR_CM_ENTRY: &str = "ADDRESS";
 const CONSOLE_CONVERSION_PATTERN: &str = "%d{ISO8601} %-5p [%t] %c{2}: %.1000m%n";
 const HBASE_LOG_FILE: &str = "hbase.log4j.xml";
 pub const LOG4J_CONFIG_FILE: &str = "log4j.properties";
+pub const LOG4J2_CONFIG_FILE: &str = "log4j2.properties";
 
 /// Return the address of the Vector aggregator if the corresponding ConfigMap name is given in the
 /// cluster spec
@@ -87,29 +89,21 @@ pub fn extend_role_group_config_map(
     vector_aggregator_address: Option<&str>,
     logging: &Logging<Container>,
     cm_builder: &mut ConfigMapBuilder,
+    hbase_version: &str,
 ) -> Result<()> {
     if let Some(ContainerLogConfig {
-        choice: Some(ContainerLogConfigChoice::Automatic(log_config)),
-    }) = logging.containers.get(&Container::Hbase)
+                    choice: Some(ContainerLogConfigChoice::Automatic(log_config)),
+                }) = logging.containers.get(&Container::Hbase)
     {
         cm_builder.add_data(
-            LOG4J_CONFIG_FILE,
-            product_logging::framework::create_log4j_config(
-                &format!("{STACKABLE_LOG_DIR}/hbase"),
-                HBASE_LOG_FILE,
-                MAX_HBASE_LOG_FILES_SIZE
-                    .scale_to(BinaryMultiple::Mebi)
-                    .floor()
-                    .value as u32,
-                CONSOLE_CONVERSION_PATTERN,
-                log_config,
-            ),
+            log4j_properties_file_name(hbase_version),
+            log4j_config(hbase_version, log_config),
         );
     }
 
     let vector_log_config = if let Some(ContainerLogConfig {
-        choice: Some(ContainerLogConfigChoice::Automatic(log_config)),
-    }) = logging.containers.get(&Container::Vector)
+                                            choice: Some(ContainerLogConfigChoice::Automatic(log_config)),
+                                        }) = logging.containers.get(&Container::Vector)
     {
         Some(log_config)
     } else {
@@ -128,4 +122,43 @@ pub fn extend_role_group_config_map(
     }
 
     Ok(())
+}
+
+pub fn log4j_properties_file_name(hbase_version: &str) -> &'static str {
+    if needs_log4j2(hbase_version) {
+        LOG4J2_CONFIG_FILE
+    } else {
+        LOG4J_CONFIG_FILE
+    }
+}
+
+fn log4j_config(hbase_version: &str, log_config: &AutomaticContainerLogConfig) -> String {
+    if needs_log4j2(hbase_version) {
+        product_logging::framework::create_log4j2_config(
+            &format!("{STACKABLE_LOG_DIR}/hbase"),
+            HBASE_LOG_FILE,
+            MAX_HBASE_LOG_FILES_SIZE
+                .scale_to(BinaryMultiple::Mebi)
+                .floor()
+                .value as u32,
+            CONSOLE_CONVERSION_PATTERN,
+            log_config,
+        )
+    } else {
+        product_logging::framework::create_log4j_config(
+            &format!("{STACKABLE_LOG_DIR}/hbase"),
+            HBASE_LOG_FILE,
+            MAX_HBASE_LOG_FILES_SIZE
+                .scale_to(BinaryMultiple::Mebi)
+                .floor()
+                .value as u32,
+            CONSOLE_CONVERSION_PATTERN,
+            log_config,
+        )
+    }
+}
+
+// HBase 2.6 moved from log4j to log4j2
+fn needs_log4j2(hbase_version: &str) -> bool {
+    !hbase_version.starts_with(r"2\.14")
 }
