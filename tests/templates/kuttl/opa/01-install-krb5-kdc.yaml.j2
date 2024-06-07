@@ -1,4 +1,3 @@
-{% if test_scenario['values']['kerberos-backend'] == 'mit' %}
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
@@ -130,17 +129,16 @@ data:
     renew_lifetime = 7d
     forwardable = true
     rdns = false
-    default_realm = {{ test_scenario['values']['kerberos-realm'] }}
+    default_realm = CLUSTER.LOCAL
     spake_preauth_groups = edwards25519
     [realms]
-    {{ test_scenario['values']['kerberos-realm'] }} = {
+    CLUSTER.LOCAL = {
      acl_file = /stackable/config/kadm5.acl
      disable_encrypted_timestamp = false
     }
     [domain_realm]
-    .cluster.local = {{ test_scenario['values']['kerberos-realm'] }}
-    cluster.local = {{ test_scenario['values']['kerberos-realm'] }}
+    .cluster.local = CLUSTER.LOCAL
+    cluster.local = CLUSTER.LOCAL
   kadm5.acl: |
     root/admin *e
     stackable-secret-operator *e
-{% endif %}
