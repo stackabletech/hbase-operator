@@ -71,6 +71,7 @@ tests:
       - hdfs-latest
       - kerberos-realm
       - zookeeper-latest
+      - krb5
       - openshift
   - name: orphaned_resources
     dimensions:
