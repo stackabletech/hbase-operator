@@ -22,7 +22,16 @@ spec:
               mountPath: /stackable/test
             - name: config
               mountPath: /stackable/conf
+            # The script 'export-snapshot-to-s3' creates links to this folder from the exported snapshot
+            # and will log an error if the folder is not found. This does not affect the test result but
+            # it makes investigating other failure cases more tedious. 
+            # So basically this folder will shut up spurious error messages from this script.
+            - name: libjars
+              mountPath: /stackable/test/libjars
       volumes:
+        - name: libjars
+          emptyDir:
+            sizeLimit: 10Mi
         - name: test-scripts
           configMap:
             name: test-scripts
