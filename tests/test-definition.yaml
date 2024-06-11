@@ -26,6 +26,9 @@ dimensions:
   - name: zookeeper-latest
     values:
       - 3.9.1
+  - name: krb5
+    values:
+      - 1.21.1
   # Used for zookeeper, hdfs and hbase
   - name: listener-class
     values:
@@ -57,6 +60,7 @@ tests:
       - hbase
       - hdfs-latest
       - zookeeper-latest
+      - krb5
       - listener-class
       - kerberos-realm
       - kerberos-backend
