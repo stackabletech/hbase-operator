@@ -19,7 +19,7 @@ dimensions:
   - name: zookeeper-latest
     values:
       - 3.9.1
-  - name: krb5-latest
+  - name: krb5
     values:
       - 1.21.1
   # Used for zookeeper, hdfs and hbase
@@ -53,7 +53,7 @@ tests:
       - hbase
       - hdfs-latest
       - zookeeper-latest
-      - krb5-latest
+      - krb5
       - listener-class
       - kerberos-realm
       - kerberos-backend
