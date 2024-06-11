@@ -30,6 +30,11 @@ matches_identity(identity) if {
     identity == concat("", ["group:", group])
 }
 
+# Allow all resources
+matches_resource(namespace, table, resource) if {
+    resource == ":"
+}
+
 # Resource mentions the namespace explicitly
 matches_resource(namespace, table, resource) if {
     resource == concat("", [namespace, ":"])
@@ -65,6 +70,8 @@ action_for_operation := {
 }
 
 groups_for_user := {
+    "hbase/hbase.kuttl-test-eager-javelin.svc.cluster.local@CLUSTER.LOCAL": ["admins"],
+    "testuser/access-hbase.kuttl-test-rapid-gannet.svc.cluster.local@CLUSTER.LOCAL": ["admins"],
     "admin/test-hbase-permissions.default.svc.cluster.local@CLUSTER.LOCAL": ["admins"],
     "alice/test-hbase-permissions.default.svc.cluster.local@CLUSTER.LOCAL": ["developers"],
     "bob/test-hbase-permissions.default.svc.cluster.local@CLUSTER.LOCAL": []
@@ -74,12 +81,12 @@ acls := [
     {
         "identity": "group:admins",
         "action": "full",
-        "resource": "hbase:",
+        "resource": ":",
     },
     {
         "identity": "group:developers",
-        "action": "rw",
-        "resource": "developers:table1",
+        "action": "full",
+        "resource": "developers:",
     },
     {
         "identity": "user:alice/test-hbase-permissions.default.svc.cluster.local@CLUSTER.LOCAL",

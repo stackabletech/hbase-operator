@@ -64,8 +64,8 @@ commands:
             hbase-site.xml:
               hbase.security.authorization: "true"
               hbase.security.exec.permission.checks: "true"
-              hbase.security.authorization.opa.policy.dryrun: "true"
-              hbase.security.authorization.opa.policy.url: "http://opa:8081"
+              hbase.security.authorization.opa.policy.dryrun: "false"
+              hbase.security.authorization.opa.policy.url: "http://opa.$NAMESPACE.svc.cluster.local:8081/v1/data/hbase/allow"
               hbase.coprocessor.region.classes: tech.stackable.hbase.OpenPolicyAgentAccessController
               hbase.coprocessor.master.classes: tech.stackable.hbase.OpenPolicyAgentAccessController
               hbase.coprocessor.regionserver.classes: tech.stackable.hbase.OpenPolicyAgentAccessController

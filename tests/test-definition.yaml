@@ -65,6 +65,7 @@ tests:
     dimensions:
       - hbase-opa
       - hdfs-latest
+      - kerberos-realm
       - zookeeper-latest
       - openshift
   - name: orphaned_resources
