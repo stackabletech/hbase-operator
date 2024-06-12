@@ -5,10 +5,15 @@ import rego.v1
 default allow := false
 default matches_identity(identity) := false
 
+# table is null if the request is for namespace permissions, but as parameters cannot be
+# undefined, we have to set it to something specific:
+checked_table_name := input.table.qualifierAsString if {input.table.qualifierAsString}
+checked_table_name := "__undefined__" if {not input.table.qualifierAsString}
+
 allow if {
     some acl in acls
     matches_identity(acl.identity)
-    matches_resource(input.table.namespaceAsString, input.table.qualifierAsString, acl.resource)
+    matches_resource(input.namespace, checked_table_name, acl.resource)
     action_sufficient_for_operation(acl.action, input.action)
 }
 

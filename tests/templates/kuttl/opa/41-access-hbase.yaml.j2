@@ -135,10 +135,9 @@ data:
     expected=$(bin/hbase shell /tmp/admin-hbase-script | grep 'Took ' | wc -l)
     if [ $expected == 2 ]; then
       echo "Test passed"
-      #exit 0
     else
       echo "Test failed"
-      #exit 1
+      exit 1
     fi
 
     #-------------------------------------------------
@@ -149,22 +148,20 @@ data:
     expected=$(bin/hbase shell /tmp/dev-hbase-script | grep '=> 3' | wc -l)
     if [ $expected == 1 ]; then
       echo "Test passed"
-      #exit 0
     else
       echo "Test failed"
-      #exit 1
+      exit 1
     fi
 
     #------------------
     # ...but not others
     #------------------
-    expected=$(bin/hbase shell /tmp/public-hbase-script | grep '=> 3' | wc -l)
-    if [ $expected == 0 ]; then
+    expected=$(bin/hbase shell /tmp/public-hbase-script | grep 'OPA denied the request' | wc -l)
+    if [ $expected == 1 ]; then
       echo "Test passed"
-      #exit 0
     else
       echo "Test failed"
-      #exit 1
+      exit 1
     fi
 
     #----------------------------------------------
@@ -175,10 +172,9 @@ data:
     expected=$(bin/hbase shell /tmp/public-hbase-script | grep '=> 3' | wc -l)
     if [ $expected == 1 ]; then
       echo "Test passed"
-      #exit 0
     else
       echo "Test failed"
-      #exit 1
+      exit 1
     fi
 
     #--------------------------------------------------------
@@ -189,8 +185,11 @@ data:
     expected=$(bin/hbase shell /tmp/readonly-hbase-script | grep '=> 3' | wc -l)
     if [ $expected == 2 ]; then
       echo "Test passed"
-      #exit 0
     else
       echo "Test failed"
-      #exit 1
+      exit 1
     fi
+
+    echo "All tests passed!"
+    exit 0
+

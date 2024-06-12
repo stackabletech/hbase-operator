@@ -12,7 +12,25 @@ test_permission_admin if {
       "namespaceAsString" : "hbase",
       "qualifierAsString" : "meta",
     },
+    "namespace" : "hbase",
     "action" : "WRITE"
+    }
+}
+
+test_namespace_admin if {
+    allow with input as {
+    "callerUgi" : {
+      "realUser" : null,
+      "userName" : "admin/test-hbase-permissions.default.svc.cluster.local@CLUSTER.LOCAL",
+      "shortUserName" : "admin",
+      "primaryGroup" : null,
+      "groups" : [ ],
+      "authenticationMethod" : "KERBEROS",
+      "realAuthenticationMethod" : "KERBEROS"
+    },
+    "table" : null,
+    "namespace" : "developers",
+    "action" : "ADMIN"
     }
 }
 
@@ -26,6 +44,7 @@ test_permission_developers if {
       "namespaceAsString" : "developers",
       "qualifierAsString" : "table1",
     },
+    "namespace" : "developers",
     "action" : "WRITE"
     }
 }
@@ -40,6 +59,7 @@ test_permission_alice if {
       "namespaceAsString" : "developers",
       "qualifierAsString" : "table2",
     },
+    "namespace" : "developers",
     "action" : "WRITE"
     }
 }
@@ -54,6 +74,7 @@ test_no_permission_bob if {
       "namespaceAsString" : "developers",
       "qualifierAsString" : "table2",
     },
+    "namespace" : "developers",
     "action" : "WRITE"
     }
 }
@@ -68,6 +89,7 @@ test_permission_bob if {
       "namespaceAsString" : "public",
       "qualifierAsString" : "table3",
     },
+    "namespace" : "public",
     "action" : "WRITE"
     }
 }
@@ -92,6 +114,7 @@ test_permission_hbase if {
       "qualifierAsString" : "meta",
       "nameWithNamespaceInclAsString" : "hbase:meta"
     },
+    "namespace" : "hbase",
     "action" : "WRITE"
     }
 }
@@ -116,6 +139,7 @@ test_permission_testuser if {
       "qualifierAsString" : "test",
       "nameWithNamespaceInclAsString" : "default:test"
     },
+    "namespace" : "default",
     "action" : "WRITE"
     }
 }
