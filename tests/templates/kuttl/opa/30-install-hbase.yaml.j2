@@ -56,19 +56,14 @@ commands:
             tlsSecretClass: tls
             kerberos:
               secretClass: kerberos-$NAMESPACE
+          authorization:
+            opa:
+              configMapName: opa
+              package: hbase
 {% if lookup('env', 'VECTOR_AGGREGATOR') %}
           vectorAggregatorConfigMapName: vector-aggregator-discovery
 {% endif %}
         masters:
-          configOverrides: &configOverrides
-            hbase-site.xml:
-              hbase.security.authorization: "true"
-              hbase.security.exec.permission.checks: "true"
-              hbase.security.authorization.opa.policy.dryrun: "false"
-              hbase.security.authorization.opa.policy.url: "http://opa.$NAMESPACE.svc.cluster.local:8081/v1/data/hbase/allow"
-              hbase.coprocessor.region.classes: tech.stackable.hbase.OpenPolicyAgentAccessController
-              hbase.coprocessor.master.classes: tech.stackable.hbase.OpenPolicyAgentAccessController
-              hbase.coprocessor.regionserver.classes: tech.stackable.hbase.OpenPolicyAgentAccessController
           config:
             logging:
               enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
@@ -83,7 +78,6 @@ commands:
                       custom:
                         configMap: hbase-log-config
         regionServers:
-          configOverrides: *configOverrides
           config:
             logging:
               enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
@@ -98,7 +92,6 @@ commands:
                       custom:
                         configMap: hbase-log-config
         restServers:
-          configOverrides: *configOverrides
           config:
             logging:
               enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
