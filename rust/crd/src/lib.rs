@@ -26,6 +26,7 @@ use stackable_operator::{
 use strum::{Display, EnumIter, EnumString};
 
 use crate::affinity::get_affinity;
+use crate::security::AuthorizationConfig;
 
 pub mod affinity;
 pub mod security;
@@ -178,6 +179,9 @@ pub struct HbaseClusterConfig {
 
     /// Settings related to user [authentication](DOCS_BASE_URL_PLACEHOLDER/usage-guide/security).
     pub authentication: Option<AuthenticationConfig>,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub authorization: Option<AuthorizationConfig>,
 }
 
 // TODO: Temporary solution until listener-operator is finished

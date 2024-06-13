@@ -68,6 +68,7 @@ use stackable_operator::{
 use strum::{EnumDiscriminants, IntoStaticStr};
 
 use crate::product_logging::STACKABLE_LOG_DIR;
+use crate::security::opa::HbaseOpaConfig;
 use crate::{
     discovery::build_discovery_configmap,
     kerberos::{
@@ -79,6 +80,7 @@ use crate::{
     product_logging::{
         extend_role_group_config_map, log4j_properties_file_name, resolve_vector_aggregator_address,
     },
+    security,
     zookeeper::{self, ZookeeperConnectionInformation},
     OPERATOR_NAME,
 };
@@ -278,6 +280,9 @@ pub enum Error {
     ObjectMeta {
         source: stackable_operator::builder::meta::Error,
     },
+
+    #[snafu(display("invalid OPA configuration"))]
+    InvalidOpaConfig { source: security::opa::Error },
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -316,6 +321,15 @@ pub async fn reconcile_hbase(hbase: Arc<HbaseCluster>, ctx: Arc<Ctx>) -> Result<
         false,
     )
     .context(InvalidProductConfigSnafu)?;
+
+    let hbase_opa_config = match &hbase.spec.cluster_config.authorization {
+        Some(opa_config) => Some(
+            HbaseOpaConfig::from_opa_config(client, &hbase, opa_config)
+                .await
+                .context(InvalidOpaConfigSnafu)?,
+        ),
+        None => None,
+    };
 
     let mut cluster_resources = ClusterResources::new(
         APP_NAME,
@@ -388,6 +402,7 @@ pub async fn reconcile_hbase(hbase: Arc<HbaseCluster>, ctx: Arc<Ctx>) -> Result<
                 &zookeeper_connection_information,
                 &merged_config,
                 &resolved_product_image,
+                hbase_opa_config.as_ref(),
                 vector_aggregator_address.as_deref(),
             )?;
             let rg_statefulset = build_rolegroup_statefulset(
@@ -514,6 +529,7 @@ fn build_rolegroup_config_map(
     zookeeper_connection_information: &ZookeeperConnectionInformation,
     hbase_config: &HbaseConfig,
     resolved_product_image: &ResolvedProductImage,
+    hbase_opa_config: Option<&HbaseOpaConfig>,
     vector_aggregator_address: Option<&str>,
 ) -> Result<ConfigMap, Error> {
     let mut hbase_site_xml = String::new();
@@ -528,6 +544,8 @@ fn build_rolegroup_config_map(
                 hbase_site_config.extend(zookeeper_connection_information.as_hbase_settings());
                 hbase_site_config
                     .extend(kerberos_config_properties(hbase).context(AddKerberosConfigSnafu)?);
+                hbase_site_config
+                    .extend(hbase_opa_config.map_or(vec![], |config| config.hbase_site_config()));
 
                 // configOverride come last
                 hbase_site_config.extend(config.clone());
