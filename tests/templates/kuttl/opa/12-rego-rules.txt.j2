@@ -84,11 +84,11 @@ data:
     }
 
     groups_for_user := {
-        "hbase/hbase.$NAMESPACE.svc.cluster.local@{{ test_scenario['values']['kerberos-realm'] }}": ["admins"],
-        "admin/access-hbase.$NAMESPACE.svc.cluster.local@{{ test_scenario['values']['kerberos-realm'] }}": ["admins"],
-        "developer/access-hbase.$NAMESPACE.svc.cluster.local@{{ test_scenario['values']['kerberos-realm'] }}": ["developers"],
-        "public/access-hbase.$NAMESPACE.svc.cluster.local@{{ test_scenario['values']['kerberos-realm'] }}": ["public"],
-        "readonlyuser/access-hbase.$NAMESPACE.svc.cluster.local@{{ test_scenario['values']['kerberos-realm'] }}": [],
+        "hbase/hbase.$NAMESPACE.svc.cluster.local@CLUSTER.LOCAL": ["admins"],
+        "admin/access-hbase.$NAMESPACE.svc.cluster.local@CLUSTER.LOCAL": ["admins"],
+        "developer/access-hbase.$NAMESPACE.svc.cluster.local@CLUSTER.LOCAL": ["developers"],
+        "public/access-hbase.$NAMESPACE.svc.cluster.local@CLUSTER.LOCAL": ["public"],
+        "readonlyuser/access-hbase.$NAMESPACE.svc.cluster.local@CLUSTER.LOCAL": [],
     }
 
     acls := [
@@ -108,7 +108,7 @@ data:
             "resource": "public:",
         },
         {
-            "identity": "user:readonlyuser/access-hbase.$NAMESPACE.svc.cluster.local@{{ test_scenario['values']['kerberos-realm'] }}",
+            "identity": "user:readonlyuser/access-hbase.$NAMESPACE.svc.cluster.local@CLUSTER.LOCAL",
             "action": "ro",
             "resource": ":",
         },
