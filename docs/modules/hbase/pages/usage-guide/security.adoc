@@ -51,9 +51,236 @@ In case you want to access your HBase it is recommended to start up a client Pod
 We have an https://github.com/stackabletech/hbase-operator/blob/main/tests/templates/kuttl/kerberos/41-access-hbase.yaml.j2[integration test] for this exact purpose, where you can see how to connect and get a valid keytab.
 
 == Authorization
-Together with Kerberos authorization is enabled.
-You need to explicitly grant table permissions to all users.
-E.g. the integration tests run `grant 'testuser', 'C';` to grant the testuser the permission to create tables.
+For authorization we developed a custom https://github.com/stackabletech/hbase-opa-authorizer[access controller CoProcessor], which contains an OPA ACL checker.
+This matches our general xref:concepts:opa.adoc[] mechanisms.
+
+IMPORTANT: It is recommended to enable Kerberos when doing Authorization, as otherwise you don't have any security measures at all.
+There still might be cases where you want authorization on top of a cluster without authentication, as you don't want to accidentally drop files and therefore use different users for different use-cases.
+
+In order to use the authorizer you need a ConfigMap containing a rego rule and reference that in your HBase cluster.
+In addition to this you need a OpaCluster that serves the rego rules - this guide assumes it's called `opa`.
+
+[source,rego]
+----
+include::example$usage-guide/hbase-regorules.yaml[]
+----
+
+This rego rule is intended for demonstration purposes and allows every operation.
+For a production setup you will probably need to have something much more granular.
+We provide a more representative rego rule in our integration tests and in the aforementioned co-processor repository.
+Details can be found below in the <<fine-granular-rego-rules, fine-granular rego rules>> section.
+Reference the rego rule as follows in your HbaseCluster:
+
+[source,yaml]
+----
+spec:
+  clusterConfig:
+    authorization:
+      opa:
+        configMapName: opa
+        package: hbase
+----
+
+=== How it works
+WARNING: This implementation takes an approach to HBase authorization that is fundamentally different from the default one (which relies on HDFS group mappings) and departs significantly from traditional Hadoop patterns and POSIX-style permissions.
+
+The current rego rules ignore file ownership and permissions, and ACLs are persisted in neither ZooKeeper nor internal HBase tables.
+Keeping this state in HDFS/HBase clashes with the infrastructure-as-code approach (IaC).
+
+Instead, HBase will send a request detailing who (e.g. `alice/test-hbase-permissions.default.svc.cluster.local@CLUSTER.LOCAL`) is trying to execute what type of action (e.g. `READ`, `WRITE`, `CREATE` or `ADMIN`) on what namespace or table (e.g. `developers:`, `developers/table1`).
+OPA then makes a decision if this action is allowed or not.
+
+Instead of using the HBase shell to grant or revoke rights to users, you can go to your IaC Git repository and add a rego rule entry specifying what a specific user is allowed to do to which specific resources.
+
+[#fine-granular-rego-rules]
+=== Fine-granular rego rules
+
+Access is granted by looking at three bits of information that must be supplied for every rego-rule callout:
+
+* the *identity* of the user
+* the *resource* requested by the user
+* the *action* which the user wants to perform on the resource
+
+Each operation has an implicit action-level attribute e.g. `CREATE` requires at least read-write permissions.
+This action attribute is then checked against the permissions assigned to the user by an ACL and the operation is permitted if this check is fulfilled.
+
+The basic structure of this rego rule is shown below.
+
+.Rego rule outline
+[source]
+----
+package hbase
+
+import rego.v1
+
+# Turn off access by default.
+default allow := false
+default matches_identity(identity) := false
+
+# Table is null if the request is for namespace permissions, but as parameters cannot be
+# undefined, we have to set it to something specific:
+checked_table_name := input.table.qualifierAsString if {input.table.qualifierAsString}
+checked_table_name := "__undefined__" if {not input.table.qualifierAsString}
+
+# Check access in order of increasing specificity (i.e. identity first).
+# Deny access as "early" as possible.
+allow if {
+    some acl in acls
+    matches_identity(acl.identity)
+    matches_resource(input.namespace, checked_table_name, acl.resource)
+    action_sufficient_for_operation(acl.action, input.action)
+}
+
+# Identity checks based on e.g.
+# - explicit matches on the fully-qualified userName
+# - regex matches
+# - the group membership (simple- or regex-matches on fully-qualified userName)
+matches_identity(identity) if {
+    ...
+}
+
+# Resource checks on e.g.
+# - wildcard access (for e.g. admins)
+# - explicit namespace- or table-mentions
+matches_resource(file, resource) if {
+    ...
+}
+
+# Check the operation and its implicit action against an ACL
+action_sufficient_for_operation(action, operation) if {
+    action_hierarchy[action][_] == action_for_operation[operation]
+}
+
+action_hierarchy := {
+    "full": ["full", "rw", "ro"],
+    "rw": ["rw", "ro"],
+    "ro": ["ro"],
+}
+
+action_for_operation := {
+    "ADMIN": "full",
+    "CREATE": "full",
+    "WRITE": "rw",
+    "READ": "ro",
+}
+
+# Maps users to groups
+groups_for_user := {
+    "fully-qualified userName": ["ACL group"],
+    ...
+}
+
+acls := [
+    {
+        # Identity: either "group:groupName" or "user:userName"
+        "identity": "group:admins",
+        "action": "full",
+        "resource": ":",
+    },
+    {
+        "identity": "group:developers",
+        "action": "full",
+        "resource": "developers:",
+    },
+    ...
+]
+----
+
+There is complete file shown below, together with a list of test cases.
+
+<details>
+<summary>Rego rules</summary>
+[source,rego]
+----
+include::example$rego/hbase.rego[]
+----
+</details>
+
+<details>
+<summary>Rego tests</summary>
+[source,rego]
+----
+include::example$rego/hbase_test.rego[]
+----
+</details>
+
+If the https://www.openpolicyagent.org/docs/latest/cli/[Opa CLI tool] has been installed, the tests can be executed by calling the following from the root folder:
+
+[shell]
+----
+opa test ./docs/modules/hbase/examples/rego/ -bv
+
+e.g.
+17:44 $ opa test ./docs/modules/hbase/examples/rego/ -bv
+docs/modules/hbase/examples/rego/hbase_test.rego:
+data.hbase.test_permission_admin: PASS (2.055153ms)
+data.hbase.test_namespace_admin: PASS (528.212µs)
+data.hbase.test_permission_developers: PASS (896.004µs)
+data.hbase.test_permission_alice: PASS (1.56663ms)
+data.hbase.test_no_permission_bob: PASS (787.445µs)
+data.hbase.test_permission_bob1: PASS (1.485691ms)
+data.hbase.test_permission_bob2: PASS (1.459236ms)
+data.hbase.test_permission_hbase: PASS (1.524541ms)
+data.hbase.test_permission_testuser: PASS (1.036205ms)
+data.hbase.test_permission_readonlyuser1: PASS (780.05µs)
+data.hbase.test_permission_readonlyuser2: PASS (1.37649ms)
+--------------------------------------------------------------------------------
+PASS: 11/11
+
+----
+
+Take the test case below as an example:
+
+[source]
+----
+test_permission_developers if {
+    allow with input as {
+    "callerUgi" : {
+      "userName" : "alice/test-hbase-permissions.default.svc.cluster.local@CLUSTER.LOCAL",
+      "primaryGroup" : "admin",
+    },
+    "table" : {
+      "namespaceAsString" : "developers",
+      "qualifierAsString" : "table1",
+    },
+    "namespace" : "developers",
+    "action" : "WRITE"
+    }
+}
+----
+
+This test passes through the following steps:
+
+==== 1. Does the user or group exist in the ACL?
+
+Yes, a match is found on userName in the mapping `groups_for_user`.
+
+==== 2. Does this user/group have permission to fulfill the specified operation on the given path?
+
+Yes, as this ACL item
+
+[source]
+----
+{
+    "identity": "group:developers",
+    "action": "full",
+    "resource": "developers:",
+},
+----
+
+matches the resource on
+
+[source]
+----
+# Resource mentions the namespace explicitly
+matches_resource(namespace, table, resource) if {
+    resource == concat("", [namespace, ":"])
+}
+----
+
+and the action permission required for the action `WRITE` (`rw`) is a subset of the ACL grant (`full`).
+
+NOTE: The various checks for `matches_identity` and `matches_resource` are generic, given that the internal list of HBase actions is comprehensive and the `input` structure is an internal implementation. This means that only the ACL needs to be adapted to specific customer needs.
 
 == Wire encryption
 In case Kerberos is enabled, `Privacy` mode is used for best security.

@@ -1,0 +1,14 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: hbase-regorules
+  labels:
+    opa.stackable.tech/bundle: "true"
+data:
+  hdfs.rego: |
+    package hbase
+
+    import rego.v1
+
+    default allow = true
