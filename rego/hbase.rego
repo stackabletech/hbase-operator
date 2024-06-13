@@ -75,10 +75,12 @@ action_for_operation := {
 }
 
 groups_for_user := {
-    "hbase/hbase.kuttl-test-eager-javelin.svc.cluster.local@CLUSTER.LOCAL": ["admins"],
-    "testuser/access-hbase.kuttl-test-rapid-gannet.svc.cluster.local@CLUSTER.LOCAL": ["admins"],
+    "hbase/test-hbase-permissions.default.svc.cluster.local@CLUSTER.LOCAL": ["admins"],
+    "testuser/test-hbase-permissions.default.svc.cluster.local@CLUSTER.LOCAL": ["admins"],
     "admin/test-hbase-permissions.default.svc.cluster.local@CLUSTER.LOCAL": ["admins"],
     "alice/test-hbase-permissions.default.svc.cluster.local@CLUSTER.LOCAL": ["developers"],
+    "readonlyuser1/test-hbase-permissions.default.svc.cluster.local@CLUSTER.LOCAL": [],
+    "readonlyuser2/test-hbase-permissions.default.svc.cluster.local@CLUSTER.LOCAL": [],
     "bob/test-hbase-permissions.default.svc.cluster.local@CLUSTER.LOCAL": []
 }
 
@@ -103,9 +105,19 @@ acls := [
         "action": "rw",
         "resource": "developers:table1",
     },
-     {
+    {
         "identity": "user:bob/test-hbase-permissions.default.svc.cluster.local@CLUSTER.LOCAL",
         "action": "rw",
         "resource": "public:table3",
+    },
+    {
+        "identity": "user:readonlyuser1/test-hbase-permissions.default.svc.cluster.local@CLUSTER.LOCAL",
+        "action": "ro",
+        "resource": "public:test",
+    },
+    {
+        "identity": "user:readonlyuser2/test-hbase-permissions.default.svc.cluster.local@CLUSTER.LOCAL",
+        "action": "ro",
+        "resource": ":",
     },
 ]

@@ -108,7 +108,7 @@ data:
             "resource": "public:",
         },
         {
-            "identity": "readonlyuser/access-hbase.$NAMESPACE.svc.cluster.local@{{ test_scenario['values']['kerberos-realm'] }}",
+            "identity": "user:readonlyuser/access-hbase.$NAMESPACE.svc.cluster.local@{{ test_scenario['values']['kerberos-realm'] }}",
             "action": "ro",
             "resource": ":",
         },
