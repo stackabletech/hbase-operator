@@ -1,7 +1,7 @@
 = Security
 
 == Authentication
-Currently the only supported authentication mechanism is Kerberos, which is disabled by default.
+Currently, the only supported authentication mechanism is Kerberos, which is disabled by default.
 For Kerberos to work a Kerberos KDC is needed, which the users need to provide.
 The xref:secret-operator:secretclass.adoc#backend-kerberoskeytab[secret-operator documentation] states which kind of Kerberos servers are supported and how they can be configured.
 
@@ -10,7 +10,7 @@ To configure HDFS to use Kerberos you first need to collect information about yo
 Additionally, you need a service-user which the secret-operator uses to create principals for the HDFS services.
 
 === 2. Create Kerberos SecretClass
-Afterwards you need to enter all the needed information into a SecretClass, as described in xref:secret-operator:secretclass.adoc#backend-kerberoskeytab[secret-operator documentation].
+Configure a SecretClass with a Kerberos backend as described in the xref:secret-operator:secretclass.adoc#backend-kerberoskeytab[secret-operator documentation].
 The following guide assumes you have named your SecretClass `kerberos`.
 
 === 3. Configure HDFS to use SecretClass
@@ -51,11 +51,11 @@ In case you want to access your HBase it is recommended to start up a client Pod
 We have an https://github.com/stackabletech/hbase-operator/blob/main/tests/templates/kuttl/kerberos/41-access-hbase.yaml.j2[integration test] for this exact purpose, where you can see how to connect and get a valid keytab.
 
 == Authorization
-For authorization we developed a custom https://github.com/stackabletech/hbase-opa-authorizer[access controller CoProcessor], which contains an OPA ACL checker.
-This matches our general xref:concepts:opa.adoc[] mechanisms.
+Authorization using the Open Policy Agent (OPA) is supported.
+A custom https://github.com/stackabletech/hbase-opa-authorizer[access controller CoProcessor] delegates authorization decisions to OPA.
+For more information on the OPA authorization mechanism and how to use it within the Stackable Platform, see the xref:concepts:opa.adoc[OPA concepts] documentation.
 
-IMPORTANT: It is recommended to enable Kerberos when doing Authorization, as otherwise you don't have any security measures at all.
-There still might be cases where you want authorization on top of a cluster without authentication, as you don't want to accidentally drop files and therefore use different users for different use-cases.
+IMPORTANT: Authentication with Kerberos is required when using authorization.
 
 In order to use the authorizer you need a ConfigMap containing a rego rule and reference that in your HBase cluster.
 In addition to this you need a OpaCluster that serves the rego rules - this guide assumes it's called `opa`.
