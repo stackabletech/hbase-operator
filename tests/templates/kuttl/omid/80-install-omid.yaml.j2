@@ -1,0 +1,60 @@
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: omid-tso-server
+  labels:
+    app: omid-tso-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: omid-tso-server
+  template:
+    metadata:
+      labels:
+        app: omid-tso-server
+    spec:
+      containers:
+        - name: omid-tso-server
+{% if test_scenario['values']['omid'].find(",") > 0 %}
+          image: "{{ test_scenario['values']['omid'].split(',')[1] }}"
+{% else %}
+          image: docker.stackable.tech/stackable/omid:"{{ test_scenario['values']['omid'] }}"-stackable0.0.0-dev
+{% endif %}
+          command:
+            - /bin/bash
+            - -x
+            - -euo
+            - pipefail
+            - -c
+          args:
+            - ./bin/omid.sh create-hbase-commit-table && ./bin/omid.sh create-hbase-timestamp-table && ./bin/omid.sh tso
+          resources:
+            requests:
+              memory: "12Gi"
+              cpu: "100m"
+            limits:
+              memory: "12Gi"
+              cpu: "500m"
+          volumeMounts:
+            - name: hbase-config
+              mountPath: /stackable/conf/hbase
+            - name: hdfs-config
+              mountPath: /stackable/conf/hdfs
+          env:
+            - name: HBASE_CONF_DIR
+              value: /stackable/conf/hbase
+            - name: HADOOP_CONF_DIR
+              value: /stackable/conf/hdfs
+            - name: JVM_ARGS
+              value: -Xmx10g -Xms10g
+          ports:
+            - containerPort: 54758
+      volumes:
+        - name: hbase-config
+          configMap:
+            name: test-hbase
+        - name: hdfs-config
+          configMap:
+            name: test-hdfs
