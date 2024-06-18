@@ -1,4 +1,30 @@
 ---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: omid-examples-client-config
+data:
+  hbase-omid-client-config.yml: |
+    # Secure HBase credentials, core-site.xml and hbase-site.xml are expected to be in the classpath
+    # It's used for secure HBase only and ignored otherwise
+    # principal: omid_hbase_client
+    # keytab: /path/to/hbase/client/keytab
+    omidClientConfiguration: !!org.apache.omid.tso.client.OmidClientConfiguration
+        connectionString: "localhost:54758"
+  log4j2.properties: |
+    status = warn
+    dest = err
+    name = PropertiesConfig
+
+    # console
+    appender.console.type = Console
+    appender.console.target = SYSTEM_OUT
+    appender.console.name = console
+    appender.console.layout.type = PatternLayout
+    appender.console.layout.pattern = %d{ISO8601} %-5p [%t] %c{2}: %m%n
+
+    rootLogger = WARN,console
+---
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
@@ -31,7 +57,7 @@ spec:
           args:
             - ./bin/omid.sh create-hbase-commit-table && ./bin/omid.sh create-hbase-timestamp-table && ./bin/omid.sh tso
           resources:
-            # The Omid TSO server seems to be extremely memory hungry.
+            # The TSO server seems to be extremely memory hungry.
             # We arrived at these (minimal) settings after much trial and error.
             # See also the JVM_FLAGS environment variable below.
             requests:
@@ -45,6 +71,8 @@ spec:
               mountPath: /stackable/conf/hbase
             - name: hdfs-config
               mountPath: /stackable/conf/hdfs
+            - name: omid-examples-client-config
+              mountPath: /stackable/omid-examples/conf
           env:
             - name: HBASE_CONF_DIR
               value: /stackable/conf/hbase
@@ -53,7 +81,18 @@ spec:
             - name: JVM_FLAGS
               value: "-Xmx3g -Xms3g"
           ports:
+            # See also hbase-omid-client-config.yml above where the client is configured with this port
             - containerPort: 54758
+              name: tso
+              protocol: TCP
+          readinessProbe:
+            # The tso server takes a while to start up, so we need to be patient.
+            failureThreshold: 3
+            periodSeconds: 10
+            successThreshold: 1
+            tcpSocket:
+              port: tso
+            timeoutSeconds: 2
       volumes:
         - name: hbase-config
           configMap:
@@ -61,3 +100,6 @@ spec:
         - name: hdfs-config
           configMap:
             name: test-hdfs
+        - name: omid-examples-client-config
+          configMap:
+            name: omid-examples-client-config

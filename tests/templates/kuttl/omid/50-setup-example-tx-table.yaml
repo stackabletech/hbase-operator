@@ -1,0 +1,8 @@
+---
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+metadata:
+  name: examples-tx-table
+commands:
+  - script: kubectl exec --namespace=$NAMESPACE test-hbase-master-default-0 -- bash -c "echo -e \"create 'MY_TX_TABLE', {NAME => 'MY_CF', VERSIONS => '2147483647', TTL => '2147483647'}\" | /stackable/hbase/bin/hbase shell"
+timeout: 240

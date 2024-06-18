@@ -3,7 +3,7 @@ apiVersion: kuttl.dev/v1beta1
 kind: TestAssert
 metadata:
   name: omid-tso-server
-timeout: 300
+timeout: 240
 ---
 apiVersion: apps/v1
 kind: StatefulSet

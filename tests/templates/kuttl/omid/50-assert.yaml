@@ -1,0 +1,8 @@
+---
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+metadata:
+  name: examples-basic-run
+commands:
+  - script: kubectl exec --namespace=$NAMESPACE omid-tso-server-0 -- bash -c "/stackable/omid-examples/run.sh basic"
+timeout: 240
