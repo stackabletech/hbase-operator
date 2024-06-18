@@ -48,6 +48,7 @@ spec:
 {% else %}
           image: docker.stackable.tech/stackable/omid:"{{ test_scenario['values']['omid'] }}"-stackable0.0.0-dev
 {% endif %}
+          imagePullPolicy: IfNotPresent
           command:
             - /bin/bash
             - -x
