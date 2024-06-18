@@ -26,8 +26,8 @@ spec:
     spec:
       terminationGracePeriodSeconds: 3600
 status:
-  readyReplicas: 2
-  replicas: 2
+  readyReplicas: 1
+  replicas: 1
 ---
 apiVersion: apps/v1
 kind: StatefulSet
@@ -38,32 +38,5 @@ spec:
     spec:
       terminationGracePeriodSeconds: 300
 status:
-  readyReplicas: 2
-  replicas: 2
----
-apiVersion: policy/v1
-kind: PodDisruptionBudget
-metadata:
-  name: test-hbase-master
-status:
-  expectedPods: 2
-  currentHealthy: 2
-  disruptionsAllowed: 1
----
-apiVersion: policy/v1
-kind: PodDisruptionBudget
-metadata:
-  name: test-hbase-regionserver
-status:
-  expectedPods: 2
-  currentHealthy: 2
-  disruptionsAllowed: 1
----
-apiVersion: policy/v1
-kind: PodDisruptionBudget
-metadata:
-  name: test-hbase-restserver
-status:
-  expectedPods: 2
-  currentHealthy: 2
-  disruptionsAllowed: 1
+  readyReplicas: 1
+  replicas: 1

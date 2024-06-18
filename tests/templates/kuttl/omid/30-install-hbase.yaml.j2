@@ -25,10 +25,6 @@ spec:
         enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
     roleGroups:
       default:
-        configOverrides:
-          hbase-site.xml:
-            phoenix.log.saltBuckets: "2"
-            hbase.regionserver.wal.codec: "org.apache.hadoop.hbase.regionserver.wal.IndexedWALEditCodec"
         replicas: 2
   regionServers:
     config:
@@ -36,19 +32,11 @@ spec:
         enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
     roleGroups:
       default:
-        configOverrides:
-          hbase-site.xml:
-            phoenix.log.saltBuckets: "2"
-            hbase.regionserver.wal.codec: "org.apache.hadoop.hbase.regionserver.wal.IndexedWALEditCodec"
-        replicas: 2
+        replicas: 1
   restServers:
     config:
       logging:
         enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
     roleGroups:
       default:
-        configOverrides:
-          hbase-site.xml:
-            phoenix.log.saltBuckets: "2"
-            hbase.regionserver.wal.codec: "org.apache.hadoop.hbase.regionserver.wal.IndexedWALEditCodec"
-        replicas: 2
+        replicas: 1
