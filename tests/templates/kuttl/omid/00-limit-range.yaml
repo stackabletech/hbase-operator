@@ -8,4 +8,4 @@ spec:
     - type: "Container"
       maxLimitRequestRatio:
         cpu: 5
-        memory: 5
+        memory: 1
