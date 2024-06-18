@@ -31,12 +31,15 @@ spec:
           args:
             - ./bin/omid.sh create-hbase-commit-table && ./bin/omid.sh create-hbase-timestamp-table && ./bin/omid.sh tso
           resources:
+            # The Omid TSO server seems to be extremely memory hungry.
+            # We arrived at these (minimal) settings after much trial and error.
+            # See also the JVM_FLAGS environment variable below.
             requests:
-              memory: "12Gi"
-              cpu: "100m"
-            limits:
-              memory: "12Gi"
+              memory: "4Gi"
               cpu: "500m"
+            limits:
+              memory: "4Gi"
+              cpu: "1"
           volumeMounts:
             - name: hbase-config
               mountPath: /stackable/conf/hbase
@@ -47,8 +50,8 @@ spec:
               value: /stackable/conf/hbase
             - name: HADOOP_CONF_DIR
               value: /stackable/conf/hdfs
-            - name: JVM_ARGS
-              value: -Xmx10g -Xms10g
+            - name: JVM_FLAGS
+              value: "-Xmx3g -Xms3g"
           ports:
             - containerPort: 54758
       volumes:
