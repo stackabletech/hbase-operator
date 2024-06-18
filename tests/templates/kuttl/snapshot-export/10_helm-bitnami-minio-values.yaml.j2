@@ -1,5 +1,6 @@
 ---
 persistence:
+  enabled: false # "false" means, that an emptyDir is used instead of a persistentVolumeClaim
   size: 64Mi
 
 provisioning:
@@ -19,5 +20,18 @@ provisioning:
       --access-key hbaseAccessKey
       --secret-key hbaseSecretKey
       provisioning hbase
+  resources:
+    requests:
+      memory: 1Gi
+      cpu: 512m
+    limits:
+      memory: 1Gi
+      cpu: "1"
 
-resourcesPreset: small
+resources:
+  requests:
+    memory: 1Gi
+    cpu: 512m
+  limits:
+    memory: 1Gi
+    cpu: "1"
