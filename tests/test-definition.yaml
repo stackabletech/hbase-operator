@@ -102,8 +102,8 @@ tests:
   - name: omid
     dimensions:
       - hbase
-      - hdfs
-      - zookeeper
+      - hdfs-latest
+      - zookeeper-latest
       - omid
       - openshift
 suites:

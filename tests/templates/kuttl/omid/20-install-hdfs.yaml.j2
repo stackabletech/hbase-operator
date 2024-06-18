@@ -5,7 +5,12 @@ metadata:
   name: test-hdfs
 spec:
   image:
-    productVersion: "{{ test_scenario['values']['hdfs'] }}"
+{% if test_scenario['values']['hdfs-latest'].find(",") > 0 %}
+    custom: "{{ test_scenario['values']['hdfs-latest'].split(',')[1] }}"
+    productVersion: "{{ test_scenario['values']['hdfs-latest'].split(',')[0] }}"
+{% else %}
+    productVersion: "{{ test_scenario['values']['hdfs-latest'] }}"
+{% endif %}
     pullPolicy: IfNotPresent
   clusterConfig:
     zookeeperConfigMapName: test-znode
