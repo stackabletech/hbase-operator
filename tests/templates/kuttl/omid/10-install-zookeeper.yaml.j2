@@ -1,0 +1,34 @@
+---
+apiVersion: zookeeper.stackable.tech/v1alpha1
+kind: ZookeeperCluster
+metadata:
+  name: test-zk
+spec:
+  image:
+{% if test_scenario['values']['zookeeper-latest'].find(",") > 0 %}
+    custom: "{{ test_scenario['values']['zookeeper-latest'].split(',')[1] }}"
+    productVersion: "{{ test_scenario['values']['zookeeper-latest'].split(',')[0] }}"
+{% else %}
+    productVersion: "{{ test_scenario['values']['zookeeper-latest'] }}"
+{% endif %}
+    pullPolicy: IfNotPresent
+  clusterConfig:
+    listenerClass: cluster-internal
+{% if lookup('env', 'VECTOR_AGGREGATOR') %}
+    vectorAggregatorConfigMapName: vector-aggregator-discovery
+{% endif %}
+  servers:
+    config:
+      logging:
+        enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
+    roleGroups:
+      default:
+        replicas: 1
+---
+apiVersion: zookeeper.stackable.tech/v1alpha1
+kind: ZookeeperZnode
+metadata:
+  name: test-znode
+spec:
+  clusterRef:
+    name: test-zk
