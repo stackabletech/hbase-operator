@@ -46,7 +46,7 @@ spec:
 {% if test_scenario['values']['omid'].find(",") > 0 %}
           image: "{{ test_scenario['values']['omid'].split(',')[1] }}"
 {% else %}
-          image: docker.stackable.tech/stackable/omid:"{{ test_scenario['values']['omid'] }}"-stackable0.0.0-dev
+          image: docker.stackable.tech/stackable/omid:{{ test_scenario['values']['omid'] }}-stackable0.0.0-dev
 {% endif %}
           imagePullPolicy: IfNotPresent
           command:
