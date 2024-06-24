@@ -4,6 +4,7 @@
 
 ### Added
 
+- Added support for HBase 2.6.0 ([#506]).
 - Added `clusterConfig.authorization` property to support the OPA authorizer starting with HBase 2.6 ([#506]).
 - Configure log4j2 starting with HBase 2.6 upwards ([#506]).
 
