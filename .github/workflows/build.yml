@@ -16,6 +16,10 @@ on:
       - '[0-9][0-9].[0-9]+.[0-9]+'
   pull_request:
   merge_group:
+  schedule:
+    # Run every Saturday morning: https://crontab.guru/#15_3_*_*_6
+    - cron: '15 3 * * 6'
+  workflow_dispatch:
 
 env:
   CARGO_TERM_COLOR: always
@@ -64,11 +68,11 @@ jobs:
   #        repository: test
   #
   #    - all tagged releases land in stable:
-  #         condition: github.event_name == 'create' & github.ref.startswith('refs/tags/')
+  #         condition: github.event_name == 'push' & github.ref.startswith('refs/tags/')
   #         repository: stable
   #
-  #    - all pushes to main (i.e. PR-merges) land in dev:
-  #         condition: github.event_name == 'push' & github.ref == 'refs/heads/main'
+  #    - all pushes to main (i.e. PR-merges) and all scheduled/manual workflow runs on main land in dev:
+  #         condition: ( github.event_name == 'push' | github.event_name == 'schedule' | github.event_name == 'workflow_dispatch' ) & github.ref == 'refs/heads/main'
   #         repository: dev
   #
   # Any other scenarios (e.g. when a branch is created/pushed) will cause the publish step to be skipped, most commonly this is expected to happen for the
@@ -87,10 +91,10 @@ jobs:
           if [[ $TRIGGER == "pull_request" ]]; then
             echo "exporting test as target helm repo: ${{ env.TEST_REPO_HELM_URL }}"
             echo "helm_repo=${{ env.TEST_REPO_HELM_URL }}" >> $GITHUB_OUTPUT
-          elif [[ $TRIGGER == "push" && $GITHUB_REF == "refs/heads/main" ]]; then
+          elif [[ ( $TRIGGER == "push" || $TRIGGER == "schedule" || $TRIGGER == "workflow_dispatch" ) && $GITHUB_REF == "refs/heads/main" ]]; then
             echo "exporting dev as target helm repo: ${{ env.DEV_REPO_HELM_URL }}"
             echo "helm_repo=${{ env.DEV_REPO_HELM_URL }}" >> $GITHUB_OUTPUT
-          elif [[ ( $TRIGGER == "create" || $TRIGGER == "push" ) && $GITHUB_REF == refs/tags/* ]]; then
+          elif [[ $TRIGGER == "push" && $GITHUB_REF == refs/tags/* ]]; then
             echo "exporting stable as target helm repo: ${{ env.STABLE_REPO_HELM_URL }}"
             echo "helm_repo=${{ env.STABLE_REPO_HELM_URL }}" >> $GITHUB_OUTPUT
           else
@@ -304,7 +308,7 @@ jobs:
       - select_helm_repo
     strategy:
       matrix:
-        runner: ["ubuntu-latest", "buildjet-2vcpu-ubuntu-2204-arm"]
+        runner: ["ubuntu-latest", "ubicloud-standard-8-arm"]
     runs-on: ${{ matrix.runner }}
     permissions:
       id-token: write
@@ -352,13 +356,14 @@ jobs:
         uses: anchore/sbom-action/download-syft@e8d2a6937ecead383dfe75190d104edd1f9c5751 # v0.16.0
       - name: Build Docker image and Helm chart
         run: |
-          # Installing helm on BuildJet only
+          # Installing helm and yq on ubicloud-standard-8-arm only
           if [ "$(arch)" = "aarch64" ]; then
             curl https://baltocdn.com/helm/signing.asc | gpg --dearmor | sudo tee /usr/share/keyrings/helm.gpg > /dev/null
-            sudo apt-get -y install apt-transport-https --yes
+            sudo apt-get -y install apt-transport-https
             echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/helm.gpg] https://baltocdn.com/helm/stable/debian/ all main" | sudo tee /etc/apt/sources.list.d/helm-stable-debian.list
             sudo apt-get -y update
             sudo apt-get -y install helm
+            sudo wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_arm64 -O /usr/bin/yq && sudo chmod +x /usr/bin/yq
           fi
 
           make -e build
