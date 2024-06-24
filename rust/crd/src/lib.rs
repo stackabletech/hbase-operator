@@ -73,6 +73,8 @@ pub const HBASE_REGIONSERVER_PORT: u16 = 16020;
 pub const HBASE_REGIONSERVER_UI_PORT: u16 = 16030;
 pub const HBASE_REST_PORT: u16 = 8080;
 pub const HBASE_REST_UI_PORT: u16 = 8085;
+// This port is only used by Hbase prior to version 2.6 with a third-party JMX exporter.
+// Newer versions use the same port as the UI because Hbase provides it's own metrics API
 pub const METRICS_PORT: u16 = 9100;
 
 pub const JVM_HEAP_FACTOR: f32 = 0.8;
@@ -432,7 +434,7 @@ impl Configuration for HbaseConfigFragment {
     fn compute_files(
         &self,
         _resource: &Self::Configurable,
-        role_name: &str,
+        _role_name: &str,
         file: &str,
     ) -> Result<BTreeMap<String, Option<String>>, stackable_operator::product_config_utils::Error>
     {
@@ -440,28 +442,11 @@ impl Configuration for HbaseConfigFragment {
 
         match file {
             HBASE_ENV_SH => {
-                result.insert(HBASE_MANAGES_ZK.to_string(), Some("false".to_string()));
-
-                // As we don't have access to the clusterConfig, we always enable the `-Djava.security.krb5.conf`
-                // config, besides it not always being used.
-                let mut all_hbase_opts = format!(
-                    "-Djava.security.properties={CONFIG_DIR_NAME}/{JVM_SECURITY_PROPERTIES_FILE} \
-                    -Djava.security.krb5.conf=/stackable/kerberos/krb5.conf \
-                    -javaagent:/stackable/jmx/jmx_prometheus_javaagent.jar={METRICS_PORT}:/stackable/jmx/{role_name}.yaml",
-                );
-                if let Some(hbase_opts) = &self.hbase_opts {
-                    all_hbase_opts += " ";
-                    all_hbase_opts += hbase_opts;
-                }
-                // Set the jmx exporter in HBASE_MASTER_OPTS, HBASE_REGIONSERVER_OPTS and HBASE_REST_OPTS instead of HBASE_OPTS
-                // to prevent a port-conflict i.e. CLI tools read HBASE_OPTS and may then try to re-start the exporter
-                if role_name == HbaseRole::Master.to_string() {
-                    result.insert(HBASE_MASTER_OPTS.to_string(), Some(all_hbase_opts));
-                } else if role_name == HbaseRole::RegionServer.to_string() {
-                    result.insert(HBASE_REGIONSERVER_OPTS.to_string(), Some(all_hbase_opts));
-                } else if role_name == HbaseRole::RestServer.to_string() {
-                    result.insert(HBASE_REST_OPTS.to_string(), Some(all_hbase_opts));
-                }
+                // The contents of this file cannot be built entirely here because we don't have
+                // access to the clusterConfig or product version.
+                // These are needed to set up Kerberos and JMX exporter settings.
+                // To avoid fragmentation of the code needed to build this file, we moved the
+                // implementation to the hbase_controller::build_hbase_env_sh() function.
             }
             HBASE_SITE_XML => {
                 result.insert(
@@ -589,17 +574,23 @@ impl HbaseCluster {
     }
 
     /// Returns required port name and port number tuples depending on the role.
-    pub fn ports(&self, role: &HbaseRole) -> Vec<(String, u16)> {
+    pub fn ports(&self, role: &HbaseRole, hbase_version: &str) -> Vec<(String, u16)> {
         match role {
             HbaseRole::Master => vec![
                 ("master".to_string(), HBASE_MASTER_PORT),
                 (self.ui_port_name(), HBASE_MASTER_UI_PORT),
-                (METRICS_PORT_NAME.to_string(), METRICS_PORT),
+                (
+                    METRICS_PORT_NAME.to_string(),
+                    metrics_port(role, hbase_version),
+                ),
             ],
             HbaseRole::RegionServer => vec![
                 ("regionserver".to_string(), HBASE_REGIONSERVER_PORT),
                 (self.ui_port_name(), HBASE_REGIONSERVER_UI_PORT),
-                (METRICS_PORT_NAME.to_string(), METRICS_PORT),
+                (
+                    METRICS_PORT_NAME.to_string(),
+                    metrics_port(role, hbase_version),
+                ),
             ],
             HbaseRole::RestServer => vec![
                 (
@@ -612,7 +603,10 @@ impl HbaseCluster {
                     HBASE_REST_PORT,
                 ),
                 (self.ui_port_name(), HBASE_REST_UI_PORT),
-                (METRICS_PORT_NAME.to_string(), METRICS_PORT),
+                (
+                    METRICS_PORT_NAME.to_string(),
+                    metrics_port(role, hbase_version),
+                ),
             ],
         }
     }
@@ -661,5 +655,35 @@ impl HbaseCluster {
 
         tracing::debug!("Merged config: {:?}", conf_rolegroup);
         fragment::validate(conf_rolegroup).context(FragmentValidationFailureSnafu)
+    }
+}
+
+/// The metrics port depends on the HBase version and the pod's role.
+/// Hbase versions prior to 2.6 use a third party prometheus/jmx exporter that can be queried on
+/// port METRICS_PORT.
+/// Later HBase versions provide their own metrics API available on the same port as the user
+/// interface.
+fn metrics_port(role: &HbaseRole, hbase_version: &str) -> u16 {
+    if hbase_version.starts_with(r"2\.14") {
+        METRICS_PORT
+    } else {
+        match role {
+            HbaseRole::Master => HBASE_MASTER_UI_PORT,
+            HbaseRole::RegionServer => HBASE_REGIONSERVER_UI_PORT,
+            HbaseRole::RestServer => HBASE_REST_UI_PORT,
+        }
+    }
+}
+
+/// Return the JVM system properties for the JMX exporter.
+/// Starting with HBase 2.6 these are not needed anymore
+pub fn jmx_system_properties(role: &HbaseRole, hbase_version: &str) -> Option<String> {
+    if hbase_version.starts_with(r"2\.14") {
+        let metrics_port = metrics_port(role, hbase_version);
+        let role_name = role.to_string();
+
+        Some(format!("-javaagent:/stackable/jmx/jmx_prometheus_javaagent.jar={metrics_port}:/stackable/jmx/{role_name}.yaml"))
+    } else {
+        None
     }
 }

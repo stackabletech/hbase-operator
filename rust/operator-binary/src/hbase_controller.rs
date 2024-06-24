@@ -14,10 +14,11 @@ use product_config::{
 };
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_hbase_crd::{
-    Container, HbaseCluster, HbaseClusterStatus, HbaseConfig, HbaseConfigFragment, HbaseRole,
-    APP_NAME, CONFIG_DIR_NAME, HBASE_ENV_SH, HBASE_HEAPSIZE, HBASE_REST_PORT_NAME_HTTP,
-    HBASE_REST_PORT_NAME_HTTPS, HBASE_SITE_XML, JVM_HEAP_FACTOR, JVM_SECURITY_PROPERTIES_FILE,
-    SSL_CLIENT_XML, SSL_SERVER_XML,
+    jmx_system_properties, Container, HbaseCluster, HbaseClusterStatus, HbaseConfig,
+    HbaseConfigFragment, HbaseRole, APP_NAME, CONFIG_DIR_NAME, HBASE_ENV_SH, HBASE_HEAPSIZE,
+    HBASE_MANAGES_ZK, HBASE_MASTER_OPTS, HBASE_REGIONSERVER_OPTS, HBASE_REST_OPTS,
+    HBASE_REST_PORT_NAME_HTTP, HBASE_REST_PORT_NAME_HTTPS, HBASE_SITE_XML, JVM_HEAP_FACTOR,
+    JVM_SECURITY_PROPERTIES_FILE, SSL_CLIENT_XML, SSL_SERVER_XML,
 };
 use stackable_operator::{
     builder::{
@@ -65,7 +66,7 @@ use stackable_operator::{
     time::Duration,
     utils::COMMON_BASH_TRAP_FUNCTIONS,
 };
-use strum::{EnumDiscriminants, IntoStaticStr};
+use strum::{EnumDiscriminants, IntoStaticStr, ParseError};
 
 use crate::product_logging::STACKABLE_LOG_DIR;
 use crate::security::opa::HbaseOpaConfig;
@@ -283,6 +284,9 @@ pub enum Error {
 
     #[snafu(display("invalid OPA configuration"))]
     InvalidOpaConfig { source: security::opa::Error },
+
+    #[snafu(display("unknown role [{role}]"))]
+    UnknownHbaseRole { source: ParseError, role: String },
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -479,7 +483,7 @@ pub fn build_region_server_role_service(
         .server_role_service_name()
         .context(GlobalServiceNameNotFoundSnafu)?;
     let ports = hbase
-        .ports(&role)
+        .ports(&role, &resolved_product_image.product_version)
         .into_iter()
         .map(|(name, value)| ServicePort {
             name: Some(name),
@@ -537,6 +541,11 @@ fn build_rolegroup_config_map(
     let mut ssl_server_xml = String::new();
     let mut ssl_client_xml = String::new();
 
+    let role =
+        HbaseRole::from_str(rolegroup.role.as_ref()).with_context(|_| UnknownHbaseRoleSnafu {
+            role: rolegroup.role.clone(),
+        })?;
+
     for (property_name_kind, config) in rolegroup_config {
         match property_name_kind {
             PropertyNameKind::File(file_name) if file_name == HBASE_SITE_XML => {
@@ -558,26 +567,11 @@ fn build_rolegroup_config_map(
                 );
             }
             PropertyNameKind::File(file_name) if file_name == HBASE_ENV_SH => {
-                let mut hbase_env_config = BTreeMap::new();
-
-                let memory_limit = MemoryQuantity::try_from(
-                    hbase_config
-                        .resources
-                        .memory
-                        .limit
-                        .as_ref()
-                        .context(InvalidJavaHeapConfigSnafu)?,
-                )
-                .context(FailedToConvertJavaHeapSnafu {
-                    unit: BinaryMultiple::Mebi.to_java_memory_unit(),
-                })?;
-                let heap_in_mebi = (memory_limit * JVM_HEAP_FACTOR)
-                    .scale_to(BinaryMultiple::Mebi)
-                    .format_for_java()
-                    .context(FailedToConvertJavaHeapSnafu {
-                        unit: BinaryMultiple::Mebi.to_java_memory_unit(),
-                    })?;
-                hbase_env_config.insert(HBASE_HEAPSIZE.to_string(), heap_in_mebi);
+                let mut hbase_env_config = build_hbase_env_sh(
+                    hbase_config,
+                    &role,
+                    resolved_product_image.product_version.as_ref(),
+                )?;
 
                 // configOverride come last
                 hbase_env_config.extend(config.clone());
@@ -688,7 +682,7 @@ fn build_rolegroup_service(
     resolved_product_image: &ResolvedProductImage,
 ) -> Result<Service> {
     let ports = hbase
-        .ports(hbase_role)
+        .ports(hbase_role, &resolved_product_image.product_version)
         .into_iter()
         .map(|(name, value)| ServicePort {
             name: Some(name),
@@ -754,7 +748,7 @@ fn build_rolegroup_statefulset(
     let role_group = role.and_then(|r| r.role_groups.get(&rolegroup_ref.role_group));
 
     let ports = hbase
-        .ports(hbase_role)
+        .ports(hbase_role, &resolved_product_image.product_version)
         .into_iter()
         .map(|(name, value)| ContainerPort {
             name: Some(name),
@@ -1087,4 +1081,60 @@ pub fn build_recommended_labels<'a>(
         role,
         role_group,
     }
+}
+
+/// The content of the HBase `hbase-env.sh` file.
+fn build_hbase_env_sh(
+    hbase_config: &HbaseConfig,
+    role: &HbaseRole,
+    hbase_version: &str,
+) -> Result<BTreeMap<String, String>, Error> {
+    let mut result = BTreeMap::new();
+
+    result.insert(HBASE_MANAGES_ZK.to_string(), "false".to_string());
+
+    // We always enable `-Djava.security.krb5.conf` even if it's not used.
+    let all_hbase_opts = [
+        format!("-Djava.security.properties={CONFIG_DIR_NAME}/{JVM_SECURITY_PROPERTIES_FILE}"),
+        String::from("-Djava.security.krb5.conf=/stackable/kerberos/krb5.conf"),
+    ]
+    .iter()
+    .chain(jmx_system_properties(role, hbase_version).as_slice()) // Add the JMX options
+    .chain(hbase_config.hbase_opts.as_slice()) // Add the user defined options
+    .cloned()
+    .collect::<Vec<String>>()
+    .join(" ");
+
+    match role {
+        HbaseRole::Master => {
+            result.insert(HBASE_MASTER_OPTS.to_string(), all_hbase_opts);
+        }
+        HbaseRole::RegionServer => {
+            result.insert(HBASE_REGIONSERVER_OPTS.to_string(), all_hbase_opts);
+        }
+        HbaseRole::RestServer => {
+            result.insert(HBASE_REST_OPTS.to_string(), all_hbase_opts);
+        }
+    }
+
+    let memory_limit = MemoryQuantity::try_from(
+        hbase_config
+            .resources
+            .memory
+            .limit
+            .as_ref()
+            .context(InvalidJavaHeapConfigSnafu)?,
+    )
+    .context(FailedToConvertJavaHeapSnafu {
+        unit: BinaryMultiple::Mebi.to_java_memory_unit(),
+    })?;
+    let heap_in_mebi = (memory_limit * JVM_HEAP_FACTOR)
+        .scale_to(BinaryMultiple::Mebi)
+        .format_for_java()
+        .context(FailedToConvertJavaHeapSnafu {
+            unit: BinaryMultiple::Mebi.to_java_memory_unit(),
+        })?;
+    result.insert(HBASE_HEAPSIZE.to_string(), heap_in_mebi);
+
+    Ok(result)
 }
