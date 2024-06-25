@@ -1138,3 +1138,82 @@ fn build_hbase_env_sh(
 
     Ok(result)
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use rstest::rstest;
+    use stackable_operator::kube::runtime::reflector::ObjectRef;
+
+    #[rstest]
+    #[case("2.6.0", HbaseRole::Master, vec!["master", "ui-http"])]
+    #[case("2.6.0", HbaseRole::RegionServer, vec!["regionserver", "ui-http"])]
+    #[case("2.6.0", HbaseRole::RestServer, vec!["rest-http", "ui-http"])]
+    #[case("2.4.14", HbaseRole::Master, vec!["master", "ui-http", "metrics"])]
+    #[case("2.4.14", HbaseRole::RegionServer, vec!["regionserver", "ui-http", "metrics"])]
+    #[case("2.4.14", HbaseRole::RestServer, vec!["rest-http", "ui-http", "metrics"])]
+    fn test_rolegroup_service_ports(
+        #[case] hbase_version: &str,
+        #[case] role: HbaseRole,
+        #[case] expected_ports: Vec<&str>,
+    ) {
+        let input = format!(
+            "
+        apiVersion: hbase.stackable.tech/v1alpha1
+        kind: HbaseCluster
+        metadata:
+          name: {hbase_version}
+          uid: c2e98fc1-6b88-4d11-9381-52530e3f431e
+        spec:
+          image:
+            productVersion: 2.6.0
+          clusterConfig:
+            hdfsConfigMapName: simple-hdfs
+            zookeeperConfigMapName: simple-znode
+          masters:
+            roleGroups:
+              default:
+                replicas: 1
+          regionServers:
+            roleGroups:
+              default:
+                replicas: 1
+          restServers:
+            roleGroups:
+              default:
+                replicas: 1
+        "
+        );
+        let hbase: HbaseCluster = serde_yaml::from_str(&input).expect("illegal test input");
+
+        let resolved_image = ResolvedProductImage {
+            image: format!(
+                "docker.stackable.tech/stackable/hbase:{hbase_version}-stackable0.0.0-dev"
+            ),
+            app_version_label: hbase_version.to_string(),
+            product_version: hbase_version.to_string(),
+            image_pull_policy: "Never".to_string(),
+            pull_secrets: None,
+        };
+
+        let role_group_ref = RoleGroupRef {
+            cluster: ObjectRef::<HbaseCluster>::from_obj(&hbase),
+            role: role.to_string(),
+            role_group: "default".to_string(),
+        };
+        let service = build_rolegroup_service(&hbase, &role, &role_group_ref, &resolved_image)
+            .expect("failed to build service");
+
+        assert_eq!(
+            expected_ports,
+            service
+                .spec
+                .unwrap()
+                .ports
+                .unwrap()
+                .iter()
+                .map(|port| { port.clone().name.unwrap() })
+                .collect::<Vec<String>>()
+        );
+    }
+}

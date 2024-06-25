@@ -161,5 +161,5 @@ fn log4j_config(hbase_version: &str, log_config: &AutomaticContainerLogConfig) -
 
 // HBase 2.6 moved from log4j to log4j2
 fn needs_log4j2(hbase_version: &str) -> bool {
-    !hbase_version.starts_with(r"2\.14")
+    !hbase_version.starts_with(r"2.4")
 }

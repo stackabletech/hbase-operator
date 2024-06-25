@@ -574,23 +574,18 @@ impl HbaseCluster {
     }
 
     /// Returns required port name and port number tuples depending on the role.
+    /// Hbase versions 2.4.* will have three ports for each role
+    /// Hbase versions 2.6.* will have two ports for each role. The metrics are available over the
+    /// UI port.
     pub fn ports(&self, role: &HbaseRole, hbase_version: &str) -> Vec<(String, u16)> {
-        match role {
+        let result_without_metric_port: Vec<(String, u16)> = match role {
             HbaseRole::Master => vec![
                 ("master".to_string(), HBASE_MASTER_PORT),
                 (self.ui_port_name(), HBASE_MASTER_UI_PORT),
-                (
-                    METRICS_PORT_NAME.to_string(),
-                    metrics_port(role, hbase_version),
-                ),
             ],
             HbaseRole::RegionServer => vec![
                 ("regionserver".to_string(), HBASE_REGIONSERVER_PORT),
                 (self.ui_port_name(), HBASE_REGIONSERVER_UI_PORT),
-                (
-                    METRICS_PORT_NAME.to_string(),
-                    metrics_port(role, hbase_version),
-                ),
             ],
             HbaseRole::RestServer => vec![
                 (
@@ -603,11 +598,15 @@ impl HbaseCluster {
                     HBASE_REST_PORT,
                 ),
                 (self.ui_port_name(), HBASE_REST_UI_PORT),
-                (
-                    METRICS_PORT_NAME.to_string(),
-                    metrics_port(role, hbase_version),
-                ),
             ],
+        };
+        if hbase_version.starts_with(r"2.4") {
+            result_without_metric_port
+                .into_iter()
+                .chain(vec![(METRICS_PORT_NAME.to_string(), METRICS_PORT)])
+                .collect()
+        } else {
+            result_without_metric_port
         }
     }
 
@@ -658,31 +657,13 @@ impl HbaseCluster {
     }
 }
 
-/// The metrics port depends on the HBase version and the pod's role.
-/// Hbase versions prior to 2.6 use a third party prometheus/jmx exporter that can be queried on
-/// port METRICS_PORT.
-/// Later HBase versions provide their own metrics API available on the same port as the user
-/// interface.
-fn metrics_port(role: &HbaseRole, hbase_version: &str) -> u16 {
-    if hbase_version.starts_with(r"2\.14") {
-        METRICS_PORT
-    } else {
-        match role {
-            HbaseRole::Master => HBASE_MASTER_UI_PORT,
-            HbaseRole::RegionServer => HBASE_REGIONSERVER_UI_PORT,
-            HbaseRole::RestServer => HBASE_REST_UI_PORT,
-        }
-    }
-}
-
 /// Return the JVM system properties for the JMX exporter.
 /// Starting with HBase 2.6 these are not needed anymore
 pub fn jmx_system_properties(role: &HbaseRole, hbase_version: &str) -> Option<String> {
-    if hbase_version.starts_with(r"2\.14") {
-        let metrics_port = metrics_port(role, hbase_version);
+    if hbase_version.starts_with(r"2.4") {
         let role_name = role.to_string();
 
-        Some(format!("-javaagent:/stackable/jmx/jmx_prometheus_javaagent.jar={metrics_port}:/stackable/jmx/{role_name}.yaml"))
+        Some(format!("-javaagent:/stackable/jmx/jmx_prometheus_javaagent.jar={METRICS_PORT}:/stackable/jmx/{role_name}.yaml"))
     } else {
         None
     }
