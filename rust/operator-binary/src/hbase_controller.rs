@@ -1162,11 +1162,11 @@ mod test {
         apiVersion: hbase.stackable.tech/v1alpha1
         kind: HbaseCluster
         metadata:
-          name: {hbase_version}
+          name: hbase
           uid: c2e98fc1-6b88-4d11-9381-52530e3f431e
         spec:
           image:
-            productVersion: 2.6.0
+            productVersion: {hbase_version}
           clusterConfig:
             hdfsConfigMapName: simple-hdfs
             zookeeperConfigMapName: simple-znode
