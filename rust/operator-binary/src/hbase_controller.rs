@@ -18,7 +18,7 @@ use stackable_hbase_crd::{
     HbaseConfigFragment, HbaseRole, APP_NAME, CONFIG_DIR_NAME, HBASE_ENV_SH, HBASE_HEAPSIZE,
     HBASE_MANAGES_ZK, HBASE_MASTER_OPTS, HBASE_REGIONSERVER_OPTS, HBASE_REST_OPTS,
     HBASE_REST_PORT_NAME_HTTP, HBASE_REST_PORT_NAME_HTTPS, HBASE_SITE_XML, JVM_HEAP_FACTOR,
-    JVM_SECURITY_PROPERTIES_FILE, METRICS_PORT_NAME, SSL_CLIENT_XML, SSL_SERVER_XML,
+    JVM_SECURITY_PROPERTIES_FILE, SSL_CLIENT_XML, SSL_SERVER_XML,
 };
 use stackable_operator::{
     builder::{
@@ -485,9 +485,6 @@ pub fn build_region_server_role_service(
     let ports = hbase
         .ports(&role, &resolved_product_image.product_version)
         .into_iter()
-        .filter(|(name, _)| {
-            resolved_product_image.product_version.starts_with(r"2\.6") && name != METRICS_PORT_NAME
-        }) // TODO: temp hack, ignore the metrics port
         .map(|(name, value)| ServicePort {
             name: Some(name),
             port: i32::from(value),
@@ -687,9 +684,6 @@ fn build_rolegroup_service(
     let ports = hbase
         .ports(hbase_role, &resolved_product_image.product_version)
         .into_iter()
-        .filter(|(name, _)| {
-            resolved_product_image.product_version.starts_with(r"2\.6") && name != METRICS_PORT_NAME
-        }) // TODO: temp hack, ignore the metrics port
         .map(|(name, value)| ServicePort {
             name: Some(name),
             port: i32::from(value),
