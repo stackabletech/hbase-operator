@@ -656,15 +656,3 @@ impl HbaseCluster {
         fragment::validate(conf_rolegroup).context(FragmentValidationFailureSnafu)
     }
 }
-
-/// Return the JVM system properties for the JMX exporter.
-/// Starting with HBase 2.6 these are not needed anymore
-pub fn jmx_system_properties(role: &HbaseRole, hbase_version: &str) -> Option<String> {
-    if hbase_version.starts_with(r"2.4") {
-        let role_name = role.to_string();
-
-        Some(format!("-javaagent:/stackable/jmx/jmx_prometheus_javaagent.jar={METRICS_PORT}:/stackable/jmx/{role_name}.yaml"))
-    } else {
-        None
-    }
-}

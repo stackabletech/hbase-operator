@@ -14,11 +14,11 @@ use product_config::{
 };
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_hbase_crd::{
-    jmx_system_properties, Container, HbaseCluster, HbaseClusterStatus, HbaseConfig,
-    HbaseConfigFragment, HbaseRole, APP_NAME, CONFIG_DIR_NAME, HBASE_ENV_SH, HBASE_HEAPSIZE,
-    HBASE_MANAGES_ZK, HBASE_MASTER_OPTS, HBASE_REGIONSERVER_OPTS, HBASE_REST_OPTS,
-    HBASE_REST_PORT_NAME_HTTP, HBASE_REST_PORT_NAME_HTTPS, HBASE_SITE_XML, JVM_HEAP_FACTOR,
-    JVM_SECURITY_PROPERTIES_FILE, SSL_CLIENT_XML, SSL_SERVER_XML,
+    Container, HbaseCluster, HbaseClusterStatus, HbaseConfig, HbaseConfigFragment, HbaseRole,
+    APP_NAME, CONFIG_DIR_NAME, HBASE_ENV_SH, HBASE_HEAPSIZE, HBASE_MANAGES_ZK, HBASE_MASTER_OPTS,
+    HBASE_REGIONSERVER_OPTS, HBASE_REST_OPTS, HBASE_REST_PORT_NAME_HTTP,
+    HBASE_REST_PORT_NAME_HTTPS, HBASE_SITE_XML, JVM_HEAP_FACTOR, JVM_SECURITY_PROPERTIES_FILE,
+    METRICS_PORT, SSL_CLIENT_XML, SSL_SERVER_XML,
 };
 use stackable_operator::{
     builder::{
@@ -1137,6 +1137,18 @@ fn build_hbase_env_sh(
     result.insert(HBASE_HEAPSIZE.to_string(), heap_in_mebi);
 
     Ok(result)
+}
+
+/// Return the JVM system properties for the JMX exporter.
+/// Starting with HBase 2.6 these are not needed anymore
+fn jmx_system_properties(role: &HbaseRole, hbase_version: &str) -> Option<String> {
+    if hbase_version.starts_with(r"2.4") {
+        let role_name = role.to_string();
+
+        Some(format!("-javaagent:/stackable/jmx/jmx_prometheus_javaagent.jar={METRICS_PORT}:/stackable/jmx/{role_name}.yaml"))
+    } else {
+        None
+    }
 }
 
 #[cfg(test)]
