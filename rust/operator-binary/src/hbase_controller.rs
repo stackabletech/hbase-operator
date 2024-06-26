@@ -13,13 +13,6 @@ use product_config::{
     ProductConfigManager,
 };
 use snafu::{OptionExt, ResultExt, Snafu};
-use stackable_hbase_crd::{
-    Container, HbaseCluster, HbaseClusterStatus, HbaseConfig, HbaseConfigFragment, HbaseRole,
-    APP_NAME, CONFIG_DIR_NAME, HBASE_ENV_SH, HBASE_HEAPSIZE, HBASE_MANAGES_ZK, HBASE_MASTER_OPTS,
-    HBASE_REGIONSERVER_OPTS, HBASE_REST_OPTS, HBASE_REST_PORT_NAME_HTTP,
-    HBASE_REST_PORT_NAME_HTTPS, HBASE_SITE_XML, JVM_HEAP_FACTOR, JVM_SECURITY_PROPERTIES_FILE,
-    METRICS_PORT, SSL_CLIENT_XML, SSL_SERVER_XML,
-};
 use stackable_operator::{
     builder::{
         configmap::ConfigMapBuilder,
@@ -67,6 +60,14 @@ use stackable_operator::{
     utils::COMMON_BASH_TRAP_FUNCTIONS,
 };
 use strum::{EnumDiscriminants, IntoStaticStr, ParseError};
+
+use stackable_hbase_crd::{
+    Container, HbaseCluster, HbaseClusterStatus, HbaseConfig, HbaseConfigFragment, HbaseRole,
+    APP_NAME, CONFIG_DIR_NAME, HBASE_ENV_SH, HBASE_HEAPSIZE, HBASE_MANAGES_ZK, HBASE_MASTER_OPTS,
+    HBASE_REGIONSERVER_OPTS, HBASE_REST_OPTS, HBASE_REST_PORT_NAME_HTTP,
+    HBASE_REST_PORT_NAME_HTTPS, HBASE_SITE_XML, JVM_HEAP_FACTOR, JVM_SECURITY_PROPERTIES_FILE,
+    METRICS_PORT, SSL_CLIENT_XML, SSL_SERVER_XML,
+};
 
 use crate::product_logging::STACKABLE_LOG_DIR;
 use crate::security::opa::HbaseOpaConfig;
@@ -287,6 +288,9 @@ pub enum Error {
 
     #[snafu(display("unknown role [{role}]"))]
     UnknownHbaseRole { source: ParseError, role: String },
+
+    #[snafu(display("authorization is only supported from HBase 2.6 onwards"))]
+    AuthorizationNotSupported,
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -301,6 +305,8 @@ pub async fn reconcile_hbase(hbase: Arc<HbaseCluster>, ctx: Arc<Ctx>) -> Result<
     tracing::info!("Starting reconcile");
 
     let client = &ctx.client;
+
+    validate_cr(&hbase)?;
 
     let resolved_product_image = hbase
         .spec
@@ -1151,11 +1157,30 @@ fn jmx_system_properties(role: &HbaseRole, hbase_version: &str) -> Option<String
     }
 }
 
+/// Ensures that no authorization is configured for HBase versions that do not support it.
+/// In the future, such validations should be moved to the CRD CEL rules which are much more flexible
+/// and have to added benefit that invalid CRs are rejected by the API server.
+/// A requirement for this is that the minimum supported Kubernetes version is 1.29.
+fn validate_cr(hbase: &HbaseCluster) -> Result<()> {
+    tracing::info!("Begin CR validation");
+
+    let hbase_version = hbase.spec.image.product_version();
+    let authorization = hbase.spec.cluster_config.authorization.is_some();
+
+    if hbase_version.starts_with("2.4") && authorization {
+        tracing::error!("Invalid custom resource");
+        return Err(Error::AuthorizationNotSupported);
+    }
+    tracing::info!("End CR validation");
+    Ok(())
+}
+
 #[cfg(test)]
 mod test {
-    use super::*;
     use rstest::rstest;
     use stackable_operator::kube::runtime::reflector::ObjectRef;
+
+    use super::*;
 
     #[rstest]
     #[case("2.6.0", HbaseRole::Master, vec!["master", "ui-http"])]

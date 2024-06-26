@@ -24,7 +24,7 @@ spec:
           properties:
             spec:
               description: |-
-                An HBase cluster stacklet. This resource is managed by the Stackable operator for Apache HBase. Find more information on how to use it and the resources that the operator generates in the [operator documentation](https://docs.stackable.tech/home/nightly/hbase/).
+                An HBase cluster stacklet. This resource is managed by the Stackable operator for Apache HBase. Find more information on how to use it and the resources that the operator generates in the [operator documentation](https://docs.stackable.tech/home/0.0/hbase/).
 
                 The CRD contains three roles: `masters`, `regionServers` and `restServers`.
               properties:
@@ -32,7 +32,7 @@ spec:
                   description: Configuration that applies to all roles and role groups. This includes settings for logging, ZooKeeper and HDFS connection, among other things.
                   properties:
                     authentication:
-                      description: Settings related to user [authentication](https://docs.stackable.tech/home/nightly/usage-guide/security).
+                      description: Settings related to user [authentication](https://docs.stackable.tech/home/0.0/usage-guide/security).
                       nullable: true
                       properties:
                         kerberos:
@@ -55,10 +55,10 @@ spec:
                       nullable: true
                       properties:
                         opa:
-                          description: Configure the OPA stacklet [discovery ConfigMap](https://docs.stackable.tech/home/nightly/concepts/service_discovery) and the name of the Rego package containing your authorization rules. Consult the [OPA authorization documentation](https://docs.stackable.tech/home/nightly/concepts/opa) to learn how to deploy Rego authorization rules with OPA.
+                          description: Configure the OPA stacklet [discovery ConfigMap](https://docs.stackable.tech/home/0.0/concepts/service_discovery) and the name of the Rego package containing your authorization rules. Consult the [OPA authorization documentation](https://docs.stackable.tech/home/0.0/concepts/opa) to learn how to deploy Rego authorization rules with OPA.
                           properties:
                             configMapName:
-                              description: The [discovery ConfigMap](https://docs.stackable.tech/home/nightly/concepts/service_discovery) for the OPA stacklet that should be used for authorization requests.
+                              description: The [discovery ConfigMap](https://docs.stackable.tech/home/0.0/concepts/service_discovery) for the OPA stacklet that should be used for authorization requests.
                               type: string
                             package:
                               description: The name of the Rego package containing the Rego rules for the product.
@@ -71,7 +71,7 @@ spec:
                         - opa
                       type: object
                     hdfsConfigMapName:
-                      description: Name of the [discovery ConfigMap](https://docs.stackable.tech/home/nightly/concepts/service_discovery) for an HDFS cluster.
+                      description: Name of the [discovery ConfigMap](https://docs.stackable.tech/home/0.0/concepts/service_discovery) for an HDFS cluster.
                       type: string
                     listenerClass:
                       default: cluster-internal
@@ -82,17 +82,17 @@ spec:
 
                         * external-unstable: Use a NodePort service
 
-                        This is a temporary solution with the goal to keep yaml manifests forward compatible. In the future, this setting will control which [ListenerClass](https://docs.stackable.tech/home/nightly/listener-operator/listenerclass.html) will be used to expose the service, and ListenerClass names will stay the same, allowing for a non-breaking change.
+                        This is a temporary solution with the goal to keep yaml manifests forward compatible. In the future, this setting will control which [ListenerClass](https://docs.stackable.tech/home/0.0/listener-operator/listenerclass.html) will be used to expose the service, and ListenerClass names will stay the same, allowing for a non-breaking change.
                       enum:
                         - cluster-internal
                         - external-unstable
                       type: string
                     vectorAggregatorConfigMapName:
-                      description: Name of the Vector aggregator [discovery ConfigMap](https://docs.stackable.tech/home/nightly/concepts/service_discovery). It must contain the key `ADDRESS` with the address of the Vector aggregator. Follow the [logging tutorial](https://docs.stackable.tech/home/nightly/tutorials/logging-vector-aggregator) to learn how to configure log aggregation with Vector.
+                      description: Name of the Vector aggregator [discovery ConfigMap](https://docs.stackable.tech/home/0.0/concepts/service_discovery). It must contain the key `ADDRESS` with the address of the Vector aggregator. Follow the [logging tutorial](https://docs.stackable.tech/home/0.0/tutorials/logging-vector-aggregator) to learn how to configure log aggregation with Vector.
                       nullable: true
                       type: string
                     zookeeperConfigMapName:
-                      description: Name of the [discovery ConfigMap](https://docs.stackable.tech/home/nightly/concepts/service_discovery) for a ZooKeeper cluster.
+                      description: Name of the [discovery ConfigMap](https://docs.stackable.tech/home/0.0/concepts/service_discovery) for a ZooKeeper cluster.
                       type: string
                   required:
                     - hdfsConfigMapName
@@ -102,7 +102,7 @@ spec:
                   default:
                     reconciliationPaused: false
                     stopped: false
-                  description: '[Cluster operations](https://docs.stackable.tech/home/nightly/concepts/operations/cluster_operations) properties, allow stopping the product instance as well as pausing reconciliation.'
+                  description: '[Cluster operations](https://docs.stackable.tech/home/0.0/concepts/operations/cluster_operations) properties, allow stopping the product instance as well as pausing reconciliation.'
                   properties:
                     reconciliationPaused:
                       default: false
@@ -123,7 +123,7 @@ spec:
                   description: |-
                     Specify which image to use, the easiest way is to only configure the `productVersion`. You can also configure a custom image registry to pull from, as well as completely custom images.
 
-                    Consult the [Product image selection documentation](https://docs.stackable.tech/home/nightly/concepts/product_image_selection) for details.
+                    Consult the [Product image selection documentation](https://docs.stackable.tech/home/0.0/concepts/product_image_selection) for details.
                   properties:
                     custom:
                       description: Overwrite the docker image. Specify the full docker image name, e.g. `docker.stackable.tech/stackable/superset:1.4.1-stackable2.1.0`
@@ -177,7 +177,7 @@ spec:
                             nodeSelector: null
                             podAffinity: null
                             podAntiAffinity: null
-                          description: These configuration settings control [Pod placement](https://docs.stackable.tech/home/nightly/concepts/operations/pod_placement).
+                          description: These configuration settings control [Pod placement](https://docs.stackable.tech/home/0.0/concepts/operations/pod_placement).
                           properties:
                             nodeAffinity:
                               description: Node affinity is a group of node affinity scheduling rules.
@@ -699,7 +699,7 @@ spec:
                           default:
                             containers: {}
                             enableVectorAgent: null
-                          description: Logging configuration, learn more in the [logging concept documentation](https://docs.stackable.tech/home/nightly/concepts/logging).
+                          description: Logging configuration, learn more in the [logging concept documentation](https://docs.stackable.tech/home/0.0/concepts/logging).
                           properties:
                             containers:
                               additionalProperties:
@@ -824,17 +824,17 @@ spec:
                           type: string
                         type: object
                       default: {}
-                      description: The `configOverrides` can be used to configure properties in product config files that are not exposed in the CRD. Read the [config overrides documentation](https://docs.stackable.tech/home/nightly/concepts/overrides#config-overrides) and consult the operator specific usage guide documentation for details on the available config files and settings for the specific product.
+                      description: The `configOverrides` can be used to configure properties in product config files that are not exposed in the CRD. Read the [config overrides documentation](https://docs.stackable.tech/home/0.0/concepts/overrides#config-overrides) and consult the operator specific usage guide documentation for details on the available config files and settings for the specific product.
                       type: object
                     envOverrides:
                       additionalProperties:
                         type: string
                       default: {}
-                      description: '`envOverrides` configure environment variables to be set in the Pods. It is a map from strings to strings - environment variables and the value to set. Read the [environment variable overrides documentation](https://docs.stackable.tech/home/nightly/concepts/overrides#env-overrides) for more information and consult the operator specific usage guide to find out about the product specific environment variables that are available.'
+                      description: '`envOverrides` configure environment variables to be set in the Pods. It is a map from strings to strings - environment variables and the value to set. Read the [environment variable overrides documentation](https://docs.stackable.tech/home/0.0/concepts/overrides#env-overrides) for more information and consult the operator specific usage guide to find out about the product specific environment variables that are available.'
                       type: object
                     podOverrides:
                       default: {}
-                      description: In the `podOverrides` property you can define a [PodTemplateSpec](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#podtemplatespec-v1-core) to override any property that can be set on a Kubernetes Pod. Read the [Pod overrides documentation](https://docs.stackable.tech/home/nightly/concepts/overrides#pod-overrides) for more information.
+                      description: In the `podOverrides` property you can define a [PodTemplateSpec](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#podtemplatespec-v1-core) to override any property that can be set on a Kubernetes Pod. Read the [Pod overrides documentation](https://docs.stackable.tech/home/0.0/concepts/overrides#pod-overrides) for more information.
                       properties:
                         metadata:
                           properties:
@@ -3744,7 +3744,7 @@ spec:
 
                             1. If PodDisruptionBudgets are created by the operator 2. The allowed number of Pods to be unavailable (`maxUnavailable`)
 
-                            Learn more in the [allowed Pod disruptions documentation](https://docs.stackable.tech/home/nightly/concepts/operations/pod_disruptions).
+                            Learn more in the [allowed Pod disruptions documentation](https://docs.stackable.tech/home/0.0/concepts/operations/pod_disruptions).
                           properties:
                             enabled:
                               default: true
@@ -3775,7 +3775,7 @@ spec:
                                   nodeSelector: null
                                   podAffinity: null
                                   podAntiAffinity: null
-                                description: These configuration settings control [Pod placement](https://docs.stackable.tech/home/nightly/concepts/operations/pod_placement).
+                                description: These configuration settings control [Pod placement](https://docs.stackable.tech/home/0.0/concepts/operations/pod_placement).
                                 properties:
                                   nodeAffinity:
                                     description: Node affinity is a group of node affinity scheduling rules.
@@ -4297,7 +4297,7 @@ spec:
                                 default:
                                   containers: {}
                                   enableVectorAgent: null
-                                description: Logging configuration, learn more in the [logging concept documentation](https://docs.stackable.tech/home/nightly/concepts/logging).
+                                description: Logging configuration, learn more in the [logging concept documentation](https://docs.stackable.tech/home/0.0/concepts/logging).
                                 properties:
                                   containers:
                                     additionalProperties:
@@ -4422,17 +4422,17 @@ spec:
                                 type: string
                               type: object
                             default: {}
-                            description: The `configOverrides` can be used to configure properties in product config files that are not exposed in the CRD. Read the [config overrides documentation](https://docs.stackable.tech/home/nightly/concepts/overrides#config-overrides) and consult the operator specific usage guide documentation for details on the available config files and settings for the specific product.
+                            description: The `configOverrides` can be used to configure properties in product config files that are not exposed in the CRD. Read the [config overrides documentation](https://docs.stackable.tech/home/0.0/concepts/overrides#config-overrides) and consult the operator specific usage guide documentation for details on the available config files and settings for the specific product.
                             type: object
                           envOverrides:
                             additionalProperties:
                               type: string
                             default: {}
-                            description: '`envOverrides` configure environment variables to be set in the Pods. It is a map from strings to strings - environment variables and the value to set. Read the [environment variable overrides documentation](https://docs.stackable.tech/home/nightly/concepts/overrides#env-overrides) for more information and consult the operator specific usage guide to find out about the product specific environment variables that are available.'
+                            description: '`envOverrides` configure environment variables to be set in the Pods. It is a map from strings to strings - environment variables and the value to set. Read the [environment variable overrides documentation](https://docs.stackable.tech/home/0.0/concepts/overrides#env-overrides) for more information and consult the operator specific usage guide to find out about the product specific environment variables that are available.'
                             type: object
                           podOverrides:
                             default: {}
-                            description: In the `podOverrides` property you can define a [PodTemplateSpec](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#podtemplatespec-v1-core) to override any property that can be set on a Kubernetes Pod. Read the [Pod overrides documentation](https://docs.stackable.tech/home/nightly/concepts/overrides#pod-overrides) for more information.
+                            description: In the `podOverrides` property you can define a [PodTemplateSpec](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#podtemplatespec-v1-core) to override any property that can be set on a Kubernetes Pod. Read the [Pod overrides documentation](https://docs.stackable.tech/home/0.0/concepts/overrides#pod-overrides) for more information.
                             properties:
                               metadata:
                                 properties:
@@ -7354,7 +7354,7 @@ spec:
                             nodeSelector: null
                             podAffinity: null
                             podAntiAffinity: null
-                          description: These configuration settings control [Pod placement](https://docs.stackable.tech/home/nightly/concepts/operations/pod_placement).
+                          description: These configuration settings control [Pod placement](https://docs.stackable.tech/home/0.0/concepts/operations/pod_placement).
                           properties:
                             nodeAffinity:
                               description: Node affinity is a group of node affinity scheduling rules.
@@ -7876,7 +7876,7 @@ spec:
                           default:
                             containers: {}
                             enableVectorAgent: null
-                          description: Logging configuration, learn more in the [logging concept documentation](https://docs.stackable.tech/home/nightly/concepts/logging).
+                          description: Logging configuration, learn more in the [logging concept documentation](https://docs.stackable.tech/home/0.0/concepts/logging).
                           properties:
                             containers:
                               additionalProperties:
@@ -8001,17 +8001,17 @@ spec:
                           type: string
                         type: object
                       default: {}
-                      description: The `configOverrides` can be used to configure properties in product config files that are not exposed in the CRD. Read the [config overrides documentation](https://docs.stackable.tech/home/nightly/concepts/overrides#config-overrides) and consult the operator specific usage guide documentation for details on the available config files and settings for the specific product.
+                      description: The `configOverrides` can be used to configure properties in product config files that are not exposed in the CRD. Read the [config overrides documentation](https://docs.stackable.tech/home/0.0/concepts/overrides#config-overrides) and consult the operator specific usage guide documentation for details on the available config files and settings for the specific product.
                       type: object
                     envOverrides:
                       additionalProperties:
                         type: string
                       default: {}
-                      description: '`envOverrides` configure environment variables to be set in the Pods. It is a map from strings to strings - environment variables and the value to set. Read the [environment variable overrides documentation](https://docs.stackable.tech/home/nightly/concepts/overrides#env-overrides) for more information and consult the operator specific usage guide to find out about the product specific environment variables that are available.'
+                      description: '`envOverrides` configure environment variables to be set in the Pods. It is a map from strings to strings - environment variables and the value to set. Read the [environment variable overrides documentation](https://docs.stackable.tech/home/0.0/concepts/overrides#env-overrides) for more information and consult the operator specific usage guide to find out about the product specific environment variables that are available.'
                       type: object
                     podOverrides:
                       default: {}
-                      description: In the `podOverrides` property you can define a [PodTemplateSpec](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#podtemplatespec-v1-core) to override any property that can be set on a Kubernetes Pod. Read the [Pod overrides documentation](https://docs.stackable.tech/home/nightly/concepts/overrides#pod-overrides) for more information.
+                      description: In the `podOverrides` property you can define a [PodTemplateSpec](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#podtemplatespec-v1-core) to override any property that can be set on a Kubernetes Pod. Read the [Pod overrides documentation](https://docs.stackable.tech/home/0.0/concepts/overrides#pod-overrides) for more information.
                       properties:
                         metadata:
                           properties:
@@ -10921,7 +10921,7 @@ spec:
 
                             1. If PodDisruptionBudgets are created by the operator 2. The allowed number of Pods to be unavailable (`maxUnavailable`)
 
-                            Learn more in the [allowed Pod disruptions documentation](https://docs.stackable.tech/home/nightly/concepts/operations/pod_disruptions).
+                            Learn more in the [allowed Pod disruptions documentation](https://docs.stackable.tech/home/0.0/concepts/operations/pod_disruptions).
                           properties:
                             enabled:
                               default: true
@@ -10952,7 +10952,7 @@ spec:
                                   nodeSelector: null
                                   podAffinity: null
                                   podAntiAffinity: null
-                                description: These configuration settings control [Pod placement](https://docs.stackable.tech/home/nightly/concepts/operations/pod_placement).
+                                description: These configuration settings control [Pod placement](https://docs.stackable.tech/home/0.0/concepts/operations/pod_placement).
                                 properties:
                                   nodeAffinity:
                                     description: Node affinity is a group of node affinity scheduling rules.
@@ -11474,7 +11474,7 @@ spec:
                                 default:
                                   containers: {}
                                   enableVectorAgent: null
-                                description: Logging configuration, learn more in the [logging concept documentation](https://docs.stackable.tech/home/nightly/concepts/logging).
+                                description: Logging configuration, learn more in the [logging concept documentation](https://docs.stackable.tech/home/0.0/concepts/logging).
                                 properties:
                                   containers:
                                     additionalProperties:
@@ -11599,17 +11599,17 @@ spec:
                                 type: string
                               type: object
                             default: {}
-                            description: The `configOverrides` can be used to configure properties in product config files that are not exposed in the CRD. Read the [config overrides documentation](https://docs.stackable.tech/home/nightly/concepts/overrides#config-overrides) and consult the operator specific usage guide documentation for details on the available config files and settings for the specific product.
+                            description: The `configOverrides` can be used to configure properties in product config files that are not exposed in the CRD. Read the [config overrides documentation](https://docs.stackable.tech/home/0.0/concepts/overrides#config-overrides) and consult the operator specific usage guide documentation for details on the available config files and settings for the specific product.
                             type: object
                           envOverrides:
                             additionalProperties:
                               type: string
                             default: {}
-                            description: '`envOverrides` configure environment variables to be set in the Pods. It is a map from strings to strings - environment variables and the value to set. Read the [environment variable overrides documentation](https://docs.stackable.tech/home/nightly/concepts/overrides#env-overrides) for more information and consult the operator specific usage guide to find out about the product specific environment variables that are available.'
+                            description: '`envOverrides` configure environment variables to be set in the Pods. It is a map from strings to strings - environment variables and the value to set. Read the [environment variable overrides documentation](https://docs.stackable.tech/home/0.0/concepts/overrides#env-overrides) for more information and consult the operator specific usage guide to find out about the product specific environment variables that are available.'
                             type: object
                           podOverrides:
                             default: {}
-                            description: In the `podOverrides` property you can define a [PodTemplateSpec](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#podtemplatespec-v1-core) to override any property that can be set on a Kubernetes Pod. Read the [Pod overrides documentation](https://docs.stackable.tech/home/nightly/concepts/overrides#pod-overrides) for more information.
+                            description: In the `podOverrides` property you can define a [PodTemplateSpec](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#podtemplatespec-v1-core) to override any property that can be set on a Kubernetes Pod. Read the [Pod overrides documentation](https://docs.stackable.tech/home/0.0/concepts/overrides#pod-overrides) for more information.
                             properties:
                               metadata:
                                 properties:
@@ -14531,7 +14531,7 @@ spec:
                             nodeSelector: null
                             podAffinity: null
                             podAntiAffinity: null
-                          description: These configuration settings control [Pod placement](https://docs.stackable.tech/home/nightly/concepts/operations/pod_placement).
+                          description: These configuration settings control [Pod placement](https://docs.stackable.tech/home/0.0/concepts/operations/pod_placement).
                           properties:
                             nodeAffinity:
                               description: Node affinity is a group of node affinity scheduling rules.
@@ -15053,7 +15053,7 @@ spec:
                           default:
                             containers: {}
                             enableVectorAgent: null
-                          description: Logging configuration, learn more in the [logging concept documentation](https://docs.stackable.tech/home/nightly/concepts/logging).
+                          description: Logging configuration, learn more in the [logging concept documentation](https://docs.stackable.tech/home/0.0/concepts/logging).
                           properties:
                             containers:
                               additionalProperties:
@@ -15178,17 +15178,17 @@ spec:
                           type: string
                         type: object
                       default: {}
-                      description: The `configOverrides` can be used to configure properties in product config files that are not exposed in the CRD. Read the [config overrides documentation](https://docs.stackable.tech/home/nightly/concepts/overrides#config-overrides) and consult the operator specific usage guide documentation for details on the available config files and settings for the specific product.
+                      description: The `configOverrides` can be used to configure properties in product config files that are not exposed in the CRD. Read the [config overrides documentation](https://docs.stackable.tech/home/0.0/concepts/overrides#config-overrides) and consult the operator specific usage guide documentation for details on the available config files and settings for the specific product.
                       type: object
                     envOverrides:
                       additionalProperties:
                         type: string
                       default: {}
-                      description: '`envOverrides` configure environment variables to be set in the Pods. It is a map from strings to strings - environment variables and the value to set. Read the [environment variable overrides documentation](https://docs.stackable.tech/home/nightly/concepts/overrides#env-overrides) for more information and consult the operator specific usage guide to find out about the product specific environment variables that are available.'
+                      description: '`envOverrides` configure environment variables to be set in the Pods. It is a map from strings to strings - environment variables and the value to set. Read the [environment variable overrides documentation](https://docs.stackable.tech/home/0.0/concepts/overrides#env-overrides) for more information and consult the operator specific usage guide to find out about the product specific environment variables that are available.'
                       type: object
                     podOverrides:
                       default: {}
-                      description: In the `podOverrides` property you can define a [PodTemplateSpec](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#podtemplatespec-v1-core) to override any property that can be set on a Kubernetes Pod. Read the [Pod overrides documentation](https://docs.stackable.tech/home/nightly/concepts/overrides#pod-overrides) for more information.
+                      description: In the `podOverrides` property you can define a [PodTemplateSpec](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#podtemplatespec-v1-core) to override any property that can be set on a Kubernetes Pod. Read the [Pod overrides documentation](https://docs.stackable.tech/home/0.0/concepts/overrides#pod-overrides) for more information.
                       properties:
                         metadata:
                           properties:
@@ -18098,7 +18098,7 @@ spec:
 
                             1. If PodDisruptionBudgets are created by the operator 2. The allowed number of Pods to be unavailable (`maxUnavailable`)
 
-                            Learn more in the [allowed Pod disruptions documentation](https://docs.stackable.tech/home/nightly/concepts/operations/pod_disruptions).
+                            Learn more in the [allowed Pod disruptions documentation](https://docs.stackable.tech/home/0.0/concepts/operations/pod_disruptions).
                           properties:
                             enabled:
                               default: true
@@ -18129,7 +18129,7 @@ spec:
                                   nodeSelector: null
                                   podAffinity: null
                                   podAntiAffinity: null
-                                description: These configuration settings control [Pod placement](https://docs.stackable.tech/home/nightly/concepts/operations/pod_placement).
+                                description: These configuration settings control [Pod placement](https://docs.stackable.tech/home/0.0/concepts/operations/pod_placement).
                                 properties:
                                   nodeAffinity:
                                     description: Node affinity is a group of node affinity scheduling rules.
@@ -18651,7 +18651,7 @@ spec:
                                 default:
                                   containers: {}
                                   enableVectorAgent: null
-                                description: Logging configuration, learn more in the [logging concept documentation](https://docs.stackable.tech/home/nightly/concepts/logging).
+                                description: Logging configuration, learn more in the [logging concept documentation](https://docs.stackable.tech/home/0.0/concepts/logging).
                                 properties:
                                   containers:
                                     additionalProperties:
@@ -18776,17 +18776,17 @@ spec:
                                 type: string
                               type: object
                             default: {}
-                            description: The `configOverrides` can be used to configure properties in product config files that are not exposed in the CRD. Read the [config overrides documentation](https://docs.stackable.tech/home/nightly/concepts/overrides#config-overrides) and consult the operator specific usage guide documentation for details on the available config files and settings for the specific product.
+                            description: The `configOverrides` can be used to configure properties in product config files that are not exposed in the CRD. Read the [config overrides documentation](https://docs.stackable.tech/home/0.0/concepts/overrides#config-overrides) and consult the operator specific usage guide documentation for details on the available config files and settings for the specific product.
                             type: object
                           envOverrides:
                             additionalProperties:
                               type: string
                             default: {}
-                            description: '`envOverrides` configure environment variables to be set in the Pods. It is a map from strings to strings - environment variables and the value to set. Read the [environment variable overrides documentation](https://docs.stackable.tech/home/nightly/concepts/overrides#env-overrides) for more information and consult the operator specific usage guide to find out about the product specific environment variables that are available.'
+                            description: '`envOverrides` configure environment variables to be set in the Pods. It is a map from strings to strings - environment variables and the value to set. Read the [environment variable overrides documentation](https://docs.stackable.tech/home/0.0/concepts/overrides#env-overrides) for more information and consult the operator specific usage guide to find out about the product specific environment variables that are available.'
                             type: object
                           podOverrides:
                             default: {}
-                            description: In the `podOverrides` property you can define a [PodTemplateSpec](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#podtemplatespec-v1-core) to override any property that can be set on a Kubernetes Pod. Read the [Pod overrides documentation](https://docs.stackable.tech/home/nightly/concepts/overrides#pod-overrides) for more information.
+                            description: In the `podOverrides` property you can define a [PodTemplateSpec](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#podtemplatespec-v1-core) to override any property that can be set on a Kubernetes Pod. Read the [Pod overrides documentation](https://docs.stackable.tech/home/0.0/concepts/overrides#pod-overrides) for more information.
                             properties:
                               metadata:
                                 properties:
