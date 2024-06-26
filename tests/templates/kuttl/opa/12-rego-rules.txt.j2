@@ -46,17 +46,22 @@ data:
 
     # Allow all resources
     matches_resource(namespace, table, resource) if {
-        resource == ":"
+        resource == "hbase:"
+    }
+
+    # Allow all namespaces
+    matches_resource(namespace, table, resource) if {
+        resource == "hbase:namespace:"
     }
 
     # Resource mentions the namespace explicitly
     matches_resource(namespace, table, resource) if {
-        resource == concat("", [namespace, ":"])
+        resource == concat(":", ["hbase:namespace", namespace])
     }
 
     # Resource mentions the namespaced table explicitly
     matches_resource(namespace, table, resource) if {
-        resource == concat("", [namespace, ":", table])
+        resource == concat("", ["hbase:table:", namespace, "/", table])
     }
 
     match_entire(pattern, value) if {
@@ -95,21 +100,21 @@ data:
         {
             "identity": "group:admins",
             "action": "full",
-            "resource": ":",
+            "resource": "hbase:",
         },
         {
             "identity": "group:developers",
             "action": "full",
-            "resource": "developers:",
+            "resource": "hbase:namespace:developers",
         },
         {
             "identity": "group:public",
             "action": "full",
-            "resource": "public:",
+            "resource": "hbase:namespace:public",
         },
         {
             "identity": "user:readonlyuser/access-hbase.$NAMESPACE.svc.cluster.local@CLUSTER.LOCAL",
             "action": "ro",
-            "resource": ":",
+            "resource": "hbase:namespace:",
         },
     ]

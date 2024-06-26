@@ -37,17 +37,22 @@ matches_identity(identity) if {
 
 # Allow all resources
 matches_resource(namespace, table, resource) if {
-    resource == ":"
+    resource == "hbase:"
+}
+
+# Allow all namespaces
+matches_resource(namespace, table, resource) if {
+    resource == "hbase:namespace:"
 }
 
 # Resource mentions the namespace explicitly
 matches_resource(namespace, table, resource) if {
-    resource == concat("", [namespace, ":"])
+    resource == concat(":", ["hbase:namespace", namespace])
 }
 
 # Resource mentions the namespaced table explicitly
 matches_resource(namespace, table, resource) if {
-    resource == concat("", [namespace, ":", table])
+    resource == concat("", ["hbase:table:", namespace, "/", table])
 }
 
 match_entire(pattern, value) if {
@@ -88,36 +93,36 @@ acls := [
     {
         "identity": "group:admins",
         "action": "full",
-        "resource": ":",
+        "resource": "hbase:",
     },
     {
         "identity": "group:developers",
         "action": "full",
-        "resource": "developers:",
+        "resource": "hbase:namespace:developers",
     },
     {
         "identity": "user:alice/test-hbase-permissions.default.svc.cluster.local@CLUSTER.LOCAL",
         "action": "rw",
-        "resource": "developers:table2",
+        "resource": "hbase:table:developers/table2",
     },
     {
         "identity": "user:bob/test-hbase-permissions.default.svc.cluster.local@CLUSTER.LOCAL",
         "action": "rw",
-        "resource": "developers:table1",
+        "resource": "hbase:table:developers/table1",
     },
     {
         "identity": "user:bob/test-hbase-permissions.default.svc.cluster.local@CLUSTER.LOCAL",
         "action": "rw",
-        "resource": "public:table3",
+        "resource": "hbase:table:public/table3",
     },
     {
         "identity": "user:readonlyuser1/test-hbase-permissions.default.svc.cluster.local@CLUSTER.LOCAL",
         "action": "ro",
-        "resource": "public:test",
+        "resource": "hbase:table:public/test",
     },
     {
         "identity": "user:readonlyuser2/test-hbase-permissions.default.svc.cluster.local@CLUSTER.LOCAL",
         "action": "ro",
-        "resource": ":",
+        "resource": "hbase:namespace:",
     },
 ]
