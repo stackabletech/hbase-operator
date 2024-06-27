@@ -42,6 +42,6 @@ spec:
 ----
 
 WARNING: The default values are _most likely_ not sufficient to run a proper cluster in production.
-Please adapt according to your requirements.
+You need to update them according to your requirements.
 
 For more details regarding Kubernetes CPU limits see: https://kubernetes.io/docs/tasks/configure-pod-container/assign-cpu-resource/[Assign CPU Resources to Containers and Pods].
