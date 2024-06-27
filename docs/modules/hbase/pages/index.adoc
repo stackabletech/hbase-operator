@@ -1,6 +1,6 @@
 = Stackable Operator for Apache HBase
 :description: The Stackable Operator for Apache HBase is a Kubernetes operator that can manage Apache HBase clusters. Learn about its features, resources, dependencies, and demos, and see the list of supported HBase versions.
-:keywords: Stackable Operator, Apache HBase, Kubernetes, operator, engineer, CRD, StatefulSet, ConfigMap, Service, ZooKeeper, HDFS
+:keywords: Stackable Operator, Apache HBase, Kubernetes, operator, ZooKeeper, HDFS
 :hbase: https://hbase.apache.org/
 :github: https://github.com/stackabletech/hbase-operator/
 :crd: {crd-docs-base-url}/hbase-operator/{crd-docs-version}/
