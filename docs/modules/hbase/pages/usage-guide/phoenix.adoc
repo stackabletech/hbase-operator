@@ -17,7 +17,7 @@ $ /stackable/phoenix/bin/psql.py  && \
    /stackable/phoenix/examples/WEB_STAT_QUERIES.sql
 ----
 
-This script creates a java command that creates, populates and queries a Phoenix table called `WEB_STAT`.
+This script creates, populates and queries a Phoenix table called `WEB_STAT`.
 Alternatively, one can use the `sqlline.py` script (which wraps the {sqlline-github}[sqlline] utility):
 
 [source,shell]
