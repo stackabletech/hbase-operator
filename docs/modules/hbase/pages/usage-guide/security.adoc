@@ -6,8 +6,8 @@ For Kerberos to work a Kerberos Key Distribution Center (KDC) is needed, which y
 The xref:secret-operator:secretclass.adoc#backend-kerberoskeytab[secret-operator documentation] states which kind of Kerberos servers are supported and how they can be configured.
 
 === 1. Prepare Kerberos server
-To configure HBase to use Kerberos you first need to collect information about your Kerberos server, e.g. hostname and port.
-Additionally, you need a service-user which the secret-operator uses to create principals for the HBase services.
+To configure HDFS and Hbase to use Kerberos you first need to collect information about your Kerberos server, e.g. hostname and port.
+Additionally, you need a service-user which the secret-operator uses to create principals for the HDFS services.
 
 === 2. Create Kerberos SecretClass
 Afterwards you need to enter all the needed information into a SecretClass, as described in xref:secret-operator:secretclass.adoc#backend-kerberoskeytab[secret-operator documentation].
