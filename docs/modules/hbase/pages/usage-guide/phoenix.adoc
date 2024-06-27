@@ -25,7 +25,7 @@ Alternatively, one can use the `sqlline.py` script (which wraps the {sqlline-git
 $ /stackable/phoenix/bin/sqlline.py [zookeeper] [sql file]
 ----
 
-The script opens an SQL prompt from where one can list, query, create and generally interact with Phoenix tables.
+`sqlline.py` provides an SQL prompt where you can work Phoenix tables interactively.
 So, to query the table that was created in the previous step, start the script and enter some SQL at the prompt:
 
 image::phoenix_sqlline.png[Phoenix Sqlline]
