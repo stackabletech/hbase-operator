@@ -3,7 +3,7 @@
 :hbase-operator-tools-github: https://github.com/apache/hbase-operator-tools/
 
 {hbck2-github}[HBCK2] is the repair tool for Apache HBase clusters.
-It is contained in the {hbase-operator-tools-github}[hbase-operator-tools].
+It is included in the {hbase-operator-tools-github}[hbase-operator-tools].
 The hbase-operator-tools are installed in the Docker image provided by Stackable in the directory `/stackable/hbase-operator-tools/`.
 HBCK2 can be executed via the wrapper script `hbck2`.
 
