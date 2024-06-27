@@ -2,13 +2,13 @@
 
 You can configure the permitted Pod disruptions for HBase nodes as described in xref:concepts:operations/pod_disruptions.adoc[].
 
-Unless you configure something else or disable our PodDisruptionBudgets (PDBs), we write the following PDBs:
+Unless you configure something else or disable our PodDisruptionBudgets (PDBs), the default PDBs are configured as follows:
 
 == Master
-We only allow a single Master to be offline at any given time, regardless of the number of replicas or `roleGroups`.
+Only a single Master is allowed to be offline at any given time, regardless of the number of replicas or `roleGroups`.
 
 == RegionServer
-We only allow a single RegionServer to be offline at any given time, regardless of the number of replicas or `roleGroups`, to have as little data unavailable as possible at any given time.
+Only a single RegionServer is allowed to be offline at any given time, regardless of the number of replicas or `roleGroups`, to have as little data unavailable as possible at any given time.
 
 == RestServer
-We only allow a single RestServer to be offline at any given time, regardless of the number of replicas or `roleGroups`.
+Only a single RestServer is allowed to be offline at any given time, regardless of the number of replicas or `roleGroups`.
