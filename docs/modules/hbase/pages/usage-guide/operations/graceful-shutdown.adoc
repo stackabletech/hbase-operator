@@ -11,7 +11,7 @@ After the graceful shutdown timeout runs out, and the process still didn't exit,
 
 This is equivalent to executing the `bin/hbase-daemon.sh stop master` command, which internally executes `kill <master-pid>` (https://github.com/apache/hbase/blob/8382f55b15be6ae190f8d202a5e6a40af177ec76/bin/hbase-daemon.sh#L338[code]), waits for a configurable period of time (defaults to 20 minutes), and finally executes `kill -9 <master-pid>` to `SIGKILL` the master (https://github.com/apache/hbase/blob/8382f55b15be6ae190f8d202a5e6a40af177ec76/bin/hbase-common.sh#L20-L41[code]).
 
-However, there is no acknowledge message in the log indicating a graceful shutdown.
+However, there is no acknowledgement message in the log indicating a graceful shutdown.
 
 == RegionServers
 
