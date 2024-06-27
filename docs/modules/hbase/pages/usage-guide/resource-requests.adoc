@@ -41,6 +41,7 @@ spec:
           limit: 512Mi
 ----
 
-WARNING: The default values are _most likely_ not sufficient to run a proper cluster in production. Please adapt according to your requirements.
+WARNING: The default values are _most likely_ not sufficient to run a proper cluster in production.
+Please adapt according to your requirements.
 
 For more details regarding Kubernetes CPU limits see: https://kubernetes.io/docs/tasks/configure-pod-container/assign-cpu-resource/[Assign CPU Resources to Containers and Pods].

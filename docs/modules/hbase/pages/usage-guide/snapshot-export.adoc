@@ -7,7 +7,8 @@ The script `export-snapshot-to-s3` facilitates the export, by providing the asso
 The S3 configuration is read from environment variables.
 The script can be directly called on the HBase master container:
 
-```shell
+[source,shell]
+----
 $ export-snapshot-to-s3  --help
 Options:
     --snapshot <arg>       Snapshot to restore.
@@ -33,16 +34,17 @@ $ export \
 $ export-snapshot-to-s3 \
     --snapshot my-snapshot \
     --copy-to s3a://my-bucket/my-snapshot
-```
+----
 
 Snapshots can also be imported from S3 into HDFS:
 
-```shell
+[source,shell]
+----
 $ export-snapshot-to-s3 \
     --snapshot snap \
     --copy-from s3a://my-bucket/my-snapshot \
     --copy-to hdfs://simple-hdfs/hbase
-```
+----
 
 However, the better approach is to create a Job:
 
