@@ -9,21 +9,18 @@ export \
     AWS_PATH_STYLE_ACCESS=true
 
 # Create local snapshot
-hbase shell create-snapshot.hbase | \
-    tee /dev/stderr | \
+hbase shell create-snapshot.hbase 2>&1 | \
     grep '=> \["snap"\]' > /dev/null
 
 # Export local snapshot to S3
 export-snapshot-to-s3 \
         --snapshot snap \
         --copy-to s3a://hbase/snap \
-        --overwrite | \
-    tee /dev/stderr | \
+        --overwrite 2>&1 | \
     grep 'Export Completed: snap' > /dev/null
 
 # Delete local snapshot
-hbase shell delete-snapshot.hbase | \
-    tee /dev/stderr | \
+hbase shell delete-snapshot.hbase 2>&1 | \
     grep '=> \[\]' > /dev/null
 
 # Import snapshot from S3
@@ -31,11 +28,9 @@ export-snapshot-to-s3 \
         --snapshot snap \
         --copy-from s3a://hbase/snap \
         --copy-to hdfs://test-hdfs/hbase \
-        --overwrite | \
-    tee /dev/stderr | \
+        --overwrite 2>&1 | \
     grep 'Export Completed: snap' > /dev/null
 
 # Restore imported snapshot
-hbase shell restore-snapshot.hbase | \
-    tee /dev/stderr | \
+hbase shell restore-snapshot.hbase 2>&1 | \
     grep 'value=42' > /dev/null

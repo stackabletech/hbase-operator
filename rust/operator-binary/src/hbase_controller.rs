@@ -13,12 +13,6 @@ use product_config::{
     ProductConfigManager,
 };
 use snafu::{OptionExt, ResultExt, Snafu};
-use stackable_hbase_crd::{
-    Container, HbaseCluster, HbaseClusterStatus, HbaseConfig, HbaseConfigFragment, HbaseRole,
-    APP_NAME, CONFIG_DIR_NAME, HBASE_ENV_SH, HBASE_HEAPSIZE, HBASE_REST_PORT_NAME_HTTP,
-    HBASE_REST_PORT_NAME_HTTPS, HBASE_SITE_XML, JVM_HEAP_FACTOR, JVM_SECURITY_PROPERTIES_FILE,
-    SSL_CLIENT_XML, SSL_SERVER_XML,
-};
 use stackable_operator::{
     builder::{
         configmap::ConfigMapBuilder,
@@ -65,8 +59,18 @@ use stackable_operator::{
     time::Duration,
     utils::COMMON_BASH_TRAP_FUNCTIONS,
 };
-use strum::{EnumDiscriminants, IntoStaticStr};
+use strum::{EnumDiscriminants, IntoStaticStr, ParseError};
 
+use stackable_hbase_crd::{
+    Container, HbaseCluster, HbaseClusterStatus, HbaseConfig, HbaseConfigFragment, HbaseRole,
+    APP_NAME, CONFIG_DIR_NAME, HBASE_ENV_SH, HBASE_HEAPSIZE, HBASE_MANAGES_ZK, HBASE_MASTER_OPTS,
+    HBASE_REGIONSERVER_OPTS, HBASE_REST_OPTS, HBASE_REST_PORT_NAME_HTTP,
+    HBASE_REST_PORT_NAME_HTTPS, HBASE_SITE_XML, JVM_HEAP_FACTOR, JVM_SECURITY_PROPERTIES_FILE,
+    METRICS_PORT, SSL_CLIENT_XML, SSL_SERVER_XML,
+};
+
+use crate::product_logging::STACKABLE_LOG_DIR;
+use crate::security::opa::HbaseOpaConfig;
 use crate::{
     discovery::build_discovery_configmap,
     kerberos::{
@@ -76,14 +80,14 @@ use crate::{
     },
     operations::{graceful_shutdown::add_graceful_shutdown_config, pdb::add_pdbs},
     product_logging::{
-        extend_role_group_config_map, resolve_vector_aggregator_address, LOG4J_CONFIG_FILE,
+        extend_role_group_config_map, log4j_properties_file_name, resolve_vector_aggregator_address,
     },
+    security,
     zookeeper::{self, ZookeeperConnectionInformation},
     OPERATOR_NAME,
 };
 
 pub const HBASE_CONTROLLER_NAME: &str = "hbasecluster";
-pub const STACKABLE_LOG_DIR: &str = "/stackable/log";
 pub const MAX_HBASE_LOG_FILES_SIZE: MemoryQuantity = MemoryQuantity {
     value: 10.0,
     unit: BinaryMultiple::Mebi,
@@ -278,6 +282,15 @@ pub enum Error {
     ObjectMeta {
         source: stackable_operator::builder::meta::Error,
     },
+
+    #[snafu(display("invalid OPA configuration"))]
+    InvalidOpaConfig { source: security::opa::Error },
+
+    #[snafu(display("unknown role [{role}]"))]
+    UnknownHbaseRole { source: ParseError, role: String },
+
+    #[snafu(display("authorization is only supported from HBase 2.6 onwards"))]
+    AuthorizationNotSupported,
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -292,6 +305,8 @@ pub async fn reconcile_hbase(hbase: Arc<HbaseCluster>, ctx: Arc<Ctx>) -> Result<
     tracing::info!("Starting reconcile");
 
     let client = &ctx.client;
+
+    validate_cr(&hbase)?;
 
     let resolved_product_image = hbase
         .spec
@@ -316,6 +331,15 @@ pub async fn reconcile_hbase(hbase: Arc<HbaseCluster>, ctx: Arc<Ctx>) -> Result<
         false,
     )
     .context(InvalidProductConfigSnafu)?;
+
+    let hbase_opa_config = match &hbase.spec.cluster_config.authorization {
+        Some(opa_config) => Some(
+            HbaseOpaConfig::from_opa_config(client, &hbase, opa_config)
+                .await
+                .context(InvalidOpaConfigSnafu)?,
+        ),
+        None => None,
+    };
 
     let mut cluster_resources = ClusterResources::new(
         APP_NAME,
@@ -388,6 +412,7 @@ pub async fn reconcile_hbase(hbase: Arc<HbaseCluster>, ctx: Arc<Ctx>) -> Result<
                 &zookeeper_connection_information,
                 &merged_config,
                 &resolved_product_image,
+                hbase_opa_config.as_ref(),
                 vector_aggregator_address.as_deref(),
             )?;
             let rg_statefulset = build_rolegroup_statefulset(
@@ -464,7 +489,7 @@ pub fn build_region_server_role_service(
         .server_role_service_name()
         .context(GlobalServiceNameNotFoundSnafu)?;
     let ports = hbase
-        .ports(&role)
+        .ports(&role, &resolved_product_image.product_version)
         .into_iter()
         .map(|(name, value)| ServicePort {
             name: Some(name),
@@ -514,12 +539,18 @@ fn build_rolegroup_config_map(
     zookeeper_connection_information: &ZookeeperConnectionInformation,
     hbase_config: &HbaseConfig,
     resolved_product_image: &ResolvedProductImage,
+    hbase_opa_config: Option<&HbaseOpaConfig>,
     vector_aggregator_address: Option<&str>,
 ) -> Result<ConfigMap, Error> {
     let mut hbase_site_xml = String::new();
     let mut hbase_env_sh = String::new();
     let mut ssl_server_xml = String::new();
     let mut ssl_client_xml = String::new();
+
+    let role =
+        HbaseRole::from_str(rolegroup.role.as_ref()).with_context(|_| UnknownHbaseRoleSnafu {
+            role: rolegroup.role.clone(),
+        })?;
 
     for (property_name_kind, config) in rolegroup_config {
         match property_name_kind {
@@ -528,6 +559,8 @@ fn build_rolegroup_config_map(
                 hbase_site_config.extend(zookeeper_connection_information.as_hbase_settings());
                 hbase_site_config
                     .extend(kerberos_config_properties(hbase).context(AddKerberosConfigSnafu)?);
+                hbase_site_config
+                    .extend(hbase_opa_config.map_or(vec![], |config| config.hbase_site_config()));
 
                 // configOverride come last
                 hbase_site_config.extend(config.clone());
@@ -540,26 +573,11 @@ fn build_rolegroup_config_map(
                 );
             }
             PropertyNameKind::File(file_name) if file_name == HBASE_ENV_SH => {
-                let mut hbase_env_config = BTreeMap::new();
-
-                let memory_limit = MemoryQuantity::try_from(
-                    hbase_config
-                        .resources
-                        .memory
-                        .limit
-                        .as_ref()
-                        .context(InvalidJavaHeapConfigSnafu)?,
-                )
-                .context(FailedToConvertJavaHeapSnafu {
-                    unit: BinaryMultiple::Mebi.to_java_memory_unit(),
-                })?;
-                let heap_in_mebi = (memory_limit * JVM_HEAP_FACTOR)
-                    .scale_to(BinaryMultiple::Mebi)
-                    .format_for_java()
-                    .context(FailedToConvertJavaHeapSnafu {
-                        unit: BinaryMultiple::Mebi.to_java_memory_unit(),
-                    })?;
-                hbase_env_config.insert(HBASE_HEAPSIZE.to_string(), heap_in_mebi);
+                let mut hbase_env_config = build_hbase_env_sh(
+                    hbase_config,
+                    &role,
+                    resolved_product_image.product_version.as_ref(),
+                )?;
 
                 // configOverride come last
                 hbase_env_config.extend(config.clone());
@@ -648,6 +666,7 @@ fn build_rolegroup_config_map(
         vector_aggregator_address,
         &hbase_config.logging,
         &mut builder,
+        &resolved_product_image.product_version,
     )
     .context(InvalidLoggingConfigSnafu {
         cm_name: rolegroup.object_name(),
@@ -669,7 +688,7 @@ fn build_rolegroup_service(
     resolved_product_image: &ResolvedProductImage,
 ) -> Result<Service> {
     let ports = hbase
-        .ports(hbase_role)
+        .ports(hbase_role, &resolved_product_image.product_version)
         .into_iter()
         .map(|(name, value)| ServicePort {
             name: Some(name),
@@ -735,7 +754,7 @@ fn build_rolegroup_statefulset(
     let role_group = role.and_then(|r| r.role_groups.get(&rolegroup_ref.role_group));
 
     let ports = hbase
-        .ports(hbase_role)
+        .ports(hbase_role, &resolved_product_image.product_version)
         .into_iter()
         .map(|(name, value)| ContainerPort {
             name: Some(name),
@@ -799,6 +818,8 @@ fn build_rolegroup_statefulset(
         ..probe_template
     };
 
+    let log4j_properties_file_name =
+        log4j_properties_file_name(&resolved_product_image.product_version);
     let mut hbase_container = ContainerBuilder::new("hbase").expect("ContainerBuilder not created");
     hbase_container
         .image_from_product_image(resolved_product_image)
@@ -814,7 +835,7 @@ fn build_rolegroup_statefulset(
             cp {HDFS_DISCOVERY_TMP_DIR}/hdfs-site.xml {CONFIG_DIR_NAME}
             cp {HDFS_DISCOVERY_TMP_DIR}/core-site.xml {CONFIG_DIR_NAME}
             cp {HBASE_CONFIG_TMP_DIR}/* {CONFIG_DIR_NAME}
-            cp {HBASE_LOG_CONFIG_TMP_DIR}/{LOG4J_CONFIG_FILE} {CONFIG_DIR_NAME}
+            cp {HBASE_LOG_CONFIG_TMP_DIR}/{log4j_properties_file_name} {CONFIG_DIR_NAME}
 
             {kerberos_container_start_commands}
 
@@ -1065,5 +1086,171 @@ pub fn build_recommended_labels<'a>(
         controller_name: HBASE_CONTROLLER_NAME,
         role,
         role_group,
+    }
+}
+
+/// The content of the HBase `hbase-env.sh` file.
+fn build_hbase_env_sh(
+    hbase_config: &HbaseConfig,
+    role: &HbaseRole,
+    hbase_version: &str,
+) -> Result<BTreeMap<String, String>, Error> {
+    let mut result = BTreeMap::new();
+
+    result.insert(HBASE_MANAGES_ZK.to_string(), "false".to_string());
+
+    // We always enable `-Djava.security.krb5.conf` even if it's not used.
+    let all_hbase_opts = [
+        format!("-Djava.security.properties={CONFIG_DIR_NAME}/{JVM_SECURITY_PROPERTIES_FILE}"),
+        String::from("-Djava.security.krb5.conf=/stackable/kerberos/krb5.conf"),
+    ]
+    .iter()
+    .chain(jmx_system_properties(role, hbase_version).as_slice()) // Add the JMX options
+    .chain(hbase_config.hbase_opts.as_slice()) // Add the user defined options
+    .cloned()
+    .collect::<Vec<String>>()
+    .join(" ");
+
+    match role {
+        HbaseRole::Master => {
+            result.insert(HBASE_MASTER_OPTS.to_string(), all_hbase_opts);
+        }
+        HbaseRole::RegionServer => {
+            result.insert(HBASE_REGIONSERVER_OPTS.to_string(), all_hbase_opts);
+        }
+        HbaseRole::RestServer => {
+            result.insert(HBASE_REST_OPTS.to_string(), all_hbase_opts);
+        }
+    }
+
+    let memory_limit = MemoryQuantity::try_from(
+        hbase_config
+            .resources
+            .memory
+            .limit
+            .as_ref()
+            .context(InvalidJavaHeapConfigSnafu)?,
+    )
+    .context(FailedToConvertJavaHeapSnafu {
+        unit: BinaryMultiple::Mebi.to_java_memory_unit(),
+    })?;
+    let heap_in_mebi = (memory_limit * JVM_HEAP_FACTOR)
+        .scale_to(BinaryMultiple::Mebi)
+        .format_for_java()
+        .context(FailedToConvertJavaHeapSnafu {
+            unit: BinaryMultiple::Mebi.to_java_memory_unit(),
+        })?;
+    result.insert(HBASE_HEAPSIZE.to_string(), heap_in_mebi);
+
+    Ok(result)
+}
+
+/// Return the JVM system properties for the JMX exporter.
+/// Starting with HBase 2.6 these are not needed anymore
+fn jmx_system_properties(role: &HbaseRole, hbase_version: &str) -> Option<String> {
+    if hbase_version.starts_with(r"2.4") {
+        let role_name = role.to_string();
+
+        Some(format!("-javaagent:/stackable/jmx/jmx_prometheus_javaagent.jar={METRICS_PORT}:/stackable/jmx/{role_name}.yaml"))
+    } else {
+        None
+    }
+}
+
+/// Ensures that no authorization is configured for HBase versions that do not support it.
+/// In the future, such validations should be moved to the CRD CEL rules which are much more flexible
+/// and have to added benefit that invalid CRs are rejected by the API server.
+/// A requirement for this is that the minimum supported Kubernetes version is 1.29.
+fn validate_cr(hbase: &HbaseCluster) -> Result<()> {
+    tracing::info!("Begin CR validation");
+
+    let hbase_version = hbase.spec.image.product_version();
+    let authorization = hbase.spec.cluster_config.authorization.is_some();
+
+    if hbase_version.starts_with("2.4") && authorization {
+        tracing::error!("Invalid custom resource");
+        return Err(Error::AuthorizationNotSupported);
+    }
+    tracing::info!("End CR validation");
+    Ok(())
+}
+
+#[cfg(test)]
+mod test {
+    use rstest::rstest;
+    use stackable_operator::kube::runtime::reflector::ObjectRef;
+
+    use super::*;
+
+    #[rstest]
+    #[case("2.6.0", HbaseRole::Master, vec!["master", "ui-http"])]
+    #[case("2.6.0", HbaseRole::RegionServer, vec!["regionserver", "ui-http"])]
+    #[case("2.6.0", HbaseRole::RestServer, vec!["rest-http", "ui-http"])]
+    #[case("2.4.14", HbaseRole::Master, vec!["master", "ui-http", "metrics"])]
+    #[case("2.4.14", HbaseRole::RegionServer, vec!["regionserver", "ui-http", "metrics"])]
+    #[case("2.4.14", HbaseRole::RestServer, vec!["rest-http", "ui-http", "metrics"])]
+    fn test_rolegroup_service_ports(
+        #[case] hbase_version: &str,
+        #[case] role: HbaseRole,
+        #[case] expected_ports: Vec<&str>,
+    ) {
+        let input = format!(
+            "
+        apiVersion: hbase.stackable.tech/v1alpha1
+        kind: HbaseCluster
+        metadata:
+          name: hbase
+          uid: c2e98fc1-6b88-4d11-9381-52530e3f431e
+        spec:
+          image:
+            productVersion: {hbase_version}
+          clusterConfig:
+            hdfsConfigMapName: simple-hdfs
+            zookeeperConfigMapName: simple-znode
+          masters:
+            roleGroups:
+              default:
+                replicas: 1
+          regionServers:
+            roleGroups:
+              default:
+                replicas: 1
+          restServers:
+            roleGroups:
+              default:
+                replicas: 1
+        "
+        );
+        let hbase: HbaseCluster = serde_yaml::from_str(&input).expect("illegal test input");
+
+        let resolved_image = ResolvedProductImage {
+            image: format!(
+                "docker.stackable.tech/stackable/hbase:{hbase_version}-stackable0.0.0-dev"
+            ),
+            app_version_label: hbase_version.to_string(),
+            product_version: hbase_version.to_string(),
+            image_pull_policy: "Never".to_string(),
+            pull_secrets: None,
+        };
+
+        let role_group_ref = RoleGroupRef {
+            cluster: ObjectRef::<HbaseCluster>::from_obj(&hbase),
+            role: role.to_string(),
+            role_group: "default".to_string(),
+        };
+        let service = build_rolegroup_service(&hbase, &role, &role_group_ref, &resolved_image)
+            .expect("failed to build service");
+
+        assert_eq!(
+            expected_ports,
+            service
+                .spec
+                .unwrap()
+                .ports
+                .unwrap()
+                .iter()
+                .map(|port| { port.clone().name.unwrap() })
+                .collect::<Vec<String>>()
+        );
     }
 }

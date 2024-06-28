@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+### Added
+
+- Added support for HBase 2.6.0 with the following changes ([#506]):
+  - Added `clusterConfig.authorization` property to support the OPA authorizer
+  - Configure log4j2 properties
+  - Use built-in prometheus metric exporter
+
+[#506]: https://github.com/stackabletech/hbase-operator/pull/506
+
 ## [24.3.0] - 2024-03-20
 
 ### Added

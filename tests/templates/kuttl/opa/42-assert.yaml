@@ -1,0 +1,10 @@
+---
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: test-rest-server
+status:
+  succeeded: 1

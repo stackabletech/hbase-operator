@@ -3,6 +3,7 @@ mod hbase_controller;
 mod kerberos;
 mod operations;
 mod product_logging;
+mod security;
 mod zookeeper;
 
 use crate::hbase_controller::HBASE_CONTROLLER_NAME;
