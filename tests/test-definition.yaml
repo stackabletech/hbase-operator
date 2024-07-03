@@ -3,9 +3,10 @@ dimensions:
   - name: hbase
     values:
       - 2.4.17
+      - 2.4.18
   - name: hbase-latest
     values:
-      - 2.4.17
+      - 2.4.18
   - name: hdfs
     values:
       - 3.3.4

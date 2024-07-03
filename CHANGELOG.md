@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Added
+
+- Added support for HBase 2.4.18 ([#XXX])
+
+[#XXX]: https://github.com/stackabletech/hbase-operator/pull/XXX
+
 ## [24.3.0] - 2024-03-20
 
 ### Added
