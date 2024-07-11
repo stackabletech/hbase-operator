@@ -7,8 +7,6 @@
 - Bump `stackable-operator` from `0.64.0` to `0.70.0` ([#524]).
 - Bump `product-config` from `0.6.0` to `0.7.0` ([#524]).
 
-[#524]: https://github.com/stackabletech/airflow-operator/pull/524
-
 ## [24.3.0] - 2024-03-20
 
 ### Added
@@ -39,6 +37,7 @@
 [#441]: https://github.com/stackabletech/hbase-operator/pull/441
 [#454]: https://github.com/stackabletech/hbase-operator/pull/454
 [#511]: https://github.com/stackabletech/hbase-operator/pull/511
+[#524]: https://github.com/stackabletech/hbase-operator/pull/524
 
 ## [23.11.0] - 2023-11-24
 
