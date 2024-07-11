@@ -75,7 +75,7 @@ include::example$getting_started/getting_started.sh[tag=cluster-version]
 This will return the version that was specified in the HBase cluster definition:
 
 [source,json]
-{"Version":"2.4.17"}
+{"Version":"2.4.18"}
 
 The cluster status can be checked and formatted like this:
 

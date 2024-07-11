@@ -131,7 +131,7 @@ version() {
 echo "Check cluster version..."
 cluster_version=$(version | jq -r '.Version')
 
-if [ "$cluster_version" == "2.4.17" ]; then
+if [ "$cluster_version" == "2.4.18" ]; then
   echo "Cluster version: $cluster_version"
 else
   echo "Unexpected version: $cluster_version"
