@@ -10,8 +10,14 @@
   - Use built-in prometheus metric exporter
 - Added support for HBase 2.4.18 ([#523])
 
+### Changed
+
+- Bump `stackable-operator` from `0.64.0` to `0.70.0` ([#524]).
+- Bump `product-config` from `0.6.0` to `0.7.0` ([#524]).
+
 [#506]: https://github.com/stackabletech/hbase-operator/pull/506
 [#523]: https://github.com/stackabletech/hbase-operator/pull/523
+[#524]: https://github.com/stackabletech/hbase-operator/pull/524
 
 ## [24.3.0] - 2024-03-20
 
