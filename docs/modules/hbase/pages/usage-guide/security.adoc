@@ -209,7 +209,7 @@ acls := [
 ]
 ----
 
-There is complete file shown below, together with a list of test cases.
+There is a complete file shown below, together with a list of test cases.
 
 <details>
 <summary>Rego rules</summary>
