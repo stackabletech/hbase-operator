@@ -51,6 +51,9 @@ In case you want to access your HBase it is recommended to start up a client Pod
 We have an https://github.com/stackabletech/hbase-operator/blob/main/tests/templates/kuttl/kerberos/41-access-hbase.yaml.j2[integration test] for this exact purpose, where you can see how to connect and get a valid keytab.
 
 == Authorization
+
+NOTE: This is an exprimental feature available from HBase version 2.6.0 upwards.
+
 Authorization using the Open Policy Agent (OPA) is supported.
 A custom https://github.com/stackabletech/hbase-opa-authorizer[access controller coprocessor] delegates authorization decisions to OPA.
 For more information on the OPA authorization mechanism and how to use it within the Stackable Platform, see the xref:concepts:opa.adoc[OPA concepts] documentation.
@@ -247,9 +250,6 @@ data.hbase.test_permission_hbase: PASS (1.524541ms)
 data.hbase.test_permission_testuser: PASS (1.036205ms)
 data.hbase.test_permission_readonlyuser1: PASS (780.05µs)
 data.hbase.test_permission_readonlyuser2: PASS (1.37649ms)
---------------------------------------------------------------------------------
-PASS: 11/11
-
 ----
 
 Take the test case below as an example:
