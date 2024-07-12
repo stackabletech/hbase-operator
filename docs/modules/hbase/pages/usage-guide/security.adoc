@@ -52,7 +52,7 @@ We have an https://github.com/stackabletech/hbase-operator/blob/main/tests/templ
 
 == Authorization
 
-NOTE: This is an exprimental feature available from HBase version 2.6.0 upwards.
+NOTE: This is an experimental feature available from HBase version 2.6.0 upwards.
 
 Authorization using the Open Policy Agent (OPA) is supported.
 A custom https://github.com/stackabletech/hbase-opa-authorizer[access controller coprocessor] delegates authorization decisions to OPA.
