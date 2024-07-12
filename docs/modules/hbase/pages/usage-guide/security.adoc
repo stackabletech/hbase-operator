@@ -107,7 +107,7 @@ Details can be found below in the <<fine-granular-rego-rules, fine-granular rego
 === How it works
 WARNING: This implementation takes an approach to HBase authorization that is fundamentally different from the default one (which relies on HDFS group mappings) and departs significantly from traditional Hadoop patterns and POSIX-style permissions.
 
-The current rego rules ignore file ownership and permissions, and ACLs are persisted in neither ZooKeeper nor internal HBase tables.
+The current rego rules ignore file ownership and permissions, and ACLs are persisted neither in ZooKeeper nor internal HBase tables.
 Keeping this state in HDFS/HBase clashes with the infrastructure-as-code approach (IaC).
 
 Instead, HBase will send a request detailing who (e.g. `alice/test-hbase-permissions.default.svc.cluster.local@CLUSTER.LOCAL`) is trying to execute what type of action (e.g. `READ`, `WRITE`, `CREATE` or `ADMIN`) on what namespace or table (e.g. `developers:`, `developers/table1`).
