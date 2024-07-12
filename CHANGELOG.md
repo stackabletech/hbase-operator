@@ -2,10 +2,22 @@
 
 ## [Unreleased]
 
+### Added
+
+- Added support for HBase 2.6.0 with the following changes ([#506]):
+  - Added `clusterConfig.authorization` property to support the OPA authorizer
+  - Configure log4j2 properties
+  - Use built-in prometheus metric exporter
+- Added support for HBase 2.4.18 ([#523])
+
 ### Changed
 
 - Bump `stackable-operator` from `0.64.0` to `0.70.0` ([#524]).
 - Bump `product-config` from `0.6.0` to `0.7.0` ([#524]).
+
+[#506]: https://github.com/stackabletech/hbase-operator/pull/506
+[#523]: https://github.com/stackabletech/hbase-operator/pull/523
+[#524]: https://github.com/stackabletech/hbase-operator/pull/524
 
 ## [24.3.0] - 2024-03-20
 
@@ -37,7 +49,6 @@
 [#441]: https://github.com/stackabletech/hbase-operator/pull/441
 [#454]: https://github.com/stackabletech/hbase-operator/pull/454
 [#511]: https://github.com/stackabletech/hbase-operator/pull/511
-[#524]: https://github.com/stackabletech/hbase-operator/pull/524
 
 ## [23.11.0] - 2023-11-24
 

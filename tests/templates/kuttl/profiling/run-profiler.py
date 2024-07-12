@@ -28,8 +28,9 @@ def parse_refresh_header(refresh_header):
         expected: {PROFILING_DURATION_IN_SEC}
         actual:   {refresh_time_in_sec}"""
 
+    # HBase 2.6 changed the output of the perf call to end with cpu-\d+.html
     expected_refresh_path_pattern = \
-        r'/prof-output-hbase/async-prof-pid-\d+-itimer-\d+.flamegraph'
+        r'/prof-output-hbase/async-prof-pid-\d+-(itimer-\d+.flamegraph|cpu-\d+.html)'
     assert re.fullmatch(expected_refresh_path_pattern, refresh_path), \
         f"""The path to the flamegraph contains an unexpected pattern.
         expected pattern: {expected_refresh_path_pattern}"
