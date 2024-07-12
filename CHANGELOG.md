@@ -5,10 +5,10 @@
 ### Added
 
 - Added support for HBase 2.6.0 with the following changes ([#506]):
-  - Added `clusterConfig.authorization` property to support the OPA authorizer
-  - Configure log4j2 properties
-  - Use built-in prometheus metric exporter
-- Added support for HBase 2.4.18 ([#523])
+  - Added `clusterConfig.authorization` property to support the OPA authorizer.
+  - Configure log4j2 properties.
+  - Use built-in prometheus metric exporter.
+- Added support for HBase 2.4.18 ([#523]).
 
 ### Changed
 
