@@ -111,7 +111,7 @@ The current rego rules ignore file ownership and permissions, and ACLs are persi
 Keeping this state in HDFS/HBase clashes with the infrastructure-as-code approach (IaC).
 
 Instead, HBase will send a request detailing who (e.g. `alice/test-hbase-permissions.default.svc.cluster.local@CLUSTER.LOCAL`) is trying to execute what type of action (e.g. `READ`, `WRITE`, `CREATE` or `ADMIN`) on what namespace or table (e.g. `developers:`, `developers/table1`) to OPA.
-OPA then makes a decision if this action is allowed or not.
+OPA then makes a decision whether this action is allowed or not.
 
 Instead of using the HBase shell to grant or revoke rights to users, you can go to your IaC Git repository and add a rego rule entry specifying what a specific user is allowed to do to which specific resources.
 
