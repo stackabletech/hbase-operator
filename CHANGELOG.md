@@ -14,10 +14,12 @@
 
 - Bump `stackable-operator` from `0.64.0` to `0.70.0` ([#524]).
 - Bump `product-config` from `0.6.0` to `0.7.0` ([#524]).
+- Bump `tokio` to `1.38` ([#527]).
 
 [#506]: https://github.com/stackabletech/hbase-operator/pull/506
 [#523]: https://github.com/stackabletech/hbase-operator/pull/523
 [#524]: https://github.com/stackabletech/hbase-operator/pull/524
+[#527]: https://github.com/stackabletech/hbase-operator/pull/527
 
 ## [24.3.0] - 2024-03-20
 
