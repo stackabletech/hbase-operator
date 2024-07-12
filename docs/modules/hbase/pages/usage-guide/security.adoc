@@ -52,7 +52,7 @@ We have an https://github.com/stackabletech/hbase-operator/blob/main/tests/templ
 
 == Authorization
 Authorization using the Open Policy Agent (OPA) is supported.
-A custom https://github.com/stackabletech/hbase-opa-authorizer[access controller CoProcessor] delegates authorization decisions to OPA.
+A custom https://github.com/stackabletech/hbase-opa-authorizer[access controller coprocessor] delegates authorization decisions to OPA.
 For more information on the OPA authorization mechanism and how to use it within the Stackable Platform, see the xref:concepts:opa.adoc[OPA concepts] documentation.
 
 IMPORTANT: Authentication with Kerberos is required when using authorization.
