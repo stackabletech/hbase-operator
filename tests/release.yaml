@@ -17,6 +17,6 @@ releases:
       hdfs:
         operatorVersion: 0.0.0-dev
       hbase:
-        operatorVersion: 0.0.0-pr506
+        operatorVersion: 0.0.0-dev
       opa:
         operatorVersion: 0.0.0-dev
