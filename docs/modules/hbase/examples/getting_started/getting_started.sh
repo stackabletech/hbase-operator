@@ -1,6 +1,21 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# DO NOT EDIT THE SCRIPT
+# Instead, update the j2 template, and regenerate it for dev:
+# cat <<EOF | jinja2 --format yaml getting_started.sh.j2 -o getting_started.sh
+# helm:
+#   repo_name: stackable-dev
+#   repo_url: https://repo.stackable.tech/repository/helm-dev/
+# versions:
+#   zookeeper: 0.0.0-dev
+#   hdfs: 0.0.0-dev
+#   commons: 0.0.0-dev
+#   secret: 0.0.0-dev
+#   listener: 0.0.0-dev
+#   hbase: 0.0.0-dev
+# EOF
+
 # This script contains all the code snippets from the guide, as well as some assert tests
 # to test if the instructions in the guide work. The user *could* use it, but it is intended
 # for testing only. It installs an HBase cluster and its dependencies and executes several steps
@@ -167,10 +182,23 @@ get_all() {
 echo "Checking tables found..."
 tables_count=$(get_all | jq -r '.table' | jq '. | length')
 
-if [ "$tables_count" == 1 ]; then
-  echo "...the single expected table"
+# There should only be the one table we created
+expected_tables=$(echo "
+users
+" | sort | sed '/^$/d')
+
+expected_count=$(echo "$expected_tables" | wc -l)
+if [ "$tables_count" == "$expected_count" ]; then
+  echo "...$tables_count expected table(s)"
 else
-  echo "...an unexpected number: $tables_count"
+  echo "...an unexpected number: $tables_count instead of $expected_count"
+  actual_tables=$(get_all | jq -r '.table[].name' | sort)
+  echo "additional tables expected to be present (if any):"
+  comm -13 <(echo "$actual_tables") <(echo "$expected_tables")
+  echo "additional tables unexpectedly present (if any):"
+  comm -23 <(echo "$actual_tables") <(echo "$expected_tables")
+  echo
+  echo "If you have already run the script, data from the next steps will already exist"
   exit 1
 fi
 
@@ -186,9 +214,30 @@ kubectl exec -n default simple-hbase-restserver-default-0 -- \
 echo "Re-checking tables: found..."
 tables_count=$(get_all | jq -r '.table' | jq '. | length')
 
-if [ "$tables_count" == 10 ]; then
-  echo "...$tables_count tables. Success!"
+# Phoenix sometimes introduces new tables, so we can list the expected tables
+# here, and error out if they don't match
+expected_tables=$(echo "
+SYSTEM.CATALOG
+SYSTEM.CHILD_LINK
+SYSTEM.FUNCTION
+SYSTEM.LOG
+SYSTEM.MUTEX
+SYSTEM.SEQUENCE
+SYSTEM.STATS
+SYSTEM.TASK
+WEB_STAT
+users
+" | sort | sed '/^$/d')
+
+expected_count=$(echo "$expected_tables" | wc -l)
+if [ "$tables_count" == "$expected_count" ]; then
+  echo "...$tables_count expected tables. Success!"
 else
-  echo "...an unexpected number: $tables_count"
+  echo "...an unexpected number: $tables_count instead of $expected_count"
+  actual_tables=$(get_all | jq -r '.table[].name' | sort)
+  echo "additional tables expected to be present (if any):"
+  comm -13 <(echo "$actual_tables") <(echo "$expected_tables")
+  echo "additional tables unexpectedly present (if any):"
+  comm -23 <(echo "$actual_tables") <(echo "$expected_tables")
   exit 1
 fi
