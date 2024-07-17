@@ -270,9 +270,9 @@ pub fn kerberos_container_start_commands(hbase: &HbaseCluster) -> String {
 
     formatdoc! {"
         export KERBEROS_REALM=$(grep -oP 'default_realm = \\K.*' /stackable/kerberos/krb5.conf)
-        sed -i -e 's/${{env.KERBEROS_REALM}}/'\"$KERBEROS_REALM/g\" {CONFIG_DIR_NAME}/core-site.xml
-        sed -i -e 's/${{env.KERBEROS_REALM}}/'\"$KERBEROS_REALM/g\" {CONFIG_DIR_NAME}/hbase-site.xml
-        sed -i -e 's/${{env.KERBEROS_REALM}}/'\"$KERBEROS_REALM/g\" {CONFIG_DIR_NAME}/hdfs-site.xml",
+        config-utils template {CONFIG_DIR_NAME}/core-site.xml
+        config-utils template {CONFIG_DIR_NAME}/hbase-site.xml
+        config-utils template {CONFIG_DIR_NAME}/hdfs-site.xml"
     }
 }
 
@@ -282,6 +282,6 @@ fn principal_host_part(hbase: &HbaseCluster) -> Result<String, Error> {
         hbase: ObjectRef::from_obj(hbase),
     })?;
     Ok(format!(
-        "{hbase_name}.{hbase_namespace}.svc.cluster.local@${{env.KERBEROS_REALM}}"
+        "{hbase_name}.{hbase_namespace}.svc.cluster.local@${{env:KERBEROS_REALM}}"
     ))
 }
