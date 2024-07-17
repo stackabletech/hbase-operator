@@ -39,12 +39,13 @@ echo "Updating Helm repo"
 helm repo update
 echo "Installing Operators with Helm"
 # tag::helm-install-operators[]
-helm install --wait zookeeper-operator stackable-dev/zookeeper-operator --version 0.0.0-dev
-helm install --wait hdfs-operator stackable-dev/hdfs-operator --version 0.0.0-dev
-helm install --wait commons-operator stackable-dev/commons-operator --version 0.0.0-dev
-helm install --wait secret-operator stackable-dev/secret-operator --version 0.0.0-dev
-helm install --wait listener-operator stackable-dev/listener-operator --version 0.0.0-dev
-helm install --wait hbase-operator stackable-dev/hbase-operator --version 0.0.0-dev
+helm install --wait zookeeper-operator stackable-dev/zookeeper-operator --version 0.0.0-dev &
+helm install --wait hdfs-operator stackable-dev/hdfs-operator --version 0.0.0-dev &
+helm install --wait commons-operator stackable-dev/commons-operator --version 0.0.0-dev &
+helm install --wait secret-operator stackable-dev/secret-operator --version 0.0.0-dev &
+helm install --wait listener-operator stackable-dev/listener-operator --version 0.0.0-dev &
+helm install --wait hbase-operator stackable-dev/hbase-operator --version 0.0.0-dev &
+wait
 # end::helm-install-operators[]
 ;;
 "stackablectl")
