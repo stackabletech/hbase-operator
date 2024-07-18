@@ -3,8 +3,7 @@ use std::collections::BTreeMap;
 use indoc::formatdoc;
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_hbase_crd::{
-    HbaseCluster, HbaseRole, CONFIG_DIR_NAME, TLS_STORE_DIR, TLS_STORE_PASSWORD,
-    TLS_STORE_VOLUME_NAME,
+    HbaseCluster, HbaseRole, TLS_STORE_DIR, TLS_STORE_PASSWORD, TLS_STORE_VOLUME_NAME,
 };
 use stackable_operator::{
     builder::pod::{
