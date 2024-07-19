@@ -3,8 +3,7 @@ use std::collections::BTreeMap;
 use indoc::formatdoc;
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_hbase_crd::{
-    HbaseCluster, HbaseRole, CONFIG_DIR_NAME, TLS_STORE_DIR, TLS_STORE_PASSWORD,
-    TLS_STORE_VOLUME_NAME,
+    HbaseCluster, HbaseRole, TLS_STORE_DIR, TLS_STORE_PASSWORD, TLS_STORE_VOLUME_NAME,
 };
 use stackable_operator::{
     builder::pod::{
@@ -269,10 +268,7 @@ pub fn kerberos_container_start_commands(hbase: &HbaseCluster) -> String {
     }
 
     formatdoc! {"
-        export KERBEROS_REALM=$(grep -oP 'default_realm = \\K.*' /stackable/kerberos/krb5.conf)
-        sed -i -e 's/${{env.KERBEROS_REALM}}/'\"$KERBEROS_REALM/g\" {CONFIG_DIR_NAME}/core-site.xml
-        sed -i -e 's/${{env.KERBEROS_REALM}}/'\"$KERBEROS_REALM/g\" {CONFIG_DIR_NAME}/hbase-site.xml
-        sed -i -e 's/${{env.KERBEROS_REALM}}/'\"$KERBEROS_REALM/g\" {CONFIG_DIR_NAME}/hdfs-site.xml",
+        export KERBEROS_REALM=$(grep -oP 'default_realm = \\K.*' /stackable/kerberos/krb5.conf)"
     }
 }
 
