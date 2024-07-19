@@ -15,11 +15,14 @@
 - Bump `stackable-operator` from `0.64.0` to `0.70.0` ([#524]).
 - Bump `product-config` from `0.6.0` to `0.7.0` ([#524]).
 - Bump other dependencies ([#527]).
+- Remove sed calls to replace KRB REALM in configuration. IMPORTANT: This means the operator will ONLY work
+  with HBase versions that are compiled against Hadoop 3.x as of now ([#531])
 
 [#506]: https://github.com/stackabletech/hbase-operator/pull/506
 [#523]: https://github.com/stackabletech/hbase-operator/pull/523
 [#524]: https://github.com/stackabletech/hbase-operator/pull/524
 [#527]: https://github.com/stackabletech/hbase-operator/pull/527
+[#531]: https://github.com/stackabletech/hbase-operator/pull/531
 
 ## [24.3.0] - 2024-03-20
 
