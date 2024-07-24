@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [24.7.0] - 2024-07-24
+
 ### Added
 
 - Added support for HBase 2.6.0 with the following changes ([#506]):
