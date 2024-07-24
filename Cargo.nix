@@ -6435,7 +6435,7 @@ rec {
       };
       "stackable-hbase-crd" = rec {
         crateName = "stackable-hbase-crd";
-        version = "0.0.0-dev";
+        version = "24.7.0";
         edition = "2021";
         # We can't filter paths with references in Nix 2.4
         # See https://github.com/NixOS/nix/issues/5410
@@ -6488,7 +6488,7 @@ rec {
       };
       "stackable-hbase-operator" = rec {
         crateName = "stackable-hbase-operator";
-        version = "0.0.0-dev";
+        version = "24.7.0";
         edition = "2021";
         crateBin = [
           {
