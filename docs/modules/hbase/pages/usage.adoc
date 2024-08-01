@@ -61,7 +61,7 @@ It should generally be safe to simply use the latest image version that is avail
 == Monitoring
 
 The managed HBase instances are automatically configured to export Prometheus metrics. See
-xref:home:operators:monitoring.adoc[] for more details.
+xref:operators:monitoring.adoc[] for more details.
 
 == Log aggregation
 
@@ -87,7 +87,7 @@ spec:
 ----
 
 Further information on how to configure logging, can be found in
-xref:home:concepts:logging.adoc[].
+xref:concepts:logging.adoc[].
 
 == Configuration Overrides
 
@@ -154,7 +154,7 @@ The HBase Operator currently does not support any https://kubernetes.io/docs/con
 // The "nightly" version is needed because the "include" directive searches for
 // files in the "stable" version by default.
 // TODO: remove the "nightly" version after the next platform release (current: 22.09)
-include::home:concepts:stackable_resource_requests.adoc[]
+include::concepts:stackable_resource_requests.adoc[]
 
 If no resources are configured explicitly, the HBase operator uses following defaults:
 
