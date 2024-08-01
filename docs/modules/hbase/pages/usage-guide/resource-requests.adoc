@@ -1,6 +1,6 @@
 = Resource requests
 
-include::home:concepts:stackable_resource_requests.adoc[]
+include::concepts:stackable_resource_requests.adoc[]
 
 If no resources are configured explicitly, the HBase operator uses following defaults:
 
