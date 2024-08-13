@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Reduce CRD size from `1.4MB` to `96KB` by accepting arbitrary YAML input instead of the underlying schema for the following fields ([#548]):
+  - `podOverrides`
+  - `affinity`
+
+[#548]: https://github.com/stackabletech/hbase-operator/pull/548
+
 ## [24.7.0] - 2024-07-24
 
 ### Added
