@@ -703,7 +703,7 @@ fn build_rolegroup_service(
 
     let metadata = ObjectMetaBuilder::new()
         .name_and_namespace(hbase)
-        .name(&rolegroup.object_name())
+        .name(rolegroup.object_name())
         .ownerreference_from_resource(hbase, None, Some(true))
         .context(ObjectMissingMetadataForOwnerRefSnafu)?
         .with_recommended_labels(build_recommended_labels(
@@ -818,6 +818,8 @@ fn build_rolegroup_statefulset(
         ..probe_template
     };
 
+    let merged_env = hbase.merged_env(role, role_group);
+
     let log4j_properties_file_name =
         log4j_properties_file_name(&resolved_product_image.product_version);
     let mut hbase_container = ContainerBuilder::new("hbase").expect("ContainerBuilder not created");
@@ -853,9 +855,7 @@ fn build_rolegroup_statefulset(
             create_vector_shutdown_file_command =
                 create_vector_shutdown_file_command(STACKABLE_LOG_DIR),
         }])
-        .add_env_var("HBASE_CONF_DIR", CONFIG_DIR_NAME)
-        // required by phoenix (for cases where Kerberos is enabled): see https://issues.apache.org/jira/browse/PHOENIX-2369
-        .add_env_var("HADOOP_CONF_DIR", CONFIG_DIR_NAME)
+        .add_env_vars(merged_env)
         .add_volume_mount("hbase-config", HBASE_CONFIG_TMP_DIR)
         .add_volume_mount("hdfs-discovery", HDFS_DISCOVERY_TMP_DIR)
         .add_volume_mount("log-config", HBASE_LOG_CONFIG_TMP_DIR)
@@ -973,7 +973,7 @@ fn build_rolegroup_statefulset(
 
     let metadata = ObjectMetaBuilder::new()
         .name_and_namespace(hbase)
-        .name(&rolegroup_ref.object_name())
+        .name(rolegroup_ref.object_name())
         .ownerreference_from_resource(hbase, None, Some(true))
         .context(ObjectMissingMetadataForOwnerRefSnafu)?
         .with_recommended_labels(build_recommended_labels(

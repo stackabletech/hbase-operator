@@ -13,8 +13,11 @@ use stackable_operator::{
             Resources, ResourcesFragment,
         },
     },
-    config::{fragment, fragment::Fragment, fragment::ValidationError, merge::Merge},
-    k8s_openapi::apimachinery::pkg::api::resource::Quantity,
+    config::{
+        fragment::{self, Fragment, ValidationError},
+        merge::Merge,
+    },
+    k8s_openapi::{api::core::v1::EnvVar, apimachinery::pkg::api::resource::Quantity},
     kube::{runtime::reflector::ObjectRef, CustomResource, ResourceExt},
     product_config_utils::Configuration,
     product_logging::{self, spec::Logging},
@@ -654,5 +657,72 @@ impl HbaseCluster {
 
         tracing::debug!("Merged config: {:?}", conf_rolegroup);
         fragment::validate(conf_rolegroup).context(FragmentValidationFailureSnafu)
+    }
+
+    pub fn merged_env(
+        &self,
+        role: Option<&Role<HbaseConfigFragment, GenericRoleConfig>>,
+        role_group: Option<&RoleGroup<HbaseConfigFragment>>,
+    ) -> Vec<EnvVar> {
+        // Maps env var name to env var object. This allows env_overrides to work
+        // as expected (i.e. users can override the env var value).
+        let mut vars: BTreeMap<String, EnvVar> = BTreeMap::new();
+
+        vars.insert(
+            "HBASE_CONF_DIR".to_string(),
+            EnvVar {
+                name: "HBASE_CONF_DIR".to_string(),
+                value: Some(CONFIG_DIR_NAME.to_string()),
+                value_from: None,
+            },
+        );
+        // required by phoenix (for cases where Kerberos is enabled): see https://issues.apache.org/jira/browse/PHOENIX-2369
+        vars.insert(
+            "HADOOP_CONF_DIR".to_string(),
+            EnvVar {
+                name: "HADOOP_CONF_DIR".to_string(),
+                value: Some(CONFIG_DIR_NAME.to_string()),
+                value_from: None,
+            },
+        );
+
+        if let Some(role) = role {
+            let mut role_envs = role
+                .config
+                .env_overrides
+                .iter()
+                .map(|(env_name, env_value)| {
+                    (
+                        env_name.clone(),
+                        EnvVar {
+                            name: env_name.clone(),
+                            value: Some(env_value.to_owned()),
+                            value_from: None,
+                        },
+                    )
+                });
+            vars.extend(&mut role_envs);
+        }
+        if let Some(role_group) = role_group {
+            let mut role_group_envs =
+                role_group
+                    .config
+                    .env_overrides
+                    .iter()
+                    .map(|(env_name, env_value)| {
+                        (
+                            env_name.clone(),
+                            EnvVar {
+                                name: env_name.clone(),
+                                value: Some(env_value.to_owned()),
+                                value_from: None,
+                            },
+                        )
+                    });
+            vars.extend(&mut role_group_envs);
+        }
+
+        // convert to Vec
+        vars.into_values().collect()
     }
 }

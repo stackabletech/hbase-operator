@@ -1,0 +1,59 @@
+---
+apiVersion: hbase.stackable.tech/v1alpha1
+kind: HbaseCluster
+metadata:
+  name: test-hbase
+spec:
+  image:
+    productVersion: "{{ test_scenario['values']['hbase-latest'] }}"
+    pullPolicy: IfNotPresent
+  clusterConfig:
+    hdfsConfigMapName: test-hdfs-namenode-default
+    zookeeperConfigMapName: test-znode
+{% if lookup('env', 'VECTOR_AGGREGATOR') %}
+    vectorAggregatorConfigMapName: vector-aggregator-discovery
+{% endif %}
+  masters:
+    envOverrides:
+      TEST_VAR_FROM_MASTER: MASTER
+      TEST_VAR: MASTER
+    config:
+      logging:
+        enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
+    roleGroups:
+      default:
+        replicas: 1
+        envOverrides:
+          TEST_VAR_FROM_MRG: MASTER
+          TEST_VAR: MASTER_RG
+  regionServers:
+    envOverrides:
+      TEST_VAR_FROM_RS: REGIONSERVER
+      TEST_VAR: REGIONSERVER
+    config:
+      logging:
+        enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
+    roleGroups:
+      resources-from-role:
+        replicas: 1
+        envOverrides:
+          TEST_VAR_FROM_RFR: REGIONSERVER
+          TEST_VAR: REGIONSERVER_RFR
+      resources-from-role-group:
+        envOverrides:
+          TEST_VAR_FROM_RFRG: REGIONSERVER
+          TEST_VAR: REGIONSERVER_RFRG
+        replicas: 1
+  restServers:
+    envOverrides:
+      TEST_VAR_FROM_REST: RESTSERVER
+      TEST_VAR: RESTSERVER
+    config:
+      logging:
+        enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
+    roleGroups:
+      default:
+        replicas: 1
+        envOverrides:
+          TEST_VAR_FROM_REST_RG: RESTSERVER
+          TEST_VAR: RESTSERVER_RG
