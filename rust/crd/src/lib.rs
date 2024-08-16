@@ -789,9 +789,9 @@ spec:
         let merged_env = hbase.merged_env(role, role_group);
 
         let env_map: BTreeMap<&str, Option<String>> = merged_env
-        .iter()
-        .map(|env_var| (env_var.name.as_str(), env_var.value.clone()))
-        .collect();
+            .iter()
+            .map(|env_var| (env_var.name.as_str(), env_var.value.clone()))
+            .collect();
 
         println!("{:#?}", merged_env);
 
