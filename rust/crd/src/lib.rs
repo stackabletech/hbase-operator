@@ -726,3 +726,86 @@ impl HbaseCluster {
         vars.into_values().collect()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::collections::BTreeMap;
+
+    use indoc::indoc;
+
+    use crate::{HbaseCluster, HbaseRole};
+
+    #[test]
+    pub fn test_env_overrides() {
+        let input = indoc! {r#"
+---
+apiVersion: hbase.stackable.tech/v1alpha1
+kind: HbaseCluster
+metadata:
+  name: test-hbase
+spec:
+  image:
+    productVersion: 2.4.18
+  clusterConfig:
+    hdfsConfigMapName: test-hdfs
+    zookeeperConfigMapName: test-znode
+  masters:
+    envOverrides:
+      TEST_VAR_FROM_MASTER: MASTER
+      TEST_VAR: MASTER
+    config:
+      logging:
+        enableVectorAgent: False
+    roleGroups:
+      default:
+        replicas: 1
+        envOverrides:
+          TEST_VAR_FROM_MRG: MASTER
+          TEST_VAR: MASTER_RG
+  regionServers:
+    config:
+      logging:
+        enableVectorAgent: False
+    roleGroups:
+      default:
+        replicas: 1
+  restServers:
+    config:
+      logging:
+        enableVectorAgent: False
+    roleGroups:
+      default:
+        replicas: 1
+        "#};
+
+        let deserializer = serde_yaml::Deserializer::from_str(input);
+        let hbase: HbaseCluster =
+            serde_yaml::with::singleton_map_recursive::deserialize(deserializer).unwrap();
+
+        let role = hbase.get_role(&HbaseRole::Master);
+        let rolegroup_ref = hbase.server_rolegroup_ref("master", "default");
+        let role_group = role.and_then(|r| r.role_groups.get(&rolegroup_ref.role_group));
+
+        let merged_env = hbase.merged_env(role, role_group);
+
+        let env_map: BTreeMap<&str, Option<String>> = merged_env
+        .iter()
+        .map(|env_var| (env_var.name.as_str(), env_var.value.clone()))
+        .collect();
+
+        println!("{:#?}", merged_env);
+
+        assert_eq!(
+            Some(&Some("MASTER_RG".to_string())),
+            env_map.get("TEST_VAR")
+        );
+        assert_eq!(
+            Some(&Some("MASTER".to_string())),
+            env_map.get("TEST_VAR_FROM_MASTER")
+        );
+        assert_eq!(
+            Some(&Some("MASTER".to_string())),
+            env_map.get("TEST_VAR_FROM_MRG")
+        );
+    }
+}
