@@ -419,6 +419,7 @@ pub async fn reconcile_hbase(hbase: Arc<HbaseCluster>, ctx: Arc<Ctx>) -> Result<
                 &hbase,
                 &hbase_role,
                 &rolegroup,
+                rolegroup_config,
                 &merged_config,
                 &resolved_product_image,
             )?;
@@ -744,6 +745,7 @@ fn build_rolegroup_statefulset(
     hbase: &HbaseCluster,
     hbase_role: &HbaseRole,
     rolegroup_ref: &RoleGroupRef<HbaseCluster>,
+    rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
     config: &HbaseConfig,
     resolved_product_image: &ResolvedProductImage,
 ) -> Result<StatefulSet> {
@@ -818,7 +820,7 @@ fn build_rolegroup_statefulset(
         ..probe_template
     };
 
-    let merged_env = hbase.merged_env(role, role_group);
+    let merged_env = hbase.merged_env(rolegroup_config.get(&PropertyNameKind::Env));
 
     let log4j_properties_file_name =
         log4j_properties_file_name(&resolved_product_image.product_version);
@@ -1018,6 +1020,7 @@ fn build_roles(
     hbase: &HbaseCluster,
 ) -> Result<HashMap<String, (Vec<PropertyNameKind>, Role<HbaseConfigFragment>)>> {
     let config_types = vec![
+        PropertyNameKind::Env,
         PropertyNameKind::File(HBASE_ENV_SH.to_string()),
         PropertyNameKind::File(HBASE_SITE_XML.to_string()),
         PropertyNameKind::File(SSL_SERVER_XML.to_string()),
