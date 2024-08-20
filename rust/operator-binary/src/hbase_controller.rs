@@ -62,9 +62,9 @@ use stackable_operator::{
 use strum::{EnumDiscriminants, IntoStaticStr, ParseError};
 
 use stackable_hbase_crd::{
-    Container, HbaseCluster, HbaseClusterStatus, HbaseConfig, HbaseConfigFragment, HbaseRole,
-    APP_NAME, CONFIG_DIR_NAME, HBASE_ENV_SH, HBASE_HEAPSIZE, HBASE_MANAGES_ZK, HBASE_MASTER_OPTS,
-    HBASE_REGIONSERVER_OPTS, HBASE_REST_OPTS, HBASE_REST_PORT_NAME_HTTP,
+    merged_env, Container, HbaseCluster, HbaseClusterStatus, HbaseConfig, HbaseConfigFragment,
+    HbaseRole, APP_NAME, CONFIG_DIR_NAME, HBASE_ENV_SH, HBASE_HEAPSIZE, HBASE_MANAGES_ZK,
+    HBASE_MASTER_OPTS, HBASE_REGIONSERVER_OPTS, HBASE_REST_OPTS, HBASE_REST_PORT_NAME_HTTP,
     HBASE_REST_PORT_NAME_HTTPS, HBASE_SITE_XML, JVM_HEAP_FACTOR, JVM_SECURITY_PROPERTIES_FILE,
     METRICS_PORT, SSL_CLIENT_XML, SSL_SERVER_XML,
 };
@@ -820,7 +820,7 @@ fn build_rolegroup_statefulset(
         ..probe_template
     };
 
-    let merged_env = hbase.merged_env(rolegroup_config.get(&PropertyNameKind::Env));
+    let merged_env = merged_env(rolegroup_config.get(&PropertyNameKind::Env));
 
     let log4j_properties_file_name =
         log4j_properties_file_name(&resolved_product_image.product_version);
