@@ -6532,6 +6532,10 @@ rec {
         ];
         dependencies = [
           {
+            name = "product-config";
+            packageId = "product-config";
+          }
+          {
             name = "serde";
             packageId = "serde";
             features = [ "derive" ];
@@ -6559,6 +6563,10 @@ rec {
           }
         ];
         devDependencies = [
+          {
+            name = "indoc";
+            packageId = "indoc";
+          }
           {
             name = "rstest";
             packageId = "rstest";

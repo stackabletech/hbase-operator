@@ -8,7 +8,12 @@
   - `podOverrides`
   - `affinity`
 
+### Fixed
+
+- Implement `envOverrides` for HbaseCluster ([#550]).
+
 [#548]: https://github.com/stackabletech/hbase-operator/pull/548
+[#550]: https://github.com/stackabletech/hbase-operator/pull/550
 
 ## [24.7.0] - 2024-07-24
 

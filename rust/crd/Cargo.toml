@@ -9,6 +9,7 @@ repository.workspace = true
 publish = false
 
 [dependencies]
+product-config.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 snafu.workspace = true
@@ -19,3 +20,4 @@ tracing.workspace = true
 [dev-dependencies]
 rstest.workspace = true
 serde_yaml.workspace = true
+indoc.workspace = true

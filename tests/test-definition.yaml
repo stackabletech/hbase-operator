@@ -92,6 +92,12 @@ tests:
       - hdfs-latest
       - zookeeper-latest
       - openshift
+  - name: overrides
+    dimensions:
+      - hbase-latest
+      - hdfs-latest
+      - zookeeper-latest
+      - openshift
   - name: logging
     dimensions:
       - hbase

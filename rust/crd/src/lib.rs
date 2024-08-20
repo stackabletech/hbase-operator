@@ -13,8 +13,11 @@ use stackable_operator::{
             Resources, ResourcesFragment,
         },
     },
-    config::{fragment, fragment::Fragment, fragment::ValidationError, merge::Merge},
-    k8s_openapi::apimachinery::pkg::api::resource::Quantity,
+    config::{
+        fragment::{self, Fragment, ValidationError},
+        merge::Merge,
+    },
+    k8s_openapi::{api::core::v1::EnvVar, apimachinery::pkg::api::resource::Quantity},
     kube::{runtime::reflector::ObjectRef, CustomResource, ResourceExt},
     product_config_utils::Configuration,
     product_logging::{self, spec::Logging},
@@ -419,7 +422,20 @@ impl Configuration for HbaseConfigFragment {
         _role_name: &str,
     ) -> Result<BTreeMap<String, Option<String>>, stackable_operator::product_config_utils::Error>
     {
-        Ok(BTreeMap::new())
+        // Maps env var name to env var object. This allows env_overrides to work
+        // as expected (i.e. users can override the env var value).
+        let mut vars: BTreeMap<String, Option<String>> = BTreeMap::new();
+
+        vars.insert(
+            "HBASE_CONF_DIR".to_string(),
+            Some(CONFIG_DIR_NAME.to_string()),
+        );
+        // required by phoenix (for cases where Kerberos is enabled): see https://issues.apache.org/jira/browse/PHOENIX-2369
+        vars.insert(
+            "HADOOP_CONF_DIR".to_string(),
+            Some(CONFIG_DIR_NAME.to_string()),
+        );
+        Ok(vars)
     }
 
     fn compute_cli(
@@ -654,5 +670,135 @@ impl HbaseCluster {
 
         tracing::debug!("Merged config: {:?}", conf_rolegroup);
         fragment::validate(conf_rolegroup).context(FragmentValidationFailureSnafu)
+    }
+}
+
+pub fn merged_env(rolegroup_config: Option<&BTreeMap<String, String>>) -> Vec<EnvVar> {
+    let merged_env: Vec<EnvVar> = if let Some(rolegroup_config) = rolegroup_config {
+        let env_vars_from_config: BTreeMap<String, EnvVar> = rolegroup_config
+            .iter()
+            .map(|(env_name, env_value)| {
+                (
+                    env_name.clone(),
+                    EnvVar {
+                        name: env_name.clone(),
+                        value: Some(env_value.to_owned()),
+                        value_from: None,
+                    },
+                )
+            })
+            .collect();
+        env_vars_from_config.into_values().collect()
+    } else {
+        vec![]
+    };
+    merged_env
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::{BTreeMap, HashMap};
+
+    use indoc::indoc;
+    use stackable_operator::product_config_utils::{
+        transform_all_roles_to_config, validate_all_roles_and_groups_config,
+    };
+
+    use crate::{merged_env, HbaseCluster, HbaseRole};
+
+    use product_config::{types::PropertyNameKind, ProductConfigManager};
+
+    #[test]
+    pub fn test_env_overrides() {
+        let input = indoc! {r#"
+---
+apiVersion: hbase.stackable.tech/v1alpha1
+kind: HbaseCluster
+metadata:
+  name: test-hbase
+spec:
+  image:
+    productVersion: 2.4.18
+  clusterConfig:
+    hdfsConfigMapName: test-hdfs
+    zookeeperConfigMapName: test-znode
+  masters:
+    envOverrides:
+      TEST_VAR_FROM_MASTER: MASTER
+      TEST_VAR: MASTER
+    config:
+      logging:
+        enableVectorAgent: False
+    roleGroups:
+      default:
+        replicas: 1
+        envOverrides:
+          TEST_VAR_FROM_MRG: MASTER
+          TEST_VAR: MASTER_RG
+  regionServers:
+    config:
+      logging:
+        enableVectorAgent: False
+    roleGroups:
+      default:
+        replicas: 1
+  restServers:
+    config:
+      logging:
+        enableVectorAgent: False
+    roleGroups:
+      default:
+        replicas: 1
+        "#};
+
+        let deserializer = serde_yaml::Deserializer::from_str(input);
+        let hbase: HbaseCluster =
+            serde_yaml::with::singleton_map_recursive::deserialize(deserializer).unwrap();
+
+        let roles = HashMap::from([(
+            HbaseRole::Master.to_string(),
+            (
+                vec![PropertyNameKind::Env],
+                hbase.get_role(&HbaseRole::Master).cloned().unwrap(),
+            ),
+        )]);
+
+        let validated_config = validate_all_roles_and_groups_config(
+            "2.4.18",
+            &transform_all_roles_to_config(&hbase, roles).unwrap(),
+            &ProductConfigManager::from_yaml_file("../../deploy/config-spec/properties.yaml")
+                .unwrap(),
+            false,
+            false,
+        )
+        .unwrap();
+
+        let rolegroup_config = validated_config
+            .get(&HbaseRole::Master.to_string())
+            .unwrap()
+            .get("default")
+            .unwrap()
+            .get(&PropertyNameKind::Env);
+        let merged_env = merged_env(rolegroup_config);
+
+        let env_map: BTreeMap<&str, Option<String>> = merged_env
+            .iter()
+            .map(|env_var| (env_var.name.as_str(), env_var.value.clone()))
+            .collect();
+
+        println!("{:#?}", merged_env);
+
+        assert_eq!(
+            Some(&Some("MASTER_RG".to_string())),
+            env_map.get("TEST_VAR")
+        );
+        assert_eq!(
+            Some(&Some("MASTER".to_string())),
+            env_map.get("TEST_VAR_FROM_MASTER")
+        );
+        assert_eq!(
+            Some(&Some("MASTER".to_string())),
+            env_map.get("TEST_VAR_FROM_MRG")
+        );
     }
 }
