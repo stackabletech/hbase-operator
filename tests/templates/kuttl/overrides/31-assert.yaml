@@ -4,22 +4,46 @@ kind: TestAssert
 timeout: 30
 commands:
   - script: |
-      POD=$(kubectl -n $NAMESPACE get pod -l app.kubernetes.io/component=master,app.kubernetes.io/role-group=default -o name | head -n 1 | sed -e 's#pod/##')
-      kubectl -n $NAMESPACE get pod $POD -o yaml | yq '.spec.containers[0].env[] | select (.name == "TEST_VAR_FROM_MASTER").value' | grep 'MASTER'
-      kubectl -n $NAMESPACE get pod $POD -o yaml | yq '.spec.containers[0].env[] | select (.name == "TEST_VAR_FROM_MRG").value' | grep 'MASTER'
-      kubectl -n $NAMESPACE get pod $POD -o yaml | yq '.spec.containers[0].env[] | select (.name == "TEST_VAR").value' | grep 'MASTER_RG'
-  - script: |
-      POD=$(kubectl -n $NAMESPACE get pod -l app.kubernetes.io/component=regionserver,app.kubernetes.io/role-group=resources-from-role -o name | head -n 1 | sed -e 's#pod/##')
-      kubectl -n $NAMESPACE get pod $POD -o yaml | yq '.spec.containers[0].env[] | select (.name == "TEST_VAR_FROM_RS").value' | grep 'REGIONSERVER'
-      kubectl -n $NAMESPACE get pod $POD -o yaml | yq '.spec.containers[0].env[] | select (.name == "TEST_VAR_FROM_RFR").value' | grep 'REGIONSERVER'
-      kubectl -n $NAMESPACE get pod $POD -o yaml | yq '.spec.containers[0].env[] | select (.name == "TEST_VAR").value' | grep 'REGIONSERVER_RFR'
-  - script: |
-      POD=$(kubectl -n $NAMESPACE get pod -l app.kubernetes.io/component=regionserver,app.kubernetes.io/role-group=resources-from-role-group -o name | head -n 1 | sed -e 's#pod/##')
-      kubectl -n $NAMESPACE get pod $POD -o yaml | yq '.spec.containers[0].env[] | select (.name == "TEST_VAR_FROM_RS").value' | grep 'REGIONSERVER'
-      kubectl -n $NAMESPACE get pod $POD -o yaml | yq '.spec.containers[0].env[] | select (.name == "TEST_VAR_FROM_RFRG").value' | grep 'REGIONSERVER'
-      kubectl -n $NAMESPACE get pod $POD -o yaml | yq '.spec.containers[0].env[] | select (.name == "TEST_VAR").value' | grep 'REGIONSERVER_RFRG'
-  - script: |
-      POD=$(kubectl -n $NAMESPACE get pod -l app.kubernetes.io/component=restserver,app.kubernetes.io/role-group=default -o name | head -n 1 | sed -e 's#pod/##')
-      kubectl -n $NAMESPACE get pod $POD -o yaml | yq '.spec.containers[0].env[] | select (.name == "TEST_VAR_FROM_REST").value' | grep 'RESTSERVER'
-      kubectl -n $NAMESPACE get pod $POD -o yaml | yq '.spec.containers[0].env[] | select (.name == "TEST_VAR_FROM_REST_RG").value' | grep 'RESTSERVER'
-      kubectl -n $NAMESPACE get pod $POD -o yaml | yq '.spec.containers[0].env[] | select (.name == "TEST_VAR").value' | grep 'RESTSERVER_RG'
+      #!/usr/bin/env bash
+      set -euo pipefail
+
+      # POD Test Names
+      POD_MASTER=$(kubectl -n $NAMESPACE get pod -l app.kubernetes.io/component=master,app.kubernetes.io/role-group=default -o name | head -n 1 | sed -e 's#pod/##')
+      POD_REGIONSERVER_ROLE=$(kubectl -n $NAMESPACE get pod -l app.kubernetes.io/component=regionserver,app.kubernetes.io/role-group=resources-from-role -o name | head -n 1 | sed -e 's#pod/##')
+      POD_REGIONSERVER_ROLE_GROUP=$(kubectl -n $NAMESPACE get pod -l app.kubernetes.io/component=regionserver,app.kubernetes.io/role-group=resources-from-role-group -o name | head -n 1 | sed -e 's#pod/##')
+      POD_RESTSERVER=$(kubectl -n $NAMESPACE get pod -l app.kubernetes.io/component=restserver,app.kubernetes.io/role-group=default -o name | head -n 1 | sed -e 's#pod/##')
+
+      # Config Test Data
+      POD_MASTER_DATA=$(kubectl -n $NAMESPACE get pod $POD_MASTER -o yaml)
+      POD_REGIONSERVER_ROLE_DATA=$(kubectl -n $NAMESPACE get pod $POD_REGIONSERVER_ROLE -o yaml)
+      POD_REGIONSERVER_ROLE_GROUP_DATA=$(kubectl -n $NAMESPACE get pod $POD_REGIONSERVER_ROLE_GROUP -o yaml)
+      POD_RESTSERVER_DATA=$(kubectl -n $NAMESPACE get pod $POD_RESTSERVER -o yaml)
+      echo "$POD_MASTER_DATA"
+      echo "$POD_REGIONSERVER_ROLE_DATA"
+      echo "$POD_REGIONSERVER_ROLE_GROUP_DATA"
+      echo "$POD_RESTSERVER_DATA"
+
+      YQ_FILTER='
+       .spec.containers[0].env[]
+       | select (.name == strenv(KEY) and .value == strenv(VALUE))
+      ' 
+
+      # POD_MASTER Test Assertions
+      echo "$POD_MASTER_DATA" | KEY="TEST_VAR_FROM_MASTER" VALUE="MASTER" yq -e "$YQ_FILTER"
+      echo "$POD_MASTER_DATA" | KEY="TEST_VAR_FROM_MRG" VALUE="MASTER" yq -e "$YQ_FILTER"
+      echo "$POD_MASTER_DATA" | KEY="TEST_VAR" VALUE="MASTER_RG" yq -e "$YQ_FILTER"
+
+      # POD_REGIONSERVER_ROLE Test Assertions
+      echo "$POD_REGIONSERVER_ROLE_DATA" | KEY="TEST_VAR_FROM_RS" VALUE="REGIONSERVER" yq -e "$YQ_FILTER"
+      echo "$POD_REGIONSERVER_ROLE_DATA" | KEY="TEST_VAR_FROM_RFR" VALUE="REGIONSERVER" yq -e "$YQ_FILTER"
+      echo "$POD_REGIONSERVER_ROLE_DATA" | KEY="TEST_VAR" VALUE="REGIONSERVER_RFR" yq -e "$YQ_FILTER"
+
+      # POD_REGIONSERVER_ROLE_GROUP_DATA Test Assertions
+      echo "$POD_REGIONSERVER_ROLE_GROUP_DATA" | KEY="TEST_VAR_FROM_RS" VALUE="REGIONSERVER" yq -e "$YQ_FILTER"
+      echo "$POD_REGIONSERVER_ROLE_GROUP_DATA" | KEY="TEST_VAR_FROM_RFRG" VALUE="REGIONSERVER" yq -e "$YQ_FILTER"
+      echo "$POD_REGIONSERVER_ROLE_GROUP_DATA" | KEY="TEST_VAR" VALUE="REGIONSERVER_RFRG" yq -e "$YQ_FILTER"
+
+      # POD_RESTSERVER_DATA Test Assertions
+      echo "$POD_RESTSERVER_DATA" | KEY="TEST_VAR_FROM_REST" VALUE="RESTSERVER" yq -e "$YQ_FILTER"
+      echo "$POD_RESTSERVER_DATA" | KEY="TEST_VAR_FROM_REST_RG" VALUE="RESTSERVER" yq -e "$YQ_FILTER"
+      echo "$POD_RESTSERVER_DATA" | KEY="TEST_VAR" VALUE="RESTSERVER_RG" yq -e "$YQ_FILTER"
