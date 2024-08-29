@@ -26,7 +26,7 @@ commands:
       YQ_FILTER='
        .spec.containers[0].env[]
        | select (.name == strenv(KEY) and .value == strenv(VALUE))
-      ' 
+      '
 
       # POD_MASTER Test Assertions
       echo "$POD_MASTER_DATA" | KEY="TEST_VAR_FROM_MASTER" VALUE="MASTER" yq -e "$YQ_FILTER"
