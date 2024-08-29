@@ -3,7 +3,7 @@ apiVersion: kuttl.dev/v1beta1
 kind: TestAssert
 timeout: 30
 commands:
-    # master, default RG
+  # master, default RG
   - script: |
       set -euo pipefail
 
@@ -30,7 +30,7 @@ commands:
       | yq --unwrapScalar '.spec.containers[0].env[] | select (.name == "TEST_VAR").value' \
       | grep '^MASTER_RG$'
 
-    # regionserver, resources-from-role RG
+  # regionserver, resources-from-role RG
   - script: |
       set -euo pipefail
 
@@ -58,7 +58,7 @@ commands:
       | yq --unwrapScalar '.spec.containers[0].env[] | select (.name == "TEST_VAR").value' \
       | grep '^REGIONSERVER_RFR$'
 
-    # regionserver, resources-from-role-group RG
+  # regionserver, resources-from-role-group RG
   - script: |
       set -euo pipefail
 
@@ -86,7 +86,7 @@ commands:
       | yq --unwrapScalar '.spec.containers[0].env[] | select (.name == "TEST_VAR").value' \
       | grep '^REGIONSERVER_RFRG$'
 
-    # restserver, default RG
+  # restserver, default RG
   - script: |
       set -euo pipefail
 
