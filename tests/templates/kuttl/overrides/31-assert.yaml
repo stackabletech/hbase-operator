@@ -8,20 +8,16 @@ commands:
       set -euo pipefail
 
       # POD Test Names
-      POD_MASTER=$(kubectl -n $NAMESPACE get pod -l app.kubernetes.io/component=master,app.kubernetes.io/role-group=default -o name | head -n 1 | sed -e 's#pod/##')
-      POD_REGIONSERVER_ROLE=$(kubectl -n $NAMESPACE get pod -l app.kubernetes.io/component=regionserver,app.kubernetes.io/role-group=resources-from-role -o name | head -n 1 | sed -e 's#pod/##')
-      POD_REGIONSERVER_ROLE_GROUP=$(kubectl -n $NAMESPACE get pod -l app.kubernetes.io/component=regionserver,app.kubernetes.io/role-group=resources-from-role-group -o name | head -n 1 | sed -e 's#pod/##')
-      POD_RESTSERVER=$(kubectl -n $NAMESPACE get pod -l app.kubernetes.io/component=restserver,app.kubernetes.io/role-group=default -o name | head -n 1 | sed -e 's#pod/##')
+      POD_MASTER=$(kubectl -n "$NAMESPACE" get pod -l app.kubernetes.io/component=master,app.kubernetes.io/role-group=default -o name | head -n 1 | sed -e 's#pod/##')
+      POD_REGIONSERVER_ROLE=$(kubectl -n "$NAMESPACE" get pod -l app.kubernetes.io/component=regionserver,app.kubernetes.io/role-group=resources-from-role -o name | head -n 1 | sed -e 's#pod/##')
+      POD_REGIONSERVER_ROLE_GROUP=$(kubectl -n "$NAMESPACE" get pod -l app.kubernetes.io/component=regionserver,app.kubernetes.io/role-group=resources-from-role-group -o name | head -n 1 | sed -e 's#pod/##')
+      POD_RESTSERVER=$(kubectl -n "$NAMESPACE" get pod -l app.kubernetes.io/component=restserver,app.kubernetes.io/role-group=default -o name | head -n 1 | sed -e 's#pod/##')
 
       # Config Test Data
-      POD_MASTER_DATA=$(kubectl -n $NAMESPACE get pod $POD_MASTER -o yaml)
-      POD_REGIONSERVER_ROLE_DATA=$(kubectl -n $NAMESPACE get pod $POD_REGIONSERVER_ROLE -o yaml)
-      POD_REGIONSERVER_ROLE_GROUP_DATA=$(kubectl -n $NAMESPACE get pod $POD_REGIONSERVER_ROLE_GROUP -o yaml)
-      POD_RESTSERVER_DATA=$(kubectl -n $NAMESPACE get pod $POD_RESTSERVER -o yaml)
-      echo "$POD_MASTER_DATA"
-      echo "$POD_REGIONSERVER_ROLE_DATA"
-      echo "$POD_REGIONSERVER_ROLE_GROUP_DATA"
-      echo "$POD_RESTSERVER_DATA"
+      POD_MASTER_DATA=$(kubectl -n "$NAMESPACE" get pod "$POD_MASTER" -o yaml)
+      POD_REGIONSERVER_ROLE_DATA=$(kubectl -n "$NAMESPACE" get pod "$POD_REGIONSERVER_ROLE" -o yaml)
+      POD_REGIONSERVER_ROLE_GROUP_DATA=$(kubectl -n "$NAMESPACE" get pod "$POD_REGIONSERVER_ROLE_GROUP" -o yaml)
+      POD_RESTSERVER_DATA=$(kubectl -n "$NAMESPACE" get pod "$POD_RESTSERVER" -o yaml)
 
       YQ_FILTER='
        .spec.containers[0].env[]
