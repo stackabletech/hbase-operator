@@ -1,0 +1,38 @@
+---
+persistence:
+  enabled: false # "false" means, that an emptyDir is used instead of a persistentVolumeClaim
+  size: 64Mi
+
+provisioning:
+  enabled: true
+  buckets:
+    - name: hbase
+    - name: hbase-root
+  users:
+    - username: hbase
+      password: hbasehbase
+      policies:
+        - readwrite
+        - consoleAdmin
+        - diagnostics
+  extraCommands:
+    - >-
+      mc admin user svcacct add
+      --access-key hbaseAccessKey
+      --secret-key hbaseSecretKey
+      provisioning hbase
+  resources:
+    requests:
+      memory: 1Gi
+      cpu: 512m
+    limits:
+      memory: 1Gi
+      cpu: "1"
+
+resources:
+  requests:
+    memory: 1Gi
+    cpu: 512m
+  limits:
+    memory: 1Gi
+    cpu: "1"

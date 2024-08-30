@@ -2,8 +2,8 @@
 dimensions:
   - name: hbase
     values:
-      - 2.6.0
-      - 2.4.18
+      - 2.6.0,docker.stackable.tech/sandbox/sigi/stackable/hbase:2.6.0-stackable0.0.0-dev
+      - 2.4.18,docker.stackable.tech/sandbox/sigi/stackable/hbase:2.4.18-stackable0.0.0-dev
       # To use a custom image, add a comma and the full name after the product version
       # - 2.6.0,docker.stackable.tech/sandbox/hbase:2.6.0-stackable0.0.0-dev
       # - 2.4.18,docker.stackable.tech/sandbox/hbase:2.4.18-stackable0.0.0-dev
@@ -117,6 +117,12 @@ tests:
       - zookeeper-latest
       - openshift
   - name: snapshot-export
+    dimensions:
+      - hbase
+      - hdfs-latest
+      - zookeeper-latest
+      - openshift
+  - name: s3a
     dimensions:
       - hbase
       - hdfs-latest

@@ -1,0 +1,91 @@
+s3a_hbase-2.6.0
+===============
+
+2024-08-30T16:04:12,730 INFO  [PEWorker-4] snapshot.RestoreSnapshotHelper: starting restore table regions using snapshot=name: "snap"
+table: "test"
+creation_time: 1725033818732
+type: FLUSH
+version: 2
+ttl: 0
+
+2024-08-30T16:04:12,747 ERROR [PEWorker-4] procedure.CloneSnapshotProcedure: clone snapshot={ ss=snap table=test type=FLUSH ttl=0 } failed because No such file or directory: s3a://hbase-root/data/default/test/774ec9f8e1ecfe62a57f6821014b29bb/.regioninfo
+java.io.FileNotFoundException: No such file or directory: s3a://hbase-root/data/default/test/774ec9f8e1ecfe62a57f6821014b29bb/.regioninfo
+        at org.apache.hadoop.fs.s3a.S3AFileSystem.s3GetFileStatus(S3AFileSystem.java:3801) ~[hadoop-aws-3.3.6.jar:?]
+        at org.apache.hadoop.fs.s3a.S3AFileSystem.innerGetFileStatus(S3AFileSystem.java:3652) ~[hadoop-aws-3.3.6.jar:?]
+        at org.apache.hadoop.fs.s3a.S3AFileSystem.extractOrFetchSimpleFileStatus(S3AFileSystem.java:5288) ~[hadoop-aws-3.3.6.jar:?]
+        at org.apache.hadoop.fs.s3a.S3AFileSystem.lambda$executeOpen$6(S3AFileSystem.java:1578) ~[hadoop-aws-3.3.6.jar:?]
+        at org.apache.hadoop.fs.statistics.impl.IOStatisticsBinding.invokeTrackingDuration(IOStatisticsBinding.java:547) ~[hadoop-common-3.3.6.jar:?]
+        at org.apache.hadoop.fs.statistics.impl.IOStatisticsBinding.lambda$trackDurationOfOperation$5(IOStatisticsBinding.java:528) ~[hadoop-common-3.3.6.jar:?]
+        at org.apache.hadoop.fs.statistics.impl.IOStatisticsBinding.trackDuration(IOStatisticsBinding.java:449) ~[hadoop-common-3.3.6.jar:?]
+        at org.apache.hadoop.fs.s3a.S3AFileSystem.executeOpen(S3AFileSystem.java:1576) ~[hadoop-aws-3.3.6.jar:?]
+        at org.apache.hadoop.fs.s3a.S3AFileSystem.open(S3AFileSystem.java:1550) ~[hadoop-aws-3.3.6.jar:?]
+        at org.apache.hadoop.fs.FileSystem.open(FileSystem.java:997) ~[hadoop-common-3.3.6.jar:?]
+        at org.apache.hadoop.hbase.regionserver.HRegionFileSystem.loadRegionInfoFileContent(HRegionFileSystem.java:851) ~[hbase-server-2.6.0.jar:2.6.0]
+        at org.apache.hadoop.hbase.snapshot.RestoreSnapshotHelper.getTableRegions(RestoreSnapshotHelper.java:855) ~[hbase-server-2.6.0.jar:2.6.0]
+        at org.apache.hadoop.hbase.snapshot.RestoreSnapshotHelper.restoreHdfsRegions(RestoreSnapshotHelper.java:195) ~[hbase-server-2.6.0.jar:2.6.0]
+        at org.apache.hadoop.hbase.snapshot.RestoreSnapshotHelper.restoreHdfsRegions(RestoreSnapshotHelper.java:174) ~[hbase-server-2.6.0.jar:2.6.0]
+        at org.apache.hadoop.hbase.master.procedure.CloneSnapshotProcedure$1.createHdfsRegions(CloneSnapshotProcedure.java:471) ~[hbase-server-2.6.0.jar:2.6.0]
+        at org.apache.hadoop.hbase.master.procedure.CloneSnapshotProcedure.createFsLayout(CloneSnapshotProcedure.java:525) ~[hbase-server-2.6.0.jar:2.6.0]
+        at org.apache.hadoop.hbase.master.procedure.CloneSnapshotProcedure.createFilesystemLayout(CloneSnapshotProcedure.java:451) ~[hbase-server-2.6.0.jar:2.6.0]
+        at org.apache.hadoop.hbase.master.procedure.CloneSnapshotProcedure.executeFromState(CloneSnapshotProcedure.java:157) ~[hbase-server-2.6.0.jar:2.6.0]
+        at org.apache.hadoop.hbase.master.procedure.CloneSnapshotProcedure.executeFromState(CloneSnapshotProcedure.java:74) ~[hbase-server-2.6.0.jar:2.6.0]
+        at org.apache.hadoop.hbase.procedure2.StateMachineProcedure.execute(StateMachineProcedure.java:188) ~[hbase-procedure-2.6.0.jar:2.6.0]
+        at org.apache.hadoop.hbase.procedure2.Procedure.doExecute(Procedure.java:944) ~[hbase-procedure-2.6.0.jar:2.6.0]
+        at org.apache.hadoop.hbase.procedure2.ProcedureExecutor.execProcedure(ProcedureExecutor.java:1766) ~[hbase-procedure-2.6.0.jar:2.6.0]
+        at org.apache.hadoop.hbase.procedure2.ProcedureExecutor.executeProcedure(ProcedureExecutor.java:1444) ~[hbase-procedure-2.6.0.jar:2.6.0]
+        at org.apache.hadoop.hbase.procedure2.ProcedureExecutor.access$1000(ProcedureExecutor.java:77) ~[hbase-procedure-2.6.0.jar:2.6.0]
+        at org.apache.hadoop.hbase.procedure2.ProcedureExecutor$WorkerThread.runProcedure(ProcedureExecutor.java:2092) ~[hbase-procedure-2.6.0.jar:2.6.0]
+        at org.apache.hadoop.hbase.trace.TraceUtil.trace(TraceUtil.java:216) ~[hbase-common-2.6.0.jar:2.6.0]
+        at org.apache.hadoop.hbase.procedure2.ProcedureExecutor$WorkerThread.run(ProcedureExecutor.java:2119) ~[hbase-procedure-2.6.0.jar:2.6.0]
+2024-08-30T16:04:12,770 WARN  [PEWorker-4] procedure.CloneSnapshotProcedure: Retriable error trying to clone snapshot=snap to table=test state=CLONE_SNAPSHOT_WRITE_FS_LAYOUT
+org.apache.hadoop.hbase.snapshot.RestoreSnapshotException: clone snapshot={ ss=snap table=test type=FLUSH ttl=0 } failed because No such file or directory: s3a://hbase-root/data/default/test/774ec9f8e1ecfe62a57f6821014b29bb/.regioninfo
+        at org.apache.hadoop.hbase.master.procedure.CloneSnapshotProcedure$1.createHdfsRegions(CloneSnapshotProcedure.java:492) ~[hbase-server-2.6.0.jar:2.6.0]
+        at org.apache.hadoop.hbase.master.procedure.CloneSnapshotProcedure.createFsLayout(CloneSnapshotProcedure.java:525) ~[hbase-server-2.6.0.jar:2.6.0]
+        at org.apache.hadoop.hbase.master.procedure.CloneSnapshotProcedure.createFilesystemLayout(CloneSnapshotProcedure.java:451) ~[hbase-server-2.6.0.jar:2.6.0]
+        at org.apache.hadoop.hbase.master.procedure.CloneSnapshotProcedure.executeFromState(CloneSnapshotProcedure.java:157) ~[hbase-server-2.6.0.jar:2.6.0]
+        at org.apache.hadoop.hbase.master.procedure.CloneSnapshotProcedure.executeFromState(CloneSnapshotProcedure.java:74) ~[hbase-server-2.6.0.jar:2.6.0]
+        at org.apache.hadoop.hbase.procedure2.StateMachineProcedure.execute(StateMachineProcedure.java:188) ~[hbase-procedure-2.6.0.jar:2.6.0]
+        at org.apache.hadoop.hbase.procedure2.Procedure.doExecute(Procedure.java:944) ~[hbase-procedure-2.6.0.jar:2.6.0]
+        at org.apache.hadoop.hbase.procedure2.ProcedureExecutor.execProcedure(ProcedureExecutor.java:1766) ~[hbase-procedure-2.6.0.jar:2.6.0]
+        at org.apache.hadoop.hbase.procedure2.ProcedureExecutor.executeProcedure(ProcedureExecutor.java:1444) ~[hbase-procedure-2.6.0.jar:2.6.0]
+        at org.apache.hadoop.hbase.procedure2.ProcedureExecutor.access$1000(ProcedureExecutor.java:77) ~[hbase-procedure-2.6.0.jar:2.6.0]
+        at org.apache.hadoop.hbase.procedure2.ProcedureExecutor$WorkerThread.runProcedure(ProcedureExecutor.java:2092) ~[hbase-procedure-2.6.0.jar:2.6.0]
+        at org.apache.hadoop.hbase.trace.TraceUtil.trace(TraceUtil.java:216) ~[hbase-common-2.6.0.jar:2.6.0]
+        at org.apache.hadoop.hbase.procedure2.ProcedureExecutor$WorkerThread.run(ProcedureExecutor.java:2119) ~[hbase-procedure-2.6.0.jar:2.6.0]
+Caused by: java.io.FileNotFoundException: No such file or directory: s3a://hbase-root/data/default/test/774ec9f8e1ecfe62a57f6821014b29bb/.regioninfo
+        at org.apache.hadoop.fs.s3a.S3AFileSystem.s3GetFileStatus(S3AFileSystem.java:3801) ~[hadoop-aws-3.3.6.jar:?]
+        at org.apache.hadoop.fs.s3a.S3AFileSystem.innerGetFileStatus(S3AFileSystem.java:3652) ~[hadoop-aws-3.3.6.jar:?]
+        at org.apache.hadoop.fs.s3a.S3AFileSystem.extractOrFetchSimpleFileStatus(S3AFileSystem.java:5288) ~[hadoop-aws-3.3.6.jar:?]
+        at org.apache.hadoop.fs.s3a.S3AFileSystem.lambda$executeOpen$6(S3AFileSystem.java:1578) ~[hadoop-aws-3.3.6.jar:?]
+        at org.apache.hadoop.fs.statistics.impl.IOStatisticsBinding.invokeTrackingDuration(IOStatisticsBinding.java:547) ~[hadoop-common-3.3.6.jar:?]
+        at org.apache.hadoop.fs.statistics.impl.IOStatisticsBinding.lambda$trackDurationOfOperation$5(IOStatisticsBinding.java:528) ~[hadoop-common-3.3.6.jar:?]
+        at org.apache.hadoop.fs.statistics.impl.IOStatisticsBinding.trackDuration(IOStatisticsBinding.java:449) ~[hadoop-common-3.3.6.jar:?]
+        at org.apache.hadoop.fs.s3a.S3AFileSystem.executeOpen(S3AFileSystem.java:1576) ~[hadoop-aws-3.3.6.jar:?]
+        at org.apache.hadoop.fs.s3a.S3AFileSystem.open(S3AFileSystem.java:1550) ~[hadoop-aws-3.3.6.jar:?]
+        at org.apache.hadoop.fs.FileSystem.open(FileSystem.java:997) ~[hadoop-common-3.3.6.jar:?]
+        at org.apache.hadoop.hbase.regionserver.HRegionFileSystem.loadRegionInfoFileContent(HRegionFileSystem.java:851) ~[hbase-server-2.6.0.jar:2.6.0]
+        at org.apache.hadoop.hbase.snapshot.RestoreSnapshotHelper.getTableRegions(RestoreSnapshotHelper.java:855) ~[hbase-server-2.6.0.jar:2.6.0]
+        at org.apache.hadoop.hbase.snapshot.RestoreSnapshotHelper.restoreHdfsRegions(RestoreSnapshotHelper.java:195) ~[hbase-server-2.6.0.jar:2.6.0]
+        at org.apache.hadoop.hbase.snapshot.RestoreSnapshotHelper.restoreHdfsRegions(RestoreSnapshotHelper.java:174) ~[hbase-server-2.6.0.jar:2.6.0]
+        at org.apache.hadoop.hbase.master.procedure.CloneSnapshotProcedure$1.createHdfsRegions(CloneSnapshotProcedure.java:471) ~[hbase-server-2.6.0.jar:2.6.0]
+        ... 12 more
+2024-08-30T16:04:12,781 WARN  [PEWorker-4] procedure.CloneSnapshotProcedure: temp table dir already exists on disk: s3a://hbase-root/data/default/test, will be deleted.
+
+
+s3a_hbase-2.4.18
+================
+
+see https://issues.apache.org/jira/browse/HBASE-26454
+
+2024-08-30 16:16:00,989 INFO  [PEWorker-2] s3a.S3AFileSystem: rename `s3a://hbase-root/data/default/test' to `s3a://hbase-root/.tmp/data/default/test': Destination is a non-empty directory
+2024-08-30 16:16:00,989 WARN  [PEWorker-2] procedure.DeleteTableProcedure: Retriable error trying to delete table=test state=DELETE_TABLE_CLEAR_FS_LAYOUT
+java.io.IOException: Unable to move 's3a://hbase-root/data/default/test' to temp 's3a://hbase-root/.tmp/data/default/test'
+        at org.apache.hadoop.hbase.master.procedure.DeleteTableProcedure.deleteFromFs(DeleteTableProcedure.java:307)
+        at org.apache.hadoop.hbase.master.procedure.DeleteTableProcedure.executeFromState(DeleteTableProcedure.java:114)
+        at org.apache.hadoop.hbase.master.procedure.DeleteTableProcedure.executeFromState(DeleteTableProcedure.java:61)
+        at org.apache.hadoop.hbase.procedure2.StateMachineProcedure.execute(StateMachineProcedure.java:188)
+        at org.apache.hadoop.hbase.procedure2.Procedure.doExecute(Procedure.java:942)
+        at org.apache.hadoop.hbase.procedure2.ProcedureExecutor.execProcedure(ProcedureExecutor.java:1757)
+        at org.apache.hadoop.hbase.procedure2.ProcedureExecutor.executeProcedure(ProcedureExecutor.java:1435)
+        at org.apache.hadoop.hbase.procedure2.ProcedureExecutor.access$1100(ProcedureExecutor.java:75)
+        at org.apache.hadoop.hbase.procedure2.ProcedureExecutor$WorkerThread.run(ProcedureExecutor.java:2089)

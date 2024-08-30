@@ -1,0 +1,11 @@
+create 'test', 'cf1';
+put 'test', 'r1', 'cf1', 42;
+
+snapshot 'test', 'snap';
+
+disable 'test';
+drop 'test';
+
+list_snapshots;
+
+exit;
