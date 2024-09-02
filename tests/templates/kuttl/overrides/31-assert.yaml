@@ -9,25 +9,25 @@ commands:
 
       # Get the name of the first pod by labels
       POD=$(
-        kubectl get pod --namespace "$NAMESPACE" \
-          --label app.kubernetes.io/component=master \
-          --label app.kubernetes.io/role-group=default \
-          --output name \
-        | head --lines 1 \
-        | sed --expression 's#pod/##'
+        kubectl get pod -n "$NAMESPACE" \
+          -l app.kubernetes.io/component=master \
+          -l app.kubernetes.io/role-group=default \
+          -o name \
+        | head -n 1 \
+        | sed -e 's#pod/##'
       )
 
       # Assert that environment variables have the correct values
-      kubectl get pod "$POD" --namespace "$NAMESPACE" --output yaml \
-      | yq --unwrapScalar '.spec.containers[0].env[] | select (.name == "TEST_VAR_FROM_MASTER").value' \
+      kubectl get pod "$POD" -n "$NAMESPACE" -o yaml \
+      | yq -r '.spec.containers[0].env[] | select (.name == "TEST_VAR_FROM_MASTER").value' \
       | grep '^MASTER$'
 
-      kubectl get pod "$POD" --namespace "$NAMESPACE" --output yaml \
-      | yq --unwrapScalar '.spec.containers[0].env[] | select (.name == "TEST_VAR_FROM_MRG").value' \
+      kubectl get pod "$POD" -n "$NAMESPACE" -o yaml \
+      | yq -r '.spec.containers[0].env[] | select (.name == "TEST_VAR_FROM_MRG").value' \
       | grep '^MASTER$'
 
-      kubectl get pod "$POD" --namespace "$NAMESPACE" --output yaml \
-      | yq --unwrapScalar '.spec.containers[0].env[] | select (.name == "TEST_VAR").value' \
+      kubectl get pod "$POD" -n "$NAMESPACE" -o yaml \
+      | yq -r '.spec.containers[0].env[] | select (.name == "TEST_VAR").value' \
       | grep '^MASTER_RG$'
 
   # regionserver, resources-from-role RG
@@ -36,26 +36,25 @@ commands:
 
       # Get the name of the first pod by labels
       POD=$(
-        kubectl get pod \
-          --namespace "$NAMESPACE" \
-          --label app.kubernetes.io/component=regionserver \
-          --label app.kubernetes.io/role-group=resources-from-role \
-          --output name \
-        | head --lines 1 \
-        | sed --expression 's#pod/##'
+        kubectl get pod -n "$NAMESPACE" \
+          -l app.kubernetes.io/component=regionserver \
+          -l app.kubernetes.io/role-group=resources-from-role \
+          -o name \
+        | head -n 1 \
+        | sed -e 's#pod/##'
       )
 
       # Assert that environment variables have the correct values
-      kubectl get pod "$POD" --namespace "$NAMESPACE" --output yaml \
-      | yq --unwrapScalar '.spec.containers[0].env[] | select (.name == "TEST_VAR_FROM_RS").value' \
+      kubectl get pod "$POD" -n "$NAMESPACE" -o yaml \
+      | yq -r '.spec.containers[0].env[] | select (.name == "TEST_VAR_FROM_RS").value' \
       | grep '^REGIONSERVER$'
 
-      kubectl get pod "$POD" --namespace "$NAMESPACE" --output yaml \
-      | yq --unwrapScalar '.spec.containers[0].env[] | select (.name == "TEST_VAR_FROM_RFR").value' \
+      kubectl get pod "$POD" -n "$NAMESPACE" -o yaml \
+      | yq -r '.spec.containers[0].env[] | select (.name == "TEST_VAR_FROM_RFR").value' \
       | grep '^REGIONSERVER$'
 
-      kubectl get pod "$POD" --namespace "$NAMESPACE" --output yaml \
-      | yq --unwrapScalar '.spec.containers[0].env[] | select (.name == "TEST_VAR").value' \
+      kubectl get pod "$POD" -n "$NAMESPACE" -o yaml \
+      | yq -r '.spec.containers[0].env[] | select (.name == "TEST_VAR").value' \
       | grep '^REGIONSERVER_RFR$'
 
   # regionserver, resources-from-role-group RG
@@ -65,25 +64,23 @@ commands:
       # Get the name of the first pod by labels
       POD=$(
         kubectl get pod \
-          --namespace "$NAMESPACE" \
-          --label app.kubernetes.io/component=regionserver \
-          --label app.kubernetes.io/role-group=resources-from-role-group \
-          --output name \
-        | head --lines 1 \
-        | sed --expression 's#pod/##'
+        -n "$NAMESPACE" \
+        -l app.kubernetes.io/component=regionserver \
+        -l app.kubernetes.io/role-group=resources-from-role-group \
+        -o name | head -n 1 | sed -e 's#pod/##'
       )
 
       # Assert that environment variables have the correct values
-      kubectl get pod "$POD" --namespace "$NAMESPACE" --output yaml \
-      | yq --unwrapScalar '.spec.containers[0].env[] | select (.name == "TEST_VAR_FROM_RS").value' \
+      kubectl get pod "$POD" -n "$NAMESPACE" -o yaml \
+      | yq -r '.spec.containers[0].env[] | select (.name == "TEST_VAR_FROM_RS").value' \
       | grep '^REGIONSERVER$'
 
-      kubectl get pod "$POD" --namespace "$NAMESPACE" --output yaml \
-      | yq --unwrapScalar '.spec.containers[0].env[] | select (.name == "TEST_VAR_FROM_RFRG").value' \
+      kubectl get pod "$POD" -n "$NAMESPACE" -o yaml \
+      | yq -r '.spec.containers[0].env[] | select (.name == "TEST_VAR_FROM_RFRG").value' \
       | grep '^REGIONSERVER$'
 
-      kubectl get pod "$POD" --namespace "$NAMESPACE" --output yaml \
-      | yq --unwrapScalar '.spec.containers[0].env[] | select (.name == "TEST_VAR").value' \
+      kubectl get pod "$POD" -n "$NAMESPACE" -o yaml \
+      | yq -r '.spec.containers[0].env[] | select (.name == "TEST_VAR").value' \
       | grep '^REGIONSERVER_RFRG$'
 
   # restserver, default RG
@@ -93,23 +90,22 @@ commands:
       # Get the name of the first pod by labels
       POD=$(
         kubectl get pod \
-          --namespace "$NAMESPACE" \
-          --label app.kubernetes.io/component=restserver \
-          --label app.kubernetes.io/role-group=default \
-          --output name \
-        | head --lines 1 \
-        | sed --expression 's#pod/##'
+        -n "$NAMESPACE" \
+        -l app.kubernetes.io/component=restserver \
+        -l app.kubernetes.io/role-group=default \
+        -o name | head -n 1 | sed -e 's#pod/##'
       )
 
       # Assert that environment variables have the correct values
-      kubectl get pod "$POD" --namespace "$NAMESPACE" --output yaml \
-      | yq --unwrapScalar '.spec.containers[0].env[] | select (.name == "TEST_VAR_FROM_REST").value' \
+      kubectl get pod "$POD" -n "$NAMESPACE" -o yaml \
+      | yq -r '.spec.containers[0].env[] | select (.name == "TEST_VAR_FROM_REST").value' \
       | grep '^RESTSERVER$'
 
-      kubectl get pod "$POD" --namespace "$NAMESPACE" --output yaml \
-      | yq --unwrapScalar '.spec.containers[0].env[] | select (.name == "TEST_VAR_FROM_REST_RG").value' \
+      kubectl get pod "$POD" -n "$NAMESPACE" -o yaml \
+      | yq -r '.spec.containers[0].env[] | select (.name == "TEST_VAR_FROM_REST_RG").value' \
       | grep '^RESTSERVER$'
 
-      kubectl get pod "$POD" --namespace "$NAMESPACE" --output yaml \
-      | yq --unwrapScalar '.spec.containers[0].env[] | select (.name == "TEST_VAR").value' \
+      kubectl get pod "$POD" -n "$NAMESPACE" -o yaml \
+      | yq -r '.spec.containers[0].env[] | select (.name == "TEST_VAR").value' \
       | grep '^RESTSERVER_RG$'
+
