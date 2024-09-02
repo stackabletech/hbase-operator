@@ -1,3 +1,22 @@
+s3a_hbase-2.4.18
+================
+
+see https://issues.apache.org/jira/browse/HBASE-26454
+
+2024-08-30 16:16:00,989 INFO  [PEWorker-2] s3a.S3AFileSystem: rename `s3a://hbase-root/data/default/test' to `s3a://hbase-root/.tmp/data/default/test': Destination is a non-empty directory
+2024-08-30 16:16:00,989 WARN  [PEWorker-2] procedure.DeleteTableProcedure: Retriable error trying to delete table=test state=DELETE_TABLE_CLEAR_FS_LAYOUT
+java.io.IOException: Unable to move 's3a://hbase-root/data/default/test' to temp 's3a://hbase-root/.tmp/data/default/test'
+        at org.apache.hadoop.hbase.master.procedure.DeleteTableProcedure.deleteFromFs(DeleteTableProcedure.java:307)
+        at org.apache.hadoop.hbase.master.procedure.DeleteTableProcedure.executeFromState(DeleteTableProcedure.java:114)
+        at org.apache.hadoop.hbase.master.procedure.DeleteTableProcedure.executeFromState(DeleteTableProcedure.java:61)
+        at org.apache.hadoop.hbase.procedure2.StateMachineProcedure.execute(StateMachineProcedure.java:188)
+        at org.apache.hadoop.hbase.procedure2.Procedure.doExecute(Procedure.java:942)
+        at org.apache.hadoop.hbase.procedure2.ProcedureExecutor.execProcedure(ProcedureExecutor.java:1757)
+        at org.apache.hadoop.hbase.procedure2.ProcedureExecutor.executeProcedure(ProcedureExecutor.java:1435)
+        at org.apache.hadoop.hbase.procedure2.ProcedureExecutor.access$1100(ProcedureExecutor.java:75)
+        at org.apache.hadoop.hbase.procedure2.ProcedureExecutor$WorkerThread.run(ProcedureExecutor.java:2089)
+
+
 s3a_hbase-2.6.0
 ===============
 
@@ -70,22 +89,3 @@ Caused by: java.io.FileNotFoundException: No such file or directory: s3a://hbase
         at org.apache.hadoop.hbase.master.procedure.CloneSnapshotProcedure$1.createHdfsRegions(CloneSnapshotProcedure.java:471) ~[hbase-server-2.6.0.jar:2.6.0]
         ... 12 more
 2024-08-30T16:04:12,781 WARN  [PEWorker-4] procedure.CloneSnapshotProcedure: temp table dir already exists on disk: s3a://hbase-root/data/default/test, will be deleted.
-
-
-s3a_hbase-2.4.18
-================
-
-see https://issues.apache.org/jira/browse/HBASE-26454
-
-2024-08-30 16:16:00,989 INFO  [PEWorker-2] s3a.S3AFileSystem: rename `s3a://hbase-root/data/default/test' to `s3a://hbase-root/.tmp/data/default/test': Destination is a non-empty directory
-2024-08-30 16:16:00,989 WARN  [PEWorker-2] procedure.DeleteTableProcedure: Retriable error trying to delete table=test state=DELETE_TABLE_CLEAR_FS_LAYOUT
-java.io.IOException: Unable to move 's3a://hbase-root/data/default/test' to temp 's3a://hbase-root/.tmp/data/default/test'
-        at org.apache.hadoop.hbase.master.procedure.DeleteTableProcedure.deleteFromFs(DeleteTableProcedure.java:307)
-        at org.apache.hadoop.hbase.master.procedure.DeleteTableProcedure.executeFromState(DeleteTableProcedure.java:114)
-        at org.apache.hadoop.hbase.master.procedure.DeleteTableProcedure.executeFromState(DeleteTableProcedure.java:61)
-        at org.apache.hadoop.hbase.procedure2.StateMachineProcedure.execute(StateMachineProcedure.java:188)
-        at org.apache.hadoop.hbase.procedure2.Procedure.doExecute(Procedure.java:942)
-        at org.apache.hadoop.hbase.procedure2.ProcedureExecutor.execProcedure(ProcedureExecutor.java:1757)
-        at org.apache.hadoop.hbase.procedure2.ProcedureExecutor.executeProcedure(ProcedureExecutor.java:1435)
-        at org.apache.hadoop.hbase.procedure2.ProcedureExecutor.access$1100(ProcedureExecutor.java:75)
-        at org.apache.hadoop.hbase.procedure2.ProcedureExecutor$WorkerThread.run(ProcedureExecutor.java:2089)
