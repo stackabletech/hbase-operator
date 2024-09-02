@@ -108,4 +108,3 @@ commands:
       kubectl get pod "$POD" -n "$NAMESPACE" -o yaml \
       | yq -r '.spec.containers[0].env[] | select (.name == "TEST_VAR").value' \
       | grep '^RESTSERVER_RG$'
-
