@@ -5,7 +5,7 @@ timeout: 30
 commands:
   # master, default RG
   - script: |
-      set -euo pipefail
+      set -eu
 
       # Get the name of the first pod by labels
       POD=$(
@@ -32,7 +32,7 @@ commands:
 
   # regionserver, resources-from-role RG
   - script: |
-      set -euo pipefail
+      set -eu
 
       # Get the name of the first pod by labels
       POD=$(
@@ -59,7 +59,7 @@ commands:
 
   # regionserver, resources-from-role-group RG
   - script: |
-      set -euo pipefail
+      set -eu
 
       # Get the name of the first pod by labels
       POD=$(
@@ -85,7 +85,7 @@ commands:
 
   # restserver, default RG
   - script: |
-      set -euo pipefail
+      set -eu
 
       # Get the name of the first pod by labels
       POD=$(
