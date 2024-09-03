@@ -10,8 +10,7 @@ commands:
       # Get the name of the first pod by labels
       POD=$(
         kubectl get pod -n "$NAMESPACE" \
-          -l app.kubernetes.io/component=master \
-          -l app.kubernetes.io/role-group=default \
+          -l app.kubernetes.io/component=master,app.kubernetes.io/role-group=default \
           -o name \
         | head -n 1 \
         | sed -e 's#pod/##'
@@ -37,8 +36,7 @@ commands:
       # Get the name of the first pod by labels
       POD=$(
         kubectl get pod -n "$NAMESPACE" \
-          -l app.kubernetes.io/component=regionserver \
-          -l app.kubernetes.io/role-group=resources-from-role \
+          -l app.kubernetes.io/component=regionserver,app.kubernetes.io/role-group=resources-from-role \
           -o name \
         | head -n 1 \
         | sed -e 's#pod/##'
@@ -65,8 +63,7 @@ commands:
       POD=$(
         kubectl get pod \
         -n "$NAMESPACE" \
-        -l app.kubernetes.io/component=regionserver \
-        -l app.kubernetes.io/role-group=resources-from-role-group \
+        -l app.kubernetes.io/component=regionserver,app.kubernetes.io/role-group=resources-from-role-group \
         -o name | head -n 1 | sed -e 's#pod/##'
       )
 
@@ -91,8 +88,7 @@ commands:
       POD=$(
         kubectl get pod \
         -n "$NAMESPACE" \
-        -l app.kubernetes.io/component=restserver \
-        -l app.kubernetes.io/role-group=default \
+        -l app.kubernetes.io/component=restserver,app.kubernetes.io/role-group=default \
         -o name | head -n 1 | sed -e 's#pod/##'
       )
 
