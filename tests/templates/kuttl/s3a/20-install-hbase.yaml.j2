@@ -37,7 +37,7 @@ spec:
         # The config must be done at role-group level. If it's done on
         # the role level then it is overridden by the defaults of the
         # role-group level.
-        # TODO: Create a bug ticket
+        # see https://github.com/stackabletech/hbase-operator/issues/555
         config: &rgConfig
           # "hbase-root" is the bucket name, "hbase" the directory name
           # hbaseRootdir must end with a slash!
@@ -50,8 +50,6 @@ spec:
             fs.s3a.endpoint: http://minio:9000/
             fs.s3a.connection.ssl.enabled: "false"
             fs.s3a.path.style.access: "true"
-            # Question: If data is often written and read before the WAL
-            # is applied to S3, is then HDFS the bottleneck?
             hbase.wal.dir: hdfs://test-hdfs/hbase
           hbase-env.sh:
             # For whatever reason, setting HBASE_CLASSPATH has no effect.
