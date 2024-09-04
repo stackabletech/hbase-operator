@@ -22,20 +22,45 @@ spec:
     config:
       logging:
         enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
+        containers:
+          hbase:
+            # There were important exceptions only on DEBUG level while
+            # the HBase master tried to create the file system hierarchy,
+            # e.g. issues with invalid TLS certificates.
+            console:
+              level: DEBUG
+            loggers:
+              ROOT:
+                level: DEBUG
     roleGroups:
       default:
-        config:
-          hbaseRootdir: s3a://hbase-root/
-        configOverrides:
+        # The config must be done at role-group level. If it's done on
+        # the role level then it is overridden by the defaults of the
+        # role-group level.
+        # TODO: Create a bug ticket
+        config: &rgConfig
+          # "hbase-root" is the bucket name, "hbase" the directory name
+          # hbaseRootdir must end with a slash!
+          hbaseRootdir: s3a://hbase-root/hbase/
+          # In case, a self-signed certificate is used and not imported.
+          # TODO: Find out how to import self-signed certificates.
+          hbaseOpts: "-Dcom.amazonaws.sdk.disableCertChecking=true"
+        configOverrides: &rgConfigOverrides
           hbase-site.xml:
             fs.s3a.endpoint: http://minio:9000/
             fs.s3a.connection.ssl.enabled: "false"
             fs.s3a.path.style.access: "true"
-            fs.s3a.committer.name: magic
+            # Question: If data is often written and read before the WAL
+            # is applied to S3, is then HDFS the bottleneck?
             hbase.wal.dir: hdfs://test-hdfs/hbase
           hbase-env.sh:
-            HBASE_CLASSPATH: /stackable/hadoop/share/hadoop/tools/lib/*.jar
+            # For whatever reason, setting HBASE_CLASSPATH has no effect.
+            # Therefore, a custom image is used where these JARs are
+            # copied to /stackable/hbase/lib which is on the classpath.
+            # This must be resolved until SDP 24.11.
+            HBASE_CLASSPATH: /stackable/hadoop/share/hadoop/tools/lib/aws-java-sdk-bundle-1.12.367.jar:/stackable/hadoop/share/hadoop/tools/lib/hadoop-aws-3.3.6.jar
             AWS_ACCESS_KEY_ID: hbaseAccessKey
+            # TODO: This must be loaded from a secret.
             AWS_SECRET_KEY: hbaseSecretKey
         replicas: 1
   regionServers:
@@ -44,19 +69,8 @@ spec:
         enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
     roleGroups:
       default:
-        config:
-          hbaseRootdir: s3a://hbase-root/
-        configOverrides:
-          hbase-site.xml:
-            fs.s3a.endpoint: http://minio:9000/
-            fs.s3a.connection.ssl.enabled: "false"
-            fs.s3a.path.style.access: "true"
-            fs.s3a.committer.name: magic
-            hbase.wal.dir: hdfs://test-hdfs/hbase
-          hbase-env.sh:
-            HBASE_CLASSPATH: /stackable/hadoop/share/hadoop/tools/lib/*.jar
-            AWS_ACCESS_KEY_ID: hbaseAccessKey
-            AWS_SECRET_KEY: hbaseSecretKey
+        config: *rgConfig
+        configOverrides: *rgConfigOverrides
         replicas: 1
   restServers:
     config:
@@ -64,17 +78,6 @@ spec:
         enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
     roleGroups:
       default:
-        config:
-          hbaseRootdir: s3a://hbase-root/
-        configOverrides:
-          hbase-site.xml:
-            fs.s3a.endpoint: http://minio:9000/
-            fs.s3a.connection.ssl.enabled: "false"
-            fs.s3a.path.style.access: "true"
-            fs.s3a.committer.name: magic
-            hbase.wal.dir: hdfs://test-hdfs/hbase
-          hbase-env.sh:
-            HBASE_CLASSPATH: /stackable/hadoop/share/hadoop/tools/lib/*.jar
-            AWS_ACCESS_KEY_ID: hbaseAccessKey
-            AWS_SECRET_KEY: hbaseSecretKey
+        config: *rgConfig
+        configOverrides: *rgConfigOverrides
         replicas: 1
