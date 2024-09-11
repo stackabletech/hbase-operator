@@ -52,7 +52,7 @@ dimensions:
       - "false"
   - name: omid
     values:
-      - 1.1.0
+      - 1.1.2
       # To use a custom image, add a comma and the full name after the product version
       # - 1.1.0,docker.stackable.tech/sandbox/omid:1.1.0-stackable0.0.0-dev
 tests:
