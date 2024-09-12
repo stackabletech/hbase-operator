@@ -1,4 +1,5 @@
 = Resource requests
+:description: Stackable managed HBase defaults to minimal resource requests. Adjust CPU and memory limits for production clusters to ensure proper performance.
 
 include::home:concepts:stackable_resource_requests.adoc[]
 
