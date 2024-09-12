@@ -11,9 +11,11 @@
 ### Fixed
 
 - Implement `envOverrides` for HbaseCluster ([#550]).
+- Omid test: use 1.1.2, update default port number and raise test timeout ([#556]).
 
 [#548]: https://github.com/stackabletech/hbase-operator/pull/548
 [#550]: https://github.com/stackabletech/hbase-operator/pull/550
+[#556]: https://github.com/stackabletech/hbase-operator/pull/556
 
 ## [24.7.0] - 2024-07-24
 
