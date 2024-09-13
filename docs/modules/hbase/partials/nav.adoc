@@ -12,6 +12,7 @@
 ** xref:hbase:usage-guide/overrides.adoc[]
 ** xref:hbase:usage-guide/hbck2.adoc[]
 ** xref:hbase:usage-guide/snapshot-export.adoc[]
+** xref:hbase:usage-guide/adls.adoc[]
 ** xref:hbase:usage-guide/operations/index.adoc[]
 *** xref:hbase:usage-guide/operations/cluster-operations.adoc[]
 *** xref:hbase:usage-guide/operations/pod-placement.adoc[]
