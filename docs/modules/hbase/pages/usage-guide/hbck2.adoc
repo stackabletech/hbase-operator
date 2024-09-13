@@ -1,4 +1,5 @@
 = Repairing a cluster with HBCK2
+:description: Use HBCK2 from hbase-operator-tools to repair HBase clusters. It helps fix issues like unknown RegionServers via the hbck2 script.
 :hbck2-github: https://github.com/apache/hbase-operator-tools/tree/master/hbase-hbck2
 :hbase-operator-tools-github: https://github.com/apache/hbase-operator-tools/
 

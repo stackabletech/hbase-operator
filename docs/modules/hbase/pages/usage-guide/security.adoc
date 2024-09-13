@@ -1,4 +1,5 @@
 = Security
+:description: Apache HBase supports Kerberos for authentication and Open Policy Agent (OPA) for authorization. Configure both in HDFS and HBase for secure access.
 
 == Authentication
 Currently the only supported authentication mechanism is Kerberos, which is disabled by default.

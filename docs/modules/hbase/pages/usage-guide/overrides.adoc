@@ -1,5 +1,6 @@
 
 = Configuration, environment and Pod overrides
+:description: Customize HBase with configuration, environment, and Pod overrides. Adjust properties in hbase-site.xml, hbase-env.sh, and security.properties as needed.
 
 The HBase xref:concepts:stacklet.adoc[Stacklet] definition also supports overriding configuration properties, environment variables and Pod specs, either per role or per role group, where the more specific override (role group) has precedence over the less specific one (role).
 

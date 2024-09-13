@@ -1,4 +1,5 @@
 = Using Apache Phoenix
+:description: Apache Phoenix lets you use SQL with HBase via JDBC. Use bundled psql.py or sqlline.py for table creation and querying, no separate installation needed.
 :phoenix-installation: https://phoenix.apache.org/installation.html
 :sqlline-github: https://github.com/julianhyde/sqlline
 
