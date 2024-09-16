@@ -1,0 +1,92 @@
+= Using the Azure Data Lake Storage (ADLS)
+:description: Use the Azure Data Lake Storage (ADLS) instead of HDFS for HBase.
+:abfs-authentication: https://hadoop.apache.org/docs/stable/hadoop-azure/abfs.html#Authentication
+:hadoop-18516: https://issues.apache.org/jira/browse/HADOOP-18516
+
+Instead of HDFS, the HBase data can be stored in the Azure Data Lake Storage (ADLS).
+HDFS is then not required anymore to run HBase.
+
+A custom ConfigMap for ADLS containing the core-site.xml and an empty hdfs-site.xml must be provided:
+
+[source,yaml]
+----
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: adls
+data:
+  core-site.xml: |-
+    <?xml version="1.0"?>
+    <configuration>
+      <property>
+        <name>fs.defaultFS</name>  <!--1-->
+        <value>abfs://<container-name>@<storage-account>.dfs.core.windows.net/</value>
+      </property>
+      <property>
+        <name>fs.azure.account.auth.type.<storage-account>.dfs.core.windows.net</name>  <!--2-->
+        <value>SAS</value>
+      </property>
+      <property>
+        <name>fs.azure.sas.fixed.token.<storage-account>.dfs.core.windows.net</name>  <!--3-->
+        <value>${env.SAS_TOKEN}</value>
+      </property>
+      <!-- Add further properties, e.g. for Kerberos. -->
+    </configuration>
+  hdfs-site.xml: |-
+    <?xml version="1.0"?>
+    <configuration>
+    </configuration>
+----
+<1> The name of the default file system.
+The `hadoop-azure` module which provides support for ADLS through the "abfs" connector, is already contained in the Stackable HBase image and accessible on the classpath.
+Make sure that the hierarchical namespace is enabled in the storage account.
+Replace `<container-name>` and `<storage-account>` accordingly.
+<2> The authentication mechanism.
+Possible values are `SharedKey`, `OAuth`, `Custom` and `SAS`, see the {abfs-authentication}[documentation] of the `hadoop-azure` module for further information.
+<3> If the authentication type is set to `SAS` (shared access signature) and no SAS token provider is given in `fs.azure.sas.token.provider.type`, then a fixed SAS token can be used instead.
+The `FixedSASTokenProvider` (see {hadoop-18516}[HADOOP-18516]) is back-ported to all supported HBase versions, so that the SAS token can be configured with this property.
+
+The ConfigMap must be referenced in `hdfsConfigMapName`.
+In the example above, the SAS token is read from an environment variable which is taken from a Secret:
+
+[source,yaml]
+----
+---
+apiVersion: hbase.stackable.tech/v1alpha1
+kind: HbaseCluster
+spec:
+  clusterConfig:
+    hdfsConfigMapName: adls
+  masters:
+    podOverrides:
+      spec:
+        containers:
+        - name: hbase
+          env:
+          - name: SAS_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: adls-credentials
+                key: sas-token
+  regionServers:
+    podOverrides:
+      spec:
+        containers:
+        - name: hbase
+          env:
+          - name: SAS_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: adls-credentials
+                key: sas-token
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: adls-credentials
+type: Opaque
+data:
+  # decoded sas-token: sp=racwdlmeop&st=2024-01-01T00:00:00Z&se=2025-01-01T00:00:00Z&spr=https&sv=2022-11-02&sr=c&sig=xxx
+  sas-token: c3A9cmFjd2RsbWVvcCZzdD0yMDI0LTAxLTAxVDAwOjAwOjAwWiZzZT0yMDI1LTAxLTAxVDAwOjAwOjAwWiZzcHI9aHR0cHMmc3Y9MjAyMi0xMS0wMiZzcj1jJnNpZz14eHgK
+----
