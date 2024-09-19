@@ -887,7 +887,7 @@ fn build_rolegroup_statefulset(
         .add_volume(stackable_operator::k8s_openapi::api::core::v1::Volume {
             name: "hbase-config".to_string(),
             config_map: Some(ConfigMapVolumeSource {
-                name: Some(rolegroup_ref.object_name()),
+                name: rolegroup_ref.object_name(),
                 ..Default::default()
             }),
             ..Default::default()
@@ -895,7 +895,7 @@ fn build_rolegroup_statefulset(
         .add_volume(stackable_operator::k8s_openapi::api::core::v1::Volume {
             name: "hdfs-discovery".to_string(),
             config_map: Some(ConfigMapVolumeSource {
-                name: Some(hbase.spec.cluster_config.hdfs_config_map_name.clone()),
+                name: hbase.spec.cluster_config.hdfs_config_map_name.clone(),
                 ..Default::default()
             }),
             ..Default::default()
@@ -925,7 +925,7 @@ fn build_rolegroup_statefulset(
         pod_builder.add_volume(Volume {
             name: "log-config".to_string(),
             config_map: Some(ConfigMapVolumeSource {
-                name: Some(config_map.into()),
+                name: config_map.into(),
                 ..ConfigMapVolumeSource::default()
             }),
             ..Volume::default()
@@ -934,7 +934,7 @@ fn build_rolegroup_statefulset(
         pod_builder.add_volume(Volume {
             name: "log-config".to_string(),
             config_map: Some(ConfigMapVolumeSource {
-                name: Some(rolegroup_ref.object_name()),
+                name: rolegroup_ref.object_name(),
                 ..ConfigMapVolumeSource::default()
             }),
             ..Volume::default()

@@ -12,6 +12,7 @@
 
 - Implement `envOverrides` for HbaseCluster ([#550]).
 - Omid test: use 1.1.2, update default port number and raise test timeout ([#556]).
+- BREAKING: The fields `connection` and `host` on `S3Connection` as well as `bucketName` on `S3Bucket`are now mandatory. Previously operators errored out in case these fields where missing ([#567]).
 
 ### Removed
 
@@ -21,6 +22,7 @@
 [#550]: https://github.com/stackabletech/hbase-operator/pull/550
 [#556]: https://github.com/stackabletech/hbase-operator/pull/556
 [#558]: https://github.com/stackabletech/hbase-operator/pull/558
+[#567]: https://github.com/stackabletech/hbase-operator/pull/567
 
 ## [24.7.0] - 2024-07-24
 
