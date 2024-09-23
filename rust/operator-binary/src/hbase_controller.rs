@@ -57,7 +57,6 @@ use stackable_operator::{
         statefulset::StatefulSetConditionBuilder,
     },
     time::Duration,
-    utils::COMMON_BASH_TRAP_FUNCTIONS,
 };
 use strum::{EnumDiscriminants, IntoStaticStr, ParseError};
 
@@ -843,11 +842,8 @@ fn build_rolegroup_statefulset(
 
             {kerberos_container_start_commands}
 
-            {COMMON_BASH_TRAP_FUNCTIONS}
             {remove_vector_shutdown_file_command}
-            prepare_signal_handlers
-            bin/hbase {hbase_role_name_in_command} start &
-            wait_for_termination $!
+            bin/hbase-daemon.sh foreground_start {hbase_role_name_in_command}
             {create_vector_shutdown_file_command}
             ",
             hbase_role_name_in_command = hbase_role.cli_role_name(),
