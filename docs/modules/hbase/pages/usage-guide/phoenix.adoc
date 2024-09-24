@@ -4,7 +4,7 @@
 :sqlline-github: https://github.com/julianhyde/sqlline
 
 Apache Phoenix allows you to interact with HBase using a familiar SQL-syntax via a JDBC driver.
-The Phoenix dependencies are bundled with the Stackable HBase image and do not need to be installed separately (client components will need to ensure that they have the correct client-side libraries available).
+The Phoenix dependencies are bundled with the Stackable HBase image and do not need to be installed separately (client components need to ensure that they have the correct client-side libraries available).
 Information about client-side installation can be found {phoenix-installation}[here].
 
 Apache Phoenix comes bundled with a few simple scripts to verify a correct server-side installation.

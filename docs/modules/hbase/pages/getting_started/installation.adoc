@@ -2,17 +2,17 @@
 :description: Install Stackable HBase and required operators using stackablectl or Helm on Kubernetes. Follow setup and verification steps for a complete installation.
 :kind: https://kind.sigs.k8s.io/
 
-On this page you will install the Stackable HBase operator and its dependencies, the ZooKeeper and HDFS operators, as well as the commons, secret and listener operators which are required by all Stackable operators.
+Install the Stackable HBase operator and its dependencies, the ZooKeeper and HDFS operators, as well as the commons, secret and listener operators which are required by all Stackable operators.
 
-== Stackable Operators
+There are multiple ways to install the Stackable Operator for Apache Zookeeper.
+xref:management:stackablectl:index.adoc[] is the preferred way but Helm is also supported.
+OpenShift users may prefer installing the operator from the RedHat Certified Operator catalog using the OpenShift web console.
 
-There are 2 ways to run Stackable operators
-
-. Using xref:management:stackablectl:index.adoc[]
-. Using Helm
-
-=== stackablectl
-
+[tabs]
+====
+stackablectl::
++
+--
 `stackablectl` is the command line tool to interact with Stackable operators and our recommended way to install operators.
 Follow the xref:management:stackablectl:installation.adoc[installation steps] for your platform.
 
@@ -23,7 +23,7 @@ After you have installed stackablectl run the following command to install all o
 include::example$getting_started/getting_started.sh[tag=stackablectl-install-operators]
 ----
 
-The tool will show
+The tool shows
 
 [source]
 include::example$getting_started/install_output.txt[]
@@ -31,24 +31,26 @@ include::example$getting_started/install_output.txt[]
 
 TIP: Consult the xref:management:stackablectl:quickstart.adoc[] to learn more about how to use `stackablectl`.
 For example, you can use the `--cluster kind` flag to create a Kubernetes cluster with {kind}[kind].
+--
 
-=== Helm
-
-You can also use Helm to install the operators.
+Helm::
++
+--
 Add the Stackable Helm repository:
 [source,bash]
 ----
 include::example$getting_started/getting_started.sh[tag=helm-add-repo]
 ----
 
-Then install the Stackable Operators:
+Install the Stackable operators:
 [source,bash]
 ----
 include::example$getting_started/getting_started.sh[tag=helm-install-operators]
 ----
 
-Helm will deploy the operators in a Kubernetes Deployment and apply the CRDs for the HBase cluster (as well as the CRDs for the required operators).
-You are now ready to deploy HBase in Kubernetes.
+Helm deploys the operators in a Kubernetes Deployment and apply the CRDs for the HBase cluster (as well as the CRDs for the required operators).
+--
+====
 
 == What's next
 

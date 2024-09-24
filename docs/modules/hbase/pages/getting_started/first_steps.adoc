@@ -2,7 +2,7 @@
 :description: Deploy and verify an HBase cluster using ZooKeeper, HDFS, and HBase configurations. Test with REST API and Apache Phoenix for table creation and data querying.
 :phoenix: https://phoenix.apache.org/index.html
 
-Once you have followed the steps in the xref:getting_started/installation.adoc[] section to install the operator and its dependencies, you will now deploy an HBase cluster and its dependencies.
+Once you have followed the steps in the xref:getting_started/installation.adoc[] section to install the operator and its dependencies, you deploy an HBase cluster and its dependencies.
 Afterwards you can <<_verify_that_it_works, verify that it works>> by creating tables and data in HBase using the REST API and Apache Phoenix (an SQL layer used to interact with HBase).
 
 == Setup
@@ -14,7 +14,7 @@ To deploy a ZooKeeper cluster create one file called `zk.yaml`:
 [source,yaml]
 include::example$getting_started/zk.yaml[]
 
-We also need to define a ZNode that will be used by the HDFS and HBase clusters to reference ZooKeeper.
+We also need to define a ZNode that is used by the HDFS and HBase clusters to reference ZooKeeper.
 Create another file called `znode.yaml` and define a separate ZNode for each service:
 
 [source,yaml]
@@ -73,8 +73,8 @@ include::example$getting_started/hbase.yaml[]
 
 == Verify that it works
 
-To test the cluster you will use the REST API to check its version and status, and to create and inspect a new table.
-You will also use Phoenix to create, populate and query a second new table, before listing all non-system tables in HBase.
+To test the cluster, use the REST API to check its version and status, and to create and inspect a new table.
+Use Phoenix to create, populate and query a second new table, before listing all non-system tables in HBase.
 These actions wil be carried out from one of the HBase components, the REST server.
 
 First, check the cluster version with this callout:
@@ -82,7 +82,7 @@ First, check the cluster version with this callout:
 [source]
 include::example$getting_started/getting_started.sh[tag=cluster-version]
 
-This will return the version that was specified in the HBase cluster definition:
+This returns the version that was specified in the HBase cluster definition:
 
 [source,json]
 {"Version":"2.4.18"}
@@ -92,7 +92,7 @@ The cluster status can be checked and formatted like this:
 [source]
 include::example$getting_started/getting_started.sh[tag=cluster-status]
 
-which will display cluster metadata that looks like this (only the first region is included for the sake of readability):
+which displays cluster metadata that looks like this (only the first region is included for the sake of readability):
 
 [source,json]
 {
@@ -134,7 +134,7 @@ You can now create a table like this:
 [source]
 include::example$getting_started/getting_started.sh[tag=create-table]
 
-This will create a table `users` with a single column family `cf`.
+This creates a table `users` with a single column family `cf`.
 Its creation can be verified by listing it:
 
 [source]
@@ -155,7 +155,7 @@ Use the Python utility `psql.py` (found in /stackable/phoenix/bin) to create, po
 [source]
 include::example$getting_started/getting_started.sh[tag=phoenix-table]
 
-The final command will display some grouped data like this:
+The final command displays some grouped data like this:
 
 [source]
 HO                    TOTAL_ACTIVE_VISITORS
