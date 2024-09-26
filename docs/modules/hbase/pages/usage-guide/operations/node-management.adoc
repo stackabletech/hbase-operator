@@ -10,7 +10,7 @@ Here we'll describe some common usecases and how to handle them.
 
 The steps required to decommission a Kubernetes node depend on the services running on that node.
 Here we'll discuss some aspects from the HBase perspective.
-In a real-world scenario, additional steps are required to ensure a a node is successfully removed from the cluster.
+In a real-world scenario, additional steps are required to ensure a node is successfully removed from the cluster.
 From HBase's perspective, it is important to consider the services running on that node.
 A node where region servers are running usually require a transfer of those regions to other servers and nodes first as shown in the example below.
 The commands below are executed on the respective region server container.
