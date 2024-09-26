@@ -1,14 +1,14 @@
 = Node management
-:description: Use tools provided by the HBase to decomission nodes and move regions within the cluster.
+:description: Use tools provided by the HBase to decommission nodes and move regions within the cluster.
 :node-management-docs: https://hbase.apache.org/book.html#node.management
 
 For detailed instructions on how to manage HBase nodes see the Apache {node-management-docs}[documentation].
 
 Here we'll describe some common usecases and how to handle them.
 
-== Decomissioning a Kubernetes node
+== Decommissioning a Kubernetes node
 
-The steps required to decomission a Kubernetes node depend on the services running on that node.
+The steps required to decommission a Kubernetes node depend on the services running on that node.
 Here we'll discuss some aspects from the HBase perspective.
 In a real-world scenario, additional steps are required to ensure a a node is successfully removed from the cluster.
 From HBase's perspective, it is important to consider the services running on that node.
@@ -17,10 +17,10 @@ The commands below are executed on the respective region server container.
 
 [source,bash]
 ----
-$ /stackable/hbase shell 'decomission_regionservers <hostname>' #<1>
+$ /stackable/hbase shell 'decommission_regionservers <hostname>' #<1>
 $ /stackable/hbase/bin/graceful_stop.sh --nobalancer localhost #<2>
 ----
-<1> Inform the HBase master that the region servers on the node are going to be decomissioned. This prevents those servers to receive additional regions during the decomissioning process. The `hostname` must contain the fully qualified name of the region server as known by HBase it's self.
+<1> Inform the HBase master that the region servers on the node are going to be decommissioned. This prevents those servers to receive additional regions during the decommissioning process. The `hostname` must contain the fully qualified name of the region server as known by HBase it's self.
 <2> Move regions to other servers and nodes. Depending on the amount of data, this process can take between a couple of seconds and several hours. You must use `localhost` and not the fully qualified name of the region server because that requires ssh tools which are not installed.
 
 Now the region server is guaranteed to not manage any regions and can be safely stopped and removed from the cluster.
