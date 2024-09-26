@@ -833,7 +833,11 @@ fn build_rolegroup_statefulset(
         .command(vec![
             "/bin/bash".to_string(),
             "-x".to_string(),
-            "-euo".to_string(),
+            // We don't use -u because there is a long list of environment variables that the
+            // hbase-daemon.sh script uses without initializing them.
+            // Configring all of them in the environment would make the operator unnecessarily
+            // complex and very sensible to all sorts of minor of changes.
+            "-eo".to_string(),
             "pipefail".to_string(),
             "-c".to_string(),
         ])
@@ -847,7 +851,10 @@ fn build_rolegroup_statefulset(
             {kerberos_container_start_commands}
 
             {remove_vector_shutdown_file_command}
-            bin/hbase-daemon.sh foreground_start {hbase_role_name_in_command}
+            # Evaluating the hbase-daemon.sh script in this shell with `source` is required
+            # for the signal handlers installed by the hbase-daemon.sh script to actually work.
+            # Also running the hbase process in the foreground is required for the container to stay alive.
+            source bin/hbase-daemon.sh foreground_start {hbase_role_name_in_command}
             {create_vector_shutdown_file_command}
             ",
             hbase_role_name_in_command = hbase_role.cli_role_name(),
