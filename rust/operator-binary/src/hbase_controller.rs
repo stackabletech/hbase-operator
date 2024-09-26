@@ -835,7 +835,7 @@ fn build_rolegroup_statefulset(
             "-x".to_string(),
             // We don't use -u because there is a long list of environment variables that the
             // hbase-daemon.sh script uses without initializing them.
-            // Configring all of them in the environment would make the operator unnecessarily
+            // Configuring all of them in the environment would make the operator unnecessarily
             // complex and very sensible to all sorts of minor of changes.
             "-eo".to_string(),
             "pipefail".to_string(),
