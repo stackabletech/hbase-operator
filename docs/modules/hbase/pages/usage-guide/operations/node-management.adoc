@@ -17,7 +17,7 @@ The commands below are executed on the respective region server container.
 
 [source,bash]
 ----
-$ /stackable/hbase shell 'decommission_regionservers <hostname>' #<1>
+$ echo "decommission_regionservers '<hostname>'" | /stackable/hbase shell #<1>
 $ /stackable/hbase/bin/graceful_stop.sh --nobalancer localhost #<2>
 ----
 <1> Inform the HBase master that the region servers on the node are going to be decommissioned. This prevents those servers to receive additional regions during the decommissioning process. The `hostname` must contain the fully qualified name of the region server as known by HBase it's self.
