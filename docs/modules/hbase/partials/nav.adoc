@@ -18,6 +18,7 @@
 *** xref:hbase:usage-guide/operations/pod-placement.adoc[]
 *** xref:hbase:usage-guide/operations/pod-disruptions.adoc[]
 *** xref:hbase:usage-guide/operations/graceful-shutdown.adoc[]
+*** xref:hbase:usage-guide/operations/node-management.adoc[]
 * xref:hbase:reference/index.adoc[]
 ** xref:hbase:reference/crds.adoc[]
 *** {crd-docs}/hbase.stackable.tech/hbasecluster/v1alpha1/[HbaseCluster {external-link-icon}^]

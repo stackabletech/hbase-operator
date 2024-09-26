@@ -9,10 +9,6 @@ As a default, masters have `20 minutes` to shut down gracefully.
 The HBase master process will receive a `SIGTERM` signal when Kubernetes wants to terminate the Pod.
 After the graceful shutdown timeout runs out, and the process still didn't exit, Kubernetes will issue a `SIGKILL` signal.
 
-This is equivalent to executing the `bin/hbase-daemon.sh stop master` command, which internally executes `kill <master-pid>` (https://github.com/apache/hbase/blob/8382f55b15be6ae190f8d202a5e6a40af177ec76/bin/hbase-daemon.sh#L338[code]), waits for a configurable period of time (defaults to 20 minutes), and finally executes `kill -9 <master-pid>` to `SIGKILL` the master (https://github.com/apache/hbase/blob/8382f55b15be6ae190f8d202a5e6a40af177ec76/bin/hbase-common.sh#L20-L41[code]).
-
-However, there is no message in the log acknowledging the graceful shutdown.
-
 == RegionServers
 
 As a default, RegionServers have `60 minutes` to shut down gracefully.
