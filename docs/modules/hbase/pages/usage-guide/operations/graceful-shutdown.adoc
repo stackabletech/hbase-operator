@@ -6,8 +6,8 @@ You can configure the graceful shutdown as described in xref:concepts:operations
 
 As a default, masters have `20 minutes` to shut down gracefully.
 
-The HBase master process will receive a `SIGTERM` signal when Kubernetes wants to terminate the Pod.
-After the graceful shutdown timeout runs out, and the process still didn't exit, Kubernetes will issue a `SIGKILL` signal.
+The HBase master process receives a `SIGTERM` signal when Kubernetes wants to terminate the Pod.
+After the graceful shutdown timeout runs out, and the process is still running, Kubernetes issues a `SIGKILL` signal.
 
 == RegionServers
 

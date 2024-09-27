@@ -1,6 +1,6 @@
 = Getting started
 
-This guide will get you started with HBase using the Stackable operator.
+This guide gets you started with HBase using the Stackable operator.
 It guides you through the installation of the operator and its dependencies, setting up your first HBase cluster and verifying its operation.
 
 == Prerequisites
