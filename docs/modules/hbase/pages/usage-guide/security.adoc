@@ -105,7 +105,7 @@ include::example$usage-guide/hbase-regorules.yaml[]
 
 This rego rule is intended for demonstration purposes and allows every operation.
 For a production setup you probably need to have something much more granular.
-More representative rego rule can be found in our integration tests and in the aforementioned coprocessor repository.
+A more representative rego rule can be found in our integration tests and in the aforementioned coprocessor repository.
 Details can be found below in the <<fine-granular-rego-rules, fine-granular rego rules>> section.
 
 === How it works
