@@ -3,7 +3,7 @@
 :phoenix: https://phoenix.apache.org/index.html
 
 Once you have followed the steps in the xref:getting_started/installation.adoc[] section to install the operator and its dependencies, you deploy an HBase cluster and its dependencies.
-Afterwards you can <<_verify_that_it_works, verify that it works>> by creating tables and data in HBase using the REST API and Apache Phoenix (an SQL layer used to interact with HBase).
+Afterward you can <<_verify_that_it_works, verify that it works>> by creating tables and data in HBase using the REST API and Apache Phoenix (an SQL layer used to interact with HBase).
 
 == Setup
 
