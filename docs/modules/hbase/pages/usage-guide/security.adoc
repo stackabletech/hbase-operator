@@ -104,8 +104,8 @@ include::example$usage-guide/hbase-regorules.yaml[]
 ----
 
 This rego rule is intended for demonstration purposes and allows every operation.
-For a production setup you will probably need to have something much more granular.
-We provide a more representative rego rule in our integration tests and in the aforementioned coprocessor repository.
+For a production setup you probably need to have something much more granular.
+A more representative rego rule can be found in our integration tests and in the aforementioned coprocessor repository.
 Details can be found below in the <<fine-granular-rego-rules, fine-granular rego rules>> section.
 
 === How it works
@@ -114,7 +114,7 @@ WARNING: This implementation takes an approach to HBase authorization that is fu
 The current rego rules ignore file ownership and permissions, and ACLs are persisted neither in ZooKeeper nor internal HBase tables.
 Keeping this state in HDFS/HBase clashes with the infrastructure-as-code approach (IaC).
 
-Instead, HBase will send a request detailing who (e.g. `alice/test-hbase-permissions.default.svc.cluster.local@CLUSTER.LOCAL`) is trying to execute what type of action (e.g. `READ`, `WRITE`, `CREATE` or `ADMIN`) on what namespace or table (e.g. `developers:`, `developers/table1`) to OPA.
+Instead, HBase sends a request detailing who (e.g. `alice/test-hbase-permissions.default.svc.cluster.local@CLUSTER.LOCAL`) is trying to execute what type of action (e.g. `READ`, `WRITE`, `CREATE` or `ADMIN`) on what namespace or table (e.g. `developers:`, `developers/table1`) to OPA.
 OPA then makes a decision whether this action is allowed or not.
 
 Instead of using the HBase shell to grant or revoke rights to users, you can create rules for OPA using the Rego language to define what a specific user is allowed or not allowed to do to.

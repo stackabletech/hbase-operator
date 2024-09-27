@@ -18,7 +18,7 @@ Apache HBase is an open-source, distributed, non-relational database that runs o
 == Getting started
 
 Follow the xref:getting_started/index.adoc[] guide to learn how to xref:getting_started/installation.adoc[install] the Stackable operator for Apache HBase as well as the dependencies.
-The guide will also show you how to xref:getting_started/first_steps.adoc[interact] with HBase running on Kubernetes by creating tables and some data using the REST API or Apache Phoenix.
+The guide shows you how to xref:getting_started/first_steps.adoc[interact] with HBase running on Kubernetes by creating tables and some data using the REST API or Apache Phoenix.
 
 The xref:usage-guide/index.adoc[] contains more information on xref:usage-guide/phoenix.adoc[] as well as other topics
 such as xref:usage-guide/resource-requests.adoc[CPU and memory configuration], xref:usage-guide/monitoring.adoc[] and
@@ -55,7 +55,7 @@ The xref:demos:hbase-hdfs-load-cycling-data.adoc[] demo shows how you can use HB
 == Supported versions
 
 The Stackable operator for Apache HBase currently supports the HBase versions listed below.
-To use a specific HBase version in your HBaseCluster, you have to specify an image - this is explained in the xref:concepts:product-image-selection.adoc[] documentation.
+To use a specific HBase version in your HBaseCluster, you have to specify an image -- this is explained in the xref:concepts:product-image-selection.adoc[] documentation.
 The operator also supports running images from a custom registry or running entirely customized images; both of these cases are explained under xref:concepts:product-image-selection.adoc[] as well.
 
 include::partial$supported-versions.adoc[]

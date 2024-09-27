@@ -4,15 +4,15 @@
 
 The HBase xref:concepts:stacklet.adoc[Stacklet] definition also supports overriding configuration properties, environment variables and Pod specs, either per role or per role group, where the more specific override (role group) has precedence over the less specific one (role).
 
-IMPORTANT: Overriding certain properties which are set by operator can interfere with the operator and can lead to problems.
+IMPORTANT: Overriding operator-set properties can interfere with the operator and can lead to problems.
 
 == Configuration properties
 
 For a role or role group, at the same level of `config`, you can specify: `configOverrides` for the following files:
 
-- `hbase-site.xml`
-- `hbase-env.sh`
-- `security.properties`
+* `hbase-site.xml`
+* `hbase-env.sh`
+* `security.properties`
 
 NOTE: `hdfs-site.xml` is not listed here, the file is always taken from the referenced HDFS cluster.
 If you want to modify it, take a look at xref:hdfs:usage-guide/configuration-environment-overrides.adoc[HDFS configuration overrides].
@@ -33,7 +33,7 @@ restServers:
       replicas: 1
 ----
 
-Just as for the `config`, it is possible to specify this at role level as well:
+Just as for the `config`, you can specify this at role level as well:
 
 [source,yaml]
 ----
@@ -50,7 +50,7 @@ restServers:
 ----
 
 All override property values must be strings.
-The properties will be formatted and escaped correctly into the XML file, respectively inserted as is into the `hbase-env.sh` file.
+The properties are formatted and escaped correctly into the XML file, respectively inserted as is into the `hbase-env.sh` file.
 
 For a full list of configuration options we refer to the HBase https://hbase.apache.org/book.html#config.files[configuration documentation].
 
