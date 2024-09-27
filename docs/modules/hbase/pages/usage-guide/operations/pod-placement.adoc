@@ -131,4 +131,4 @@ spec:
         replicas: 2
 ----
 
-WARNING: The Pods get stuck in `Pending`, if your Kubernetes cluster does not have any nodes without a masters already running on it and sufficient compute resources available.
+WARNING: The Pods remain in the  `Pending` phase until the masters are up and running and there are  sufficient compute resources available.
