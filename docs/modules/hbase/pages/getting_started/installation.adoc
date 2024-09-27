@@ -5,7 +5,7 @@
 Install the Stackable HBase operator and its dependencies, the ZooKeeper and HDFS operators, as well as the commons, secret and listener operators which are required by all Stackable operators.
 
 There are multiple ways to install the Stackable Operator for Apache Zookeeper.
-xref:management:stackablectl:index.adoc[] is the preferred way but Helm is also supported.
+xref:management:stackablectl:index.adoc[] is the preferred way, but Helm is also supported.
 OpenShift users may prefer installing the operator from the RedHat Certified Operator catalog using the OpenShift web console.
 
 [tabs]
