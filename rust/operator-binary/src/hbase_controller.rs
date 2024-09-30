@@ -117,9 +117,12 @@ handle_term_signal()
     command="$1"
     if [ "${term_child_pid}" ]; then
         if [ "regionserver" == "$command" ]; then
-            echo Start moving regions
-            bin/hbase org.apache.hadoop.hbase.util.RegionMover --regionserverhost localhost --operation unload
-            echo Done moving regions
+            if [ "" != "$MOVE_REGIONS_ON_SHUTDOWN" ]; then
+                echo Start moving regions
+                REGION_MOVER_OPTS="--regionserverhost localhost --operation unload $REGION_MOVER_OPTS"
+                bin/hbase org.apache.hadoop.hbase.util.RegionMover "$REGION_MOVER_OPTS"
+                echo Done moving regions
+            fi
         fi
         kill -TERM "${term_child_pid}" 2>/dev/null
     else
@@ -893,6 +896,9 @@ fn build_rolegroup_statefulset(
             prepare_signal_handlers {hbase_command}
             {remove_vector_shutdown_file_command}
             bin/hbase {hbase_command} start &
+            # Save the HBase process pid so other scripts provided by the HBase distribution
+            # (like graceful_stop.sh) can reuse it.
+            echo $! > /tmp/hbase--{hbase_command}.pid
             wait_for_termination $!
             {create_vector_shutdown_file_command}
             ",
