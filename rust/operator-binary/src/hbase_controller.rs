@@ -103,6 +103,44 @@ const HBASE_NO_REDIRECT_LOG: &str = "HBASE_NO_REDIRECT_LOG";
 const DOCKER_IMAGE_BASE_NAME: &str = "hbase";
 const HBASE_UID: i64 = 1000;
 
+pub const HBASE_BASH_TRAP_FUNCTIONS: &str = r#"
+prepare_signal_handlers()
+{
+    command="$1"
+    unset term_child_pid
+    unset term_kill_needed
+    trap "handle_term_signal $command" TERM
+}
+
+handle_term_signal()
+{
+    command="$1"
+    if [ "${term_child_pid}" ]; then
+        if [ "regionserver" == "$command" ]; then
+            echo Start moving regions
+            bin/hbase org.apache.hadoop.hbase.util.RegionMover --regionserverhost localhost --operation unload
+            echo Done moving regions
+        fi
+        kill -TERM "${term_child_pid}" 2>/dev/null
+    else
+        term_kill_needed='yes'
+    fi
+}
+
+wait_for_termination()
+{
+    set +e
+    term_child_pid=$1
+    if [[ -v term_kill_needed ]]; then
+        kill -TERM "${term_child_pid}" 2>/dev/null
+    fi
+    wait ${term_child_pid} 2>/dev/null
+    trap - TERM
+    wait ${term_child_pid} 2>/dev/null
+    set -e
+}
+"#;
+
 pub struct Ctx {
     pub client: stackable_operator::client::Client,
     pub product_config: ProductConfigManager,
@@ -850,14 +888,15 @@ fn build_rolegroup_statefulset(
 
             {kerberos_container_start_commands}
 
+            {HBASE_BASH_TRAP_FUNCTIONS}
+
+            prepare_signal_handlers {hbase_command}
             {remove_vector_shutdown_file_command}
-            # Evaluating the hbase-daemon.sh script in this shell with `source` is required
-            # for the signal handlers installed by the hbase-daemon.sh script to actually work.
-            # Also running the hbase process in the foreground is required for the container to stay alive.
-            source bin/hbase-daemon.sh foreground_start {hbase_role_name_in_command}
+            bin/hbase {hbase_command} start &
+            wait_for_termination $!
             {create_vector_shutdown_file_command}
             ",
-            hbase_role_name_in_command = hbase_role.cli_role_name(),
+            hbase_command  = hbase_role.cli_role_name(),
             kerberos_container_start_commands = kerberos_container_start_commands(hbase),
             remove_vector_shutdown_file_command =
                 remove_vector_shutdown_file_command(STACKABLE_LOG_DIR),
