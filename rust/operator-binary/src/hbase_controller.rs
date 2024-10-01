@@ -96,10 +96,6 @@ const HDFS_DISCOVERY_TMP_DIR: &str = "/stackable/tmp/hdfs";
 const HBASE_CONFIG_TMP_DIR: &str = "/stackable/tmp/hbase";
 const HBASE_LOG_CONFIG_TMP_DIR: &str = "/stackable/tmp/log_config";
 
-// Set this env var to any value for the hbase-daemon.sh script to output to stdout.
-// Java logging is not affected by this.
-const HBASE_NO_REDIRECT_LOG: &str = "HBASE_NO_REDIRECT_LOG";
-
 const DOCKER_IMAGE_BASE_NAME: &str = "hbase";
 const HBASE_UID: i64 = 1000;
 
@@ -874,11 +870,7 @@ fn build_rolegroup_statefulset(
         .command(vec![
             "/bin/bash".to_string(),
             "-x".to_string(),
-            // We don't use -u because there is a long list of environment variables that the
-            // hbase-daemon.sh script uses without initializing them.
-            // Configuring all of them in the environment would make the operator unnecessarily
-            // complex and very sensible to all sorts of minor of changes.
-            "-eo".to_string(),
+            "-euo".to_string(),
             "pipefail".to_string(),
             "-c".to_string(),
         ])
@@ -1153,7 +1145,6 @@ fn build_hbase_env_sh(
     let mut result = BTreeMap::new();
 
     result.insert(HBASE_MANAGES_ZK.to_string(), "false".to_string());
-    result.insert(HBASE_NO_REDIRECT_LOG.to_string(), "true".to_string());
 
     // We always enable `-Djava.security.krb5.conf` even if it's not used.
     let all_hbase_opts = [
