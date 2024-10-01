@@ -1,0 +1,48 @@
+= Node management
+:description: Use tools provided by the HBase to decommission nodes and move regions within the cluster.
+:node-management-docs: https://hbase.apache.org/book.html#node.management
+
+For detailed instructions on how to manage HBase nodes see the Apache {node-management-docs}[documentation].
+
+Here we'll describe some common usecases and how to handle them.
+
+== Decommissioning a Kubernetes node
+
+The steps required to decommission a Kubernetes node depend on the services running on that node.
+Here we'll discuss some aspects from the HBase perspective.
+In a real-world scenario, additional steps are required to ensure a node is successfully removed from the cluster.
+From HBase's perspective, it is important to consider the services running on that node.
+A node where region servers are running usually require a transfer of those regions to other servers and nodes first as shown in the example below.
+
+First, turn off the region balancer during the decommissioning process to prevent regions from being moved back to the decommissioned node.
+The `graceful_stop.sh` script can also do this, but it will never be able to turn the balancer back on because the container will be terminated as soon as the regions are moved.
+Inform the HBase master that the region servers on the node are going to be decommissioned.
+This prevents those servers to receive additional regions during the decommissioning process (puts them in "draining" mode).
+The `hostname` must contain the fully qualified name of the region server as known by HBase it's self.
+If you plan to decommission multiple nodes, it is recommended to decommission all nodes at once to avoid moving regions unnecessarily back and forth between servers.
+
+[source,bash]
+----
+$ echo "balance_switch false" | /stackable/hbase shell
+$ echo "decommission_regionservers <hostname>" | /stackable/hbase shell
+----
+
+Then, decommision the server and move the regions to other servers.
+The commands below are executed on the respective region server container.
+
+[source,bash]
+----
+$ /stackable/hbase/bin/graceful_stop.sh --nobalancer localhost
+----
+
+Depending on the amount of data, this process can take between a couple of seconds and several hours.
+You must use `localhost` and not the fully qualified name of the region server because that requires ssh tools which are not installed.
+
+Now the region server is guaranteed to not manage any regions and can be safely stopped and removed from the cluster.
+
+Finally, after removing the nodes from the cluster, turn the region balancer back on.
+
+[source,bash]
+----
+$ echo "balance_switch true" | /stackable/hbase shell
+----

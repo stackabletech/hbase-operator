@@ -11,8 +11,6 @@ After the graceful shutdown timeout runs out, and the process is still running, 
 
 This is equivalent to executing the `bin/hbase-daemon.sh stop master` command, which internally executes `kill <master-pid>` (https://github.com/apache/hbase/blob/8382f55b15be6ae190f8d202a5e6a40af177ec76/bin/hbase-daemon.sh#L338[code]), waits for a configurable period of time (defaults to 20 minutes), and finally executes `kill -9 <master-pid>` to `SIGKILL` the master (https://github.com/apache/hbase/blob/8382f55b15be6ae190f8d202a5e6a40af177ec76/bin/hbase-common.sh#L20-L41[code]).
 
-However, there is no message in the log acknowledging the graceful shutdown.
-
 == RegionServers
 
 As a default, RegionServers have `60 minutes` to shut down gracefully.
@@ -39,3 +37,8 @@ In contrast to the Master servers, they will, however, acknowledge the graceful 
 2023-10-11 12:40:42,309 INFO  [JettyShutdownThread] server.session: node0 Stopped scavenging
 2023-10-11 12:40:42,316 INFO  [main] RESTServer: ***** STOPPING service 'RESTServer' *****
 ----
+
+There are two environment variables that you can add to the regionserver roles (or groups) that allow you more control over the shotdonw process: `MOVE_REGIONS_ON_SHUTDOWN` and `REGION_MOVER_OPTS`.
+
+If `MOVE_REGIONS_ON_SHUTDOWN` (default is empty) is set to any value, the region server will attempt to move it's regions away to other servers before shutting down.
+The `REGION_MOVER_OPTS` variable allows you to pass additional options to the region mover. For example, you can set the `--maxthreads` option to control the number of threads used to move regions. The operator sets the `--regionserverhost localhost` and `--operation unload` options.
