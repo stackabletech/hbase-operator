@@ -15,7 +15,7 @@ From HBase's perspective, it is important to consider the services running on th
 A node where region servers are running usually require a transfer of those regions to other servers and nodes first as shown in the example below.
 
 First, turn off the region balancer during the decommissioning process to prevent regions from being moved back to the decommissioned node.
-The `graceful_stop.sh` script can also do this but it will never be able to turn the balancer back on because the container will be terminated as soon as the regions are moved.
+The `graceful_stop.sh` script can also do this, but it will never be able to turn the balancer back on because the container will be terminated as soon as the regions are moved.
 Inform the HBase master that the region servers on the node are going to be decommissioned.
 This prevents those servers to receive additional regions during the decommissioning process (puts them in "draining" mode).
 The `hostname` must contain the fully qualified name of the region server as known by HBase it's self.
@@ -24,7 +24,7 @@ If you plan to decommission multiple nodes, it is recommended to decommission al
 [source,bash]
 ----
 $ echo "balance_switch false" | /stackable/hbase shell
-$ echo "decommission_regionservers '<hostname>'" | /stackable/hbase shell
+$ echo "decommission_regionservers <hostname>" | /stackable/hbase shell
 ----
 
 Then, decommision the server and move the regions to other servers.

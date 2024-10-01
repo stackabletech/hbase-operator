@@ -37,3 +37,8 @@ In contrast to the Master servers, they will, however, acknowledge the graceful 
 2023-10-11 12:40:42,309 INFO  [JettyShutdownThread] server.session: node0 Stopped scavenging
 2023-10-11 12:40:42,316 INFO  [main] RESTServer: ***** STOPPING service 'RESTServer' *****
 ----
+
+There are two environment variables that you can add to the regionserver roles (or groups) that allow you more control over the shotdonw process: `MOVE_REGIONS_ON_SHUTDOWN` and `REGION_MOVER_OPTS`.
+
+If `MOVE_REGIONS_ON_SHUTDOWN` (default is empty) is set to any value, the region server will attempt to move it's regions away to other servers before shutting down.
+The `REGION_MOVER_OPTS` variable allows you to pass additional options to the region mover. For example, you can set the `--maxthreads` option to control the number of threads used to move regions. The operator will sets the `--regionserverhost localhost` and `--operation unload options`.
