@@ -7,7 +7,7 @@
 - Reduce CRD size from `1.4MB` to `96KB` by accepting arbitrary YAML input instead of the underlying schema for the following fields ([#548]):
   - `podOverrides`
   - `affinity`
-- Use the `hbase-daemon.sh` script to start and stop HBase processes ([#568]).
+- Region servers can now optionally move regions to other servers before shutting down ([#568]).
 
 ### Fixed
 
