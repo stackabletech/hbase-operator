@@ -85,8 +85,13 @@ pub const METRICS_PORT: u16 = 9100;
 pub const JVM_HEAP_FACTOR: f32 = 0.8;
 
 const DEFAULT_MASTER_GRACEFUL_SHUTDOWN_TIMEOUT: Duration = Duration::from_minutes_unchecked(20);
+// The following three values should be kept in sync so that
+// DEFAULT_REGION_SERVER_GRACEFUL_SHUTDOWN_TIMEOUT = DEFAULT_REGION_MOVER_TIMEOUT + DEFAULT_REGION_MOVER_DELTA_TO_SHUTDOWN
 const DEFAULT_REGION_SERVER_GRACEFUL_SHUTDOWN_TIMEOUT: Duration =
     Duration::from_minutes_unchecked(60);
+// This should always be slightly less than the above
+const DEFAULT_REGION_MOVER_TIMEOUT: Duration = Duration::from_minutes_unchecked(59);
+const DEFAULT_REGION_MOVER_DELTA_TO_SHUTDOWN: Duration = Duration::from_minutes_unchecked(1);
 const DEFAULT_REST_SERVER_GRACEFUL_SHUTDOWN_TIMEOUT: Duration = Duration::from_minutes_unchecked(5);
 
 #[derive(Snafu, Debug)]
@@ -312,7 +317,7 @@ fn default_regionserver_config(
             hdfs_discovery_cm_name,
         ),
         graceful_shutdown_timeout: Some(DEFAULT_REGION_SERVER_GRACEFUL_SHUTDOWN_TIMEOUT),
-        graceful_shutdown_region_mover_opts: Some(CliArgList { args: vec![] }),
+        region_mover: Some(RegionMover::default()),
     }
 }
 
@@ -509,17 +514,32 @@ impl Configuration for HbaseConfigFragment {
     }
 }
 
-#[derive(Clone, Debug, Default, JsonSchema, PartialEq, Serialize, Deserialize)]
-pub struct CliArgList {
-    // todo how to serialize this properly?
-    args: Vec<String>,
+#[derive(Clone, Debug, JsonSchema, PartialEq, Serialize, Deserialize)]
+pub struct RegionMover {
+    run_before_shutdown: bool,
+    max_threads: u16,
+    ack: bool,
+    extra_opts: Vec<String>,
 }
 
-impl Atomic for CliArgList {}
+impl Default for RegionMover {
+    fn default() -> Self {
+        Self {
+            run_before_shutdown: false,
+            max_threads: 1,
+            ack: true,
+            extra_opts: vec![],
+        }
+    }
+}
+impl Atomic for RegionMover {}
 
-impl Merge for CliArgList {
+impl Merge for RegionMover {
     fn merge(&mut self, other: &Self) {
-        self.args.extend(other.args.clone());
+        self.run_before_shutdown = other.run_before_shutdown;
+        self.max_threads = other.max_threads;
+        self.ack = other.ack;
+        self.extra_opts.extend(other.extra_opts.clone());
     }
 }
 
@@ -552,7 +572,7 @@ pub struct RegionServerConfig {
     /// Time period Pods have to gracefully shut down, e.g. `30m`, `1h` or `2d`. Consult the operator documentation for details.
     #[fragment_attrs(serde(default))]
     pub graceful_shutdown_timeout: Option<Duration>,
-    pub graceful_shutdown_region_mover_opts: CliArgList,
+    pub region_mover: RegionMover,
 }
 
 impl Configuration for RegionServerConfigFragment {
@@ -1087,6 +1107,44 @@ impl AnyServiceConfig {
             AnyServiceConfig::Master(config) => &config.hbase_opts,
             AnyServiceConfig::RegionServer(config) => &config.hbase_opts,
             AnyServiceConfig::RestServer(config) => &config.hbase_opts,
+        }
+    }
+
+    pub fn region_mover_command(&self) -> String {
+        match self {
+            AnyServiceConfig::RegionServer(config) => {
+                if config.region_mover.run_before_shutdown {
+                    let timeout = config
+                        .graceful_shutdown_timeout
+                        .map(|d| {
+                            if d.as_secs() < DEFAULT_REGION_MOVER_DELTA_TO_SHUTDOWN.as_secs() {
+                                d.as_secs()
+                            } else {
+                                d.as_secs() - DEFAULT_REGION_MOVER_DELTA_TO_SHUTDOWN.as_secs()
+                            }
+                        })
+                        .unwrap_or(DEFAULT_REGION_MOVER_TIMEOUT.as_secs());
+                    let mut command = vec![
+                        "bin/hbase".to_string(),
+                        "org.apache.hadoop.hbase.util.RegionMover".to_string(),
+                        "--regionserverhost".to_string(),
+                        "localhost".to_string(),
+                        "--operation".to_string(),
+                        "unload".to_string(),
+                        "--ack".to_string(),
+                        config.region_mover.ack.to_string(),
+                        "--timeout".to_string(),
+                        timeout.to_string(),
+                    ];
+                    // TODO: this is a security risk, we should validate and escape the extra_opts
+                    command.extend(config.region_mover.extra_opts.clone());
+                    let command = command.join(" ");
+                    format!("\"{command}\"")
+                } else {
+                    "\"\"".to_string()
+                }
+            }
+            _ => "\"\"".to_string(),
         }
     }
 }

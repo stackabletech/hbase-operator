@@ -2,9 +2,7 @@ use std::collections::BTreeMap;
 
 use indoc::formatdoc;
 use snafu::{OptionExt, ResultExt, Snafu};
-use stackable_hbase_crd::{
-    HbaseCluster, HbaseRole, TLS_STORE_DIR, TLS_STORE_PASSWORD, TLS_STORE_VOLUME_NAME,
-};
+use stackable_hbase_crd::{HbaseCluster, TLS_STORE_DIR, TLS_STORE_PASSWORD, TLS_STORE_VOLUME_NAME};
 use stackable_operator::{
     builder::pod::{
         container::ContainerBuilder,
@@ -213,7 +211,6 @@ pub fn kerberos_ssl_client_settings(hbase: &HbaseCluster) -> BTreeMap<String, St
 
 pub fn add_kerberos_pod_config(
     hbase: &HbaseCluster,
-    _role: &HbaseRole,
     cb: &mut ContainerBuilder,
     pb: &mut PodBuilder,
 ) -> Result<(), Error> {

@@ -49,7 +49,6 @@ use stackable_operator::{
         statefulset::StatefulSetConditionBuilder,
     },
     time::Duration,
-    utils::COMMON_BASH_TRAP_FUNCTIONS,
 };
 use std::{
     collections::{BTreeMap, HashMap},
@@ -97,6 +96,42 @@ const HBASE_LOG_CONFIG_TMP_DIR: &str = "/stackable/tmp/log_config";
 
 const DOCKER_IMAGE_BASE_NAME: &str = "hbase";
 const HBASE_UID: i64 = 1000;
+
+pub const HBASE_BASH_TRAP_FUNCTIONS: &str = r#"
+prepare_signal_handlers()
+{
+    unset term_child_pid
+    unset term_kill_needed
+    trap handle_term_signal TERM
+}
+
+handle_term_signal()
+{
+    if [ "${term_child_pid}" ]; then
+        if [ -n "$REGION_MOVER_COMMAND" ]; then
+            echo Start region mover
+            source "$REGION_MOVER_COMMAND"
+            echo Done moving regions
+        fi
+        kill -TERM "${term_child_pid}" 2>/dev/null
+    else
+        term_kill_needed='yes'
+    fi
+}
+
+wait_for_termination()
+{
+    set +e
+    term_child_pid=$1
+    if [[ -v term_kill_needed ]]; then
+        kill -TERM "${term_child_pid}" 2>/dev/null
+    fi
+    wait ${term_child_pid} 2>/dev/null
+    trap - TERM
+    wait ${term_child_pid} 2>/dev/null
+    set -e
+}
+"#;
 
 pub struct Ctx {
     pub client: stackable_operator::client::Client,
@@ -834,13 +869,15 @@ fn build_rolegroup_statefulset(
 
             {kerberos_container_start_commands}
 
-            {COMMON_BASH_TRAP_FUNCTIONS}
+            REGION_MOVER_COMMAND={region_mover_command}
+            {HBASE_BASH_TRAP_FUNCTIONS}
             {remove_vector_shutdown_file_command}
             prepare_signal_handlers
             bin/hbase {hbase_role_name_in_command} start &
             wait_for_termination $!
             {create_vector_shutdown_file_command}
             ",
+            region_mover_command=config.region_mover_command(),
             hbase_role_name_in_command = hbase_role.cli_role_name(),
             kerberos_container_start_commands = kerberos_container_start_commands(hbase),
             remove_vector_shutdown_file_command =
@@ -934,7 +971,7 @@ fn build_rolegroup_statefulset(
 
     add_graceful_shutdown_config(config, &mut pod_builder).context(GracefulShutdownSnafu)?;
     if hbase.has_kerberos_enabled() {
-        add_kerberos_pod_config(hbase, hbase_role, &mut hbase_container, &mut pod_builder)
+        add_kerberos_pod_config(hbase, &mut hbase_container, &mut pod_builder)
             .context(AddKerberosConfigSnafu)?;
     }
     pod_builder.add_container(hbase_container.build());
