@@ -630,6 +630,16 @@ spec:
                               type: object
                               x-kubernetes-preserve-unknown-fields: true
                           type: object
+                        gracefulShutdownRegionMoverOpts:
+                          nullable: true
+                          properties:
+                            args:
+                              items:
+                                type: string
+                              type: array
+                          required:
+                            - args
+                          type: object
                         gracefulShutdownTimeout:
                           description: Time period Pods have to gracefully shut down, e.g. `30m`, `1h` or `2d`. Consult the operator documentation for details.
                           nullable: true
@@ -852,6 +862,16 @@ spec:
                                     nullable: true
                                     type: object
                                     x-kubernetes-preserve-unknown-fields: true
+                                type: object
+                              gracefulShutdownRegionMoverOpts:
+                                nullable: true
+                                properties:
+                                  args:
+                                    items:
+                                      type: string
+                                    type: array
+                                required:
+                                  - args
                                 type: object
                               gracefulShutdownTimeout:
                                 description: Time period Pods have to gracefully shut down, e.g. `30m`, `1h` or `2d`. Consult the operator documentation for details.
