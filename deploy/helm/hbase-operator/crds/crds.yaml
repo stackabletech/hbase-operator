@@ -724,6 +724,27 @@ spec:
                               nullable: true
                               type: boolean
                           type: object
+                        regionMover:
+                          nullable: true
+                          properties:
+                            ack:
+                              type: boolean
+                            extra_opts:
+                              items:
+                                type: string
+                              type: array
+                            max_threads:
+                              format: uint16
+                              minimum: 0.0
+                              type: integer
+                            run_before_shutdown:
+                              type: boolean
+                          required:
+                            - ack
+                            - extra_opts
+                            - max_threads
+                            - run_before_shutdown
+                          type: object
                         resources:
                           default:
                             cpu:
@@ -946,6 +967,27 @@ spec:
                                     description: Wether or not to deploy a container with the Vector log agent.
                                     nullable: true
                                     type: boolean
+                                type: object
+                              regionMover:
+                                nullable: true
+                                properties:
+                                  ack:
+                                    type: boolean
+                                  extra_opts:
+                                    items:
+                                      type: string
+                                    type: array
+                                  max_threads:
+                                    format: uint16
+                                    minimum: 0.0
+                                    type: integer
+                                  run_before_shutdown:
+                                    type: boolean
+                                required:
+                                  - ack
+                                  - extra_opts
+                                  - max_threads
+                                  - run_before_shutdown
                                 type: object
                               resources:
                                 default:

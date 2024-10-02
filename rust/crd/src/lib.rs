@@ -1,8 +1,8 @@
-use std::{collections::BTreeMap, str::FromStr};
-
+use product_config::types::PropertyNameKind;
 use security::AuthenticationConfig;
 use serde::{Deserialize, Serialize};
 use snafu::{OptionExt, ResultExt, Snafu};
+use stackable_operator::k8s_openapi::api::core::v1::PodTemplateSpec;
 use stackable_operator::{
     commons::{
         affinity::StackableAffinity,
@@ -15,17 +15,19 @@ use stackable_operator::{
     },
     config::{
         fragment::{self, Fragment, ValidationError},
-        merge::Merge,
+        merge::{Atomic, Merge},
     },
-    k8s_openapi::{api::core::v1::EnvVar, apimachinery::pkg::api::resource::Quantity},
+    k8s_openapi::{api::core::v1::EnvVar, apimachinery::pkg::api::resource::Quantity, DeepMerge},
     kube::{runtime::reflector::ObjectRef, CustomResource, ResourceExt},
     product_config_utils::Configuration,
     product_logging::{self, spec::Logging},
-    role_utils::{GenericRoleConfig, Role, RoleGroup, RoleGroupRef},
+    role_utils::{GenericRoleConfig, Role, RoleGroupRef},
     schemars::{self, JsonSchema},
     status::condition::{ClusterCondition, HasStatusCondition},
     time::Duration,
 };
+use std::collections::BTreeMap;
+use std::collections::HashMap;
 use strum::{Display, EnumIter, EnumString};
 
 use crate::affinity::get_affinity;
@@ -83,12 +85,20 @@ pub const METRICS_PORT: u16 = 9100;
 pub const JVM_HEAP_FACTOR: f32 = 0.8;
 
 const DEFAULT_MASTER_GRACEFUL_SHUTDOWN_TIMEOUT: Duration = Duration::from_minutes_unchecked(20);
+// The following three values should be kept in sync so that
+// DEFAULT_REGION_SERVER_GRACEFUL_SHUTDOWN_TIMEOUT = DEFAULT_REGION_MOVER_TIMEOUT + DEFAULT_REGION_MOVER_DELTA_TO_SHUTDOWN
 const DEFAULT_REGION_SERVER_GRACEFUL_SHUTDOWN_TIMEOUT: Duration =
     Duration::from_minutes_unchecked(60);
+// This should always be slightly less than the above
+const DEFAULT_REGION_MOVER_TIMEOUT: Duration = Duration::from_minutes_unchecked(59);
+const DEFAULT_REGION_MOVER_DELTA_TO_SHUTDOWN: Duration = Duration::from_minutes_unchecked(1);
 const DEFAULT_REST_SERVER_GRACEFUL_SHUTDOWN_TIMEOUT: Duration = Duration::from_minutes_unchecked(5);
 
 #[derive(Snafu, Debug)]
 pub enum Error {
+    #[snafu(display("expected role [{expected}] but got role [{got}]"))]
+    ExpectedRole { expected: String, got: String },
+
     #[snafu(display("the role [{role}] is invalid and does not exist in HBase"))]
     InvalidRole {
         source: strum::ParseError,
@@ -103,6 +113,12 @@ pub enum Error {
 
     #[snafu(display("fragment validation failure"))]
     FragmentValidationFailure { source: ValidationError },
+
+    #[snafu(display("object defines no master role"))]
+    NoMasterRole,
+
+    #[snafu(display("object defines no regionserver role"))]
+    NoRegionServerRole,
 }
 
 /// An HBase cluster stacklet. This resource is managed by the Stackable operator for Apache HBase.
@@ -145,7 +161,7 @@ pub struct HbaseClusterSpec {
 
     /// Region servers hold the data and handle requests from clients for their region.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub region_servers: Option<Role<HbaseConfigFragment>>,
+    pub region_servers: Option<Role<RegionServerConfigFragment>>,
 
     /// Rest servers provide a REST API to interact with.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -263,63 +279,6 @@ pub enum HbaseRole {
 }
 
 impl HbaseRole {
-    pub fn default_config(
-        &self,
-        cluster_name: &str,
-        hdfs_discovery_cm_name: &str,
-    ) -> HbaseConfigFragment {
-        let resources = match &self {
-            HbaseRole::Master => ResourcesFragment {
-                cpu: CpuLimitsFragment {
-                    min: Some(Quantity("250m".to_owned())),
-                    max: Some(Quantity("1".to_owned())),
-                },
-                memory: MemoryLimitsFragment {
-                    limit: Some(Quantity("1Gi".to_owned())),
-                    runtime_limits: NoRuntimeLimitsFragment {},
-                },
-                storage: HbaseStorageConfigFragment {},
-            },
-            HbaseRole::RegionServer => ResourcesFragment {
-                cpu: CpuLimitsFragment {
-                    min: Some(Quantity("250m".to_owned())),
-                    max: Some(Quantity("1".to_owned())),
-                },
-                memory: MemoryLimitsFragment {
-                    limit: Some(Quantity("1Gi".to_owned())),
-                    runtime_limits: NoRuntimeLimitsFragment {},
-                },
-                storage: HbaseStorageConfigFragment {},
-            },
-            HbaseRole::RestServer => ResourcesFragment {
-                cpu: CpuLimitsFragment {
-                    min: Some(Quantity("100m".to_owned())),
-                    max: Some(Quantity("400m".to_owned())),
-                },
-                memory: MemoryLimitsFragment {
-                    limit: Some(Quantity("512Mi".to_owned())),
-                    runtime_limits: NoRuntimeLimitsFragment {},
-                },
-                storage: HbaseStorageConfigFragment {},
-            },
-        };
-
-        let graceful_shutdown_timeout = match &self {
-            HbaseRole::Master => DEFAULT_MASTER_GRACEFUL_SHUTDOWN_TIMEOUT,
-            HbaseRole::RegionServer => DEFAULT_REGION_SERVER_GRACEFUL_SHUTDOWN_TIMEOUT,
-            HbaseRole::RestServer => DEFAULT_REST_SERVER_GRACEFUL_SHUTDOWN_TIMEOUT,
-        };
-
-        HbaseConfigFragment {
-            hbase_rootdir: None,
-            hbase_opts: None,
-            resources,
-            logging: product_logging::spec::default_logging(),
-            affinity: get_affinity(cluster_name, self, hdfs_discovery_cm_name),
-            graceful_shutdown_timeout: Some(graceful_shutdown_timeout),
-        }
-    }
-
     /// Returns the name of the role as it is needed by the `bin/hbase {cli_role_name} start` command.
     pub fn cli_role_name(&self) -> String {
         match self {
@@ -329,19 +288,82 @@ impl HbaseRole {
             HbaseRole::RestServer => "rest".to_string(),
         }
     }
+}
 
-    /// We could have different service names depended on the role (e.g. "hbase-master", "hbase-regionserver" and
-    /// "hbase-restserver"). However this produces error messages such as
-    /// [RpcServer.priority.RWQ.Fifo.write.handler=0,queue=0,port=16020] security.ShellBasedUnixGroupsMapping: unable to return groups for user hbase-master PartialGroupNameException The user name 'hbase-master' is not found. id: 'hbase-master': no such user
-    /// or
-    /// Caused by: org.apache.hadoop.hbase.ipc.RemoteWithExtrasException(org.apache.hadoop.hbase.security.AccessDeniedException): org.apache.hadoop.hbase.security.AccessDeniedException: Insufficient permissions (user=hbase-master/hbase-master-default-1.hbase-master-default.kuttl-test-poetic-sunbeam.svc.cluster.local@CLUSTER.LOCAL, scope=hbase:meta, family=table:state, params=[table=hbase:meta,family=table:state],action=WRITE)
-    ///
-    /// Also the documentation states:
-    /// > A Kerberos principal has three parts, with the form username/fully.qualified.domain.name@YOUR-REALM.COM. We recommend using hbase as the username portion.
-    ///
-    /// As a result we use "hbase" everywhere (which e.g. differs from the current hdfs implementation)
-    pub fn kerberos_service_name(&self) -> &'static str {
-        "hbase"
+fn default_regionserver_config(
+    cluster_name: &str,
+    hdfs_discovery_cm_name: &str,
+) -> RegionServerConfigFragment {
+    let resources = ResourcesFragment {
+        cpu: CpuLimitsFragment {
+            min: Some(Quantity("250m".to_owned())),
+            max: Some(Quantity("1".to_owned())),
+        },
+        memory: MemoryLimitsFragment {
+            limit: Some(Quantity("1Gi".to_owned())),
+            runtime_limits: NoRuntimeLimitsFragment {},
+        },
+        storage: HbaseStorageConfigFragment {},
+    };
+
+    RegionServerConfigFragment {
+        hbase_rootdir: None,
+        hbase_opts: None,
+        resources,
+        logging: product_logging::spec::default_logging(),
+        affinity: get_affinity(
+            cluster_name,
+            &HbaseRole::RegionServer,
+            hdfs_discovery_cm_name,
+        ),
+        graceful_shutdown_timeout: Some(DEFAULT_REGION_SERVER_GRACEFUL_SHUTDOWN_TIMEOUT),
+        region_mover: Some(RegionMover::default()),
+    }
+}
+
+fn default_rest_config(cluster_name: &str, hdfs_discovery_cm_name: &str) -> HbaseConfigFragment {
+    let resources = ResourcesFragment {
+        cpu: CpuLimitsFragment {
+            min: Some(Quantity("100m".to_owned())),
+            max: Some(Quantity("400m".to_owned())),
+        },
+        memory: MemoryLimitsFragment {
+            limit: Some(Quantity("512Mi".to_owned())),
+            runtime_limits: NoRuntimeLimitsFragment {},
+        },
+        storage: HbaseStorageConfigFragment {},
+    };
+
+    HbaseConfigFragment {
+        hbase_rootdir: None,
+        hbase_opts: None,
+        resources,
+        logging: product_logging::spec::default_logging(),
+        affinity: get_affinity(cluster_name, &HbaseRole::RestServer, hdfs_discovery_cm_name),
+        graceful_shutdown_timeout: Some(DEFAULT_REST_SERVER_GRACEFUL_SHUTDOWN_TIMEOUT),
+    }
+}
+
+fn default_master_config(cluster_name: &str, hdfs_discovery_cm_name: &str) -> HbaseConfigFragment {
+    let resources = ResourcesFragment {
+        cpu: CpuLimitsFragment {
+            min: Some(Quantity("250m".to_owned())),
+            max: Some(Quantity("1".to_owned())),
+        },
+        memory: MemoryLimitsFragment {
+            limit: Some(Quantity("1Gi".to_owned())),
+            runtime_limits: NoRuntimeLimitsFragment {},
+        },
+        storage: HbaseStorageConfigFragment {},
+    };
+
+    HbaseConfigFragment {
+        hbase_rootdir: None,
+        hbase_opts: None,
+        resources,
+        logging: product_logging::spec::default_logging(),
+        affinity: get_affinity(cluster_name, &HbaseRole::Master, hdfs_discovery_cm_name),
+        graceful_shutdown_timeout: Some(DEFAULT_MASTER_GRACEFUL_SHUTDOWN_TIMEOUT),
     }
 }
 
@@ -492,6 +514,146 @@ impl Configuration for HbaseConfigFragment {
     }
 }
 
+#[derive(Clone, Debug, JsonSchema, PartialEq, Serialize, Deserialize)]
+pub struct RegionMover {
+    run_before_shutdown: bool,
+    max_threads: u16,
+    ack: bool,
+    extra_opts: Vec<String>,
+}
+
+impl Default for RegionMover {
+    fn default() -> Self {
+        Self {
+            run_before_shutdown: false,
+            max_threads: 1,
+            ack: true,
+            extra_opts: vec![],
+        }
+    }
+}
+impl Atomic for RegionMover {}
+
+impl Merge for RegionMover {
+    fn merge(&mut self, other: &Self) {
+        self.run_before_shutdown = other.run_before_shutdown;
+        self.max_threads = other.max_threads;
+        self.ack = other.ack;
+        self.extra_opts.extend(other.extra_opts.clone());
+    }
+}
+
+#[derive(Clone, Debug, Default, Fragment, JsonSchema, PartialEq)]
+#[fragment_attrs(
+    derive(
+        Clone,
+        Debug,
+        Default,
+        Deserialize,
+        Merge,
+        JsonSchema,
+        PartialEq,
+        Serialize
+    ),
+    serde(rename_all = "camelCase")
+)]
+pub struct RegionServerConfig {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hbase_rootdir: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hbase_opts: Option<String>,
+    #[fragment_attrs(serde(default))]
+    pub resources: Resources<HbaseStorageConfig, NoRuntimeLimits>,
+    #[fragment_attrs(serde(default))]
+    pub logging: Logging<Container>,
+    #[fragment_attrs(serde(default))]
+    pub affinity: StackableAffinity,
+
+    /// Time period Pods have to gracefully shut down, e.g. `30m`, `1h` or `2d`. Consult the operator documentation for details.
+    #[fragment_attrs(serde(default))]
+    pub graceful_shutdown_timeout: Option<Duration>,
+    pub region_mover: RegionMover,
+}
+
+impl Configuration for RegionServerConfigFragment {
+    type Configurable = HbaseCluster;
+
+    fn compute_env(
+        &self,
+        _resource: &Self::Configurable,
+        _role_name: &str,
+    ) -> Result<BTreeMap<String, Option<String>>, stackable_operator::product_config_utils::Error>
+    {
+        // Maps env var name to env var object. This allows env_overrides to work
+        // as expected (i.e. users can override the env var value).
+        let mut vars: BTreeMap<String, Option<String>> = BTreeMap::new();
+
+        vars.insert(
+            "HBASE_CONF_DIR".to_string(),
+            Some(CONFIG_DIR_NAME.to_string()),
+        );
+        // required by phoenix (for cases where Kerberos is enabled): see https://issues.apache.org/jira/browse/PHOENIX-2369
+        vars.insert(
+            "HADOOP_CONF_DIR".to_string(),
+            Some(CONFIG_DIR_NAME.to_string()),
+        );
+        Ok(vars)
+    }
+
+    fn compute_cli(
+        &self,
+        _resource: &Self::Configurable,
+        _role_name: &str,
+    ) -> Result<BTreeMap<String, Option<String>>, stackable_operator::product_config_utils::Error>
+    {
+        Ok(BTreeMap::new())
+    }
+
+    fn compute_files(
+        &self,
+        _resource: &Self::Configurable,
+        _role_name: &str,
+        file: &str,
+    ) -> Result<BTreeMap<String, Option<String>>, stackable_operator::product_config_utils::Error>
+    {
+        let mut result = BTreeMap::new();
+
+        match file {
+            HBASE_ENV_SH => {
+                // The contents of this file cannot be built entirely here because we don't have
+                // access to the clusterConfig or product version.
+                // These are needed to set up Kerberos and JMX exporter settings.
+                // To avoid fragmentation of the code needed to build this file, we moved the
+                // implementation to the hbase_controller::build_hbase_env_sh() function.
+            }
+            HBASE_SITE_XML => {
+                result.insert(
+                    HBASE_CLUSTER_DISTRIBUTED.to_string(),
+                    Some("true".to_string()),
+                );
+                result.insert(
+                    HBASE_UNSAFE_REGIONSERVER_HOSTNAME_DISABLE_MASTER_REVERSEDNS.to_string(),
+                    Some("true".to_string()),
+                );
+                result.insert(
+                    HBASE_ROOTDIR.to_string(),
+                    Some(
+                        self.hbase_rootdir
+                            .as_deref()
+                            .unwrap_or(HBASE_ROOT_DIR_DEFAULT)
+                            .to_string(),
+                    ),
+                );
+            }
+            _ => {}
+        }
+
+        result.retain(|_, maybe_value| maybe_value.is_some());
+
+        Ok(result)
+    }
+}
+
 #[derive(Clone, Debug, Default, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct HbaseClusterStatus {
@@ -509,6 +671,281 @@ impl HasStatusCondition for HbaseCluster {
 }
 
 impl HbaseCluster {
+    /// Retrieve and merge resource configs for role and role groups
+    pub fn merged_config(
+        &self,
+        role: &HbaseRole,
+        role_group: &str,
+        hdfs_discovery_cm_name: &str,
+    ) -> Result<AnyServiceConfig, Error> {
+        match role {
+            HbaseRole::Master => {
+                let config = self.merged_master_config(role_group, hdfs_discovery_cm_name)?;
+                Ok(AnyServiceConfig::Master(config))
+            }
+            HbaseRole::RegionServer => {
+                let config = self.merged_regionserver_config(role_group, hdfs_discovery_cm_name)?;
+                Ok(AnyServiceConfig::RegionServer(config))
+            }
+            HbaseRole::RestServer => {
+                let config = self.merged_rest_config(role_group, hdfs_discovery_cm_name)?;
+                Ok(AnyServiceConfig::RestServer(config))
+            }
+        }
+    }
+
+    fn merged_regionserver_config(
+        &self,
+        role_group: &str,
+        hdfs_discovery_cm_name: &str,
+    ) -> Result<RegionServerConfig, Error> {
+        let role = HbaseRole::RegionServer;
+
+        // Initialize the result with all default values as baseline
+        let conf_defaults = default_regionserver_config(&self.name_any(), hdfs_discovery_cm_name);
+
+        let role = self
+            .spec
+            .region_servers
+            .clone()
+            .context(MissingHbaseRoleSnafu {
+                role: role.to_string(),
+            })?;
+
+        // Retrieve role resource config
+        let mut conf_role = role.config.config.to_owned();
+
+        // Retrieve rolegroup specific resource config
+        let mut conf_rolegroup = role
+            .role_groups
+            .get(role_group)
+            .map(|rg| rg.config.config.clone())
+            .unwrap_or_default();
+
+        // Merge more specific configs into default config
+        // Hierarchy is:
+        // 1. RoleGroup
+        // 2. Role
+        // 3. Default
+        conf_role.merge(&conf_defaults);
+        conf_rolegroup.merge(&conf_role);
+
+        tracing::debug!("Merged config: {:?}", conf_rolegroup);
+        fragment::validate(conf_rolegroup).context(FragmentValidationFailureSnafu)
+    }
+
+    fn merged_rest_config(
+        &self,
+        role_group: &str,
+        hdfs_discovery_cm_name: &str,
+    ) -> Result<HbaseConfig, Error> {
+        let role = HbaseRole::RestServer;
+
+        // Initialize the result with all default values as baseline
+        let conf_defaults = default_rest_config(&self.name_any(), hdfs_discovery_cm_name);
+
+        let role = self
+            .spec
+            .rest_servers
+            .clone()
+            .context(MissingHbaseRoleSnafu {
+                role: role.to_string(),
+            })?;
+
+        // Retrieve role resource config
+        let mut conf_role = role.config.config.to_owned();
+
+        // Retrieve rolegroup specific resource config
+        let mut conf_rolegroup = role
+            .role_groups
+            .get(role_group)
+            .map(|rg| rg.config.config.clone())
+            .unwrap_or_default();
+
+        // Merge more specific configs into default config
+        // Hierarchy is:
+        // 1. RoleGroup
+        // 2. Role
+        // 3. Default
+        conf_role.merge(&conf_defaults);
+        conf_rolegroup.merge(&conf_role);
+
+        tracing::debug!("Merged config: {:?}", conf_rolegroup);
+        fragment::validate(conf_rolegroup).context(FragmentValidationFailureSnafu)
+    }
+
+    fn merged_master_config(
+        &self,
+        role_group: &str,
+        hdfs_discovery_cm_name: &str,
+    ) -> Result<HbaseConfig, Error> {
+        let role = HbaseRole::Master;
+
+        // Initialize the result with all default values as baseline
+        let conf_defaults = default_master_config(&self.name_any(), hdfs_discovery_cm_name);
+
+        let role = self.spec.masters.clone().context(MissingHbaseRoleSnafu {
+            role: role.to_string(),
+        })?;
+
+        // Retrieve role resource config
+        let mut conf_role = role.config.config.to_owned();
+
+        // Retrieve rolegroup specific resource config
+        let mut conf_rolegroup = role
+            .role_groups
+            .get(role_group)
+            .map(|rg| rg.config.config.clone())
+            .unwrap_or_default();
+
+        // Merge more specific configs into default config
+        // Hierarchy is:
+        // 1. RoleGroup
+        // 2. Role
+        // 3. Default
+        conf_role.merge(&conf_defaults);
+        conf_rolegroup.merge(&conf_role);
+
+        tracing::debug!("Merged config: {:?}", conf_rolegroup);
+        fragment::validate(conf_rolegroup).context(FragmentValidationFailureSnafu)
+    }
+
+    // The result type is only defined once, there is no value in extracting it into a type definition.
+    #[allow(clippy::type_complexity)]
+    pub fn build_role_properties(
+        &self,
+    ) -> Result<
+        HashMap<
+            String,
+            (
+                Vec<PropertyNameKind>,
+                Role<impl Configuration<Configurable = HbaseCluster>>,
+            ),
+        >,
+        Error,
+    > {
+        let config_types = vec![
+            PropertyNameKind::Env,
+            PropertyNameKind::File(HBASE_ENV_SH.to_string()),
+            PropertyNameKind::File(HBASE_SITE_XML.to_string()),
+            PropertyNameKind::File(SSL_SERVER_XML.to_string()),
+            PropertyNameKind::File(SSL_CLIENT_XML.to_string()),
+            PropertyNameKind::File(JVM_SECURITY_PROPERTIES_FILE.to_string()),
+        ];
+
+        let mut roles = HashMap::from([(
+            HbaseRole::Master.to_string(),
+            (
+                config_types.to_owned(),
+                self.spec
+                    .masters
+                    .clone()
+                    .context(NoMasterRoleSnafu)?
+                    .erase(),
+            ),
+        )]);
+        roles.insert(
+            HbaseRole::RegionServer.to_string(),
+            (
+                config_types.to_owned(),
+                self.spec
+                    .region_servers
+                    .clone()
+                    .context(NoRegionServerRoleSnafu)?
+                    .erase(),
+            ),
+        );
+
+        if let Some(rest_servers) = self.spec.rest_servers.as_ref() {
+            roles.insert(
+                HbaseRole::RestServer.to_string(),
+                (config_types, rest_servers.to_owned().erase()),
+            );
+        }
+
+        Ok(roles)
+    }
+
+    pub fn merge_pod_overrides(
+        &self,
+        pod_template: &mut PodTemplateSpec,
+        role: &HbaseRole,
+        role_group_ref: &RoleGroupRef<HbaseCluster>,
+    ) {
+        let (role_pod_overrides, role_group_pod_overrides) = match role {
+            HbaseRole::Master => (
+                self.spec
+                    .masters
+                    .as_ref()
+                    .map(|r| r.config.pod_overrides.clone()),
+                self.spec
+                    .masters
+                    .as_ref()
+                    .and_then(|r| r.role_groups.get(&role_group_ref.role_group))
+                    .map(|r| r.config.pod_overrides.clone()),
+            ),
+            HbaseRole::RegionServer => (
+                self.spec
+                    .region_servers
+                    .as_ref()
+                    .map(|r| r.config.pod_overrides.clone()),
+                self.spec
+                    .region_servers
+                    .as_ref()
+                    .and_then(|r| r.role_groups.get(&role_group_ref.role_group))
+                    .map(|r| r.config.pod_overrides.clone()),
+            ),
+            HbaseRole::RestServer => (
+                self.spec
+                    .rest_servers
+                    .as_ref()
+                    .map(|r| r.config.pod_overrides.clone()),
+                self.spec
+                    .rest_servers
+                    .as_ref()
+                    .and_then(|r| r.role_groups.get(&role_group_ref.role_group))
+                    .map(|r| r.config.pod_overrides.clone()),
+            ),
+        };
+
+        if let Some(rpo) = role_pod_overrides {
+            pod_template.merge_from(rpo);
+        }
+        if let Some(rgpo) = role_group_pod_overrides {
+            pod_template.merge_from(rgpo);
+        }
+    }
+
+    pub fn replicas(
+        &self,
+        hbase_role: &HbaseRole,
+        role_group_ref: &RoleGroupRef<HbaseCluster>,
+    ) -> Option<i32> {
+        match hbase_role {
+            HbaseRole::Master => self
+                .spec
+                .masters
+                .as_ref()
+                .and_then(|r| r.role_groups.get(&role_group_ref.role_group))
+                .and_then(|rg| rg.replicas)
+                .map(i32::from),
+            HbaseRole::RegionServer => self
+                .spec
+                .region_servers
+                .as_ref()
+                .and_then(|r| r.role_groups.get(&role_group_ref.role_group))
+                .and_then(|rg| rg.replicas)
+                .map(i32::from),
+            HbaseRole::RestServer => self
+                .spec
+                .rest_servers
+                .as_ref()
+                .and_then(|r| r.role_groups.get(&role_group_ref.role_group))
+                .and_then(|rg| rg.replicas)
+                .map(i32::from),
+        }
+    }
+
     /// The name of the role-level load-balanced Kubernetes `Service`
     pub fn server_role_service_name(&self) -> Option<String> {
         self.metadata.name.clone()
@@ -525,35 +962,6 @@ impl HbaseCluster {
             role: role_name.into(),
             role_group: group_name.into(),
         }
-    }
-
-    pub fn get_role(&self, role: &HbaseRole) -> Option<&Role<HbaseConfigFragment>> {
-        match role {
-            HbaseRole::Master => self.spec.masters.as_ref(),
-            HbaseRole::RegionServer => self.spec.region_servers.as_ref(),
-            HbaseRole::RestServer => self.spec.rest_servers.as_ref(),
-        }
-    }
-
-    /// Get the RoleGroup struct for the given ref
-    pub fn get_role_group(
-        &self,
-        rolegroup_ref: &RoleGroupRef<HbaseCluster>,
-    ) -> Result<&RoleGroup<HbaseConfigFragment>, Error> {
-        let role_variant =
-            HbaseRole::from_str(&rolegroup_ref.role).with_context(|_| InvalidRoleSnafu {
-                role: rolegroup_ref.role.to_owned(),
-            })?;
-        let role = self
-            .get_role(&role_variant)
-            .with_context(|| MissingHbaseRoleSnafu {
-                role: role_variant.to_string(),
-            })?;
-        role.role_groups
-            .get(&rolegroup_ref.role_group)
-            .with_context(|| MissingHbaseRoleGroupSnafu {
-                role_group: rolegroup_ref.role_group.to_owned(),
-            })
     }
 
     pub fn role_config(&self, role: &HbaseRole) -> Option<&GenericRoleConfig> {
@@ -635,42 +1043,6 @@ impl HbaseCluster {
         }
         .to_string()
     }
-
-    /// Retrieve and merge resource configs for role and role groups
-    pub fn merged_config(
-        &self,
-        role: &HbaseRole,
-        role_group: &str,
-        hdfs_discovery_cm_name: &str,
-    ) -> Result<HbaseConfig, Error> {
-        // Initialize the result with all default values as baseline
-        let conf_defaults = role.default_config(&self.name_any(), hdfs_discovery_cm_name);
-
-        let role = self.get_role(role).context(MissingHbaseRoleSnafu {
-            role: role.to_string(),
-        })?;
-
-        // Retrieve role resource config
-        let mut conf_role = role.config.config.to_owned();
-
-        // Retrieve rolegroup specific resource config
-        let mut conf_rolegroup = role
-            .role_groups
-            .get(role_group)
-            .map(|rg| rg.config.config.clone())
-            .unwrap_or_default();
-
-        // Merge more specific configs into default config
-        // Hierarchy is:
-        // 1. RoleGroup
-        // 2. Role
-        // 3. Default
-        conf_role.merge(&conf_defaults);
-        conf_rolegroup.merge(&conf_role);
-
-        tracing::debug!("Merged config: {:?}", conf_rolegroup);
-        fragment::validate(conf_rolegroup).context(FragmentValidationFailureSnafu)
-    }
 }
 
 pub fn merged_env(rolegroup_config: Option<&BTreeMap<String, String>>) -> Vec<EnvVar> {
@@ -693,6 +1065,88 @@ pub fn merged_env(rolegroup_config: Option<&BTreeMap<String, String>>) -> Vec<En
         vec![]
     };
     merged_env
+}
+
+pub enum AnyServiceConfig {
+    Master(HbaseConfig),
+    RegionServer(RegionServerConfig),
+    RestServer(HbaseConfig),
+}
+
+impl AnyServiceConfig {
+    pub fn resources(&self) -> &Resources<HbaseStorageConfig, NoRuntimeLimits> {
+        match self {
+            AnyServiceConfig::Master(config) => &config.resources,
+            AnyServiceConfig::RegionServer(config) => &config.resources,
+            AnyServiceConfig::RestServer(config) => &config.resources,
+        }
+    }
+    pub fn logging(&self) -> &Logging<Container> {
+        match self {
+            AnyServiceConfig::Master(config) => &config.logging,
+            AnyServiceConfig::RegionServer(config) => &config.logging,
+            AnyServiceConfig::RestServer(config) => &config.logging,
+        }
+    }
+    pub fn affinity(&self) -> &StackableAffinity {
+        match self {
+            AnyServiceConfig::Master(config) => &config.affinity,
+            AnyServiceConfig::RegionServer(config) => &config.affinity,
+            AnyServiceConfig::RestServer(config) => &config.affinity,
+        }
+    }
+    pub fn graceful_shutdown_timeout(&self) -> &Option<Duration> {
+        match self {
+            AnyServiceConfig::Master(config) => &config.graceful_shutdown_timeout,
+            AnyServiceConfig::RegionServer(config) => &config.graceful_shutdown_timeout,
+            AnyServiceConfig::RestServer(config) => &config.graceful_shutdown_timeout,
+        }
+    }
+    pub fn hbase_opts(&self) -> &Option<String> {
+        match self {
+            AnyServiceConfig::Master(config) => &config.hbase_opts,
+            AnyServiceConfig::RegionServer(config) => &config.hbase_opts,
+            AnyServiceConfig::RestServer(config) => &config.hbase_opts,
+        }
+    }
+
+    pub fn region_mover_command(&self) -> String {
+        match self {
+            AnyServiceConfig::RegionServer(config) => {
+                if config.region_mover.run_before_shutdown {
+                    let timeout = config
+                        .graceful_shutdown_timeout
+                        .map(|d| {
+                            if d.as_secs() < DEFAULT_REGION_MOVER_DELTA_TO_SHUTDOWN.as_secs() {
+                                d.as_secs()
+                            } else {
+                                d.as_secs() - DEFAULT_REGION_MOVER_DELTA_TO_SHUTDOWN.as_secs()
+                            }
+                        })
+                        .unwrap_or(DEFAULT_REGION_MOVER_TIMEOUT.as_secs());
+                    let mut command = vec![
+                        "bin/hbase".to_string(),
+                        "org.apache.hadoop.hbase.util.RegionMover".to_string(),
+                        "--regionserverhost".to_string(),
+                        "localhost".to_string(),
+                        "--operation".to_string(),
+                        "unload".to_string(),
+                        "--ack".to_string(),
+                        config.region_mover.ack.to_string(),
+                        "--timeout".to_string(),
+                        timeout.to_string(),
+                    ];
+                    // TODO: this is a security risk, we should validate and escape the extra_opts
+                    command.extend(config.region_mover.extra_opts.clone());
+                    let command = command.join(" ");
+                    format!("\"{command}\"")
+                } else {
+                    "\"\"".to_string()
+                }
+            }
+            _ => "\"\"".to_string(),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -759,7 +1213,7 @@ spec:
             HbaseRole::Master.to_string(),
             (
                 vec![PropertyNameKind::Env],
-                hbase.get_role(&HbaseRole::Master).cloned().unwrap(),
+                hbase.spec.masters.clone().unwrap(),
             ),
         )]);
 
@@ -785,8 +1239,6 @@ spec:
             .iter()
             .map(|env_var| (env_var.name.as_str(), env_var.value.clone()))
             .collect();
-
-        println!("{:#?}", merged_env);
 
         assert_eq!(
             Some(&Some("MASTER_RG".to_string())),
