@@ -657,7 +657,7 @@ impl HbaseCluster {
         role: &HbaseRole,
         role_group: &str,
         hdfs_discovery_cm_name: &str,
-    ) -> Result<Box<dyn UnifiedRoleConfiguration + Send>, Error> {
+    ) -> Result<Box<dyn UnifiedRoleConfiguration>, Error> {
         match role {
             HbaseRole::Master => {
                 let config = self.merged_master_config(role_group, hdfs_discovery_cm_name)?;
@@ -1048,7 +1048,7 @@ pub fn merged_env(rolegroup_config: Option<&BTreeMap<String, String>>) -> Vec<En
 }
 
 /// TODO: describe the purpose of this trait
-pub trait UnifiedRoleConfiguration {
+pub trait UnifiedRoleConfiguration: Send {
     fn resources(&self) -> &Resources<HbaseStorageConfig, NoRuntimeLimits>;
     fn logging(&self) -> &Logging<Container>;
     fn affinity(&self) -> &StackableAffinity;
@@ -1182,8 +1182,6 @@ spec:
             .iter()
             .map(|env_var| (env_var.name.as_str(), env_var.value.clone()))
             .collect();
-
-        println!("{:#?}", merged_env);
 
         assert_eq!(
             Some(&Some("MASTER_RG".to_string())),

@@ -534,7 +534,7 @@ fn build_rolegroup_config_map(
     rolegroup: &RoleGroupRef<HbaseCluster>,
     rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
     zookeeper_connection_information: &ZookeeperConnectionInformation,
-    hbase_config: &(dyn UnifiedRoleConfiguration + Send),
+    hbase_config: &dyn UnifiedRoleConfiguration,
     resolved_product_image: &ResolvedProductImage,
     hbase_opa_config: Option<&HbaseOpaConfig>,
     vector_aggregator_address: Option<&str>,
@@ -742,7 +742,7 @@ fn build_rolegroup_statefulset(
     hbase_role: &HbaseRole,
     rolegroup_ref: &RoleGroupRef<HbaseCluster>,
     rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
-    config: &(dyn UnifiedRoleConfiguration + Send),
+    config: &dyn UnifiedRoleConfiguration,
     resolved_product_image: &ResolvedProductImage,
 ) -> Result<StatefulSet> {
     let hbase_version = &resolved_product_image.app_version_label;
@@ -1033,7 +1033,7 @@ pub fn build_recommended_labels<'a>(
 
 /// The content of the HBase `hbase-env.sh` file.
 fn build_hbase_env_sh(
-    hbase_config: &(dyn UnifiedRoleConfiguration + Send),
+    hbase_config: &dyn UnifiedRoleConfiguration,
     role: &HbaseRole,
     hbase_version: &str,
 ) -> Result<BTreeMap<String, String>, Error> {

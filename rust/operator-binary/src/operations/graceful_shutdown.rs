@@ -11,7 +11,7 @@ pub enum Error {
 }
 
 pub fn add_graceful_shutdown_config(
-    merged_config: &(dyn UnifiedRoleConfiguration + Send),
+    merged_config: &dyn UnifiedRoleConfiguration,
     pod_builder: &mut PodBuilder,
 ) -> Result<(), Error> {
     // This must be always set by the merge mechanism, as we provide a default value,
