@@ -51,7 +51,6 @@ use stackable_operator::{
     time::Duration,
     utils::COMMON_BASH_TRAP_FUNCTIONS,
 };
-use std::ops::Deref;
 use std::{
     collections::{BTreeMap, HashMap},
     fmt::Write,
@@ -61,8 +60,8 @@ use std::{
 use strum::{EnumDiscriminants, IntoStaticStr, ParseError};
 
 use stackable_hbase_crd::{
-    merged_env, Container, HbaseCluster, HbaseClusterStatus, HbaseRole, UnifiedRoleConfiguration,
-    APP_NAME, CONFIG_DIR_NAME, HBASE_ENV_SH, HBASE_HEAPSIZE, HBASE_MANAGES_ZK, HBASE_MASTER_OPTS,
+    merged_env, AnyServiceConfig, Container, HbaseCluster, HbaseClusterStatus, HbaseRole, APP_NAME,
+    CONFIG_DIR_NAME, HBASE_ENV_SH, HBASE_HEAPSIZE, HBASE_MANAGES_ZK, HBASE_MASTER_OPTS,
     HBASE_REGIONSERVER_OPTS, HBASE_REST_OPTS, HBASE_REST_PORT_NAME_HTTP,
     HBASE_REST_PORT_NAME_HTTPS, HBASE_SITE_XML, JVM_HEAP_FACTOR, JVM_SECURITY_PROPERTIES_FILE,
     METRICS_PORT, SSL_CLIENT_XML, SSL_SERVER_XML,
@@ -406,7 +405,7 @@ pub async fn reconcile_hbase(hbase: Arc<HbaseCluster>, ctx: Arc<Ctx>) -> Result<
                 &rolegroup,
                 rolegroup_config,
                 &zookeeper_connection_information,
-                merged_config.deref(),
+                &merged_config,
                 &resolved_product_image,
                 hbase_opa_config.as_ref(),
                 vector_aggregator_address.as_deref(),
@@ -416,7 +415,7 @@ pub async fn reconcile_hbase(hbase: Arc<HbaseCluster>, ctx: Arc<Ctx>) -> Result<
                 &hbase_role,
                 &rolegroup,
                 rolegroup_config,
-                merged_config.deref(),
+                &merged_config,
                 &resolved_product_image,
             )?;
             cluster_resources
@@ -534,7 +533,7 @@ fn build_rolegroup_config_map(
     rolegroup: &RoleGroupRef<HbaseCluster>,
     rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
     zookeeper_connection_information: &ZookeeperConnectionInformation,
-    hbase_config: &dyn UnifiedRoleConfiguration,
+    hbase_config: &AnyServiceConfig,
     resolved_product_image: &ResolvedProductImage,
     hbase_opa_config: Option<&HbaseOpaConfig>,
     vector_aggregator_address: Option<&str>,
@@ -742,7 +741,7 @@ fn build_rolegroup_statefulset(
     hbase_role: &HbaseRole,
     rolegroup_ref: &RoleGroupRef<HbaseCluster>,
     rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
-    config: &dyn UnifiedRoleConfiguration,
+    config: &AnyServiceConfig,
     resolved_product_image: &ResolvedProductImage,
 ) -> Result<StatefulSet> {
     let hbase_version = &resolved_product_image.app_version_label;
@@ -1033,7 +1032,7 @@ pub fn build_recommended_labels<'a>(
 
 /// The content of the HBase `hbase-env.sh` file.
 fn build_hbase_env_sh(
-    hbase_config: &dyn UnifiedRoleConfiguration,
+    hbase_config: &AnyServiceConfig,
     role: &HbaseRole,
     hbase_version: &str,
 ) -> Result<BTreeMap<String, String>, Error> {

@@ -657,19 +657,19 @@ impl HbaseCluster {
         role: &HbaseRole,
         role_group: &str,
         hdfs_discovery_cm_name: &str,
-    ) -> Result<Box<dyn UnifiedRoleConfiguration>, Error> {
+    ) -> Result<AnyServiceConfig, Error> {
         match role {
             HbaseRole::Master => {
                 let config = self.merged_master_config(role_group, hdfs_discovery_cm_name)?;
-                Ok(Box::new(config))
+                Ok(AnyServiceConfig::Master(config))
             }
             HbaseRole::RegionServer => {
                 let config = self.merged_regionserver_config(role_group, hdfs_discovery_cm_name)?;
-                Ok(Box::new(config))
+                Ok(AnyServiceConfig::RegionServer(config))
             }
             HbaseRole::RestServer => {
                 let config = self.merged_rest_config(role_group, hdfs_discovery_cm_name)?;
-                Ok(Box::new(config))
+                Ok(AnyServiceConfig::RestServer(config))
             }
         }
     }
@@ -1047,48 +1047,47 @@ pub fn merged_env(rolegroup_config: Option<&BTreeMap<String, String>>) -> Vec<En
     merged_env
 }
 
-/// TODO: describe the purpose of this trait
-pub trait UnifiedRoleConfiguration: Send {
-    fn resources(&self) -> &Resources<HbaseStorageConfig, NoRuntimeLimits>;
-    fn logging(&self) -> &Logging<Container>;
-    fn affinity(&self) -> &StackableAffinity;
-    fn graceful_shutdown_timeout(&self) -> &Option<Duration>;
-    fn hbase_opts(&self) -> &Option<String>;
+pub enum AnyServiceConfig {
+    Master(HbaseConfig),
+    RegionServer(RegionServerConfig),
+    RestServer(HbaseConfig),
 }
 
-impl UnifiedRoleConfiguration for HbaseConfig {
-    fn resources(&self) -> &Resources<HbaseStorageConfig, NoRuntimeLimits> {
-        &self.resources
+impl AnyServiceConfig {
+    pub fn resources(&self) -> &Resources<HbaseStorageConfig, NoRuntimeLimits> {
+        match self {
+            AnyServiceConfig::Master(config) => &config.resources,
+            AnyServiceConfig::RegionServer(config) => &config.resources,
+            AnyServiceConfig::RestServer(config) => &config.resources,
+        }
     }
-    fn logging(&self) -> &Logging<Container> {
-        &self.logging
+    pub fn logging(&self) -> &Logging<Container> {
+        match self {
+            AnyServiceConfig::Master(config) => &config.logging,
+            AnyServiceConfig::RegionServer(config) => &config.logging,
+            AnyServiceConfig::RestServer(config) => &config.logging,
+        }
     }
-    fn affinity(&self) -> &StackableAffinity {
-        &self.affinity
+    pub fn affinity(&self) -> &StackableAffinity {
+        match self {
+            AnyServiceConfig::Master(config) => &config.affinity,
+            AnyServiceConfig::RegionServer(config) => &config.affinity,
+            AnyServiceConfig::RestServer(config) => &config.affinity,
+        }
     }
-    fn graceful_shutdown_timeout(&self) -> &Option<Duration> {
-        &self.graceful_shutdown_timeout
+    pub fn graceful_shutdown_timeout(&self) -> &Option<Duration> {
+        match self {
+            AnyServiceConfig::Master(config) => &config.graceful_shutdown_timeout,
+            AnyServiceConfig::RegionServer(config) => &config.graceful_shutdown_timeout,
+            AnyServiceConfig::RestServer(config) => &config.graceful_shutdown_timeout,
+        }
     }
-    fn hbase_opts(&self) -> &Option<String> {
-        &self.hbase_opts
-    }
-}
-
-impl UnifiedRoleConfiguration for RegionServerConfig {
-    fn resources(&self) -> &Resources<HbaseStorageConfig, NoRuntimeLimits> {
-        &self.resources
-    }
-    fn logging(&self) -> &Logging<Container> {
-        &self.logging
-    }
-    fn affinity(&self) -> &StackableAffinity {
-        &self.affinity
-    }
-    fn graceful_shutdown_timeout(&self) -> &Option<Duration> {
-        &self.graceful_shutdown_timeout
-    }
-    fn hbase_opts(&self) -> &Option<String> {
-        &self.hbase_opts
+    pub fn hbase_opts(&self) -> &Option<String> {
+        match self {
+            AnyServiceConfig::Master(config) => &config.hbase_opts,
+            AnyServiceConfig::RegionServer(config) => &config.hbase_opts,
+            AnyServiceConfig::RestServer(config) => &config.hbase_opts,
+        }
     }
 }
 
