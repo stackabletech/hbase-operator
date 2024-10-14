@@ -515,10 +515,12 @@ impl Configuration for HbaseConfigFragment {
 }
 
 #[derive(Clone, Debug, JsonSchema, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct RegionMover {
     run_before_shutdown: bool,
     max_threads: u16,
     ack: bool,
+    #[serde(default)]
     extra_opts: Vec<String>,
 }
 

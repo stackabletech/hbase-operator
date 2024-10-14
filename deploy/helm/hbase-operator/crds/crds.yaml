@@ -729,21 +729,21 @@ spec:
                           properties:
                             ack:
                               type: boolean
-                            extra_opts:
+                            extraOpts:
+                              default: []
                               items:
                                 type: string
                               type: array
-                            max_threads:
+                            maxThreads:
                               format: uint16
                               minimum: 0.0
                               type: integer
-                            run_before_shutdown:
+                            runBeforeShutdown:
                               type: boolean
                           required:
                             - ack
-                            - extra_opts
-                            - max_threads
-                            - run_before_shutdown
+                            - maxThreads
+                            - runBeforeShutdown
                           type: object
                         resources:
                           default:
@@ -973,21 +973,21 @@ spec:
                                 properties:
                                   ack:
                                     type: boolean
-                                  extra_opts:
+                                  extraOpts:
+                                    default: []
                                     items:
                                       type: string
                                     type: array
-                                  max_threads:
+                                  maxThreads:
                                     format: uint16
                                     minimum: 0.0
                                     type: integer
-                                  run_before_shutdown:
+                                  runBeforeShutdown:
                                     type: boolean
                                 required:
                                   - ack
-                                  - extra_opts
-                                  - max_threads
-                                  - run_before_shutdown
+                                  - maxThreads
+                                  - runBeforeShutdown
                                 type: object
                               resources:
                                 default:
