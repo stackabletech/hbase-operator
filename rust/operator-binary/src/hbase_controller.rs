@@ -108,10 +108,10 @@ prepare_signal_handlers()
 handle_term_signal()
 {
     if [ "${term_child_pid}" ]; then
-        if [ -n "$REGION_MOVER_COMMAND" ]; then
-            echo Start region mover
-            source "$REGION_MOVER_COMMAND"
-            echo Done moving regions
+        if [ -n "$PRE_SHUTDOWN_COMMAND" ]; then
+            echo "Start pre-shutdown command: $PRE_SHUTDOWN_COMMAND"
+            source "$PRE_SHUTDOWN_COMMAND"
+            echo "Done pre-shutdown command"
         fi
         kill -TERM "${term_child_pid}" 2>/dev/null
     else
@@ -869,7 +869,7 @@ fn build_rolegroup_statefulset(
 
             {kerberos_container_start_commands}
 
-            REGION_MOVER_COMMAND={region_mover_command}
+            PRE_SHUTDOWN_COMMAND={pre_shutdown_command}
             {HBASE_BASH_TRAP_FUNCTIONS}
             {remove_vector_shutdown_file_command}
             prepare_signal_handlers
@@ -877,7 +877,7 @@ fn build_rolegroup_statefulset(
             wait_for_termination $!
             {create_vector_shutdown_file_command}
             ",
-            region_mover_command=config.region_mover_command(),
+            pre_shutdown_command=config.pre_shutdown_command(),
             hbase_role_name_in_command = hbase_role.cli_role_name(),
             kerberos_container_start_commands = kerberos_container_start_commands(hbase),
             remove_vector_shutdown_file_command =

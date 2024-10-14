@@ -1,6 +1,7 @@
 use product_config::types::PropertyNameKind;
 use security::AuthenticationConfig;
 use serde::{Deserialize, Serialize};
+use shell_escape::escape;
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::k8s_openapi::api::core::v1::PodTemplateSpec;
 use stackable_operator::{
@@ -1112,7 +1113,12 @@ impl AnyServiceConfig {
         }
     }
 
-    pub fn region_mover_command(&self) -> String {
+    /// This function is called for all HBase roles but it currently only returns something for the
+    /// region server roles.
+    /// For all other roles it currently returns an empty string meaning there is no command to run
+    /// before shutdown.
+    /// This might change in the future.
+    pub fn pre_shutdown_command(&self) -> String {
         match self {
             AnyServiceConfig::RegionServer(config) => {
                 if config.region_mover.run_before_shutdown {
@@ -1133,13 +1139,22 @@ impl AnyServiceConfig {
                         "localhost".to_string(),
                         "--operation".to_string(),
                         "unload".to_string(),
-                        "--ack".to_string(),
-                        config.region_mover.ack.to_string(),
+                        "--maxthreads".to_string(),
+                        config.region_mover.max_threads.to_string(),
                         "--timeout".to_string(),
                         timeout.to_string(),
                     ];
-                    // TODO: this is a security risk, we should validate and escape the extra_opts
-                    command.extend(config.region_mover.extra_opts.clone());
+                    if !config.region_mover.ack {
+                        command.push("--noack".to_string());
+                    }
+                    //
+                    command.extend(
+                        config
+                            .region_mover
+                            .extra_opts
+                            .iter()
+                            .map(|s| escape(std::borrow::Cow::Borrowed(s)).to_string()),
+                    );
                     let command = command.join(" ");
                     format!("\"{command}\"")
                 } else {
@@ -1160,7 +1175,10 @@ mod tests {
         transform_all_roles_to_config, validate_all_roles_and_groups_config,
     };
 
-    use crate::{merged_env, HbaseCluster, HbaseRole};
+    use crate::{
+        merged_env, AnyServiceConfig, HbaseCluster, HbaseConfig, HbaseRole, RegionMover,
+        RegionServerConfig,
+    };
 
     use product_config::{types::PropertyNameKind, ProductConfigManager};
 
@@ -1254,5 +1272,73 @@ spec:
             Some(&Some("MASTER".to_string())),
             env_map.get("TEST_VAR_FROM_MRG")
         );
+    }
+
+    #[test]
+    fn test_pre_shutdown_command_master() {
+        let config = AnyServiceConfig::Master(HbaseConfig::default());
+        assert_eq!(config.pre_shutdown_command(), "\"\"");
+    }
+
+    #[test]
+    fn test_pre_shutdown_command_region_server_disabled() {
+        let config = AnyServiceConfig::RegionServer(RegionServerConfig::default());
+        assert_eq!(config.pre_shutdown_command(), "\"\"");
+    }
+
+    #[test]
+    fn test_pre_shutdown_command_region_server_enabled_1() {
+        let config = AnyServiceConfig::RegionServer(RegionServerConfig {
+            region_mover: RegionMover {
+                run_before_shutdown: true,
+                max_threads: 1,
+                ack: true,
+                extra_opts: vec![],
+            },
+            ..RegionServerConfig::default()
+        });
+        assert_eq!(config.pre_shutdown_command(), "\"bin/hbase org.apache.hadoop.hbase.util.RegionMover --regionserverhost localhost --operation unload --maxthreads 1 --timeout 3540\"");
+    }
+
+    #[test]
+    fn test_pre_shutdown_command_region_server_enabled_2() {
+        let config = AnyServiceConfig::RegionServer(RegionServerConfig {
+            region_mover: RegionMover {
+                run_before_shutdown: true,
+                max_threads: 5,
+                ack: false,
+                extra_opts: vec![],
+            },
+            ..RegionServerConfig::default()
+        });
+        assert_eq!(config.pre_shutdown_command(), "\"bin/hbase org.apache.hadoop.hbase.util.RegionMover --regionserverhost localhost --operation unload --maxthreads 5 --timeout 3540 --noack\"");
+    }
+
+    #[test]
+    fn test_pre_shutdown_command_region_server_enabled_3() {
+        let config = AnyServiceConfig::RegionServer(RegionServerConfig {
+            region_mover: RegionMover {
+                run_before_shutdown: true,
+                max_threads: 5,
+                ack: false,
+                extra_opts: vec!["-x".to_string(), "/blubb".to_string()],
+            },
+            ..RegionServerConfig::default()
+        });
+        assert_eq!(config.pre_shutdown_command(), "\"bin/hbase org.apache.hadoop.hbase.util.RegionMover --regionserverhost localhost --operation unload --maxthreads 5 --timeout 3540 --noack -x /blubb\"");
+    }
+
+    #[test]
+    fn test_pre_shutdown_command_region_server_enabled_4() {
+        let config = AnyServiceConfig::RegionServer(RegionServerConfig {
+            region_mover: RegionMover {
+                run_before_shutdown: true,
+                max_threads: 1,
+                ack: true,
+                extra_opts: vec!["&&".to_string(), "sudo gotcha!".to_string()],
+            },
+            ..RegionServerConfig::default()
+        });
+        assert_eq!(config.pre_shutdown_command(), "\"bin/hbase org.apache.hadoop.hbase.util.RegionMover --regionserverhost localhost --operation unload --maxthreads 1 --timeout 3540 '&&' 'sudo gotcha'\\!''\"");
     }
 }
