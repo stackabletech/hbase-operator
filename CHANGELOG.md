@@ -7,6 +7,7 @@
 - Reduce CRD size from `1.4MB` to `96KB` by accepting arbitrary YAML input instead of the underlying schema for the following fields ([#548]):
   - `podOverrides`
   - `affinity`
+- Optionally move regions to other pods before shutting down a region server ([#570]).
 
 ### Fixed
 
@@ -21,6 +22,7 @@
 [#550]: https://github.com/stackabletech/hbase-operator/pull/550
 [#556]: https://github.com/stackabletech/hbase-operator/pull/556
 [#558]: https://github.com/stackabletech/hbase-operator/pull/558
+[#570]: https://github.com/stackabletech/hbase-operator/pull/570
 
 ## [24.7.0] - 2024-07-24
 

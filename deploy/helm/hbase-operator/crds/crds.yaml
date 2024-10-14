@@ -725,20 +725,25 @@ spec:
                               type: boolean
                           type: object
                         regionMover:
+                          description: Before terminating a region server pod, the RegionMover tool can be invoked to transfer local regions to other servers. This may cause a lot of network traffic in the Kubernetes cluster if the entire HBase stacklet is being restarted. The operator will compute a timeout period for the region move that will not exceed the graceful shutdown timeout.
                           nullable: true
                           properties:
                             ack:
+                              description: If enabled (default), the region mover will confirm that regions are available on the source as well as the target pods before and after the move.
                               type: boolean
                             extraOpts:
                               default: []
+                              description: Additional options to pass to the region mover.
                               items:
                                 type: string
                               type: array
                             maxThreads:
+                              description: Maximum number of threads to use for moving regions.
                               format: uint16
                               minimum: 0.0
                               type: integer
                             runBeforeShutdown:
+                              description: Move local regions to other servers before terminating a region server's pod.
                               type: boolean
                           required:
                             - ack
@@ -969,20 +974,25 @@ spec:
                                     type: boolean
                                 type: object
                               regionMover:
+                                description: Before terminating a region server pod, the RegionMover tool can be invoked to transfer local regions to other servers. This may cause a lot of network traffic in the Kubernetes cluster if the entire HBase stacklet is being restarted. The operator will compute a timeout period for the region move that will not exceed the graceful shutdown timeout.
                                 nullable: true
                                 properties:
                                   ack:
+                                    description: If enabled (default), the region mover will confirm that regions are available on the source as well as the target pods before and after the move.
                                     type: boolean
                                   extraOpts:
                                     default: []
+                                    description: Additional options to pass to the region mover.
                                     items:
                                       type: string
                                     type: array
                                   maxThreads:
+                                    description: Maximum number of threads to use for moving regions.
                                     format: uint16
                                     minimum: 0.0
                                     type: integer
                                   runBeforeShutdown:
+                                    description: Move local regions to other servers before terminating a region server's pod.
                                     type: boolean
                                 required:
                                   - ack

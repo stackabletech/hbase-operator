@@ -518,9 +518,17 @@ impl Configuration for HbaseConfigFragment {
 #[derive(Clone, Debug, JsonSchema, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RegionMover {
+    /// Move local regions to other servers before terminating a region server's pod.
     run_before_shutdown: bool,
+
+    /// Maximum number of threads to use for moving regions.
     max_threads: u16,
+
+    /// If enabled (default), the region mover will confirm that regions are available on the
+    /// source as well as the target pods before and after the move.
     ack: bool,
+
+    /// Additional options to pass to the region mover.
     #[serde(default)]
     extra_opts: Vec<String>,
 }
@@ -575,6 +583,12 @@ pub struct RegionServerConfig {
     /// Time period Pods have to gracefully shut down, e.g. `30m`, `1h` or `2d`. Consult the operator documentation for details.
     #[fragment_attrs(serde(default))]
     pub graceful_shutdown_timeout: Option<Duration>,
+
+    /// Before terminating a region server pod, the RegionMover tool can be invoked to transfer
+    /// local regions to other servers.
+    /// This may cause a lot of network traffic in the Kubernetes cluster if the entire HBase stacklet is being
+    /// restarted.
+    /// The operator will compute a timeout period for the region move that will not exceed the graceful shutdown timeout.
     pub region_mover: RegionMover,
 }
 

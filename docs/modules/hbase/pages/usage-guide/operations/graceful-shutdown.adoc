@@ -1,6 +1,6 @@
 = Graceful shutdown
 
-You can configure the graceful shutdown as described in xref:concepts:operations/graceful_shutdown.adoc[].
+You can configure the graceful shutdown grace period as described in xref:concepts:operations/graceful_shutdown.adoc[].
 
 == Masters
 
@@ -15,7 +15,7 @@ However, there is no message in the log acknowledging the graceful shutdown.
 
 == RegionServers
 
-As a default, RegionServers have `60 minutes` to shut down gracefully.
+By default, RegionServers have `60 minutes` to shut down gracefully.
 
 They use the same mechanism described above.
 In contrast to the Master servers, they will, however, acknowledge the graceful shutdown with a message in the logs:
@@ -25,6 +25,30 @@ In contrast to the Master servers, they will, however, acknowledge the graceful 
 2023-10-11 12:38:05,059 INFO  [shutdown-hook-0] regionserver.ShutdownHook: Shutdown hook starting; hbase.shutdown.hook=true; fsShutdownHook=org.apache.hadoop.fs.FileSystem$Cache$ClientFinalizer@5875de6a
 2023-10-11 12:38:05,060 INFO  [shutdown-hook-0] regionserver.HRegionServer: ***** STOPPING region server 'test-hbase-regionserver-default-0.test-hbase-regionserver-default.kuttl-test-topical-parakeet.svc.cluster.local,16020,1697027870348' *****
 ----
+
+The operator allows for finer control over the shutdown process of region servers.
+For each region server pod, the region mover tool may be invoked before terminating the region server's pod.
+The affected regions are transfered to other pods thus ensuring that the data is not lost.
+
+Here is a an example:
+
+[source,yaml]
+----
+spec:
+  regionServers:
+    config:
+      regionMover
+        runBeforeShutdown: true, <1>
+        maxThreads: 5, <2>
+        ack: false, <3>
+        extraOpts: ["--designatedFile", "/path/to/designatedFile"] <4>
+----
+<1>: Run the region mover tool before shutting down the region server. Default is `false`.
+<2>: Maximum number of threads to use for moving regions. Default is 1.
+<3>: Enable or disable region confirmation on the present and target servers. Default is `true`.
+<4>: Extra options to pass to the region mover tool.
+
+NOTE: There is no need to explicitely specify a timeout for the region movement. The operator will compute an appropriate timeout that cannot exceed the `gracefulShutdownTimeout` for region servers.
 
 == RestServers
 
