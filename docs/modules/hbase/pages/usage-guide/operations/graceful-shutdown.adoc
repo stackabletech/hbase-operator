@@ -28,7 +28,7 @@ In contrast to the Master servers, they will, however, acknowledge the graceful 
 
 The operator allows for finer control over the shutdown process of region servers.
 For each region server pod, the region mover tool may be invoked before terminating the region server's pod.
-The affected regions are transfered to other pods thus ensuring that the data is not lost.
+The affected regions are transferred to other pods thus ensuring that the data is not lost.
 
 Here is a an example:
 
@@ -48,7 +48,7 @@ spec:
 <3>: Enable or disable region confirmation on the present and target servers. Default is `true`.
 <4>: Extra options to pass to the region mover tool.
 
-NOTE: There is no need to explicitely specify a timeout for the region movement. The operator will compute an appropriate timeout that cannot exceed the `gracefulShutdownTimeout` for region servers.
+NOTE: There is no need to explicitly specify a timeout for the region movement. The operator will compute an appropriate timeout that cannot exceed the `gracefulShutdownTimeout` for region servers.
 
 == RestServers
 
