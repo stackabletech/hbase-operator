@@ -110,7 +110,7 @@ handle_term_signal()
     if [ "${term_child_pid}" ]; then
         if [ -n "$PRE_SHUTDOWN_COMMAND" ]; then
             echo "Start pre-shutdown command: $PRE_SHUTDOWN_COMMAND"
-            source "$PRE_SHUTDOWN_COMMAND"
+            $(${PRE_SHUTDOWN_COMMAND})
             echo "Done pre-shutdown command"
         fi
         kill -TERM "${term_child_pid}" 2>/dev/null
@@ -853,38 +853,12 @@ fn build_rolegroup_statefulset(
     let mut hbase_container = ContainerBuilder::new("hbase").expect("ContainerBuilder not created");
     hbase_container
         .image_from_product_image(resolved_product_image)
-        .command(vec![
-            "/bin/bash".to_string(),
-            "-x".to_string(),
-            "-euo".to_string(),
-            "pipefail".to_string(),
-            "-c".to_string(),
+        .command(vec!["/stackable/hbase/bin/hbase-entrypoint.sh".to_string()])
+        .args(vec![
+            hbase_role.cli_role_name(),
+            rolegroup_ref.object_name(),
+            hbase.service_port(hbase_role).to_string(),
         ])
-        .args(vec![formatdoc! {"
-            mkdir -p {CONFIG_DIR_NAME}
-            cp {HDFS_DISCOVERY_TMP_DIR}/hdfs-site.xml {CONFIG_DIR_NAME}
-            cp {HDFS_DISCOVERY_TMP_DIR}/core-site.xml {CONFIG_DIR_NAME}
-            cp {HBASE_CONFIG_TMP_DIR}/* {CONFIG_DIR_NAME}
-            cp {HBASE_LOG_CONFIG_TMP_DIR}/{log4j_properties_file_name} {CONFIG_DIR_NAME}
-
-            {kerberos_container_start_commands}
-
-            PRE_SHUTDOWN_COMMAND={pre_shutdown_command}
-            {HBASE_BASH_TRAP_FUNCTIONS}
-            {remove_vector_shutdown_file_command}
-            prepare_signal_handlers
-            bin/hbase {hbase_role_name_in_command} start &
-            wait_for_termination $!
-            {create_vector_shutdown_file_command}
-            ",
-            pre_shutdown_command=config.pre_shutdown_command(),
-            hbase_role_name_in_command = hbase_role.cli_role_name(),
-            kerberos_container_start_commands = kerberos_container_start_commands(hbase),
-            remove_vector_shutdown_file_command =
-                remove_vector_shutdown_file_command(STACKABLE_LOG_DIR),
-            create_vector_shutdown_file_command =
-                create_vector_shutdown_file_command(STACKABLE_LOG_DIR),
-        }])
         .add_env_vars(merged_env)
         .add_volume_mount("hbase-config", HBASE_CONFIG_TMP_DIR)
         .add_volume_mount("hdfs-discovery", HDFS_DISCOVERY_TMP_DIR)

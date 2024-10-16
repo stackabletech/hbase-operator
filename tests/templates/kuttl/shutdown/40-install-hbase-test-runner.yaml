@@ -1,0 +1,29 @@
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: hbase-test-runner
+  labels:
+    app: hbase-test-runner
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hbase-test-runner
+  template:
+    metadata:
+      labels:
+        app: hbase-test-runner
+    spec:
+      containers:
+        - name: hbase-test-runner
+          image: docker.stackable.tech/stackable/testing-tools:0.2.0-stackable0.0.0-dev
+          stdin: true
+          tty: true
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "128Mi"
+              cpu: "500m"

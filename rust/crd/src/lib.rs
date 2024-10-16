@@ -18,7 +18,11 @@ use stackable_operator::{
         fragment::{self, Fragment, ValidationError},
         merge::{Atomic, Merge},
     },
-    k8s_openapi::{api::core::v1::EnvVar, apimachinery::pkg::api::resource::Quantity, DeepMerge},
+    k8s_openapi::{
+        api::core::v1::{EnvVar, EnvVarSource, ObjectFieldSelector},
+        apimachinery::pkg::api::resource::Quantity,
+        DeepMerge,
+    },
     kube::{runtime::reflector::ObjectRef, CustomResource, ResourceExt},
     product_config_utils::Configuration,
     product_logging::{self, spec::Logging},
@@ -1051,6 +1055,14 @@ impl HbaseCluster {
         }
     }
 
+    pub fn service_port(&self, role: &HbaseRole) -> u16 {
+        match role {
+            HbaseRole::Master => HBASE_MASTER_PORT,
+            HbaseRole::RegionServer => HBASE_REGIONSERVER_PORT,
+            _ => HBASE_REST_PORT,
+        }
+    }
+
     /// Name of the port used by the Web UI, which depends on HTTPS usage
     fn ui_port_name(&self) -> String {
         if self.has_https_enabled() {
@@ -1064,20 +1076,36 @@ impl HbaseCluster {
 
 pub fn merged_env(rolegroup_config: Option<&BTreeMap<String, String>>) -> Vec<EnvVar> {
     let merged_env: Vec<EnvVar> = if let Some(rolegroup_config) = rolegroup_config {
-        let env_vars_from_config: BTreeMap<String, EnvVar> = rolegroup_config
+        let mut env_vars_from_config: Vec<EnvVar> = rolegroup_config
             .iter()
-            .map(|(env_name, env_value)| {
-                (
-                    env_name.clone(),
-                    EnvVar {
-                        name: env_name.clone(),
-                        value: Some(env_value.to_owned()),
-                        value_from: None,
-                    },
-                )
+            .map(|(env_name, env_value)| EnvVar {
+                name: env_name.clone(),
+                value: Some(env_value.to_owned()),
+                value_from: None,
             })
             .collect();
-        env_vars_from_config.into_values().collect()
+
+        // Needed by the hbase-entrypoint.sh script
+        env_vars_from_config.push(EnvVar {
+            name: "NAMESPACE".to_string(),
+            value: None,
+            value_from: Some(EnvVarSource {
+                field_ref: Some(ObjectFieldSelector {
+                    field_path: "metadata.namespace".to_string(),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            }),
+        });
+
+        // Needed by the hbase-entrypoint.sh script
+        env_vars_from_config.push(EnvVar {
+            name: "REGION_MOVER_OPTS".to_string(),
+            value: None,
+            value_from: None,
+        });
+
+        env_vars_from_config
     } else {
         vec![]
     };
