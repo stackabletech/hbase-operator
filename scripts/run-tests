@@ -230,15 +230,16 @@ def release_file(
 
         # Filter out skip operators
         release_contents = []
-        skip = False
+        skip_lines = 0
         valid_skip_ops = []
         for line in patched_release:
-            if skip:
-                skip = False
+            if skip_lines:
+                skip_lines -= 1
                 continue
             for op in skip_ops:
                 if op in line:
-                    skip = True
+                    # Every product section has 1 line of additional config to skip
+                    skip_lines = 1
                     valid_skip_ops.append(op)
                     break
             else:
