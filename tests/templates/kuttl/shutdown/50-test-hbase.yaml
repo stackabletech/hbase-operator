@@ -2,4 +2,5 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
 commands:
-  - script: kubectl cp --namespace=$NAMESPACE ./test-hbase.py hbase-test-runner-0:/tmp
+  - script: kubectl cp --namespace=$NAMESPACE ./create_regions.sh test-hbase-master-default-0:/tmp
+  - script: kubectl cp --namespace=$NAMESPACE ./count_regions.sh test-hbase-master-default-0:/tmp
