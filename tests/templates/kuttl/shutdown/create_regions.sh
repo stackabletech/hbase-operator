@@ -10,6 +10,6 @@ echo "balance_switch false" | /stackable/hbase/bin/hbase shell --noninteractive
 
 echo "create 't1', 'f1', {NUMREGIONS => 15, SPLITALGO => 'HexStringSplit'}" | /stackable/hbase/bin/hbase shell --noninteractive
 
-REGION_COUNT_ON_0=$(echo "list_regions 't1'" | /stackable/hbase/bin/hbase shell --noninteractive | grep test-hbase-regionserver-default-0 | wc -l)
+REGION_COUNT_ON_0=$(echo "list_regions 't1'" | /stackable/hbase/bin/hbase shell --noninteractive | grep -c test-hbase-regionserver-default-0)
 
 test "${REGION_COUNT_ON_0}" -ge 0

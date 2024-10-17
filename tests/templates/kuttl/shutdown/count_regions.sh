@@ -6,6 +6,6 @@
 set -euo 'pipefail'
 set -x
 
-REGION_COUNT_ON_1=$(echo "list_regions 't1'" | /stackable/hbase/bin/hbase shell --noninteractive | grep test-hbase-regionserver-default-1 | wc -l)
+REGION_COUNT_ON_1=$(echo "list_regions 't1'" | /stackable/hbase/bin/hbase shell --noninteractive | grep -c test-hbase-regionserver-default-1)
 
 test "${REGION_COUNT_ON_1}" -eq 15
