@@ -38,10 +38,10 @@ spec:
   regionServers:
     config:
       regionMover
-        runBeforeShutdown: true, <1>
-        maxThreads: 5, <2>
-        ack: false, <3>
-        extraOpts: ["--designatedFile", "/path/to/designatedFile"] <4>
+        runBeforeShutdown: true # <1> 
+        maxThreads: 5 # <2> 
+        ack: false # <3>
+        extraOpts: ["--designatedFile", "/path/to/designatedFile"] # <4>
 ----
 <1>: Run the region mover tool before shutting down the region server. Default is `false`.
 <2>: Maximum number of threads to use for moving regions. Default is 1.
