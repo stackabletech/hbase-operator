@@ -807,11 +807,18 @@ fn build_rolegroup_statefulset(
 
     let mut merged_env = merged_env(rolegroup_config.get(&PropertyNameKind::Env));
     // This env var is set for all roles to avoid bash's "unbound variable" errors
-    merged_env.push(EnvVar {
-        name: "REGION_MOVER_OPTS".to_string(),
-        value: Some(config.region_mover_args()),
-        ..EnvVar::default()
-    });
+    merged_env.extend([
+        EnvVar {
+            name: "REGION_MOVER_OPTS".to_string(),
+            value: Some(config.region_mover_args()),
+            ..EnvVar::default()
+        },
+        EnvVar {
+            name: "RUN_REGION_MOVER".to_string(),
+            value: Some(config.run_region_mover().to_string()),
+            ..EnvVar::default()
+        },
+    ]);
 
     let mut hbase_container = ContainerBuilder::new("hbase").expect("ContainerBuilder not created");
     hbase_container

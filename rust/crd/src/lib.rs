@@ -1175,6 +1175,13 @@ impl AnyServiceConfig {
             _ => "".to_string(),
         }
     }
+
+    pub fn run_region_mover(&self) -> bool {
+        match self {
+            AnyServiceConfig::RegionServer(config) => config.region_mover.run_before_shutdown,
+            _ => false,
+        }
+    }
 }
 
 #[cfg(test)]
