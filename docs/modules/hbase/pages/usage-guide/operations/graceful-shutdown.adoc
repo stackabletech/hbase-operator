@@ -38,8 +38,8 @@ spec:
   regionServers:
     config:
       regionMover
-        runBeforeShutdown: true # <1> 
-        maxThreads: 5 # <2> 
+        runBeforeShutdown: true # <1>
+        maxThreads: 5 # <2>
         ack: false # <3>
         extraOpts: ["--designatedFile", "/path/to/designatedFile"] # <4>
 ----
