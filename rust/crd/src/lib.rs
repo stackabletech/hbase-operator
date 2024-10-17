@@ -18,11 +18,7 @@ use stackable_operator::{
         fragment::{self, Fragment, ValidationError},
         merge::{Atomic, Merge},
     },
-    k8s_openapi::{
-        api::core::v1::{EnvVar, EnvVarSource, ObjectFieldSelector},
-        apimachinery::pkg::api::resource::Quantity,
-        DeepMerge,
-    },
+    k8s_openapi::{api::core::v1::EnvVar, apimachinery::pkg::api::resource::Quantity, DeepMerge},
     kube::{runtime::reflector::ObjectRef, CustomResource, ResourceExt},
     product_config_utils::Configuration,
     product_logging::{self, spec::Logging},
@@ -1076,36 +1072,14 @@ impl HbaseCluster {
 
 pub fn merged_env(rolegroup_config: Option<&BTreeMap<String, String>>) -> Vec<EnvVar> {
     let merged_env: Vec<EnvVar> = if let Some(rolegroup_config) = rolegroup_config {
-        let mut env_vars_from_config: Vec<EnvVar> = rolegroup_config
+        rolegroup_config
             .iter()
             .map(|(env_name, env_value)| EnvVar {
                 name: env_name.clone(),
                 value: Some(env_value.to_owned()),
                 value_from: None,
             })
-            .collect();
-
-        // Needed by the hbase-entrypoint.sh script
-        env_vars_from_config.push(EnvVar {
-            name: "NAMESPACE".to_string(),
-            value: None,
-            value_from: Some(EnvVarSource {
-                field_ref: Some(ObjectFieldSelector {
-                    field_path: "metadata.namespace".to_string(),
-                    ..Default::default()
-                }),
-                ..Default::default()
-            }),
-        });
-
-        // Needed by the hbase-entrypoint.sh script
-        env_vars_from_config.push(EnvVar {
-            name: "REGION_MOVER_OPTS".to_string(),
-            value: None,
-            value_from: None,
-        });
-
-        env_vars_from_config
+            .collect()
     } else {
         vec![]
     };
@@ -1155,12 +1129,14 @@ impl AnyServiceConfig {
         }
     }
 
-    /// This function is called for all HBase roles but it currently only returns something for the
-    /// region server roles.
-    /// For all other roles it currently returns an empty string meaning there is no command to run
-    /// before shutdown.
-    /// This might change in the future.
-    pub fn pre_shutdown_command(&self) -> String {
+    /// Returns command line arguments to pass on to the region mover tool.
+    /// The follwing arguments are excluded because they are already part of the
+    /// hbase-entrypoint.sh script.
+    /// The most important argument, '--regionserverhost' can only be computed on the Pod
+    /// because it contains the pod's hostname.
+    ///
+    /// Returns an empty string if the region mover is disabled or any other role is "self".
+    pub fn region_mover_args(&self) -> String {
         match self {
             AnyServiceConfig::RegionServer(config) => {
                 if config.region_mover.run_before_shutdown {
@@ -1175,12 +1151,6 @@ impl AnyServiceConfig {
                         })
                         .unwrap_or(DEFAULT_REGION_MOVER_TIMEOUT.as_secs());
                     let mut command = vec![
-                        "bin/hbase".to_string(),
-                        "org.apache.hadoop.hbase.util.RegionMover".to_string(),
-                        "--regionserverhost".to_string(),
-                        "localhost".to_string(),
-                        "--operation".to_string(),
-                        "unload".to_string(),
                         "--maxthreads".to_string(),
                         config.region_mover.max_threads.to_string(),
                         "--timeout".to_string(),
@@ -1189,7 +1159,7 @@ impl AnyServiceConfig {
                     if !config.region_mover.ack {
                         command.push("--noack".to_string());
                     }
-                    //
+
                     command.extend(
                         config
                             .region_mover
@@ -1197,13 +1167,12 @@ impl AnyServiceConfig {
                             .iter()
                             .map(|s| escape(std::borrow::Cow::Borrowed(s)).to_string()),
                     );
-                    let command = command.join(" ");
-                    format!("\"{command}\"")
+                    command.join(" ")
                 } else {
-                    "\"\"".to_string()
+                    "".to_string()
                 }
             }
-            _ => "\"\"".to_string(),
+            _ => "".to_string(),
         }
     }
 }
@@ -1217,10 +1186,7 @@ mod tests {
         transform_all_roles_to_config, validate_all_roles_and_groups_config,
     };
 
-    use crate::{
-        merged_env, AnyServiceConfig, HbaseCluster, HbaseConfig, HbaseRole, RegionMover,
-        RegionServerConfig,
-    };
+    use crate::{merged_env, HbaseCluster, HbaseRole};
 
     use product_config::{types::PropertyNameKind, ProductConfigManager};
 
@@ -1314,73 +1280,5 @@ spec:
             Some(&Some("MASTER".to_string())),
             env_map.get("TEST_VAR_FROM_MRG")
         );
-    }
-
-    #[test]
-    fn test_pre_shutdown_command_master() {
-        let config = AnyServiceConfig::Master(HbaseConfig::default());
-        assert_eq!(config.pre_shutdown_command(), "\"\"");
-    }
-
-    #[test]
-    fn test_pre_shutdown_command_region_server_disabled() {
-        let config = AnyServiceConfig::RegionServer(RegionServerConfig::default());
-        assert_eq!(config.pre_shutdown_command(), "\"\"");
-    }
-
-    #[test]
-    fn test_pre_shutdown_command_region_server_enabled_1() {
-        let config = AnyServiceConfig::RegionServer(RegionServerConfig {
-            region_mover: RegionMover {
-                run_before_shutdown: true,
-                max_threads: 1,
-                ack: true,
-                extra_opts: vec![],
-            },
-            ..RegionServerConfig::default()
-        });
-        assert_eq!(config.pre_shutdown_command(), "\"bin/hbase org.apache.hadoop.hbase.util.RegionMover --regionserverhost localhost --operation unload --maxthreads 1 --timeout 3540\"");
-    }
-
-    #[test]
-    fn test_pre_shutdown_command_region_server_enabled_2() {
-        let config = AnyServiceConfig::RegionServer(RegionServerConfig {
-            region_mover: RegionMover {
-                run_before_shutdown: true,
-                max_threads: 5,
-                ack: false,
-                extra_opts: vec![],
-            },
-            ..RegionServerConfig::default()
-        });
-        assert_eq!(config.pre_shutdown_command(), "\"bin/hbase org.apache.hadoop.hbase.util.RegionMover --regionserverhost localhost --operation unload --maxthreads 5 --timeout 3540 --noack\"");
-    }
-
-    #[test]
-    fn test_pre_shutdown_command_region_server_enabled_3() {
-        let config = AnyServiceConfig::RegionServer(RegionServerConfig {
-            region_mover: RegionMover {
-                run_before_shutdown: true,
-                max_threads: 5,
-                ack: false,
-                extra_opts: vec!["-x".to_string(), "/blubb".to_string()],
-            },
-            ..RegionServerConfig::default()
-        });
-        assert_eq!(config.pre_shutdown_command(), "\"bin/hbase org.apache.hadoop.hbase.util.RegionMover --regionserverhost localhost --operation unload --maxthreads 5 --timeout 3540 --noack -x /blubb\"");
-    }
-
-    #[test]
-    fn test_pre_shutdown_command_region_server_enabled_4() {
-        let config = AnyServiceConfig::RegionServer(RegionServerConfig {
-            region_mover: RegionMover {
-                run_before_shutdown: true,
-                max_threads: 1,
-                ack: true,
-                extra_opts: vec!["&&".to_string(), "sudo gotcha!".to_string()],
-            },
-            ..RegionServerConfig::default()
-        });
-        assert_eq!(config.pre_shutdown_command(), "\"bin/hbase org.apache.hadoop.hbase.util.RegionMover --regionserverhost localhost --operation unload --maxthreads 1 --timeout 3540 '&&' 'sudo gotcha'\\!''\"");
     }
 }

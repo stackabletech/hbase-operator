@@ -15,7 +15,6 @@ anyhow.workspace = true
 clap.workspace = true
 fnv.workspace = true
 futures.workspace = true
-indoc.workspace = true
 product-config.workspace = true
 serde.workspace = true
 snafu.workspace = true
@@ -30,3 +29,4 @@ built.workspace = true
 [dev-dependencies]
 rstest.workspace = true
 serde_yaml.workspace = true
+indoc.workspace = true

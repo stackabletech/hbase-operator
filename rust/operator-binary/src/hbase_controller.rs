@@ -1,5 +1,4 @@
 //! Ensures that `Pod`s are configured and running for each [`HbaseCluster`]
-use indoc::formatdoc;
 use product_config::{
     types::PropertyNameKind,
     writer::{to_hadoop_xml, to_java_properties_string, PropertiesWriterError},
@@ -24,8 +23,8 @@ use stackable_operator::{
         api::{
             apps::v1::{StatefulSet, StatefulSetSpec},
             core::v1::{
-                ConfigMap, ConfigMapVolumeSource, ContainerPort, Probe, Service, ServicePort,
-                ServiceSpec, TCPSocketAction, Volume,
+                ConfigMap, ConfigMapVolumeSource, ContainerPort, EnvVar, Probe, Service,
+                ServicePort, ServiceSpec, TCPSocketAction, Volume,
             },
         },
         apimachinery::pkg::{apis::meta::v1::LabelSelector, util::intstr::IntOrString},
@@ -37,7 +36,6 @@ use stackable_operator::{
     product_config_utils::{transform_all_roles_to_config, validate_all_roles_and_groups_config},
     product_logging::{
         self,
-        framework::{create_vector_shutdown_file_command, remove_vector_shutdown_file_command},
         spec::{
             ConfigMapLogConfig, ContainerLogConfig, ContainerLogConfigChoice,
             CustomContainerLogConfig,
@@ -71,14 +69,11 @@ use crate::security::opa::HbaseOpaConfig;
 use crate::{
     discovery::build_discovery_configmap,
     kerberos::{
-        self, add_kerberos_pod_config, kerberos_config_properties,
-        kerberos_container_start_commands, kerberos_ssl_client_settings,
+        self, add_kerberos_pod_config, kerberos_config_properties, kerberos_ssl_client_settings,
         kerberos_ssl_server_settings,
     },
     operations::{graceful_shutdown::add_graceful_shutdown_config, pdb::add_pdbs},
-    product_logging::{
-        extend_role_group_config_map, log4j_properties_file_name, resolve_vector_aggregator_address,
-    },
+    product_logging::{extend_role_group_config_map, resolve_vector_aggregator_address},
     security,
     zookeeper::{self, ZookeeperConnectionInformation},
     OPERATOR_NAME,
@@ -96,42 +91,6 @@ const HBASE_LOG_CONFIG_TMP_DIR: &str = "/stackable/tmp/log_config";
 
 const DOCKER_IMAGE_BASE_NAME: &str = "hbase";
 const HBASE_UID: i64 = 1000;
-
-pub const HBASE_BASH_TRAP_FUNCTIONS: &str = r#"
-prepare_signal_handlers()
-{
-    unset term_child_pid
-    unset term_kill_needed
-    trap handle_term_signal TERM
-}
-
-handle_term_signal()
-{
-    if [ "${term_child_pid}" ]; then
-        if [ -n "$PRE_SHUTDOWN_COMMAND" ]; then
-            echo "Start pre-shutdown command: $PRE_SHUTDOWN_COMMAND"
-            $(${PRE_SHUTDOWN_COMMAND})
-            echo "Done pre-shutdown command"
-        fi
-        kill -TERM "${term_child_pid}" 2>/dev/null
-    else
-        term_kill_needed='yes'
-    fi
-}
-
-wait_for_termination()
-{
-    set +e
-    term_child_pid=$1
-    if [[ -v term_kill_needed ]]; then
-        kill -TERM "${term_child_pid}" 2>/dev/null
-    fi
-    wait ${term_child_pid} 2>/dev/null
-    trap - TERM
-    wait ${term_child_pid} 2>/dev/null
-    set -e
-}
-"#;
 
 pub struct Ctx {
     pub client: stackable_operator::client::Client,
@@ -846,17 +805,29 @@ fn build_rolegroup_statefulset(
         ..probe_template
     };
 
-    let merged_env = merged_env(rolegroup_config.get(&PropertyNameKind::Env));
+    let mut merged_env = merged_env(rolegroup_config.get(&PropertyNameKind::Env));
+    // This env var is set for all roles to avoid bash's "unbound variable" errors
+    merged_env.push(EnvVar {
+        name: "REGION_MOVER_OPTS".to_string(),
+        value: Some(config.region_mover_args()),
+        ..EnvVar::default()
+    });
 
-    let log4j_properties_file_name =
-        log4j_properties_file_name(&resolved_product_image.product_version);
     let mut hbase_container = ContainerBuilder::new("hbase").expect("ContainerBuilder not created");
     hbase_container
         .image_from_product_image(resolved_product_image)
         .command(vec!["/stackable/hbase/bin/hbase-entrypoint.sh".to_string()])
         .args(vec![
             hbase_role.cli_role_name(),
-            rolegroup_ref.object_name(),
+            format!(
+                "{}.{}.svc.cluster.local",
+                rolegroup_ref.object_name(),
+                hbase
+                    .metadata
+                    .namespace
+                    .clone()
+                    .context(ObjectHasNoNamespaceSnafu)?
+            ),
             hbase.service_port(hbase_role).to_string(),
         ])
         .add_env_vars(merged_env)

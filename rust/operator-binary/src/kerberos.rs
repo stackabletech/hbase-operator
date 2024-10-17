@@ -1,6 +1,5 @@
 use std::collections::BTreeMap;
 
-use indoc::formatdoc;
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_hbase_crd::{HbaseCluster, TLS_STORE_DIR, TLS_STORE_PASSWORD, TLS_STORE_VOLUME_NAME};
 use stackable_operator::{
@@ -257,16 +256,6 @@ pub fn add_kerberos_pod_config(
         cb.add_volume_mount(TLS_STORE_VOLUME_NAME, TLS_STORE_DIR);
     }
     Ok(())
-}
-
-pub fn kerberos_container_start_commands(hbase: &HbaseCluster) -> String {
-    if !hbase.has_kerberos_enabled() {
-        return String::new();
-    }
-
-    formatdoc! {"
-        export KERBEROS_REALM=$(grep -oP 'default_realm = \\K.*' /stackable/kerberos/krb5.conf)"
-    }
 }
 
 fn principal_host_part(hbase: &HbaseCluster) -> Result<String, Error> {
