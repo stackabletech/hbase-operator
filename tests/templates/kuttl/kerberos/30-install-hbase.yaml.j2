@@ -24,6 +24,7 @@ commands:
 {% else %}
           productVersion: "{{ test_scenario['values']['hbase'] }}"
 {% endif %}
+          pullPolicy: IfNotPresent
         clusterConfig:
           hdfsConfigMapName: hdfs
           zookeeperConfigMapName: hbase-znode
