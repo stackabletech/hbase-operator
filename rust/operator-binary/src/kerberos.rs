@@ -6,12 +6,16 @@ use stackable_hbase_crd::{
     HbaseCluster, HbaseRole, TLS_STORE_DIR, TLS_STORE_PASSWORD, TLS_STORE_VOLUME_NAME,
 };
 use stackable_operator::{
-    builder::pod::{
-        container::ContainerBuilder,
-        volume::{SecretFormat, SecretOperatorVolumeSourceBuilder, VolumeBuilder},
-        PodBuilder,
+    builder::{
+        self,
+        pod::{
+            container::ContainerBuilder,
+            volume::{SecretFormat, SecretOperatorVolumeSourceBuilder, VolumeBuilder},
+            PodBuilder,
+        },
     },
     kube::{runtime::reflector::ObjectRef, ResourceExt},
+    utils::cluster_domain::KUBERNETES_CLUSTER_DOMAIN,
 };
 
 #[derive(Snafu, Debug)]
@@ -27,6 +31,14 @@ pub enum Error {
     #[snafu(display("failed to add TLS secret volume"))]
     AddTlsSecretVolume {
         source: stackable_operator::builder::pod::volume::SecretOperatorVolumeSourceBuilderError,
+    },
+
+    #[snafu(display("failed to add needed volume"))]
+    AddVolume { source: builder::pod::Error },
+
+    #[snafu(display("failed to add needed volumeMount"))]
+    AddVolumeMount {
+        source: builder::pod::container::Error,
     },
 }
 
@@ -230,8 +242,10 @@ pub fn add_kerberos_pod_config(
             VolumeBuilder::new("kerberos")
                 .ephemeral(kerberos_secret_operator_volume)
                 .build(),
-        );
-        cb.add_volume_mount("kerberos", "/stackable/kerberos");
+        )
+        .context(AddVolumeSnafu)?;
+        cb.add_volume_mount("kerberos", "/stackable/kerberos")
+            .context(AddVolumeMountSnafu)?;
 
         // Needed env vars
         cb.add_env_var("KRB5_CONFIG", "/stackable/kerberos/krb5.conf");
@@ -256,8 +270,10 @@ pub fn add_kerberos_pod_config(
                         .context(AddTlsSecretVolumeSnafu)?,
                 )
                 .build(),
-        );
-        cb.add_volume_mount(TLS_STORE_VOLUME_NAME, TLS_STORE_DIR);
+        )
+        .context(AddVolumeSnafu)?;
+        cb.add_volume_mount(TLS_STORE_VOLUME_NAME, TLS_STORE_DIR)
+            .context(AddVolumeMountSnafu)?;
     }
     Ok(())
 }
@@ -278,6 +294,9 @@ fn principal_host_part(hbase: &HbaseCluster) -> Result<String, Error> {
         hbase: ObjectRef::from_obj(hbase),
     })?;
     Ok(format!(
-        "{hbase_name}.{hbase_namespace}.svc.cluster.local@${{env.KERBEROS_REALM}}"
+        "{hbase_name}.{hbase_namespace}.svc.{cluster_domain}@${{env.KERBEROS_REALM}}",
+        cluster_domain = KUBERNETES_CLUSTER_DOMAIN
+            .get()
+            .expect("KUBERNETES_CLUSTER_DOMAIN must first be set by calling initialize_operator"),
     ))
 }
