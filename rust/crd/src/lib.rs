@@ -1,4 +1,3 @@
-use lazy_static::lazy_static;
 use product_config::types::PropertyNameKind;
 use security::AuthenticationConfig;
 use serde::{Deserialize, Serialize};
@@ -30,6 +29,7 @@ use stackable_operator::{
 };
 use std::collections::BTreeMap;
 use std::collections::HashMap;
+use std::sync::LazyLock;
 use strum::{Display, EnumIter, EnumString};
 
 use crate::affinity::get_affinity;
@@ -90,10 +90,8 @@ const DEFAULT_MASTER_GRACEFUL_SHUTDOWN_TIMEOUT: Duration = Duration::from_minute
 const DEFAULT_REGION_MOVER_TIMEOUT: Duration = Duration::from_minutes_unchecked(59);
 const DEFAULT_REGION_MOVER_DELTA_TO_SHUTDOWN: Duration = Duration::from_minutes_unchecked(1);
 const DEFAULT_REST_SERVER_GRACEFUL_SHUTDOWN_TIMEOUT: Duration = Duration::from_minutes_unchecked(5);
-lazy_static! {
-    static ref DEFAULT_REGION_SERVER_GRACEFUL_SHUTDOWN_TIMEOUT: Duration =
-        DEFAULT_REGION_MOVER_TIMEOUT + DEFAULT_REGION_MOVER_DELTA_TO_SHUTDOWN;
-}
+static DEFAULT_REGION_SERVER_GRACEFUL_SHUTDOWN_TIMEOUT: LazyLock<Duration> =
+    LazyLock::new(|| DEFAULT_REGION_MOVER_TIMEOUT + DEFAULT_REGION_MOVER_DELTA_TO_SHUTDOWN);
 
 #[derive(Snafu, Debug)]
 pub enum Error {
