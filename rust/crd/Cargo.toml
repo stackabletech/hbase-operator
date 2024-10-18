@@ -12,6 +12,7 @@ publish = false
 product-config.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+shell-escape.workspace = true
 snafu.workspace = true
 stackable-operator.workspace = true
 strum.workspace = true
