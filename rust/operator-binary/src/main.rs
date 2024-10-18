@@ -63,7 +63,8 @@ async fn main() -> anyhow::Result<()> {
                 "/etc/stackable/hbase-operator/config-spec/properties.yaml",
             ])?;
             let client =
-                stackable_operator::client::create_client(Some(OPERATOR_NAME.to_string())).await?;
+                stackable_operator::client::initialize_operator(Some(OPERATOR_NAME.to_string()))
+                    .await?;
 
             Controller::new(
                 watch_namespace.get_api::<HbaseCluster>(&client),
