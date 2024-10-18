@@ -35,6 +35,7 @@ commands:
 {% endif %}
         nameNodes:
           config:
+            gracefulShutdownTimeout: 1m
             listenerClass: 'cluster-internal'
             logging:
               enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
@@ -58,6 +59,7 @@ commands:
               replicas: 2
         dataNodes:
           config:
+            gracefulShutdownTimeout: 1m
             listenerClass: 'cluster-internal'
             logging:
               enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
@@ -67,6 +69,7 @@ commands:
               replicas: 1
         journalNodes:
           config:
+            gracefulShutdownTimeout: 1m
             logging:
               enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
           configOverrides: *configOverrides
