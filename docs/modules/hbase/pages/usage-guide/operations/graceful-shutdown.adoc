@@ -50,6 +50,8 @@ spec:
 
 NOTE: There is no need to explicitly specify a timeout for the region movement. The operator will compute an appropriate timeout that cannot exceed the `gracefulShutdownTimeout` for region servers.
 
+IMPORTANT: The ZooKeeper connection must be available during the time the region mover is running for the graceful shutdown process to succeed.
+
 == RestServers
 
 As a default, RestServers have `5 minutes` to shut down gracefully.
