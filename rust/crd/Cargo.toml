@@ -17,6 +17,7 @@ snafu.workspace = true
 stackable-operator.workspace = true
 strum.workspace = true
 tracing.workspace = true
+lazy_static.workspace = true
 
 [dev-dependencies]
 rstest.workspace = true

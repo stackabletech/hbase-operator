@@ -2150,6 +2150,7 @@ name = "stackable-hbase-crd"
 version = "0.0.0-dev"
 dependencies = [
  "indoc",
+ "lazy_static",
  "product-config",
  "rstest",
  "serde",

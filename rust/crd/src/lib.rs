@@ -1,3 +1,4 @@
+use lazy_static::lazy_static;
 use product_config::types::PropertyNameKind;
 use security::AuthenticationConfig;
 use serde::{Deserialize, Serialize};
@@ -86,12 +87,13 @@ pub const METRICS_PORT: u16 = 9100;
 pub const JVM_HEAP_FACTOR: f32 = 0.8;
 
 const DEFAULT_MASTER_GRACEFUL_SHUTDOWN_TIMEOUT: Duration = Duration::from_minutes_unchecked(20);
-const DEFAULT_REGION_MOVER_TIMEOUT: Duration = Duration::from_minutes_unchecked(59); 
+const DEFAULT_REGION_MOVER_TIMEOUT: Duration = Duration::from_minutes_unchecked(59);
 const DEFAULT_REGION_MOVER_DELTA_TO_SHUTDOWN: Duration = Duration::from_minutes_unchecked(1);
-const DEFAULT_REGION_SERVER_GRACEFUL_SHUTDOWN_TIMEOUT: Duration = DEFAULT_REGION_MOVER_TIMEOUT + DEFAULT_REGION_MOVER_DELTA_TO_SHUTDOWN;
-      
- 
 const DEFAULT_REST_SERVER_GRACEFUL_SHUTDOWN_TIMEOUT: Duration = Duration::from_minutes_unchecked(5);
+lazy_static! {
+    static ref DEFAULT_REGION_SERVER_GRACEFUL_SHUTDOWN_TIMEOUT: Duration =
+        DEFAULT_REGION_MOVER_TIMEOUT + DEFAULT_REGION_MOVER_DELTA_TO_SHUTDOWN;
+}
 
 #[derive(Snafu, Debug)]
 pub enum Error {
@@ -315,7 +317,7 @@ fn default_regionserver_config(
             &HbaseRole::RegionServer,
             hdfs_discovery_cm_name,
         ),
-        graceful_shutdown_timeout: Some(DEFAULT_REGION_SERVER_GRACEFUL_SHUTDOWN_TIMEOUT),
+        graceful_shutdown_timeout: Some(*DEFAULT_REGION_SERVER_GRACEFUL_SHUTDOWN_TIMEOUT),
         region_mover: Some(RegionMover::default()),
     }
 }
