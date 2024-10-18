@@ -12,7 +12,7 @@ metadata:
 spec:
   template:
     spec:
-      terminationGracePeriodSeconds: 1200
+      terminationGracePeriodSeconds: 60
 status:
   readyReplicas: 2
   replicas: 2
@@ -24,7 +24,7 @@ metadata:
 spec:
   template:
     spec:
-      terminationGracePeriodSeconds: 3600
+      terminationGracePeriodSeconds: 120
 status:
   readyReplicas: 2
   replicas: 2
@@ -36,7 +36,7 @@ metadata:
 spec:
   template:
     spec:
-      terminationGracePeriodSeconds: 300
+      terminationGracePeriodSeconds: 60
 status:
   readyReplicas: 2
   replicas: 2

@@ -1,4 +1,11 @@
 ---
+# This test works as follows:
+# - given
+#   - an HBase cluster with two region servers (0 and 1)
+#   - create a table + column familiy with 15 regions
+#   - where region server 0 has some regions assigned to it
+# - restart server 0 (the region mover is triggerred by the shutdown)
+# - assert that server 1 now hosts all 15 regions
 apiVersion: kuttl.dev/v1beta1
 kind: TestAssert
 metadata:
