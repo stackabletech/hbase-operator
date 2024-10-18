@@ -86,13 +86,11 @@ pub const METRICS_PORT: u16 = 9100;
 pub const JVM_HEAP_FACTOR: f32 = 0.8;
 
 const DEFAULT_MASTER_GRACEFUL_SHUTDOWN_TIMEOUT: Duration = Duration::from_minutes_unchecked(20);
-// The following three values should be kept in sync so that
-// DEFAULT_REGION_SERVER_GRACEFUL_SHUTDOWN_TIMEOUT = DEFAULT_REGION_MOVER_TIMEOUT + DEFAULT_REGION_MOVER_DELTA_TO_SHUTDOWN
-const DEFAULT_REGION_SERVER_GRACEFUL_SHUTDOWN_TIMEOUT: Duration =
-    Duration::from_minutes_unchecked(60);
-// This should always be slightly less than the above
-const DEFAULT_REGION_MOVER_TIMEOUT: Duration = Duration::from_minutes_unchecked(59);
+const DEFAULT_REGION_MOVER_TIMEOUT: Duration = Duration::from_minutes_unchecked(59); 
 const DEFAULT_REGION_MOVER_DELTA_TO_SHUTDOWN: Duration = Duration::from_minutes_unchecked(1);
+const DEFAULT_REGION_SERVER_GRACEFUL_SHUTDOWN_TIMEOUT: Duration = DEFAULT_REGION_MOVER_TIMEOUT + DEFAULT_REGION_MOVER_DELTA_TO_SHUTDOWN;
+      
+ 
 const DEFAULT_REST_SERVER_GRACEFUL_SHUTDOWN_TIMEOUT: Duration = Duration::from_minutes_unchecked(5);
 
 #[derive(Snafu, Debug)]
