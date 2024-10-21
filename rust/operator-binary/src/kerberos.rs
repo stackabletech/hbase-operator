@@ -293,10 +293,10 @@ fn principal_host_part(hbase: &HbaseCluster) -> Result<String, Error> {
     let hbase_namespace = hbase.namespace().context(ObjectMissingNamespaceSnafu {
         hbase: ObjectRef::from_obj(hbase),
     })?;
+    let cluster_domain = KUBERNETES_CLUSTER_DOMAIN
+        .get()
+        .expect("KUBERNETES_CLUSTER_DOMAIN must first be set by calling initialize_operator");
     Ok(format!(
-        "{hbase_name}.{hbase_namespace}.svc.{cluster_domain}@${{env.KERBEROS_REALM}}",
-        cluster_domain = KUBERNETES_CLUSTER_DOMAIN
-            .get()
-            .expect("KUBERNETES_CLUSTER_DOMAIN must first be set by calling initialize_operator"),
+        "{hbase_name}.{hbase_namespace}.svc.{cluster_domain}@${{env.KERBEROS_REALM}}"
     ))
 }
