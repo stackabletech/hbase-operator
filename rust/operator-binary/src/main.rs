@@ -14,6 +14,7 @@ use stackable_hbase_crd::{HbaseCluster, APP_NAME};
 use stackable_operator::{
     cli::{Command, ProductOperatorRun},
     k8s_openapi::api::{apps::v1::StatefulSet, core::v1::Service},
+    kube::core::DeserializeGuard,
     kube::runtime::{controller::Controller, watcher},
     logging::controller::report_controller_reconciled,
     CustomResourceExt,
@@ -66,7 +67,7 @@ async fn main() -> anyhow::Result<()> {
                 stackable_operator::client::create_client(Some(OPERATOR_NAME.to_string())).await?;
 
             Controller::new(
-                watch_namespace.get_api::<HbaseCluster>(&client),
+                watch_namespace.get_api::<DeserializeGuard<HbaseCluster>>(&client),
                 watcher::Config::default(),
             )
             .owns(
