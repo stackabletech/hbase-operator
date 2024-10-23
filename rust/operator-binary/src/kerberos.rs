@@ -15,7 +15,7 @@ use stackable_operator::{
         },
     },
     kube::{runtime::reflector::ObjectRef, ResourceExt},
-    utils::cluster_domain::KUBERNETES_CLUSTER_DOMAIN,
+    utils::cluster_info::KubernetesClusterInfo,
 };
 
 #[derive(Snafu, Debug)]
@@ -42,12 +42,15 @@ pub enum Error {
     },
 }
 
-pub fn kerberos_config_properties(hbase: &HbaseCluster) -> Result<BTreeMap<String, String>, Error> {
+pub fn kerberos_config_properties(
+    hbase: &HbaseCluster,
+    cluster_info: &KubernetesClusterInfo,
+) -> Result<BTreeMap<String, String>, Error> {
     if !hbase.has_kerberos_enabled() {
         return Ok(BTreeMap::new());
     }
 
-    let principal_host_part = principal_host_part(hbase)?;
+    let principal_host_part = principal_host_part(hbase, cluster_info)?;
 
     Ok(BTreeMap::from([
         // Kerberos settings
@@ -134,12 +137,13 @@ pub fn kerberos_config_properties(hbase: &HbaseCluster) -> Result<BTreeMap<Strin
 
 pub fn kerberos_discovery_config_properties(
     hbase: &HbaseCluster,
+    cluster_info: &KubernetesClusterInfo,
 ) -> Result<BTreeMap<String, String>, Error> {
     if !hbase.has_kerberos_enabled() {
         return Ok(BTreeMap::new());
     }
 
-    let principal_host_part = principal_host_part(hbase)?;
+    let principal_host_part = principal_host_part(hbase, cluster_info)?;
 
     Ok(BTreeMap::from([
         (
@@ -288,14 +292,15 @@ pub fn kerberos_container_start_commands(hbase: &HbaseCluster) -> String {
     }
 }
 
-fn principal_host_part(hbase: &HbaseCluster) -> Result<String, Error> {
+fn principal_host_part(
+    hbase: &HbaseCluster,
+    cluster_info: &KubernetesClusterInfo,
+) -> Result<String, Error> {
     let hbase_name = hbase.name_any();
     let hbase_namespace = hbase.namespace().context(ObjectMissingNamespaceSnafu {
         hbase: ObjectRef::from_obj(hbase),
     })?;
-    let cluster_domain = KUBERNETES_CLUSTER_DOMAIN
-        .get()
-        .expect("KUBERNETES_CLUSTER_DOMAIN must first be set by calling initialize_operator");
+    let cluster_domain = &cluster_info.cluster_domain;
     Ok(format!(
         "{hbase_name}.{hbase_namespace}.svc.{cluster_domain}@${{env.KERBEROS_REALM}}"
     ))

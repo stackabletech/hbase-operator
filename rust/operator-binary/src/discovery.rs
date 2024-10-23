@@ -8,6 +8,7 @@ use stackable_operator::{
     commons::product_image_selection::ResolvedProductImage,
     k8s_openapi::api::core::v1::ConfigMap,
     kube::runtime::reflector::ObjectRef,
+    utils::cluster_info::KubernetesClusterInfo,
 };
 
 use crate::{
@@ -43,12 +44,15 @@ pub enum Error {
 /// Creates a discovery config map containing the `hbase-site.xml` for clients.
 pub fn build_discovery_configmap(
     hbase: &HbaseCluster,
+    cluster_info: &KubernetesClusterInfo,
     zookeeper_connection_information: &ZookeeperConnectionInformation,
     resolved_product_image: &ResolvedProductImage,
 ) -> Result<ConfigMap> {
     let mut hbase_site = zookeeper_connection_information.as_hbase_settings();
-    hbase_site
-        .extend(kerberos_discovery_config_properties(hbase).context(AddKerberosDiscoverySnafu)?);
+    hbase_site.extend(
+        kerberos_discovery_config_properties(hbase, cluster_info)
+            .context(AddKerberosDiscoverySnafu)?,
+    );
 
     ConfigMapBuilder::new()
         .metadata(

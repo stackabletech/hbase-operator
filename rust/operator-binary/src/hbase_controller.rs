@@ -60,7 +60,7 @@ use stackable_operator::{
         statefulset::StatefulSetConditionBuilder,
     },
     time::Duration,
-    utils::COMMON_BASH_TRAP_FUNCTIONS,
+    utils::{cluster_info::KubernetesClusterInfo, COMMON_BASH_TRAP_FUNCTIONS},
 };
 use strum::{EnumDiscriminants, IntoStaticStr, ParseError};
 
@@ -374,6 +374,7 @@ pub async fn reconcile_hbase(hbase: Arc<HbaseCluster>, ctx: Arc<Ctx>) -> Result<
     // discovery config map
     let discovery_cm = build_discovery_configmap(
         &hbase,
+        &client.kubernetes_cluster_info,
         &zookeeper_connection_information,
         &resolved_product_image,
     )
@@ -421,6 +422,7 @@ pub async fn reconcile_hbase(hbase: Arc<HbaseCluster>, ctx: Arc<Ctx>) -> Result<
                 build_rolegroup_service(&hbase, &hbase_role, &rolegroup, &resolved_product_image)?;
             let rg_configmap = build_rolegroup_config_map(
                 &hbase,
+                &client.kubernetes_cluster_info,
                 &rolegroup,
                 rolegroup_config,
                 &zookeeper_connection_information,
@@ -549,6 +551,7 @@ pub fn build_region_server_role_service(
 #[allow(clippy::too_many_arguments)]
 fn build_rolegroup_config_map(
     hbase: &HbaseCluster,
+    cluster_info: &KubernetesClusterInfo,
     rolegroup: &RoleGroupRef<HbaseCluster>,
     rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
     zookeeper_connection_information: &ZookeeperConnectionInformation,
@@ -572,8 +575,10 @@ fn build_rolegroup_config_map(
             PropertyNameKind::File(file_name) if file_name == HBASE_SITE_XML => {
                 let mut hbase_site_config = BTreeMap::new();
                 hbase_site_config.extend(zookeeper_connection_information.as_hbase_settings());
-                hbase_site_config
-                    .extend(kerberos_config_properties(hbase).context(AddKerberosConfigSnafu)?);
+                hbase_site_config.extend(
+                    kerberos_config_properties(hbase, cluster_info)
+                        .context(AddKerberosConfigSnafu)?,
+                );
                 hbase_site_config
                     .extend(hbase_opa_config.map_or(vec![], |config| config.hbase_site_config()));
 
