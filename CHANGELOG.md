@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Added
+
+- The operator can now run on Kubernetes clusters using a non-default cluster domain.
+  Use the env var `KUBERNETES_CLUSTER_DOMAIN` or the operator Helm chart property `kubernetesClusterDomain` to set a non-default cluster domain ([#574]).
+
 ### Changed
 
 - Reduce CRD size from `1.4MB` to `96KB` by accepting arbitrary YAML input instead of the underlying schema for the following fields ([#548]):
@@ -22,6 +27,7 @@
 [#550]: https://github.com/stackabletech/hbase-operator/pull/550
 [#556]: https://github.com/stackabletech/hbase-operator/pull/556
 [#558]: https://github.com/stackabletech/hbase-operator/pull/558
+[#574]: https://github.com/stackabletech/hbase-operator/pull/574
 
 ## [24.7.0] - 2024-07-24
 
