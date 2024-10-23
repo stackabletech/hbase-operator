@@ -7,7 +7,7 @@
 - Reduce CRD size from `1.4MB` to `96KB` by accepting arbitrary YAML input instead of the underlying schema for the following fields ([#548]):
   - `podOverrides`
   - `affinity`
-- Optionally move regions to other pods before shutting down a region server ([#570]).
+- Support moving regions to other Pods during graceful shutdown of region servers ([#570]).
 
 ### Fixed
 
