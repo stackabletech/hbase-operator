@@ -12,6 +12,7 @@
 
 - Implement `envOverrides` for HbaseCluster ([#550]).
 - Omid test: use 1.1.2, update default port number and raise test timeout ([#556]).
+- An invalid `HBaseCluster` doesn't cause the operator to stop functioning (#[575]).
 
 ### Removed
 
