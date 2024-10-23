@@ -8,5 +8,7 @@ spec:
     productVersion: 0.61.0
     pullPolicy: IfNotPresent
   servers:
+    config:
+      gracefulShutdownTimeout: 1m
     roleGroups:
       default: {}
