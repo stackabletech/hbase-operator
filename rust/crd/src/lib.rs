@@ -1053,7 +1053,7 @@ impl HbaseCluster {
         match role {
             HbaseRole::Master => HBASE_MASTER_PORT,
             HbaseRole::RegionServer => HBASE_REGIONSERVER_PORT,
-            _ => HBASE_REST_PORT,
+            HbaseRole::RestServer => HBASE_REST_PORT,
         }
     }
 
