@@ -95,9 +95,6 @@ static DEFAULT_REGION_SERVER_GRACEFUL_SHUTDOWN_TIMEOUT: LazyLock<Duration> =
 
 #[derive(Snafu, Debug)]
 pub enum Error {
-    #[snafu(display("expected role [{expected}] but got role [{got}]"))]
-    ExpectedRole { expected: String, got: String },
-
     #[snafu(display("the role [{role}] is invalid and does not exist in HBase"))]
     InvalidRole {
         source: strum::ParseError,
