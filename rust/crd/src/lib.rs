@@ -1141,7 +1141,7 @@ impl AnyServiceConfig {
                     let timeout = config
                         .graceful_shutdown_timeout
                         .map(|d| {
-                            if d.as_secs() < DEFAULT_REGION_MOVER_DELTA_TO_SHUTDOWN.as_secs() {
+                            if d.as_secs() <= DEFAULT_REGION_MOVER_DELTA_TO_SHUTDOWN.as_secs() {
                                 d.as_secs()
                             } else {
                                 d.as_secs() - DEFAULT_REGION_MOVER_DELTA_TO_SHUTDOWN.as_secs()
