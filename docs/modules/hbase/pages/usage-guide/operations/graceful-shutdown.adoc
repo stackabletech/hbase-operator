@@ -37,7 +37,7 @@ Here is an example:
 spec:
   regionServers:
     config:
-      regionMover
+      regionMover:
         runBeforeShutdown: true # <1>
         maxThreads: 5 # <2>
         ack: false # <3>
