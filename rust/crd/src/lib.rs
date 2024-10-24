@@ -1128,7 +1128,7 @@ impl AnyServiceConfig {
     }
 
     /// Returns command line arguments to pass on to the region mover tool.
-    /// The follwing arguments are excluded because they are already part of the
+    /// The following arguments are excluded because they are already part of the
     /// hbase-entrypoint.sh script.
     /// The most important argument, '--regionserverhost' can only be computed on the Pod
     /// because it contains the pod's hostname.
