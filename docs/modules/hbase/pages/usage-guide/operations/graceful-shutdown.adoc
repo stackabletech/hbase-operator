@@ -50,7 +50,7 @@ spec:
 
 For a list of additional options accepted by the region mover use the `--help` option first:
 
-[source,bash]
+[source]
 ----
 $ /stackable/hbase/bin/hbase org.apache.hadoop.hbase.util.RegionMover --help
 usage: hbase org.apache.hadoop.hbase.util.RegionMover <options>
