@@ -3,12 +3,16 @@ use std::collections::BTreeMap;
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_hbase_crd::{HbaseCluster, TLS_STORE_DIR, TLS_STORE_PASSWORD, TLS_STORE_VOLUME_NAME};
 use stackable_operator::{
-    builder::pod::{
-        container::ContainerBuilder,
-        volume::{SecretFormat, SecretOperatorVolumeSourceBuilder, VolumeBuilder},
-        PodBuilder,
+    builder::{
+        self,
+        pod::{
+            container::ContainerBuilder,
+            volume::{SecretFormat, SecretOperatorVolumeSourceBuilder, VolumeBuilder},
+            PodBuilder,
+        },
     },
     kube::{runtime::reflector::ObjectRef, ResourceExt},
+    utils::cluster_info::KubernetesClusterInfo,
 };
 
 #[derive(Snafu, Debug)]
@@ -25,14 +29,25 @@ pub enum Error {
     AddTlsSecretVolume {
         source: stackable_operator::builder::pod::volume::SecretOperatorVolumeSourceBuilderError,
     },
+
+    #[snafu(display("failed to add needed volume"))]
+    AddVolume { source: builder::pod::Error },
+
+    #[snafu(display("failed to add needed volumeMount"))]
+    AddVolumeMount {
+        source: builder::pod::container::Error,
+    },
 }
 
-pub fn kerberos_config_properties(hbase: &HbaseCluster) -> Result<BTreeMap<String, String>, Error> {
+pub fn kerberos_config_properties(
+    hbase: &HbaseCluster,
+    cluster_info: &KubernetesClusterInfo,
+) -> Result<BTreeMap<String, String>, Error> {
     if !hbase.has_kerberos_enabled() {
         return Ok(BTreeMap::new());
     }
 
-    let principal_host_part = principal_host_part(hbase)?;
+    let principal_host_part = principal_host_part(hbase, cluster_info)?;
 
     Ok(BTreeMap::from([
         // Kerberos settings
@@ -119,12 +134,13 @@ pub fn kerberos_config_properties(hbase: &HbaseCluster) -> Result<BTreeMap<Strin
 
 pub fn kerberos_discovery_config_properties(
     hbase: &HbaseCluster,
+    cluster_info: &KubernetesClusterInfo,
 ) -> Result<BTreeMap<String, String>, Error> {
     if !hbase.has_kerberos_enabled() {
         return Ok(BTreeMap::new());
     }
 
-    let principal_host_part = principal_host_part(hbase)?;
+    let principal_host_part = principal_host_part(hbase, cluster_info)?;
 
     Ok(BTreeMap::from([
         (
@@ -226,8 +242,10 @@ pub fn add_kerberos_pod_config(
             VolumeBuilder::new("kerberos")
                 .ephemeral(kerberos_secret_operator_volume)
                 .build(),
-        );
-        cb.add_volume_mount("kerberos", "/stackable/kerberos");
+        )
+        .context(AddVolumeSnafu)?;
+        cb.add_volume_mount("kerberos", "/stackable/kerberos")
+            .context(AddVolumeMountSnafu)?;
 
         // Needed env vars
         cb.add_env_var("KRB5_CONFIG", "/stackable/kerberos/krb5.conf");
@@ -252,19 +270,25 @@ pub fn add_kerberos_pod_config(
                         .context(AddTlsSecretVolumeSnafu)?,
                 )
                 .build(),
-        );
-        cb.add_volume_mount(TLS_STORE_VOLUME_NAME, TLS_STORE_DIR);
+        )
+        .context(AddVolumeSnafu)?;
+        cb.add_volume_mount(TLS_STORE_VOLUME_NAME, TLS_STORE_DIR)
+            .context(AddVolumeMountSnafu)?;
     }
     Ok(())
 }
 
-fn principal_host_part(hbase: &HbaseCluster) -> Result<String, Error> {
+fn principal_host_part(
+    hbase: &HbaseCluster,
+    cluster_info: &KubernetesClusterInfo,
+) -> Result<String, Error> {
     let hbase_name = hbase.name_any();
     let hbase_namespace = hbase.namespace().context(ObjectMissingNamespaceSnafu {
         hbase: ObjectRef::from_obj(hbase),
     })?;
+    let cluster_domain = &cluster_info.cluster_domain;
     Ok(format!(
-        "{hbase_name}.{hbase_namespace}.svc.cluster.local@${{env.KERBEROS_REALM}}"
+        "{hbase_name}.{hbase_namespace}.svc.{cluster_domain}@${{env.KERBEROS_REALM}}"
     ))
 }
 

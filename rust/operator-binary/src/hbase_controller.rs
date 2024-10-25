@@ -7,6 +7,7 @@ use product_config::{
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
     builder::{
+        self,
         configmap::ConfigMapBuilder,
         meta::ObjectMetaBuilder,
         pod::{
@@ -37,6 +38,7 @@ use stackable_operator::{
     product_config_utils::{transform_all_roles_to_config, validate_all_roles_and_groups_config},
     product_logging::{
         self,
+        framework::LoggingError,
         spec::{
             ConfigMapLogConfig, ContainerLogConfig, ContainerLogConfigChoice,
             CustomContainerLogConfig,
@@ -48,6 +50,7 @@ use stackable_operator::{
         statefulset::StatefulSetConditionBuilder,
     },
     time::Duration,
+    utils::cluster_info::KubernetesClusterInfo,
 };
 use std::{
     collections::{BTreeMap, HashMap},
@@ -282,6 +285,17 @@ pub enum Error {
     #[snafu(display("authorization is only supported from HBase 2.6 onwards"))]
     AuthorizationNotSupported,
 
+    #[snafu(display("failed to configure logging"))]
+    ConfigureLogging { source: LoggingError },
+
+    #[snafu(display("failed to add needed volume"))]
+    AddVolume { source: builder::pod::Error },
+
+    #[snafu(display("failed to add needed volumeMount"))]
+    AddVolumeMount {
+        source: builder::pod::container::Error,
+    },
+
     #[snafu(display("HBaseCluster object is invalid"))]
     InvalidHBaseCluster {
         source: error_boundary::InvalidObject,
@@ -363,6 +377,7 @@ pub async fn reconcile_hbase(
     // discovery config map
     let discovery_cm = build_discovery_configmap(
         hbase,
+        &client.kubernetes_cluster_info,
         &zookeeper_connection_information,
         &resolved_product_image,
     )
@@ -410,6 +425,7 @@ pub async fn reconcile_hbase(
                 build_rolegroup_service(hbase, &hbase_role, &rolegroup, &resolved_product_image)?;
             let rg_configmap = build_rolegroup_config_map(
                 hbase,
+                &client.kubernetes_cluster_info,
                 &rolegroup,
                 rolegroup_config,
                 &zookeeper_connection_information,
@@ -535,6 +551,7 @@ pub fn build_region_server_role_service(
 #[allow(clippy::too_many_arguments)]
 fn build_rolegroup_config_map(
     hbase: &HbaseCluster,
+    cluster_info: &KubernetesClusterInfo,
     rolegroup: &RoleGroupRef<HbaseCluster>,
     rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
     zookeeper_connection_information: &ZookeeperConnectionInformation,
@@ -558,8 +575,10 @@ fn build_rolegroup_config_map(
             PropertyNameKind::File(file_name) if file_name == HBASE_SITE_XML => {
                 let mut hbase_site_config = BTreeMap::new();
                 hbase_site_config.extend(zookeeper_connection_information.as_hbase_settings());
-                hbase_site_config
-                    .extend(kerberos_config_properties(hbase).context(AddKerberosConfigSnafu)?);
+                hbase_site_config.extend(
+                    kerberos_config_properties(hbase, cluster_info)
+                        .context(AddKerberosConfigSnafu)?,
+                );
                 hbase_site_config
                     .extend(hbase_opa_config.map_or(vec![], |config| config.hbase_site_config()));
 
@@ -850,9 +869,13 @@ fn build_rolegroup_statefulset(
         ])
         .add_env_vars(merged_env)
         .add_volume_mount("hbase-config", HBASE_CONFIG_TMP_DIR)
+        .context(AddVolumeMountSnafu)?
         .add_volume_mount("hdfs-discovery", HDFS_DISCOVERY_TMP_DIR)
+        .context(AddVolumeMountSnafu)?
         .add_volume_mount("log-config", HBASE_LOG_CONFIG_TMP_DIR)
+        .context(AddVolumeMountSnafu)?
         .add_volume_mount("log", STACKABLE_LOG_DIR)
+        .context(AddVolumeMountSnafu)?
         .add_container_ports(ports)
         .resources(config.resources().clone().into())
         .startup_probe(startup_probe)
@@ -883,6 +906,7 @@ fn build_rolegroup_statefulset(
             }),
             ..Default::default()
         })
+        .context(AddVolumeSnafu)?
         .add_volume(stackable_operator::k8s_openapi::api::core::v1::Volume {
             name: "hdfs-discovery".to_string(),
             config_map: Some(ConfigMapVolumeSource {
@@ -891,12 +915,14 @@ fn build_rolegroup_statefulset(
             }),
             ..Default::default()
         })
+        .context(AddVolumeSnafu)?
         .add_empty_dir_volume(
             "log",
             Some(product_logging::framework::calculate_log_volume_size_limit(
                 &[MAX_HBASE_LOG_FILES_SIZE],
             )),
         )
+        .context(AddVolumeSnafu)?
         .service_account_name(service_account_name(APP_NAME))
         .security_context(
             PodSecurityContextBuilder::new()
@@ -913,23 +939,27 @@ fn build_rolegroup_statefulset(
             })),
     }) = config.logging().containers.get(&Container::Hbase)
     {
-        pod_builder.add_volume(Volume {
-            name: "log-config".to_string(),
-            config_map: Some(ConfigMapVolumeSource {
-                name: config_map.into(),
-                ..ConfigMapVolumeSource::default()
-            }),
-            ..Volume::default()
-        });
+        pod_builder
+            .add_volume(Volume {
+                name: "log-config".to_string(),
+                config_map: Some(ConfigMapVolumeSource {
+                    name: config_map.into(),
+                    ..ConfigMapVolumeSource::default()
+                }),
+                ..Volume::default()
+            })
+            .context(AddVolumeSnafu)?;
     } else {
-        pod_builder.add_volume(Volume {
-            name: "log-config".to_string(),
-            config_map: Some(ConfigMapVolumeSource {
-                name: rolegroup_ref.object_name(),
-                ..ConfigMapVolumeSource::default()
-            }),
-            ..Volume::default()
-        });
+        pod_builder
+            .add_volume(Volume {
+                name: "log-config".to_string(),
+                config_map: Some(ConfigMapVolumeSource {
+                    name: rolegroup_ref.object_name(),
+                    ..ConfigMapVolumeSource::default()
+                }),
+                ..Volume::default()
+            })
+            .context(AddVolumeSnafu)?;
     }
 
     add_graceful_shutdown_config(config, &mut pod_builder).context(GracefulShutdownSnafu)?;
@@ -941,18 +971,21 @@ fn build_rolegroup_statefulset(
 
     // Vector sidecar shall be the last container in the list
     if config.logging().enable_vector_agent {
-        pod_builder.add_container(product_logging::framework::vector_container(
-            resolved_product_image,
-            "hbase-config",
-            "log",
-            config.logging().containers.get(&Container::Vector),
-            ResourceRequirementsBuilder::new()
-                .with_cpu_request("250m")
-                .with_cpu_limit("500m")
-                .with_memory_request("128Mi")
-                .with_memory_limit("128Mi")
-                .build(),
-        ));
+        pod_builder.add_container(
+            product_logging::framework::vector_container(
+                resolved_product_image,
+                "hbase-config",
+                "log",
+                config.logging().containers.get(&Container::Vector),
+                ResourceRequirementsBuilder::new()
+                    .with_cpu_request("250m")
+                    .with_cpu_limit("500m")
+                    .with_memory_request("128Mi")
+                    .with_memory_limit("128Mi")
+                    .build(),
+            )
+            .context(ConfigureLoggingSnafu)?,
+        );
     }
 
     let mut pod_template = pod_builder.build_template();
