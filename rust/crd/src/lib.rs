@@ -106,9 +106,6 @@ pub enum Error {
     #[snafu(display("the HBase role [{role}] is missing from spec"))]
     MissingHbaseRole { role: String },
 
-    #[snafu(display("the HBase role group [{role_group}] is missing from spec"))]
-    MissingHbaseRoleGroup { role_group: String },
-
     #[snafu(display("fragment validation failure"))]
     FragmentValidationFailure { source: ValidationError },
 
@@ -315,7 +312,7 @@ fn default_regionserver_config(
             hdfs_discovery_cm_name,
         ),
         graceful_shutdown_timeout: Some(*DEFAULT_REGION_SERVER_GRACEFUL_SHUTDOWN_TIMEOUT),
-        region_mover: Some(RegionMover::default()),
+        region_mover: RegionMoverFragment::default(),
     }
 }
 
@@ -512,42 +509,54 @@ impl Configuration for HbaseConfigFragment {
     }
 }
 
-#[derive(Clone, Debug, JsonSchema, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Fragment, Clone, Debug, JsonSchema, PartialEq, Serialize, Deserialize)]
+#[fragment_attrs(
+    derive(
+        Clone,
+        Debug,
+        Default,
+        Deserialize,
+        Merge,
+        JsonSchema,
+        PartialEq,
+        Serialize
+    ),
+    serde(rename_all = "camelCase")
+)]
 pub struct RegionMover {
     /// Move local regions to other servers before terminating a region server's pod.
-    run_before_shutdown: bool,
+    run_before_shutdown: Option<bool>,
 
     /// Maximum number of threads to use for moving regions.
-    max_threads: u16,
+    max_threads: Option<u16>,
 
     /// If enabled (default), the region mover will confirm that regions are available on the
     /// source as well as the target pods before and after the move.
-    ack: bool,
+    ack: Option<bool>,
 
     /// Additional options to pass to the region mover.
     #[serde(default)]
-    extra_opts: Vec<String>,
+    extra_opts: Option<RegionMoverExtraCliOpts>,
 }
+
+#[derive(Clone, Debug, Eq, Deserialize, JsonSchema, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+#[schemars(deny_unknown_fields)]
+pub struct RegionMoverExtraCliOpts {
+    #[serde(flatten)]
+    pub cli_opts: Vec<String>,
+}
+
+impl Atomic for RegionMoverExtraCliOpts {}
 
 impl Default for RegionMover {
     fn default() -> Self {
         Self {
-            run_before_shutdown: false,
-            max_threads: 1,
-            ack: true,
-            extra_opts: vec![],
+            run_before_shutdown: Some(false),
+            max_threads: Some(1),
+            ack: Some(true),
+            extra_opts: None,
         }
-    }
-}
-impl Atomic for RegionMover {}
-
-impl Merge for RegionMover {
-    fn merge(&mut self, other: &Self) {
-        self.run_before_shutdown = other.run_before_shutdown;
-        self.max_threads = other.max_threads;
-        self.ack = other.ack;
-        self.extra_opts.extend(other.extra_opts.clone());
     }
 }
 
@@ -1136,7 +1145,8 @@ impl AnyServiceConfig {
     pub fn region_mover_args(&self) -> String {
         match self {
             AnyServiceConfig::RegionServer(config) => {
-                if config.region_mover.run_before_shutdown {
+                // TODO: is unwrap_or() the correct way to do it ? (same below)
+                if config.region_mover.run_before_shutdown.unwrap_or(false) {
                     let timeout = config
                         .graceful_shutdown_timeout
                         .map(|d| {
@@ -1149,11 +1159,11 @@ impl AnyServiceConfig {
                         .unwrap_or(DEFAULT_REGION_MOVER_TIMEOUT.as_secs());
                     let mut command = vec![
                         "--maxthreads".to_string(),
-                        config.region_mover.max_threads.to_string(),
+                        config.region_mover.max_threads.unwrap_or(1).to_string(),
                         "--timeout".to_string(),
                         timeout.to_string(),
                     ];
-                    if !config.region_mover.ack {
+                    if !config.region_mover.ack.unwrap_or(true) {
                         command.push("--noack".to_string());
                     }
 
@@ -1162,7 +1172,8 @@ impl AnyServiceConfig {
                             .region_mover
                             .extra_opts
                             .iter()
-                            .map(|s| escape(std::borrow::Cow::Borrowed(s)).to_string()),
+                            .flat_map(|o| o.cli_opts.clone())
+                            .map(|s| escape(std::borrow::Cow::Borrowed(&s)).to_string()),
                     );
                     command.join(" ")
                 } else {
@@ -1175,7 +1186,9 @@ impl AnyServiceConfig {
 
     pub fn run_region_mover(&self) -> bool {
         match self {
-            AnyServiceConfig::RegionServer(config) => config.region_mover.run_before_shutdown,
+            AnyServiceConfig::RegionServer(config) => {
+                config.region_mover.run_before_shutdown.unwrap_or(false)
+            }
             _ => false,
         }
     }
@@ -1225,6 +1238,8 @@ spec:
     config:
       logging:
         enableVectorAgent: False
+      regionMover:
+        runBeforeShutdown: false
     roleGroups:
       default:
         replicas: 1
