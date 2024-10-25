@@ -534,17 +534,17 @@ pub struct RegionMover {
     /// source as well as the target pods before and after the move.
     ack: Option<bool>,
 
-    /// Additional options to pass to the region mover.
-    #[serde(default)]
-    extra_opts: Option<RegionMoverExtraCliOpts>,
+    #[fragment_attrs(serde(flatten))]
+    cli_opts: Option<RegionMoverExtraCliOpts>,
 }
 
 #[derive(Clone, Debug, Eq, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 #[schemars(deny_unknown_fields)]
 pub struct RegionMoverExtraCliOpts {
-    #[serde(flatten)]
-    pub cli_opts: Vec<String>,
+    /// Additional options to pass to the region mover.
+    #[serde(default)]
+    pub additional_mover_options: Vec<String>,
 }
 
 impl Atomic for RegionMoverExtraCliOpts {}
@@ -555,7 +555,7 @@ impl Default for RegionMover {
             run_before_shutdown: Some(false),
             max_threads: Some(1),
             ack: Some(true),
-            extra_opts: None,
+            cli_opts: None,
         }
     }
 }
@@ -595,6 +595,7 @@ pub struct RegionServerConfig {
     /// This may cause a lot of network traffic in the Kubernetes cluster if the entire HBase stacklet is being
     /// restarted.
     /// The operator will compute a timeout period for the region move that will not exceed the graceful shutdown timeout.
+    #[fragment_attrs(serde(default))]
     pub region_mover: RegionMover,
 }
 
@@ -1170,9 +1171,9 @@ impl AnyServiceConfig {
                     command.extend(
                         config
                             .region_mover
-                            .extra_opts
+                            .cli_opts
                             .iter()
-                            .flat_map(|o| o.cli_opts.clone())
+                            .flat_map(|o| o.additional_mover_options.clone())
                             .map(|s| escape(std::borrow::Cow::Borrowed(&s)).to_string()),
                     );
                     command.join(" ")
