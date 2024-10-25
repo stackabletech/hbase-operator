@@ -40,6 +40,8 @@ pub mod security;
 
 pub const APP_NAME: &str = "hbase";
 
+// This constant is hard coded in hbase-entrypoint.sh
+// You need to change it there too.
 pub const CONFIG_DIR_NAME: &str = "/stackable/conf";
 
 pub const TLS_STORE_DIR: &str = "/stackable/tls";
