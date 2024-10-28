@@ -27,6 +27,14 @@ spec:
     roleGroups:
       default:
         replicas: 2
+        configOverrides:
+          hbase-site.xml:
+            # Prevent the master from re-assigning the region when the region server is
+            # gone. Otherwise, the test case would not fail if the region mover fails. The
+            # default retainment wait period is larger than the test step timeout. This
+            # works only for HBase 2.6 (https://issues.apache.org/jira/browse/HBASE-27551).
+            hbase.master.scp.retain.assignment: "true"
+            hbase.master.scp.retain.assignment.force: "true"
   regionServers:
     config:
       gracefulShutdownTimeout: 2m # one minute for the region mover
