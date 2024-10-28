@@ -2,23 +2,19 @@
 dimensions:
   - name: hbase
     values:
-      # - 2.6.0
-      # - 2.4.18
+      - 2.6.0
+      - 2.4.18
       # To use a custom image, add a comma and the full name after the product version
-      - 2.6.0,docker.stackable.tech/razvan/hbase-2.6.0
-      - 2.4.18,docker.stackable.tech/razvan/hbase-2.4.18
       # - 2.4.18,docker.stackable.tech/sandbox/hbase:2.4.18-stackable0.0.0-dev
   - name: hbase-opa
     values:
-      # - 2.6.0
+      - 2.6.0
       # To use a custom image, add a comma and the full name after the product version
       # - 2.6.0,docker.stackable.tech/sandbox/hbase:2.6.0-stackable0.0.0-dev
-      - 2.6.0,docker.stackable.tech/razvan/hbase-2.6.0
   - name: hbase-latest
     values:
-      # - 2.6.0
+      - 2.6.0
       # - 2.4.18,docker.stackable.tech/sandbox/hbase:2.4.18-stackable0.0.0-dev
-      - 2.6.0,docker.stackable.tech/razvan/hbase-2.6.0
   - name: hdfs
     values:
       - 3.3.4
