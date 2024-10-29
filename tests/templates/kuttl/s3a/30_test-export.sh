@@ -27,7 +27,7 @@ hbase shell delete-snapshot.hbase 2>&1 | \
 export-snapshot-to-s3 \
         --snapshot snap \
         --copy-from s3a://hbase/snap \
-        --copy-to s3a://hbase-root/ \
+        --copy-to s3a://hbase-root/hbase/ \
         --overwrite 2>&1 | \
     grep 'Export Completed: snap' > /dev/null
 

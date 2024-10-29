@@ -52,10 +52,6 @@ spec:
             fs.s3a.path.style.access: "true"
             hbase.wal.dir: hdfs://test-hdfs/hbase
           hbase-env.sh:
-            # For whatever reason, setting HBASE_CLASSPATH has no effect.
-            # Therefore, a custom image is used where these JARs are
-            # copied to /stackable/hbase/lib which is on the classpath.
-            # This must be resolved until SDP 24.11.
             HBASE_CLASSPATH: /stackable/hadoop/share/hadoop/tools/lib/aws-java-sdk-bundle-1.12.367.jar:/stackable/hadoop/share/hadoop/tools/lib/hadoop-aws-3.3.6.jar
             AWS_ACCESS_KEY_ID: hbaseAccessKey
             # TODO: This must be loaded from a secret.
