@@ -1,4 +1,5 @@
 = Exporting a snapshot to S3
+:description: Export HBase snapshots to S3 using export-snapshot-to-s3. Configure AWS settings, then use the script or create a job for efficient transfers.
 
 HBase snapshots can be exported with the command `hbase snapshot export`.
 To be able to export to S3, the AWS libraries from Hadoop must be on the classpath.

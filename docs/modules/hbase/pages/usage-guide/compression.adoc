@@ -1,5 +1,6 @@
 = Compression support
 :hbase-docs-compression: https://hbase.apache.org/book.html#changing.compression
+:description: Stackable HBase supports GZip and Snappy compression. Learn to enable and use compression for column families via HBase Shell commands.
 
 Stackable images of Apache HBase support compressed column families.
 The following compression algorithms are supported for all HBase 2.4 versions:

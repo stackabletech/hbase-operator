@@ -10,7 +10,7 @@ data:
     # principal: omid_hbase_client
     # keytab: /path/to/hbase/client/keytab
     omidClientConfiguration: !!org.apache.omid.tso.client.OmidClientConfiguration
-        connectionString: "localhost:54758"
+        connectionString: "localhost:24758"
   log4j2.properties: |
     status = warn
     dest = err
@@ -83,12 +83,12 @@ spec:
               value: "-Xmx3g -Xms3g"
           ports:
             # See also hbase-omid-client-config.yml above where the client is configured with this port
-            - containerPort: 54758
+            - containerPort: 24758
               name: tso
               protocol: TCP
           readinessProbe:
             # The tso server takes a while to start up, so we need to be patient.
-            failureThreshold: 3
+            failureThreshold: 12
             periodSeconds: 10
             successThreshold: 1
             tcpSocket:

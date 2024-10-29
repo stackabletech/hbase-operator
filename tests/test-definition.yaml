@@ -14,18 +14,19 @@ dimensions:
       # - 2.6.0,docker.stackable.tech/sandbox/hbase:2.6.0-stackable0.0.0-dev
   - name: hbase-latest
     values:
-      - 2.4.18
+      - 2.6.0
       # - 2.4.18,docker.stackable.tech/sandbox/hbase:2.4.18-stackable0.0.0-dev
   - name: hdfs
     values:
       - 3.3.4
       - 3.3.6
+      - 3.4.0
   - name: hdfs-latest
     values:
-      - 3.3.6
+      - 3.4.0
   - name: zookeeper
     values:
-      - 3.8.4
+      - 3.9.2
   - name: zookeeper-latest
     values:
       - 3.9.2
@@ -52,7 +53,7 @@ dimensions:
       - "false"
   - name: omid
     values:
-      - 1.1.0
+      - 1.1.2
       # To use a custom image, add a comma and the full name after the product version
       # - 1.1.0,docker.stackable.tech/sandbox/omid:1.1.0-stackable0.0.0-dev
 tests:
