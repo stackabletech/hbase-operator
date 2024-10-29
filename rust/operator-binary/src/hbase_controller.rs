@@ -438,6 +438,7 @@ pub async fn reconcile_hbase(
             )?;
             let rg_statefulset = build_rolegroup_statefulset(
                 hbase,
+                &client.kubernetes_cluster_info,
                 &hbase_role,
                 &rolegroup,
                 rolegroup_config,
@@ -764,6 +765,7 @@ fn build_rolegroup_service(
 /// The [`Pod`](`stackable_operator::k8s_openapi::api::core::v1::Pod`)s are accessible through the corresponding [`Service`] (from [`build_rolegroup_service`]).
 fn build_rolegroup_statefulset(
     hbase: &HbaseCluster,
+    cluster_info: &KubernetesClusterInfo,
     hbase_role: &HbaseRole,
     rolegroup_ref: &RoleGroupRef<HbaseCluster>,
     rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
@@ -858,15 +860,7 @@ fn build_rolegroup_statefulset(
         .command(vec!["/stackable/hbase/bin/hbase-entrypoint.sh".to_string()])
         .args(vec![
             hbase_role.cli_role_name(),
-            format!(
-                "{}.{}.svc.cluster.local",
-                rolegroup_ref.object_name(),
-                hbase
-                    .metadata
-                    .namespace
-                    .clone()
-                    .context(ObjectHasNoNamespaceSnafu)?
-            ),
+            hbase_service_domain_name(hbase, rolegroup_ref, cluster_info)?,
             hbase.service_port(hbase_role).to_string(),
         ])
         .add_env_vars(merged_env)
@@ -1157,6 +1151,28 @@ fn validate_cr(hbase: &HbaseCluster) -> Result<()> {
     }
     tracing::info!("End CR validation");
     Ok(())
+}
+
+/// Build the domain name of an HBase service pod.
+/// The hbase-entrypoint.sh script uses this to build the fully qualified name of a pod
+/// by appending it to the `HOSTNAME` environment variable.
+/// This name is required by the RegionMover to function properly.
+fn hbase_service_domain_name(
+    hbase: &HbaseCluster,
+    rolegroup_ref: &RoleGroupRef<HbaseCluster>,
+    cluster_info: &KubernetesClusterInfo,
+) -> Result<String, Error> {
+    let hbase_cluster_name = rolegroup_ref.object_name();
+    let pod_namespace = hbase
+        .metadata
+        .namespace
+        .clone()
+        .context(ObjectHasNoNamespaceSnafu)?;
+    let cluster_domain = &cluster_info.cluster_domain;
+
+    Ok(format!(
+        "{hbase_cluster_name}.{pod_namespace}.svc.{cluster_domain}"
+    ))
 }
 
 #[cfg(test)]
