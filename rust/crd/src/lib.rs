@@ -368,7 +368,12 @@ impl AnyConfigFragment {
                     graceful_shutdown_timeout: Some(
                         *DEFAULT_REGION_SERVER_GRACEFUL_SHUTDOWN_TIMEOUT,
                     ),
-                    region_mover: RegionMoverFragment::default(),
+                    region_mover: RegionMoverFragment {
+                        run_before_shutdown: Some(false),
+                        max_threads: Some(1),
+                        ack: Some(true),
+                        cli_opts: None,
+                    },
                 })
             }
             HbaseRole::RestServer => AnyConfigFragment::RestServer(HbaseConfigFragment {
@@ -554,14 +559,14 @@ impl Configuration for HbaseConfigFragment {
 )]
 pub struct RegionMover {
     /// Move local regions to other servers before terminating a region server's pod.
-    run_before_shutdown: Option<bool>,
+    run_before_shutdown: bool,
 
     /// Maximum number of threads to use for moving regions.
-    max_threads: Option<u16>,
+    max_threads: u16,
 
     /// If enabled (default), the region mover will confirm that regions are available on the
     /// source as well as the target pods before and after the move.
-    ack: Option<bool>,
+    ack: bool,
 
     #[fragment_attrs(serde(flatten))]
     cli_opts: Option<RegionMoverExtraCliOpts>,
@@ -578,18 +583,7 @@ pub struct RegionMoverExtraCliOpts {
 
 impl Atomic for RegionMoverExtraCliOpts {}
 
-impl Default for RegionMover {
-    fn default() -> Self {
-        Self {
-            run_before_shutdown: Some(false),
-            max_threads: Some(1),
-            ack: Some(true),
-            cli_opts: None,
-        }
-    }
-}
-
-#[derive(Clone, Debug, Default, Fragment, JsonSchema, PartialEq)]
+#[derive(Clone, Debug, Fragment, JsonSchema, PartialEq)]
 #[fragment_attrs(
     derive(
         Clone,
@@ -637,8 +631,6 @@ impl Configuration for RegionServerConfigFragment {
         _role_name: &str,
     ) -> Result<BTreeMap<String, Option<String>>, stackable_operator::product_config_utils::Error>
     {
-        // Maps env var name to env var object. This allows env_overrides to work
-        // as expected (i.e. users can override the env var value).
         let mut vars: BTreeMap<String, Option<String>> = BTreeMap::new();
 
         vars.insert(
@@ -1137,8 +1129,7 @@ impl AnyServiceConfig {
     pub fn region_mover_args(&self) -> String {
         match self {
             AnyServiceConfig::RegionServer(config) => {
-                // TODO: is unwrap_or() the correct way to do it ? (same below)
-                if config.region_mover.run_before_shutdown.unwrap_or(false) {
+                if config.region_mover.run_before_shutdown {
                     let timeout = config
                         .graceful_shutdown_timeout
                         .map(|d| {
@@ -1151,11 +1142,11 @@ impl AnyServiceConfig {
                         .unwrap_or(DEFAULT_REGION_MOVER_TIMEOUT.as_secs());
                     let mut command = vec![
                         "--maxthreads".to_string(),
-                        config.region_mover.max_threads.unwrap_or(1).to_string(),
+                        config.region_mover.max_threads.to_string(),
                         "--timeout".to_string(),
                         timeout.to_string(),
                     ];
-                    if !config.region_mover.ack.unwrap_or(true) {
+                    if !config.region_mover.ack {
                         command.push("--noack".to_string());
                     }
 
@@ -1178,9 +1169,7 @@ impl AnyServiceConfig {
 
     pub fn run_region_mover(&self) -> bool {
         match self {
-            AnyServiceConfig::RegionServer(config) => {
-                config.region_mover.run_before_shutdown.unwrap_or(false)
-            }
+            AnyServiceConfig::RegionServer(config) => config.region_mover.run_before_shutdown,
             _ => false,
         }
     }
@@ -1188,6 +1177,8 @@ impl AnyServiceConfig {
 
 #[cfg(test)]
 mod tests {
+    use rstest::rstest;
+
     use std::collections::{BTreeMap, HashMap};
 
     use indoc::indoc;
@@ -1195,7 +1186,7 @@ mod tests {
         transform_all_roles_to_config, validate_all_roles_and_groups_config,
     };
 
-    use crate::{merged_env, HbaseCluster, HbaseRole};
+    use crate::{merged_env, AnyServiceConfig, HbaseCluster, HbaseRole, RegionMoverExtraCliOpts};
 
     use product_config::{types::PropertyNameKind, ProductConfigManager};
 
@@ -1291,5 +1282,78 @@ spec:
             Some(&Some("MASTER".to_string())),
             env_map.get("TEST_VAR_FROM_MRG")
         );
+    }
+
+    #[rstest]
+    #[case("default", false, 1, vec![])]
+    #[case("groupRegionMover", true, 5, vec!["--some".to_string(), "extra".to_string()])]
+    pub fn test_region_mover_merge(
+        #[case] role_group_name: &str,
+        #[case] run_before_shutdown: bool,
+        #[case] max_threads: u16,
+        #[case] additional_mover_options: Vec<String>,
+    ) {
+        let input = indoc! {r#"
+---
+apiVersion: hbase.stackable.tech/v1alpha1
+kind: HbaseCluster
+metadata:
+  name: test-hbase
+spec:
+  image:
+    productVersion: 2.4.18
+  clusterConfig:
+    hdfsConfigMapName: test-hdfs
+    zookeeperConfigMapName: test-znode
+  masters:
+    roleGroups:
+      default:
+        replicas: 1
+  restServers:
+    roleGroups:
+      default:
+        replicas: 1
+  regionServers:
+    config:
+      regionMover:
+        runBeforeShutdown: False
+    roleGroups:
+      default:
+        replicas: 1
+      groupRegionMover:
+        replicas: 1
+        config:
+          regionMover:
+            runBeforeShutdown: True
+            maxThreads: 5
+            additionalMoverOptions: ["--some", "extra"]
+        "#};
+
+        let deserializer = serde_yaml::Deserializer::from_str(input);
+        let hbase: HbaseCluster =
+            serde_yaml::with::singleton_map_recursive::deserialize(deserializer).unwrap();
+
+        let hbase_role = HbaseRole::RegionServer;
+        let rolegroup = hbase.server_rolegroup_ref(hbase_role.to_string(), role_group_name);
+
+        let merged_config = hbase
+            .merged_config(
+                &hbase_role,
+                &rolegroup.role_group,
+                &hbase.spec.cluster_config.hdfs_config_map_name,
+            )
+            .unwrap();
+        if let AnyServiceConfig::RegionServer(config) = merged_config {
+            assert_eq!(run_before_shutdown, config.region_mover.run_before_shutdown);
+            assert_eq!(max_threads, config.region_mover.max_threads);
+            assert_eq!(
+                Some(RegionMoverExtraCliOpts {
+                    additional_mover_options
+                }),
+                config.region_mover.cli_opts
+            );
+        } else {
+            panic!("this shouldn't happen");
+        };
     }
 }
