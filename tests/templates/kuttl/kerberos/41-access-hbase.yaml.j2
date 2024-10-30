@@ -20,6 +20,7 @@ commands:
 {% else %}
                 image: docker.stackable.tech/stackable/hbase:{{ test_scenario['values']['hbase'] }}-stackable0.0.0-dev
 {% endif %}
+                imagePullPolicy: IfNotPresent
                 env:
                   - name: HBASE_CONF_DIR
                     value: /stackable/conf/hbase
