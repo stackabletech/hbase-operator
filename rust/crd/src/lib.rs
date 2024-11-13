@@ -473,15 +473,7 @@ impl Configuration for HbaseConfigFragment {
                     HBASE_UNSAFE_REGIONSERVER_HOSTNAME_DISABLE_MASTER_REVERSEDNS.to_string(),
                     Some("true".to_string()),
                 );
-                result.insert(
-                    HBASE_ROOTDIR.to_string(),
-                    Some(
-                        self.hbase_rootdir
-                            .as_deref()
-                            .unwrap_or(HBASE_ROOT_DIR_DEFAULT)
-                            .to_string(),
-                    ),
-                );
+                result.insert(HBASE_ROOTDIR.to_string(), self.hbase_rootdir.clone());
             }
             _ => {}
         }
