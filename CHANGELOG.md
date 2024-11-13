@@ -12,6 +12,7 @@
 - Reduce CRD size from `1.4MB` to `96KB` by accepting arbitrary YAML input instead of the underlying schema for the following fields ([#548]):
   - `podOverrides`
   - `affinity`
+- Fix bug where the configuration of the `hbaseRootdir` at the role level is ignored ([#584]).
 
 ### Fixed
 
@@ -28,6 +29,7 @@
 [#556]: https://github.com/stackabletech/hbase-operator/pull/556
 [#558]: https://github.com/stackabletech/hbase-operator/pull/558
 [#574]: https://github.com/stackabletech/hbase-operator/pull/574
+[#584]: https://github.com/stackabletech/hbase-operator/pull/584
 
 ## [24.7.0] - 2024-07-24
 
