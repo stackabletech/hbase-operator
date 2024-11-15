@@ -59,7 +59,6 @@ pub const HBASE_ROOTDIR: &str = "hbase.rootdir";
 pub const HBASE_UNSAFE_REGIONSERVER_HOSTNAME_DISABLE_MASTER_REVERSEDNS: &str =
     "hbase.unsafe.regionserver.hostname.disable.master.reversedns";
 pub const HBASE_HEAPSIZE: &str = "HBASE_HEAPSIZE";
-pub const HBASE_ROOT_DIR_DEFAULT: &str = "/hbase";
 
 pub const HBASE_UI_PORT_NAME_HTTP: &str = "ui-http";
 pub const HBASE_UI_PORT_NAME_HTTPS: &str = "ui-https";
