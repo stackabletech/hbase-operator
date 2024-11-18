@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [24.11.0] - 2024-11-18
+
 ### Added
 
 - The operator can now run on Kubernetes clusters using a non-default cluster domain.
