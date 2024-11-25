@@ -24,23 +24,23 @@ use stackable_operator::{
         },
     },
     cluster_resources::{ClusterResourceApplyStrategy, ClusterResources},
-    commons::{
-        product_image_selection::ResolvedProductImage,
-        rbac::{build_rbac_resources, service_account_name},
-    },
+    commons::{product_image_selection::ResolvedProductImage, rbac::build_rbac_resources},
     k8s_openapi::{
         api::{
             apps::v1::{StatefulSet, StatefulSetSpec},
             core::v1::{
-                ConfigMap, ConfigMapVolumeSource, ContainerPort, Probe, Service, ServicePort,
-                ServiceSpec, TCPSocketAction, Volume,
+                ConfigMap, ConfigMapVolumeSource, ContainerPort, Probe, Service, ServiceAccount,
+                ServicePort, ServiceSpec, TCPSocketAction, Volume,
             },
         },
         apimachinery::pkg::{apis::meta::v1::LabelSelector, util::intstr::IntOrString},
         DeepMerge,
     },
-    kube::core::{error_boundary, DeserializeGuard},
-    kube::{runtime::controller::Action, Resource},
+    kube::{
+        core::{error_boundary, DeserializeGuard},
+        runtime::controller::Action,
+        Resource, ResourceExt,
+    },
     kvp::{Label, LabelError, Labels, ObjectLabels},
     logging::controller::ReconcilerError,
     memory::{BinaryMultiple, MemoryQuantity},
@@ -407,7 +407,7 @@ pub async fn reconcile_hbase(
     )
     .context(BuildRbacResourcesSnafu)?;
     cluster_resources
-        .add(client, rbac_sa)
+        .add(client, rbac_sa.clone())
         .await
         .context(ApplyServiceAccountSnafu)?;
     cluster_resources
@@ -452,6 +452,7 @@ pub async fn reconcile_hbase(
                 rolegroup_config,
                 &merged_config,
                 &resolved_product_image,
+                &rbac_sa,
             )?;
             cluster_resources
                 .add(client, rg_service)
@@ -778,6 +779,7 @@ fn build_rolegroup_statefulset(
     rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
     config: &HbaseConfig,
     resolved_product_image: &ResolvedProductImage,
+    service_account: &ServiceAccount,
 ) -> Result<StatefulSet> {
     let hbase_version = &resolved_product_image.app_version_label;
 
@@ -943,7 +945,7 @@ fn build_rolegroup_statefulset(
             )),
         )
         .context(AddVolumeSnafu)?
-        .service_account_name(service_account_name(APP_NAME))
+        .service_account_name(service_account.name_any())
         .security_context(
             PodSecurityContextBuilder::new()
                 .run_as_user(HBASE_UID)
