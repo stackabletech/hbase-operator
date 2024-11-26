@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- BREAKING: Use distinct ServiceAccounts for the Stacklets, so that multiple Stacklets can be
+  deployed in one namespace. Existing Stacklets will use the newly created ServiceAccounts after
+  restart ([#594]).
+
+[#594]: https://github.com/stackabletech/hbase-operator/pull/594
+
 ## [24.11.0] - 2024-11-18
 
 ### Added
@@ -21,7 +29,6 @@
 - Implement `envOverrides` for HbaseCluster ([#550]).
 - Omid test: use 1.1.2, update default port number and raise test timeout ([#556]).
 - An invalid `HBaseCluster` doesn't cause the operator to stop functioning (#[575]).
-- BREAKING: Use distinct ServiceAccounts for the Stacklets, so that multiple Stacklets can be deployed in one namespace. Existing Stacklets will use the newly created ServiceAccounts after restart ([#594]).
 
 ### Removed
 
@@ -33,7 +40,6 @@
 [#558]: https://github.com/stackabletech/hbase-operator/pull/558
 [#574]: https://github.com/stackabletech/hbase-operator/pull/574
 [#584]: https://github.com/stackabletech/hbase-operator/pull/584
-[#594]: https://github.com/stackabletech/hbase-operator/pull/594
 
 ## [24.7.0] - 2024-07-24
 
