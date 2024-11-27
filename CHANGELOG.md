@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- BREAKING: Use distinct ServiceAccounts for the Stacklets, so that multiple Stacklets can be
+  deployed in one namespace. Existing Stacklets will use the newly created ServiceAccounts after
+  restart ([#594]).
+
+[#594]: https://github.com/stackabletech/hbase-operator/pull/594
+
 ## [24.11.0] - 2024-11-18
 
 ### Added
