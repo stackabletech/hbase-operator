@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- Lifetime of auto generated certificates is configurable with the `requestedSecretLifetime` role group property ([#598])
+
 ### Fixed
 
 - BREAKING: Use distinct ServiceAccounts for the Stacklets, so that multiple Stacklets can be
@@ -9,6 +13,7 @@
   restart ([#594]).
 
 [#594]: https://github.com/stackabletech/hbase-operator/pull/594
+[#598]: https://github.com/stackabletech/hbase-operator/pull/598
 
 ## [24.11.0] - 2024-11-18
 

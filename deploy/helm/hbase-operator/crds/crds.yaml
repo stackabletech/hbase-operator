@@ -297,6 +297,10 @@ spec:
                               nullable: true
                               type: boolean
                           type: object
+                        requestedSecretLifetime:
+                          description: Request secret (currently only auto certificates) lifetime from the secret operator.
+                          nullable: true
+                          type: string
                         resources:
                           default:
                             cpu:
@@ -520,6 +524,10 @@ spec:
                                     nullable: true
                                     type: boolean
                                 type: object
+                              requestedSecretLifetime:
+                                description: Request secret (currently only auto certificates) lifetime from the secret operator.
+                                nullable: true
+                                type: string
                               resources:
                                 default:
                                   cpu:
@@ -724,6 +732,10 @@ spec:
                               nullable: true
                               type: boolean
                           type: object
+                        requestedSecretLifetime:
+                          description: Request secret (currently only auto certificates) lifetime from the secret operator.
+                          nullable: true
+                          type: string
                         resources:
                           default:
                             cpu:
@@ -947,6 +959,10 @@ spec:
                                     nullable: true
                                     type: boolean
                                 type: object
+                              requestedSecretLifetime:
+                                description: Request secret (currently only auto certificates) lifetime from the secret operator.
+                                nullable: true
+                                type: string
                               resources:
                                 default:
                                   cpu:
@@ -1151,6 +1167,10 @@ spec:
                               nullable: true
                               type: boolean
                           type: object
+                        requestedSecretLifetime:
+                          description: Request secret (currently only auto certificates) lifetime from the secret operator.
+                          nullable: true
+                          type: string
                         resources:
                           default:
                             cpu:
@@ -1374,6 +1394,10 @@ spec:
                                     nullable: true
                                     type: boolean
                                 type: object
+                              requestedSecretLifetime:
+                                description: Request secret (currently only auto certificates) lifetime from the secret operator.
+                                nullable: true
+                                type: string
                               resources:
                                 default:
                                   cpu:

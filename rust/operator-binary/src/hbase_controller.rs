@@ -67,10 +67,10 @@ use strum::{EnumDiscriminants, IntoStaticStr, ParseError};
 
 use stackable_hbase_crd::{
     merged_env, Container, HbaseCluster, HbaseClusterStatus, HbaseConfig, HbaseConfigFragment,
-    HbaseRole, APP_NAME, CONFIG_DIR_NAME, HBASE_ENV_SH, HBASE_HEAPSIZE, HBASE_MANAGES_ZK,
-    HBASE_MASTER_OPTS, HBASE_REGIONSERVER_OPTS, HBASE_REST_OPTS, HBASE_REST_PORT_NAME_HTTP,
-    HBASE_REST_PORT_NAME_HTTPS, HBASE_SITE_XML, JVM_HEAP_FACTOR, JVM_SECURITY_PROPERTIES_FILE,
-    METRICS_PORT, SSL_CLIENT_XML, SSL_SERVER_XML,
+    HbaseRole, APP_NAME, CONFIG_DIR_NAME, DEFAULT_SECRET_LIFETIME, HBASE_ENV_SH, HBASE_HEAPSIZE,
+    HBASE_MANAGES_ZK, HBASE_MASTER_OPTS, HBASE_REGIONSERVER_OPTS, HBASE_REST_OPTS,
+    HBASE_REST_PORT_NAME_HTTP, HBASE_REST_PORT_NAME_HTTPS, HBASE_SITE_XML, JVM_HEAP_FACTOR,
+    JVM_SECURITY_PROPERTIES_FILE, METRICS_PORT, SSL_CLIENT_XML, SSL_SERVER_XML,
 };
 
 use crate::product_logging::STACKABLE_LOG_DIR;
@@ -986,8 +986,16 @@ fn build_rolegroup_statefulset(
 
     add_graceful_shutdown_config(config, &mut pod_builder).context(GracefulShutdownSnafu)?;
     if hbase.has_kerberos_enabled() {
-        add_kerberos_pod_config(hbase, hbase_role, &mut hbase_container, &mut pod_builder)
-            .context(AddKerberosConfigSnafu)?;
+        add_kerberos_pod_config(
+            hbase,
+            hbase_role,
+            &mut hbase_container,
+            &mut pod_builder,
+            config
+                .requested_secret_lifetime
+                .unwrap_or(DEFAULT_SECRET_LIFETIME),
+        )
+        .context(AddKerberosConfigSnafu)?;
     }
     pod_builder.add_container(hbase_container.build());
 

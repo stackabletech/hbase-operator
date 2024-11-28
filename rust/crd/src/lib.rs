@@ -86,6 +86,9 @@ const DEFAULT_REGION_SERVER_GRACEFUL_SHUTDOWN_TIMEOUT: Duration =
     Duration::from_minutes_unchecked(60);
 const DEFAULT_REST_SERVER_GRACEFUL_SHUTDOWN_TIMEOUT: Duration = Duration::from_minutes_unchecked(5);
 
+// Auto TLS certificate lifetime
+pub const DEFAULT_SECRET_LIFETIME: Duration = Duration::from_days_unchecked(7);
+
 #[derive(Snafu, Debug)]
 pub enum Error {
     #[snafu(display("the role [{role}] is invalid and does not exist in HBase"))]
@@ -316,6 +319,7 @@ impl HbaseRole {
             logging: product_logging::spec::default_logging(),
             affinity: get_affinity(cluster_name, self, hdfs_discovery_cm_name),
             graceful_shutdown_timeout: Some(graceful_shutdown_timeout),
+            requested_secret_lifetime: Some(DEFAULT_SECRET_LIFETIME),
         }
     }
 
@@ -410,6 +414,10 @@ pub struct HbaseConfig {
     /// Time period Pods have to gracefully shut down, e.g. `30m`, `1h` or `2d`. Consult the operator documentation for details.
     #[fragment_attrs(serde(default))]
     pub graceful_shutdown_timeout: Option<Duration>,
+
+    /// Request secret (currently only auto certificates) lifetime from the secret operator.
+    #[fragment_attrs(serde(default))]
+    pub requested_secret_lifetime: Option<Duration>,
 }
 
 impl Configuration for HbaseConfigFragment {
