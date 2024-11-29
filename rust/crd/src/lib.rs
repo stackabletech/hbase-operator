@@ -415,7 +415,8 @@ pub struct HbaseConfig {
     #[fragment_attrs(serde(default))]
     pub graceful_shutdown_timeout: Option<Duration>,
 
-    /// Request secret (currently only auto certificates) lifetime from the secret operator.
+    /// Request secret (currently only autoTls certificates) lifetime from the secret operator, e.g. `7d`, or `30d`.
+    /// Please note that this can be shortened by the `maxCertificateLifetime` setting on the SecretClass issuing the TLS certificate.
     #[fragment_attrs(serde(default))]
     pub requested_secret_lifetime: Option<Duration>,
 }
