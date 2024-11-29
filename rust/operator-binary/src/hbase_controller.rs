@@ -67,10 +67,10 @@ use strum::{EnumDiscriminants, IntoStaticStr, ParseError};
 
 use stackable_hbase_crd::{
     merged_env, Container, HbaseCluster, HbaseClusterStatus, HbaseConfig, HbaseConfigFragment,
-    HbaseRole, APP_NAME, CONFIG_DIR_NAME, DEFAULT_SECRET_LIFETIME, HBASE_ENV_SH, HBASE_HEAPSIZE,
-    HBASE_MANAGES_ZK, HBASE_MASTER_OPTS, HBASE_REGIONSERVER_OPTS, HBASE_REST_OPTS,
-    HBASE_REST_PORT_NAME_HTTP, HBASE_REST_PORT_NAME_HTTPS, HBASE_SITE_XML, JVM_HEAP_FACTOR,
-    JVM_SECURITY_PROPERTIES_FILE, METRICS_PORT, SSL_CLIENT_XML, SSL_SERVER_XML,
+    HbaseRole, APP_NAME, CONFIG_DIR_NAME, HBASE_ENV_SH, HBASE_HEAPSIZE, HBASE_MANAGES_ZK,
+    HBASE_MASTER_OPTS, HBASE_REGIONSERVER_OPTS, HBASE_REST_OPTS, HBASE_REST_PORT_NAME_HTTP,
+    HBASE_REST_PORT_NAME_HTTPS, HBASE_SITE_XML, JVM_HEAP_FACTOR, JVM_SECURITY_PROPERTIES_FILE,
+    METRICS_PORT, SSL_CLIENT_XML, SSL_SERVER_XML,
 };
 
 use crate::product_logging::STACKABLE_LOG_DIR;
@@ -113,6 +113,9 @@ pub struct Ctx {
 #[strum_discriminants(derive(IntoStaticStr))]
 #[allow(clippy::enum_variant_names)]
 pub enum Error {
+    #[snafu(display("missing secret lifetime"))]
+    MissingSecretLifetime,
+
     #[snafu(display("object defines no version"))]
     ObjectHasNoVersion,
 
@@ -777,7 +780,7 @@ fn build_rolegroup_statefulset(
     hbase_role: &HbaseRole,
     rolegroup_ref: &RoleGroupRef<HbaseCluster>,
     rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
-    config: &HbaseConfig,
+    merged_config: &HbaseConfig,
     resolved_product_image: &ResolvedProductImage,
     service_account: &ServiceAccount,
 ) -> Result<StatefulSet> {
@@ -899,7 +902,7 @@ fn build_rolegroup_statefulset(
         .add_volume_mount("log", STACKABLE_LOG_DIR)
         .context(AddVolumeMountSnafu)?
         .add_container_ports(ports)
-        .resources(config.resources.clone().into())
+        .resources(merged_config.resources.clone().into())
         .startup_probe(startup_probe)
         .liveness_probe(liveness_probe)
         .readiness_probe(readiness_probe);
@@ -919,7 +922,7 @@ fn build_rolegroup_statefulset(
     pod_builder
         .metadata(pb_metadata)
         .image_pull_secrets_from_product_image(resolved_product_image)
-        .affinity(&config.affinity)
+        .affinity(&merged_config.affinity)
         .add_volume(stackable_operator::k8s_openapi::api::core::v1::Volume {
             name: "hbase-config".to_string(),
             config_map: Some(ConfigMapVolumeSource {
@@ -959,7 +962,7 @@ fn build_rolegroup_statefulset(
             Some(ContainerLogConfigChoice::Custom(CustomContainerLogConfig {
                 custom: ConfigMapLogConfig { config_map },
             })),
-    }) = config.logging.containers.get(&Container::Hbase)
+    }) = merged_config.logging.containers.get(&Container::Hbase)
     {
         pod_builder
             .add_volume(Volume {
@@ -984,29 +987,29 @@ fn build_rolegroup_statefulset(
             .context(AddVolumeSnafu)?;
     }
 
-    add_graceful_shutdown_config(config, &mut pod_builder).context(GracefulShutdownSnafu)?;
+    add_graceful_shutdown_config(merged_config, &mut pod_builder).context(GracefulShutdownSnafu)?;
     if hbase.has_kerberos_enabled() {
         add_kerberos_pod_config(
             hbase,
             hbase_role,
             &mut hbase_container,
             &mut pod_builder,
-            config
+            merged_config
                 .requested_secret_lifetime
-                .unwrap_or(DEFAULT_SECRET_LIFETIME),
+                .context(MissingSecretLifetimeSnafu)?,
         )
         .context(AddKerberosConfigSnafu)?;
     }
     pod_builder.add_container(hbase_container.build());
 
     // Vector sidecar shall be the last container in the list
-    if config.logging.enable_vector_agent {
+    if merged_config.logging.enable_vector_agent {
         pod_builder.add_container(
             product_logging::framework::vector_container(
                 resolved_product_image,
                 "hbase-config",
                 "log",
-                config.logging.containers.get(&Container::Vector),
+                merged_config.logging.containers.get(&Container::Vector),
                 ResourceRequirementsBuilder::new()
                     .with_cpu_request("250m")
                     .with_cpu_limit("500m")
