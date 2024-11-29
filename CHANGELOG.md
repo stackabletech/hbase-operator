@@ -4,7 +4,8 @@
 
 ### Added
 
-- The lifetime of auto generated TLS certificates is now configurable with the role and roleGroup config property `requestedSecretLifetime` ([#598])
+- The lifetime of auto generated TLS certificates is now configurable with the role and roleGroup
+  config property `requestedSecretLifetime`. This helps reducing frequent Pod restarts ([#598]).
 
 ### Fixed
 
