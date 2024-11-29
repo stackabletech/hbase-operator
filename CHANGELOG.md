@@ -4,7 +4,7 @@
 
 ### Added
 
-- Lifetime of auto generated certificates is configurable with the `requestedSecretLifetime` role group property ([#598])
+- The lifetime of auto generated TLS certificates is now configurable with the role and roleGroup config property `requestedSecretLifetime` ([#598])
 
 ### Fixed
 
