@@ -81,16 +81,6 @@ pub const METRICS_PORT: u16 = 9100;
 
 pub const JVM_HEAP_FACTOR: f32 = 0.8;
 
-const DEFAULT_MASTER_GRACEFUL_SHUTDOWN_TIMEOUT: Duration = Duration::from_minutes_unchecked(20);
-const DEFAULT_REGION_SERVER_GRACEFUL_SHUTDOWN_TIMEOUT: Duration =
-    Duration::from_minutes_unchecked(60);
-const DEFAULT_REST_SERVER_GRACEFUL_SHUTDOWN_TIMEOUT: Duration = Duration::from_minutes_unchecked(5);
-
-// Auto TLS certificate lifetime
-const DEFAULT_MASTER_SECRET_LIFETIME: Duration = Duration::from_days_unchecked(7);
-const DEFAULT_REGION_SECRET_LIFETIME: Duration = Duration::from_days_unchecked(7);
-const DEFAULT_REST_SECRET_LIFETIME: Duration = Duration::from_days_unchecked(7);
-
 #[derive(Snafu, Debug)]
 pub enum Error {
     #[snafu(display("the role [{role}] is invalid and does not exist in HBase"))]
@@ -267,6 +257,17 @@ pub enum HbaseRole {
 }
 
 impl HbaseRole {
+    const DEFAULT_MASTER_GRACEFUL_SHUTDOWN_TIMEOUT: Duration = Duration::from_minutes_unchecked(20);
+    const DEFAULT_REGION_SERVER_GRACEFUL_SHUTDOWN_TIMEOUT: Duration =
+        Duration::from_minutes_unchecked(60);
+    const DEFAULT_REST_SERVER_GRACEFUL_SHUTDOWN_TIMEOUT: Duration =
+        Duration::from_minutes_unchecked(5);
+
+    // Auto TLS certificate lifetime
+    const DEFAULT_MASTER_SECRET_LIFETIME: Duration = Duration::from_days_unchecked(7);
+    const DEFAULT_REGION_SECRET_LIFETIME: Duration = Duration::from_days_unchecked(7);
+    const DEFAULT_REST_SECRET_LIFETIME: Duration = Duration::from_days_unchecked(7);
+
     pub fn default_config(
         &self,
         cluster_name: &str,
@@ -309,15 +310,15 @@ impl HbaseRole {
         };
 
         let graceful_shutdown_timeout = match &self {
-            HbaseRole::Master => Some(DEFAULT_MASTER_GRACEFUL_SHUTDOWN_TIMEOUT),
-            HbaseRole::RegionServer => Some(DEFAULT_REGION_SERVER_GRACEFUL_SHUTDOWN_TIMEOUT),
-            HbaseRole::RestServer => Some(DEFAULT_REST_SERVER_GRACEFUL_SHUTDOWN_TIMEOUT),
+            HbaseRole::Master => Some(Self::DEFAULT_MASTER_GRACEFUL_SHUTDOWN_TIMEOUT),
+            HbaseRole::RegionServer => Some(Self::DEFAULT_REGION_SERVER_GRACEFUL_SHUTDOWN_TIMEOUT),
+            HbaseRole::RestServer => Some(Self::DEFAULT_REST_SERVER_GRACEFUL_SHUTDOWN_TIMEOUT),
         };
 
         let requested_secret_lifetime = match &self {
-            HbaseRole::Master => Some(DEFAULT_MASTER_SECRET_LIFETIME),
-            HbaseRole::RegionServer => Some(DEFAULT_REGION_SECRET_LIFETIME),
-            HbaseRole::RestServer => Some(DEFAULT_REST_SECRET_LIFETIME),
+            HbaseRole::Master => Some(Self::DEFAULT_MASTER_SECRET_LIFETIME),
+            HbaseRole::RegionServer => Some(Self::DEFAULT_REGION_SECRET_LIFETIME),
+            HbaseRole::RestServer => Some(Self::DEFAULT_REST_SECRET_LIFETIME),
         };
 
         HbaseConfigFragment {
