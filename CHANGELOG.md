@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Added
+
+- The lifetime of auto generated TLS certificates is now configurable with the role and roleGroup
+  config property `requestedSecretLifetime`. This helps reducing frequent Pod restarts ([#598]).
+
 ### Fixed
 
 - BREAKING: Use distinct ServiceAccounts for the Stacklets, so that multiple Stacklets can be
@@ -9,6 +14,7 @@
   restart ([#594]).
 
 [#594]: https://github.com/stackabletech/hbase-operator/pull/594
+[#598]: https://github.com/stackabletech/hbase-operator/pull/598
 
 ## [24.11.0] - 2024-11-18
 
