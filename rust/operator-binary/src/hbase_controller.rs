@@ -881,6 +881,7 @@ fn build_rolegroup_statefulset(
             {COMMON_BASH_TRAP_FUNCTIONS}
             {remove_vector_shutdown_file_command}
             prepare_signal_handlers
+            CONTAINERDEBUG_LOG_DIRECTORY={STACKABLE_LOG_DIR}/containerdebug containerdebug --output={STACKABLE_LOG_DIR}/containerdebug-state.json --loop &
             bin/hbase {hbase_role_name_in_command} start &
             wait_for_termination $!
             {create_vector_shutdown_file_command}
