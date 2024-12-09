@@ -264,9 +264,9 @@ impl HbaseRole {
         Duration::from_minutes_unchecked(5);
 
     // Auto TLS certificate lifetime
-    const DEFAULT_MASTER_SECRET_LIFETIME: Duration = Duration::from_days_unchecked(7);
-    const DEFAULT_REGION_SECRET_LIFETIME: Duration = Duration::from_days_unchecked(7);
-    const DEFAULT_REST_SECRET_LIFETIME: Duration = Duration::from_days_unchecked(7);
+    const DEFAULT_MASTER_SECRET_LIFETIME: Duration = Duration::from_days_unchecked(1);
+    const DEFAULT_REGION_SECRET_LIFETIME: Duration = Duration::from_days_unchecked(1);
+    const DEFAULT_REST_SECRET_LIFETIME: Duration = Duration::from_days_unchecked(1);
 
     pub fn default_config(
         &self,
