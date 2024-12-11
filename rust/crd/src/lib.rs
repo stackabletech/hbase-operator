@@ -59,7 +59,6 @@ pub const HBASE_ROOTDIR: &str = "hbase.rootdir";
 pub const HBASE_UNSAFE_REGIONSERVER_HOSTNAME_DISABLE_MASTER_REVERSEDNS: &str =
     "hbase.unsafe.regionserver.hostname.disable.master.reversedns";
 pub const HBASE_HEAPSIZE: &str = "HBASE_HEAPSIZE";
-pub const HBASE_ROOT_DIR_DEFAULT: &str = "/hbase";
 
 pub const HBASE_UI_PORT_NAME_HTTP: &str = "ui-http";
 pub const HBASE_UI_PORT_NAME_HTTPS: &str = "ui-https";
@@ -81,11 +80,6 @@ pub const HBASE_REST_UI_PORT: u16 = 8085;
 pub const METRICS_PORT: u16 = 9100;
 
 pub const JVM_HEAP_FACTOR: f32 = 0.8;
-
-const DEFAULT_MASTER_GRACEFUL_SHUTDOWN_TIMEOUT: Duration = Duration::from_minutes_unchecked(20);
-const DEFAULT_REGION_SERVER_GRACEFUL_SHUTDOWN_TIMEOUT: Duration =
-    Duration::from_minutes_unchecked(60);
-const DEFAULT_REST_SERVER_GRACEFUL_SHUTDOWN_TIMEOUT: Duration = Duration::from_minutes_unchecked(5);
 
 #[derive(Snafu, Debug)]
 pub enum Error {
@@ -263,6 +257,17 @@ pub enum HbaseRole {
 }
 
 impl HbaseRole {
+    const DEFAULT_MASTER_GRACEFUL_SHUTDOWN_TIMEOUT: Duration = Duration::from_minutes_unchecked(20);
+    const DEFAULT_REGION_SERVER_GRACEFUL_SHUTDOWN_TIMEOUT: Duration =
+        Duration::from_minutes_unchecked(60);
+    const DEFAULT_REST_SERVER_GRACEFUL_SHUTDOWN_TIMEOUT: Duration =
+        Duration::from_minutes_unchecked(5);
+
+    // Auto TLS certificate lifetime
+    const DEFAULT_MASTER_SECRET_LIFETIME: Duration = Duration::from_days_unchecked(1);
+    const DEFAULT_REGION_SECRET_LIFETIME: Duration = Duration::from_days_unchecked(1);
+    const DEFAULT_REST_SECRET_LIFETIME: Duration = Duration::from_days_unchecked(1);
+
     pub fn default_config(
         &self,
         cluster_name: &str,
@@ -305,9 +310,15 @@ impl HbaseRole {
         };
 
         let graceful_shutdown_timeout = match &self {
-            HbaseRole::Master => DEFAULT_MASTER_GRACEFUL_SHUTDOWN_TIMEOUT,
-            HbaseRole::RegionServer => DEFAULT_REGION_SERVER_GRACEFUL_SHUTDOWN_TIMEOUT,
-            HbaseRole::RestServer => DEFAULT_REST_SERVER_GRACEFUL_SHUTDOWN_TIMEOUT,
+            HbaseRole::Master => Self::DEFAULT_MASTER_GRACEFUL_SHUTDOWN_TIMEOUT,
+            HbaseRole::RegionServer => Self::DEFAULT_REGION_SERVER_GRACEFUL_SHUTDOWN_TIMEOUT,
+            HbaseRole::RestServer => Self::DEFAULT_REST_SERVER_GRACEFUL_SHUTDOWN_TIMEOUT,
+        };
+
+        let requested_secret_lifetime = match &self {
+            HbaseRole::Master => Self::DEFAULT_MASTER_SECRET_LIFETIME,
+            HbaseRole::RegionServer => Self::DEFAULT_REGION_SECRET_LIFETIME,
+            HbaseRole::RestServer => Self::DEFAULT_REST_SECRET_LIFETIME,
         };
 
         HbaseConfigFragment {
@@ -317,6 +328,7 @@ impl HbaseRole {
             logging: product_logging::spec::default_logging(),
             affinity: get_affinity(cluster_name, self, hdfs_discovery_cm_name),
             graceful_shutdown_timeout: Some(graceful_shutdown_timeout),
+            requested_secret_lifetime: Some(requested_secret_lifetime),
         }
     }
 
@@ -411,6 +423,11 @@ pub struct HbaseConfig {
     /// Time period Pods have to gracefully shut down, e.g. `30m`, `1h` or `2d`. Consult the operator documentation for details.
     #[fragment_attrs(serde(default))]
     pub graceful_shutdown_timeout: Option<Duration>,
+
+    /// Request secret (currently only autoTls certificates) lifetime from the secret operator, e.g. `7d`, or `30d`.
+    /// Please note that this can be shortened by the `maxCertificateLifetime` setting on the SecretClass issuing the TLS certificate.
+    #[fragment_attrs(serde(default))]
+    pub requested_secret_lifetime: Option<Duration>,
 }
 
 impl Configuration for HbaseConfigFragment {
@@ -473,15 +490,7 @@ impl Configuration for HbaseConfigFragment {
                     HBASE_UNSAFE_REGIONSERVER_HOSTNAME_DISABLE_MASTER_REVERSEDNS.to_string(),
                     Some("true".to_string()),
                 );
-                result.insert(
-                    HBASE_ROOTDIR.to_string(),
-                    Some(
-                        self.hbase_rootdir
-                            .as_deref()
-                            .unwrap_or(HBASE_ROOT_DIR_DEFAULT)
-                            .to_string(),
-                    ),
-                );
+                result.insert(HBASE_ROOTDIR.to_string(), self.hbase_rootdir.clone());
             }
             _ => {}
         }
