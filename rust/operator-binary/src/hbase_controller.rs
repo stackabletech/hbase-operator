@@ -881,6 +881,7 @@ fn build_rolegroup_statefulset(
             {COMMON_BASH_TRAP_FUNCTIONS}
             {remove_vector_shutdown_file_command}
             prepare_signal_handlers
+            containerdebug --output={STACKABLE_LOG_DIR}/containerdebug-state.json --loop &
             bin/hbase {hbase_role_name_in_command} start &
             wait_for_termination $!
             {create_vector_shutdown_file_command}
@@ -893,6 +894,11 @@ fn build_rolegroup_statefulset(
                 create_vector_shutdown_file_command(STACKABLE_LOG_DIR),
         }])
         .add_env_vars(merged_env)
+        // Needed for the `containerdebug` process to log it's tracing information to.
+        .add_env_var(
+            "CONTAINERDEBUG_LOG_DIRECTORY",
+            format!("{STACKABLE_LOG_DIR}/containerdebug"),
+        )
         .add_volume_mount("hbase-config", HBASE_CONFIG_TMP_DIR)
         .context(AddVolumeMountSnafu)?
         .add_volume_mount("hdfs-discovery", HDFS_DISCOVERY_TMP_DIR)
