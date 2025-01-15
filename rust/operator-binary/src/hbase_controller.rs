@@ -16,22 +16,22 @@ use stackable_operator::{
         },
     },
     cluster_resources::{ClusterResourceApplyStrategy, ClusterResources},
-    commons::{
-        product_image_selection::ResolvedProductImage,
-        rbac::{build_rbac_resources, service_account_name},
-    },
+    commons::{product_image_selection::ResolvedProductImage, rbac::build_rbac_resources},
     k8s_openapi::{
         api::{
             apps::v1::{StatefulSet, StatefulSetSpec},
             core::v1::{
                 ConfigMap, ConfigMapVolumeSource, ContainerPort, EnvVar, Probe, Service,
-                ServicePort, ServiceSpec, TCPSocketAction, Volume,
+                ServiceAccount, ServicePort, ServiceSpec, TCPSocketAction, Volume,
             },
         },
         apimachinery::pkg::{apis::meta::v1::LabelSelector, util::intstr::IntOrString},
     },
-    kube::core::{error_boundary, DeserializeGuard},
-    kube::{runtime::controller::Action, Resource},
+    kube::{
+        core::{error_boundary, DeserializeGuard},
+        runtime::controller::Action,
+        Resource, ResourceExt,
+    },
     kvp::{Label, LabelError, Labels, ObjectLabels},
     logging::controller::ReconcilerError,
     memory::{BinaryMultiple, MemoryQuantity},
@@ -109,6 +109,9 @@ pub struct Ctx {
 pub enum Error {
     #[snafu(display("invalid role properties"))]
     RoleProperties { source: stackable_hbase_crd::Error },
+
+    #[snafu(display("missing secret lifetime"))]
+    MissingSecretLifetime,
 
     #[snafu(display("object defines no version"))]
     ObjectHasNoVersion,
@@ -398,7 +401,7 @@ pub async fn reconcile_hbase(
     )
     .context(BuildRbacResourcesSnafu)?;
     cluster_resources
-        .add(client, rbac_sa)
+        .add(client, rbac_sa.clone())
         .await
         .context(ApplyServiceAccountSnafu)?;
     cluster_resources
@@ -444,6 +447,7 @@ pub async fn reconcile_hbase(
                 rolegroup_config,
                 &merged_config,
                 &resolved_product_image,
+                &rbac_sa,
             )?;
             cluster_resources
                 .add(client, rg_service)
@@ -763,14 +767,16 @@ fn build_rolegroup_service(
 /// The rolegroup [`StatefulSet`] runs the rolegroup, as configured by the administrator.
 ///
 /// The [`Pod`](`stackable_operator::k8s_openapi::api::core::v1::Pod`)s are accessible through the corresponding [`Service`] (from [`build_rolegroup_service`]).
+#[allow(clippy::too_many_arguments)]
 fn build_rolegroup_statefulset(
     hbase: &HbaseCluster,
     cluster_info: &KubernetesClusterInfo,
     hbase_role: &HbaseRole,
     rolegroup_ref: &RoleGroupRef<HbaseCluster>,
     rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
-    config: &AnyServiceConfig,
+    merged_config: &AnyServiceConfig,
     resolved_product_image: &ResolvedProductImage,
+    service_account: &ServiceAccount,
 ) -> Result<StatefulSet> {
     let hbase_version = &resolved_product_image.app_version_label;
 
@@ -844,12 +850,12 @@ fn build_rolegroup_statefulset(
     merged_env.extend([
         EnvVar {
             name: "REGION_MOVER_OPTS".to_string(),
-            value: Some(config.region_mover_args()),
+            value: Some(merged_config.region_mover_args()),
             ..EnvVar::default()
         },
         EnvVar {
             name: "RUN_REGION_MOVER".to_string(),
-            value: Some(config.run_region_mover().to_string()),
+            value: Some(merged_config.run_region_mover().to_string()),
             ..EnvVar::default()
         },
     ]);
@@ -864,6 +870,11 @@ fn build_rolegroup_statefulset(
             hbase.service_port(hbase_role).to_string(),
         ])
         .add_env_vars(merged_env)
+        // Needed for the `containerdebug` process to log it's tracing information to.
+        .add_env_var(
+            "CONTAINERDEBUG_LOG_DIRECTORY",
+            format!("{STACKABLE_LOG_DIR}/containerdebug"),
+        )
         .add_volume_mount("hbase-config", HBASE_CONFIG_TMP_DIR)
         .context(AddVolumeMountSnafu)?
         .add_volume_mount("hdfs-discovery", HDFS_DISCOVERY_TMP_DIR)
@@ -873,7 +884,7 @@ fn build_rolegroup_statefulset(
         .add_volume_mount("log", STACKABLE_LOG_DIR)
         .context(AddVolumeMountSnafu)?
         .add_container_ports(ports)
-        .resources(config.resources().clone().into())
+        .resources(merged_config.resources().clone().into())
         .startup_probe(startup_probe)
         .liveness_probe(liveness_probe)
         .readiness_probe(readiness_probe);
@@ -893,7 +904,7 @@ fn build_rolegroup_statefulset(
     pod_builder
         .metadata(pb_metadata)
         .image_pull_secrets_from_product_image(resolved_product_image)
-        .affinity(config.affinity())
+        .affinity(merged_config.affinity())
         .add_volume(stackable_operator::k8s_openapi::api::core::v1::Volume {
             name: "hbase-config".to_string(),
             config_map: Some(ConfigMapVolumeSource {
@@ -919,7 +930,7 @@ fn build_rolegroup_statefulset(
             )),
         )
         .context(AddVolumeSnafu)?
-        .service_account_name(service_account_name(APP_NAME))
+        .service_account_name(service_account.name_any())
         .security_context(
             PodSecurityContextBuilder::new()
                 .run_as_user(HBASE_UID)
@@ -933,7 +944,7 @@ fn build_rolegroup_statefulset(
             Some(ContainerLogConfigChoice::Custom(CustomContainerLogConfig {
                 custom: ConfigMapLogConfig { config_map },
             })),
-    }) = config.logging().containers.get(&Container::Hbase)
+    }) = merged_config.logging().containers.get(&Container::Hbase)
     {
         pod_builder
             .add_volume(Volume {
@@ -958,21 +969,28 @@ fn build_rolegroup_statefulset(
             .context(AddVolumeSnafu)?;
     }
 
-    add_graceful_shutdown_config(config, &mut pod_builder).context(GracefulShutdownSnafu)?;
+    add_graceful_shutdown_config(merged_config, &mut pod_builder).context(GracefulShutdownSnafu)?;
     if hbase.has_kerberos_enabled() {
-        add_kerberos_pod_config(hbase, &mut hbase_container, &mut pod_builder)
-            .context(AddKerberosConfigSnafu)?;
+        add_kerberos_pod_config(
+            hbase,
+            &mut hbase_container,
+            &mut pod_builder,
+            merged_config
+                .requested_secret_lifetime()
+                .context(MissingSecretLifetimeSnafu)?,
+        )
+        .context(AddKerberosConfigSnafu)?;
     }
     pod_builder.add_container(hbase_container.build());
 
     // Vector sidecar shall be the last container in the list
-    if config.logging().enable_vector_agent {
+    if merged_config.logging().enable_vector_agent {
         pod_builder.add_container(
             product_logging::framework::vector_container(
                 resolved_product_image,
                 "hbase-config",
                 "log",
-                config.logging().containers.get(&Container::Vector),
+                merged_config.logging().containers.get(&Container::Vector),
                 ResourceRequirementsBuilder::new()
                     .with_cpu_request("250m")
                     .with_cpu_limit("500m")

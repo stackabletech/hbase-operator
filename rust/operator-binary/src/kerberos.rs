@@ -12,6 +12,7 @@ use stackable_operator::{
         },
     },
     kube::{runtime::reflector::ObjectRef, ResourceExt},
+    time::Duration,
     utils::cluster_info::KubernetesClusterInfo,
 };
 
@@ -228,6 +229,7 @@ pub fn add_kerberos_pod_config(
     hbase: &HbaseCluster,
     cb: &mut ContainerBuilder,
     pb: &mut PodBuilder,
+    requested_secret_lifetime: Duration,
 ) -> Result<(), Error> {
     if let Some(kerberos_secret_class) = hbase.kerberos_secret_class() {
         // Mount keytab
@@ -266,6 +268,7 @@ pub fn add_kerberos_pod_config(
                         .with_node_scope()
                         .with_format(SecretFormat::TlsPkcs12)
                         .with_tls_pkcs12_password(TLS_STORE_PASSWORD)
+                        .with_auto_tls_cert_lifetime(requested_secret_lifetime)
                         .build()
                         .context(AddTlsSecretVolumeSnafu)?,
                 )

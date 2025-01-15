@@ -4,6 +4,29 @@
 
 ### Added
 
+- The lifetime of auto generated TLS certificates is now configurable with the role and roleGroup
+  config property `requestedSecretLifetime`. This helps reducing frequent Pod restarts ([#598]).
+- Run a `containerdebug` process in the background of each HBase container to collect debugging information ([#605]).
+
+### Changed
+
+- Support moving regions to other Pods during graceful shutdown of region servers ([#570]).
+
+### Fixed
+
+- BREAKING: Use distinct ServiceAccounts for the Stacklets, so that multiple Stacklets can be
+  deployed in one namespace. Existing Stacklets will use the newly created ServiceAccounts after
+  restart ([#594]).
+
+[#570]: https://github.com/stackabletech/hbase-operator/pull/570
+[#594]: https://github.com/stackabletech/hbase-operator/pull/594
+[#598]: https://github.com/stackabletech/hbase-operator/pull/598
+[#605]: https://github.com/stackabletech/hbase-operator/pull/605
+
+## [24.11.0] - 2024-11-18
+
+### Added
+
 - The operator can now run on Kubernetes clusters using a non-default cluster domain.
   Use the env var `KUBERNETES_CLUSTER_DOMAIN` or the operator Helm chart property `kubernetesClusterDomain` to set a non-default cluster domain ([#574]).
 
@@ -12,7 +35,7 @@
 - Reduce CRD size from `1.4MB` to `96KB` by accepting arbitrary YAML input instead of the underlying schema for the following fields ([#548]):
   - `podOverrides`
   - `affinity`
-- Support moving regions to other Pods during graceful shutdown of region servers ([#570]).
+- Fix bug where the configuration of the `hbaseRootdir` at the role level is ignored ([#584]).
 
 ### Fixed
 
@@ -28,8 +51,8 @@
 [#550]: https://github.com/stackabletech/hbase-operator/pull/550
 [#556]: https://github.com/stackabletech/hbase-operator/pull/556
 [#558]: https://github.com/stackabletech/hbase-operator/pull/558
-[#570]: https://github.com/stackabletech/hbase-operator/pull/570
 [#574]: https://github.com/stackabletech/hbase-operator/pull/574
+[#584]: https://github.com/stackabletech/hbase-operator/pull/584
 
 ## [24.7.0] - 2024-07-24
 

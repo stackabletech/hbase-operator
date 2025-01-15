@@ -29,7 +29,6 @@ use stackable_operator::{
 };
 use std::collections::BTreeMap;
 use std::collections::HashMap;
-use std::sync::LazyLock;
 use strum::{Display, EnumIter, EnumString};
 
 use crate::affinity::get_affinity;
@@ -65,7 +64,6 @@ pub const HBASE_ROOTDIR: &str = "hbase.rootdir";
 pub const HBASE_UNSAFE_REGIONSERVER_HOSTNAME_DISABLE_MASTER_REVERSEDNS: &str =
     "hbase.unsafe.regionserver.hostname.disable.master.reversedns";
 pub const HBASE_HEAPSIZE: &str = "HBASE_HEAPSIZE";
-pub const HBASE_ROOT_DIR_DEFAULT: &str = "/hbase";
 
 pub const HBASE_UI_PORT_NAME_HTTP: &str = "ui-http";
 pub const HBASE_UI_PORT_NAME_HTTPS: &str = "ui-https";
@@ -88,12 +86,8 @@ pub const METRICS_PORT: u16 = 9100;
 
 pub const JVM_HEAP_FACTOR: f32 = 0.8;
 
-const DEFAULT_MASTER_GRACEFUL_SHUTDOWN_TIMEOUT: Duration = Duration::from_minutes_unchecked(20);
 const DEFAULT_REGION_MOVER_TIMEOUT: Duration = Duration::from_minutes_unchecked(59);
 const DEFAULT_REGION_MOVER_DELTA_TO_SHUTDOWN: Duration = Duration::from_minutes_unchecked(1);
-const DEFAULT_REST_SERVER_GRACEFUL_SHUTDOWN_TIMEOUT: Duration = Duration::from_minutes_unchecked(5);
-static DEFAULT_REGION_SERVER_GRACEFUL_SHUTDOWN_TIMEOUT: LazyLock<Duration> =
-    LazyLock::new(|| DEFAULT_REGION_MOVER_TIMEOUT + DEFAULT_REGION_MOVER_DELTA_TO_SHUTDOWN);
 
 #[derive(Snafu, Debug)]
 pub enum Error {
@@ -277,6 +271,17 @@ pub enum HbaseRole {
 }
 
 impl HbaseRole {
+    const DEFAULT_MASTER_GRACEFUL_SHUTDOWN_TIMEOUT: Duration = Duration::from_minutes_unchecked(20);
+    const DEFAULT_REGION_SERVER_GRACEFUL_SHUTDOWN_TIMEOUT: Duration =
+        Duration::from_minutes_unchecked(60);
+    const DEFAULT_REST_SERVER_GRACEFUL_SHUTDOWN_TIMEOUT: Duration =
+        Duration::from_minutes_unchecked(5);
+
+    // Auto TLS certificate lifetime
+    const DEFAULT_MASTER_SECRET_LIFETIME: Duration = Duration::from_days_unchecked(1);
+    const DEFAULT_REGION_SECRET_LIFETIME: Duration = Duration::from_days_unchecked(1);
+    const DEFAULT_REST_SECRET_LIFETIME: Duration = Duration::from_days_unchecked(1);
+
     /// Returns the name of the role as it is needed by the `bin/hbase {cli_role_name} start` command.
     pub fn cli_role_name(&self) -> String {
         match self {
@@ -366,7 +371,7 @@ impl AnyConfigFragment {
                     logging: product_logging::spec::default_logging(),
                     affinity: get_affinity(cluster_name, role, hdfs_discovery_cm_name),
                     graceful_shutdown_timeout: Some(
-                        *DEFAULT_REGION_SERVER_GRACEFUL_SHUTDOWN_TIMEOUT,
+                        HbaseRole::DEFAULT_REGION_SERVER_GRACEFUL_SHUTDOWN_TIMEOUT,
                     ),
                     region_mover: RegionMoverFragment {
                         run_before_shutdown: Some(false),
@@ -374,6 +379,7 @@ impl AnyConfigFragment {
                         ack: Some(true),
                         cli_opts: None,
                     },
+                    requested_secret_lifetime: Some(HbaseRole::DEFAULT_REGION_SECRET_LIFETIME),
                 })
             }
             HbaseRole::RestServer => AnyConfigFragment::RestServer(HbaseConfigFragment {
@@ -382,7 +388,10 @@ impl AnyConfigFragment {
                 resources: default_resources(role),
                 logging: product_logging::spec::default_logging(),
                 affinity: get_affinity(cluster_name, role, hdfs_discovery_cm_name),
-                graceful_shutdown_timeout: Some(DEFAULT_REST_SERVER_GRACEFUL_SHUTDOWN_TIMEOUT),
+                graceful_shutdown_timeout: Some(
+                    HbaseRole::DEFAULT_REST_SERVER_GRACEFUL_SHUTDOWN_TIMEOUT,
+                ),
+                requested_secret_lifetime: Some(HbaseRole::DEFAULT_REST_SECRET_LIFETIME),
             }),
             HbaseRole::Master => AnyConfigFragment::Master(HbaseConfigFragment {
                 hbase_rootdir: None,
@@ -390,7 +399,10 @@ impl AnyConfigFragment {
                 resources: default_resources(role),
                 logging: product_logging::spec::default_logging(),
                 affinity: get_affinity(cluster_name, role, hdfs_discovery_cm_name),
-                graceful_shutdown_timeout: Some(DEFAULT_MASTER_GRACEFUL_SHUTDOWN_TIMEOUT),
+                graceful_shutdown_timeout: Some(
+                    HbaseRole::DEFAULT_MASTER_GRACEFUL_SHUTDOWN_TIMEOUT,
+                ),
+                requested_secret_lifetime: Some(HbaseRole::DEFAULT_MASTER_SECRET_LIFETIME),
             }),
         }
     }
@@ -462,6 +474,11 @@ pub struct HbaseConfig {
     /// Time period Pods have to gracefully shut down, e.g. `30m`, `1h` or `2d`. Consult the operator documentation for details.
     #[fragment_attrs(serde(default))]
     pub graceful_shutdown_timeout: Option<Duration>,
+
+    /// Request secret (currently only autoTls certificates) lifetime from the secret operator, e.g. `7d`, or `30d`.
+    /// Please note that this can be shortened by the `maxCertificateLifetime` setting on the SecretClass issuing the TLS certificate.
+    #[fragment_attrs(serde(default))]
+    pub requested_secret_lifetime: Option<Duration>,
 }
 
 impl Configuration for HbaseConfigFragment {
@@ -524,15 +541,7 @@ impl Configuration for HbaseConfigFragment {
                     HBASE_UNSAFE_REGIONSERVER_HOSTNAME_DISABLE_MASTER_REVERSEDNS.to_string(),
                     Some("true".to_string()),
                 );
-                result.insert(
-                    HBASE_ROOTDIR.to_string(),
-                    Some(
-                        self.hbase_rootdir
-                            .as_deref()
-                            .unwrap_or(HBASE_ROOT_DIR_DEFAULT)
-                            .to_string(),
-                    ),
-                );
+                result.insert(HBASE_ROOTDIR.to_string(), self.hbase_rootdir.clone());
             }
             _ => {}
         }
@@ -613,6 +622,11 @@ pub struct RegionServerConfig {
     #[fragment_attrs(serde(default))]
     pub graceful_shutdown_timeout: Option<Duration>,
 
+    /// Request secret (currently only autoTls certificates) lifetime from the secret operator, e.g. `7d`, or `30d`.
+    /// Please note that this can be shortened by the `maxCertificateLifetime` setting on the SecretClass issuing the TLS certificate.
+    #[fragment_attrs(serde(default))]
+    pub requested_secret_lifetime: Option<Duration>,
+
     /// Before terminating a region server pod, the RegionMover tool can be invoked to transfer
     /// local regions to other servers.
     /// This may cause a lot of network traffic in the Kubernetes cluster if the entire HBase stacklet is being
@@ -680,15 +694,7 @@ impl Configuration for RegionServerConfigFragment {
                     HBASE_UNSAFE_REGIONSERVER_HOSTNAME_DISABLE_MASTER_REVERSEDNS.to_string(),
                     Some("true".to_string()),
                 );
-                result.insert(
-                    HBASE_ROOTDIR.to_string(),
-                    Some(
-                        self.hbase_rootdir
-                            .as_deref()
-                            .unwrap_or(HBASE_ROOT_DIR_DEFAULT)
-                            .to_string(),
-                    ),
-                );
+                result.insert(HBASE_ROOTDIR.to_string(), self.hbase_rootdir.clone());
             }
             _ => {}
         }
@@ -1116,6 +1122,13 @@ impl AnyServiceConfig {
             AnyServiceConfig::Master(config) => &config.hbase_opts,
             AnyServiceConfig::RegionServer(config) => &config.hbase_opts,
             AnyServiceConfig::RestServer(config) => &config.hbase_opts,
+        }
+    }
+    pub fn requested_secret_lifetime(&self) -> Option<Duration> {
+        match self {
+            AnyServiceConfig::Master(config) => config.requested_secret_lifetime,
+            AnyServiceConfig::RegionServer(config) => config.requested_secret_lifetime,
+            AnyServiceConfig::RestServer(config) => config.requested_secret_lifetime,
         }
     }
 
