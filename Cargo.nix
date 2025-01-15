@@ -6678,7 +6678,7 @@ rec {
       };
       "stackable-hbase-crd" = rec {
         crateName = "stackable-hbase-crd";
-        version = "24.11.1-rc2";
+        version = "24.11.1";
         edition = "2021";
         src = lib.cleanSourceWith { filter = sourceFilter;  src = ./rust/crd; };
         libName = "stackable_hbase_crd";
@@ -6735,7 +6735,7 @@ rec {
       };
       "stackable-hbase-operator" = rec {
         crateName = "stackable-hbase-operator";
-        version = "24.11.1-rc2";
+        version = "24.11.1";
         edition = "2021";
         crateBin = [
           {
