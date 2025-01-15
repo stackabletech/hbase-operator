@@ -858,6 +858,11 @@ fn build_rolegroup_statefulset(
             value: Some(merged_config.run_region_mover().to_string()),
             ..EnvVar::default()
         },
+        EnvVar {
+            name: "STACKABLE_LOG_DIR".to_string(),
+            value: Some(STACKABLE_LOG_DIR.to_string()),
+            ..EnvVar::default()
+        },
     ]);
 
     let mut hbase_container = ContainerBuilder::new("hbase").expect("ContainerBuilder not created");
