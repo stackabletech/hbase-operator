@@ -49,6 +49,8 @@ const HBASE_LOG4J2_FILE: &str = "hbase.log4j2.xml";
 pub const LOG4J_CONFIG_FILE: &str = "log4j.properties";
 pub const LOG4J2_CONFIG_FILE: &str = "log4j2.properties";
 pub const STACKABLE_LOG_DIR: &str = "/stackable/log";
+pub static CONTAINERDEBUG_LOG_DIRECTORY: std::sync::LazyLock<String> =
+    std::sync::LazyLock::new(|| format!("{STACKABLE_LOG_DIR}/containerdebug"));
 
 /// Return the address of the Vector aggregator if the corresponding ConfigMap name is given in the
 /// cluster spec

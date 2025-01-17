@@ -68,7 +68,7 @@ use stackable_hbase_crd::{
     METRICS_PORT, SSL_CLIENT_XML, SSL_SERVER_XML,
 };
 
-use crate::product_logging::STACKABLE_LOG_DIR;
+use crate::product_logging::{CONTAINERDEBUG_LOG_DIRECTORY, STACKABLE_LOG_DIR};
 use crate::security::opa::HbaseOpaConfig;
 use crate::{
     discovery::build_discovery_configmap,
@@ -878,7 +878,7 @@ fn build_rolegroup_statefulset(
         // Needed for the `containerdebug` process to log it's tracing information to.
         .add_env_var(
             "CONTAINERDEBUG_LOG_DIRECTORY",
-            format!("{STACKABLE_LOG_DIR}/containerdebug"),
+            &*CONTAINERDEBUG_LOG_DIRECTORY,
         )
         .add_volume_mount("hbase-config", HBASE_CONFIG_TMP_DIR)
         .context(AddVolumeMountSnafu)?
