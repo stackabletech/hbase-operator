@@ -1,7 +1,7 @@
 # Default values for hbase-operator.
 ---
 image:
-  repository: docker.stackable.tech/stackable/hbase-operator
+  repository: oci.stackable.tech/sdp/hbase-operator
   pullPolicy: IfNotPresent
   pullSecrets: []
 
