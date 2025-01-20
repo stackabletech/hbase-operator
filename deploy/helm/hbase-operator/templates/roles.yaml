@@ -76,7 +76,7 @@ rules:
       - events
     verbs:
       - create
-      - patch      
+      - patch
   - apiGroups:
       - {{ include "operator.name" . }}.stackable.tech
     resources:
