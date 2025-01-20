@@ -7,6 +7,11 @@
 - The lifetime of auto generated TLS certificates is now configurable with the role and roleGroup
   config property `requestedSecretLifetime`. This helps reducing frequent Pod restarts ([#598]).
 - Run a `containerdebug` process in the background of each HBase container to collect debugging information ([#605]).
+- Aggregate emitted Kubernetes events on the CustomResources ([#xxx]).
+
+### Changed
+
+- Append a dot (`.`) to the default cluster domain to reduce DNS requests ([#xxx]).
 
 ### Fixed
 
@@ -17,6 +22,7 @@
 [#594]: https://github.com/stackabletech/hbase-operator/pull/594
 [#598]: https://github.com/stackabletech/hbase-operator/pull/598
 [#605]: https://github.com/stackabletech/hbase-operator/pull/605
+[#xxx]: https://github.com/stackabletech/hbase-operator/pull/xxx
 
 ## [24.11.0] - 2024-11-18
 
