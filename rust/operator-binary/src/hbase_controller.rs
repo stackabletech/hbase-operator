@@ -6,6 +6,7 @@ use std::{
     sync::Arc,
 };
 
+use const_format::concatcp;
 use indoc::formatdoc;
 use product_config::{
     types::PropertyNameKind,
@@ -92,6 +93,7 @@ use crate::{
 };
 
 pub const HBASE_CONTROLLER_NAME: &str = "hbasecluster";
+pub const FULL_HBASE_CONTROLLER_NAME: &str = concatcp!(HBASE_CONTROLLER_NAME, '.', OPERATOR_NAME);
 pub const MAX_HBASE_LOG_FILES_SIZE: MemoryQuantity = MemoryQuantity {
     value: 10.0,
     unit: BinaryMultiple::Mebi,

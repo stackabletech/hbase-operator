@@ -21,7 +21,9 @@ use stackable_operator::{
     kube::{runtime::reflector::ObjectRef, CustomResource, ResourceExt},
     product_config_utils::Configuration,
     product_logging::{self, spec::Logging},
-    role_utils::{GenericRoleConfig, Role, RoleGroup, RoleGroupRef},
+    role_utils::{
+        GenericProductSpecificCommonConfig, GenericRoleConfig, Role, RoleGroup, RoleGroupRef,
+    },
     schemars::{self, JsonSchema},
     status::condition::{ClusterCondition, HasStatusCondition},
     time::Duration,
@@ -548,7 +550,7 @@ impl HbaseCluster {
     pub fn get_role_group(
         &self,
         rolegroup_ref: &RoleGroupRef<HbaseCluster>,
-    ) -> Result<&RoleGroup<HbaseConfigFragment>, Error> {
+    ) -> Result<&RoleGroup<HbaseConfigFragment, GenericProductSpecificCommonConfig>, Error> {
         let role_variant =
             HbaseRole::from_str(&rolegroup_ref.role).with_context(|_| InvalidRoleSnafu {
                 role: rolegroup_ref.role.to_owned(),
