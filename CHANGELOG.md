@@ -9,10 +9,6 @@
 - Run a `containerdebug` process in the background of each HBase container to collect debugging information ([#605]).
 - Aggregate emitted Kubernetes events on the CustomResources ([#612]).
 
-### Changed
-
-- Append a dot (`.`) to the default cluster domain to reduce DNS requests ([#612]).
-
 ### Fixed
 
 - BREAKING: Use distinct ServiceAccounts for the Stacklets, so that multiple Stacklets can be
