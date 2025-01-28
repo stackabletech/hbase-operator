@@ -6,16 +6,20 @@ mod product_logging;
 mod security;
 mod zookeeper;
 
-use crate::hbase_controller::HBASE_CONTROLLER_NAME;
-
 use clap::Parser;
 use futures::StreamExt;
+use hbase_controller::FULL_HBASE_CONTROLLER_NAME;
 use stackable_hbase_crd::{HbaseCluster, APP_NAME};
 use stackable_operator::{
     cli::{Command, ProductOperatorRun},
     k8s_openapi::api::{apps::v1::StatefulSet, core::v1::Service},
-    kube::core::DeserializeGuard,
-    kube::runtime::{controller::Controller, watcher},
+    kube::{
+        core::DeserializeGuard,
+        runtime::{
+            events::{Recorder, Reporter},
+            watcher, Controller,
+        },
+    },
     logging::controller::report_controller_reconciled,
     CustomResourceExt,
 };
@@ -70,6 +74,14 @@ async fn main() -> anyhow::Result<()> {
             )
             .await?;
 
+            let event_recorder = Arc::new(Recorder::new(
+                client.as_kube_client(),
+                Reporter {
+                    controller: FULL_HBASE_CONTROLLER_NAME.to_string(),
+                    instance: None,
+                },
+            ));
+
             Controller::new(
                 watch_namespace.get_api::<DeserializeGuard<HbaseCluster>>(&client),
                 watcher::Config::default(),
@@ -91,14 +103,22 @@ async fn main() -> anyhow::Result<()> {
                     product_config,
                 }),
             )
-            .map(|res| {
-                report_controller_reconciled(
-                    &client,
-                    &format!("{HBASE_CONTROLLER_NAME}.{OPERATOR_NAME}"),
-                    &res,
-                )
-            })
-            .collect::<()>()
+            .for_each_concurrent(
+                16, // concurrency limit
+                |result| {
+                    // The event_recorder needs to be shared across all invocations, so that
+                    // events are correctly aggregated
+                    let event_recorder = event_recorder.clone();
+                    async move {
+                        report_controller_reconciled(
+                            &event_recorder,
+                            FULL_HBASE_CONTROLLER_NAME,
+                            &result,
+                        )
+                        .await;
+                    }
+                },
+            )
             .await;
         }
     }
