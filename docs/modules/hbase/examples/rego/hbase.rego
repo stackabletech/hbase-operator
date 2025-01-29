@@ -1,7 +1,5 @@
 package hbase
 
-
-
 default allow := false
 default matches_identity(identity) := false
 

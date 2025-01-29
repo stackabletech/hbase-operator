@@ -1,7 +1,5 @@
 package hbase
 
-
-
 test_permission_admin if {
     allow with input as {
     "callerUgi" : {
