@@ -1,6 +1,6 @@
 package hbase
 
-import rego.v1
+
 
 test_permission_admin if {
     allow with input as {
