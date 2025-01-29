@@ -9,7 +9,7 @@ data:
   hbase.rego: |
     package hbase
 
-    default allow if := false
+    default allow := false
     default matches_identity(identity) := false
 
     # table is null if the request is for namespace permissions, but as parameters cannot be
