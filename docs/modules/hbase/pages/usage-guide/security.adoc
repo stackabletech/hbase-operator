@@ -138,7 +138,7 @@ The basic structure of this rego rule is shown below.
 ----
 package hbase
 
-import rego.v1
+
 
 # Turn off access by default.
 default allow := false

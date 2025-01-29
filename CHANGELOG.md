@@ -9,6 +9,12 @@
 - Run a `containerdebug` process in the background of each HBase container to collect debugging information ([#605]).
 - Aggregate emitted Kubernetes events on the CustomResources ([#612]).
 
+[#598]: https://github.com/stackabletech/hbase-operator/pull/598
+[#605]: https://github.com/stackabletech/hbase-operator/pull/605
+[#612]: https://github.com/stackabletech/hbase-operator/pull/612
+
+## [24.11.1] - 2025-01-09
+
 ### Fixed
 
 - BREAKING: Use distinct ServiceAccounts for the Stacklets, so that multiple Stacklets can be
@@ -16,9 +22,6 @@
   restart ([#594]).
 
 [#594]: https://github.com/stackabletech/hbase-operator/pull/594
-[#598]: https://github.com/stackabletech/hbase-operator/pull/598
-[#605]: https://github.com/stackabletech/hbase-operator/pull/605
-[#612]: https://github.com/stackabletech/hbase-operator/pull/612
 
 ## [24.11.0] - 2024-11-18
 
