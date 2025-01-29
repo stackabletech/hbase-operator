@@ -9,8 +9,13 @@
 - Run a `containerdebug` process in the background of each HBase container to collect debugging information ([#605]).
 - Aggregate emitted Kubernetes events on the CustomResources ([#612]).
 
+### Changed
+
+- Default to OCI for image metadata and product image selection ([#611]).
+
 [#598]: https://github.com/stackabletech/hbase-operator/pull/598
 [#605]: https://github.com/stackabletech/hbase-operator/pull/605
+[#611]: https://github.com/stackabletech/hbase-operator/pull/611
 [#612]: https://github.com/stackabletech/hbase-operator/pull/612
 
 ## [24.11.1] - 2025-01-09
