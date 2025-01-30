@@ -1,11 +1,3 @@
-mod discovery;
-mod hbase_controller;
-mod kerberos;
-mod operations;
-mod product_logging;
-mod security;
-mod zookeeper;
-
 use clap::Parser;
 use futures::StreamExt;
 use hbase_controller::FULL_HBASE_CONTROLLER_NAME;
@@ -24,6 +16,15 @@ use stackable_operator::{
     CustomResourceExt,
 };
 use std::sync::Arc;
+
+mod config;
+mod discovery;
+mod hbase_controller;
+mod kerberos;
+mod operations;
+mod product_logging;
+mod security;
+mod zookeeper;
 
 mod built_info {
     include!(concat!(env!("OUT_DIR"), "/built.rs"));
