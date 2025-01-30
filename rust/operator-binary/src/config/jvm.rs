@@ -61,18 +61,9 @@ fn construct_role_specific_jvm_args(
             format!("-javaagent:/stackable/jmx/jmx_prometheus_javaagent.jar={METRICS_PORT}:/stackable/jmx/{hbase_role}.yaml")
         );
     }
-
     if kerberos_enabled {
         jvm_args.push("-Djava.security.krb5.conf=/stackable/kerberos/krb5.conf".to_owned());
     }
-
-    // let all_hbase_opts = [
-    //     format!("-Djava.security.properties={CONFIG_DIR_NAME}/{JVM_SECURITY_PROPERTIES_FILE}"),
-    //     String::from("-Djava.security.krb5.conf=/stackable/kerberos/krb5.conf"),
-    // ]
-    // .iter()
-    // .chain(jmx_system_properties(role, hbase_version).as_slice()) // Add the JMX options
-    // .chain(merged_config.hbase_opts.as_slice()) // Add the user defined options
 
     let operator_generated = JvmArgumentOverrides::new_with_only_additions(jvm_args);
     let merged = role
