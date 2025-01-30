@@ -43,7 +43,7 @@ pub fn construct_global_jvm_args(kerberos_enabled: bool) -> String {
     jvm_args.join(" ")
 }
 
-/// All JVM arguments.
+/// JVM arguments that specifically for the role [server], so will *not* be used e.g. by CLI tools
 fn construct_role_specific_jvm_args(
     hbase_role: &HbaseRole,
     role: &Role<HbaseConfigFragment, GenericRoleConfig, JavaCommonConfig>,
