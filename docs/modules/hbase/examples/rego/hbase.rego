@@ -1,7 +1,5 @@
 package hbase
 
-import rego.v1
-
 default allow := false
 default matches_identity(identity) := false
 

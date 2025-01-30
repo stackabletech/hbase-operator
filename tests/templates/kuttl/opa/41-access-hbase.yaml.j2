@@ -18,7 +18,7 @@ commands:
 {% if test_scenario['values']['hbase-opa'].find(",") > 0 %}
                 image: "{{ test_scenario['values']['hbase-opa'].split(',')[1] }}"
 {% else %}
-                image: docker.stackable.tech/stackable/hbase:{{ test_scenario['values']['hbase-opa'] }}-stackable0.0.0-dev
+                image: oci.stackable.tech/sdp/hbase:{{ test_scenario['values']['hbase-opa'] }}-stackable0.0.0-dev
 {% endif %}
                 env:
                   - name: HBASE_CONF_DIR

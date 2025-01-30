@@ -1,4 +1,12 @@
 //! Ensures that `Pod`s are configured and running for each [`HbaseCluster`]
+use std::{
+    collections::{BTreeMap, HashMap},
+    fmt::Write,
+    str::FromStr,
+    sync::Arc,
+};
+
+use const_format::concatcp;
 use product_config::{
     types::PropertyNameKind,
     writer::{to_hadoop_xml, to_java_properties_string, PropertiesWriterError},
@@ -52,12 +60,6 @@ use stackable_operator::{
     time::Duration,
     utils::cluster_info::KubernetesClusterInfo,
 };
-use std::{
-    collections::{BTreeMap, HashMap},
-    fmt::Write,
-    str::FromStr,
-    sync::Arc,
-};
 use strum::{EnumDiscriminants, IntoStaticStr, ParseError};
 
 use stackable_hbase_crd::{
@@ -84,6 +86,7 @@ use crate::{
 };
 
 pub const HBASE_CONTROLLER_NAME: &str = "hbasecluster";
+pub const FULL_HBASE_CONTROLLER_NAME: &str = concatcp!(HBASE_CONTROLLER_NAME, '.', OPERATOR_NAME);
 pub const MAX_HBASE_LOG_FILES_SIZE: MemoryQuantity = MemoryQuantity {
     value: 10.0,
     unit: BinaryMultiple::Mebi,
@@ -1247,9 +1250,7 @@ mod test {
         let hbase: HbaseCluster = serde_yaml::from_str(&input).expect("illegal test input");
 
         let resolved_image = ResolvedProductImage {
-            image: format!(
-                "docker.stackable.tech/stackable/hbase:{hbase_version}-stackable0.0.0-dev"
-            ),
+            image: format!("oci.stackable.tech/sdp/hbase:{hbase_version}-stackable0.0.0-dev"),
             app_version_label: hbase_version.to_string(),
             product_version: hbase_version.to_string(),
             image_pull_policy: "Never".to_string(),

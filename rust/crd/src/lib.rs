@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use shell_escape::escape;
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::k8s_openapi::api::core::v1::PodTemplateSpec;
+use stackable_operator::schemars::{self, JsonSchema};
 use stackable_operator::{
     commons::{
         affinity::StackableAffinity,
@@ -23,7 +24,6 @@ use stackable_operator::{
     product_config_utils::Configuration,
     product_logging::{self, spec::Logging},
     role_utils::{GenericRoleConfig, Role, RoleGroupRef},
-    schemars::{self, JsonSchema},
     status::condition::{ClusterCondition, HasStatusCondition},
     time::Duration,
 };

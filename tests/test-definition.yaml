@@ -5,16 +5,17 @@ dimensions:
       - 2.6.0
       - 2.4.18
       # To use a custom image, add a comma and the full name after the product version
-      # - 2.4.18,docker.stackable.tech/sandbox/hbase:2.4.18-stackable0.0.0-dev
+      # - 2.6.0,oci.stackable.tech/sandbox/hbase:2.6.0-stackable0.0.0-dev
+      # - 2.4.18,oci.stackable.tech/sandbox/hbase:2.4.18-stackable0.0.0-dev
   - name: hbase-opa
     values:
       - 2.6.0
       # To use a custom image, add a comma and the full name after the product version
-      # - 2.6.0,docker.stackable.tech/sandbox/hbase:2.6.0-stackable0.0.0-dev
+      # - 2.6.0,oci.stackable.tech/sandbox/hbase:2.6.0-stackable0.0.0-dev
   - name: hbase-latest
     values:
       - 2.6.0
-      # - 2.4.18,docker.stackable.tech/sandbox/hbase:2.4.18-stackable0.0.0-dev
+      # - 2.4.18,oci.stackable.tech/sandbox/hbase:2.4.18-stackable0.0.0-dev
   - name: hdfs
     values:
       - 3.3.4
@@ -34,7 +35,7 @@ dimensions:
       - 1.21.1
   - name: opa
     values:
-      - 0.67.1
+      - 1.0.0
   # Used for zookeeper, hdfs and hbase
   - name: listener-class
     values:
@@ -57,7 +58,7 @@ dimensions:
     values:
       - 1.1.2
       # To use a custom image, add a comma and the full name after the product version
-      # - 1.1.0,docker.stackable.tech/sandbox/omid:1.1.0-stackable0.0.0-dev
+      # - 1.1.0,oci.stackable.tech/sandbox/omid:1.1.0-stackable0.0.0-dev
 tests:
   - name: smoke
     dimensions:
