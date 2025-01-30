@@ -1305,9 +1305,7 @@ mod test {
         let hbase: HbaseCluster = serde_yaml::from_str(&input).expect("illegal test input");
 
         let resolved_image = ResolvedProductImage {
-            image: format!(
-                "docker.stackable.tech/stackable/hbase:{hbase_version}-stackable0.0.0-dev"
-            ),
+            image: format!("oci.stackable.tech/sdp/hbase:{hbase_version}-stackable0.0.0-dev"),
             app_version_label: hbase_version.to_string(),
             product_version: hbase_version.to_string(),
             image_pull_policy: "Never".to_string(),
