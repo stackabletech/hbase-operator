@@ -21,9 +21,7 @@ use stackable_operator::{
     kube::{runtime::reflector::ObjectRef, CustomResource, ResourceExt},
     product_config_utils::Configuration,
     product_logging::{self, spec::Logging},
-    role_utils::{
-        GenericProductSpecificCommonConfig, GenericRoleConfig, Role, RoleGroup, RoleGroupRef,
-    },
+    role_utils::{GenericRoleConfig, JavaCommonConfig, Role, RoleGroup, RoleGroupRef},
     schemars::{self, JsonSchema},
     status::condition::{ClusterCondition, HasStatusCondition},
     time::Duration,
@@ -51,16 +49,10 @@ pub const HBASE_SITE_XML: &str = "hbase-site.xml";
 pub const SSL_SERVER_XML: &str = "ssl-server.xml";
 pub const SSL_CLIENT_XML: &str = "ssl-client.xml";
 
-pub const HBASE_MANAGES_ZK: &str = "HBASE_MANAGES_ZK";
-pub const HBASE_MASTER_OPTS: &str = "HBASE_MASTER_OPTS";
-pub const HBASE_REGIONSERVER_OPTS: &str = "HBASE_REGIONSERVER_OPTS";
-pub const HBASE_REST_OPTS: &str = "HBASE_REST_OPTS";
-
 pub const HBASE_CLUSTER_DISTRIBUTED: &str = "hbase.cluster.distributed";
 pub const HBASE_ROOTDIR: &str = "hbase.rootdir";
 pub const HBASE_UNSAFE_REGIONSERVER_HOSTNAME_DISABLE_MASTER_REVERSEDNS: &str =
     "hbase.unsafe.regionserver.hostname.disable.master.reversedns";
-pub const HBASE_HEAPSIZE: &str = "HBASE_HEAPSIZE";
 
 pub const HBASE_UI_PORT_NAME_HTTP: &str = "ui-http";
 pub const HBASE_UI_PORT_NAME_HTTPS: &str = "ui-https";
@@ -80,8 +72,6 @@ pub const HBASE_REST_UI_PORT: u16 = 8085;
 // This port is only used by Hbase prior to version 2.6 with a third-party JMX exporter.
 // Newer versions use the same port as the UI because Hbase provides it's own metrics API
 pub const METRICS_PORT: u16 = 9100;
-
-pub const JVM_HEAP_FACTOR: f32 = 0.8;
 
 #[derive(Snafu, Debug)]
 pub enum Error {
@@ -137,15 +127,15 @@ pub struct HbaseClusterSpec {
     /// The HBase master process is responsible for assigning regions to region servers and
     /// manages the cluster.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub masters: Option<Role<HbaseConfigFragment>>,
+    pub masters: Option<Role<HbaseConfigFragment, GenericRoleConfig, JavaCommonConfig>>,
 
     /// Region servers hold the data and handle requests from clients for their region.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub region_servers: Option<Role<HbaseConfigFragment>>,
+    pub region_servers: Option<Role<HbaseConfigFragment, GenericRoleConfig, JavaCommonConfig>>,
 
     /// Rest servers provide a REST API to interact with.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub rest_servers: Option<Role<HbaseConfigFragment>>,
+    pub rest_servers: Option<Role<HbaseConfigFragment, GenericRoleConfig, JavaCommonConfig>>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
@@ -325,7 +315,6 @@ impl HbaseRole {
 
         HbaseConfigFragment {
             hbase_rootdir: None,
-            hbase_opts: None,
             resources,
             logging: product_logging::spec::default_logging(),
             affinity: get_affinity(cluster_name, self, hdfs_discovery_cm_name),
@@ -413,12 +402,13 @@ pub enum Container {
 pub struct HbaseConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub hbase_rootdir: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub hbase_opts: Option<String>,
+
     #[fragment_attrs(serde(default))]
     pub resources: Resources<HbaseStorageConfig, NoRuntimeLimits>,
+
     #[fragment_attrs(serde(default))]
     pub logging: Logging<Container>,
+
     #[fragment_attrs(serde(default))]
     pub affinity: StackableAffinity,
 
@@ -538,7 +528,10 @@ impl HbaseCluster {
         }
     }
 
-    pub fn get_role(&self, role: &HbaseRole) -> Option<&Role<HbaseConfigFragment>> {
+    pub fn get_role(
+        &self,
+        role: &HbaseRole,
+    ) -> Option<&Role<HbaseConfigFragment, GenericRoleConfig, JavaCommonConfig>> {
         match role {
             HbaseRole::Master => self.spec.masters.as_ref(),
             HbaseRole::RegionServer => self.spec.region_servers.as_ref(),
@@ -550,7 +543,7 @@ impl HbaseCluster {
     pub fn get_role_group(
         &self,
         rolegroup_ref: &RoleGroupRef<HbaseCluster>,
-    ) -> Result<&RoleGroup<HbaseConfigFragment, GenericProductSpecificCommonConfig>, Error> {
+    ) -> Result<&RoleGroup<HbaseConfigFragment, JavaCommonConfig>, Error> {
         let role_variant =
             HbaseRole::from_str(&rolegroup_ref.role).with_context(|_| InvalidRoleSnafu {
                 role: rolegroup_ref.role.to_owned(),

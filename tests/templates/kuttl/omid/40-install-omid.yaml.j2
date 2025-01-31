@@ -80,7 +80,7 @@ spec:
             - name: HADOOP_CONF_DIR
               value: /stackable/conf/hdfs
             - name: JVM_FLAGS
-              value: "-Xmx3g -Xms3g"
+              value: "-Xms3g -Xmx3g"
           ports:
             # See also hbase-omid-client-config.yml above where the client is configured with this port
             - containerPort: 24758
