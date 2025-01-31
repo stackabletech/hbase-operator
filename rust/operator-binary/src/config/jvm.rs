@@ -56,7 +56,7 @@ fn construct_role_specific_jvm_args(
     )];
 
     // Starting with HBase 2.6 the JVM exporter is not needed anymore
-    if product_version.starts_with(r"2.4") {
+    if product_version.starts_with("2.4") || product_version.starts_with("2.5") {
         jvm_args.push(
             format!("-javaagent:/stackable/jmx/jmx_prometheus_javaagent.jar={METRICS_PORT}:/stackable/jmx/{hbase_role}.yaml")
         );
