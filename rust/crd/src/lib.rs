@@ -23,7 +23,7 @@ use stackable_operator::{
     kube::{runtime::reflector::ObjectRef, CustomResource, ResourceExt},
     product_config_utils::Configuration,
     product_logging::{self, spec::Logging},
-    role_utils::{GenericRoleConfig, Role, RoleGroupRef},
+    role_utils::{GenericRoleConfig, JavaCommonConfig, Role, RoleGroupRef},
     status::condition::{ClusterCondition, HasStatusCondition},
     time::Duration,
 };
@@ -54,16 +54,10 @@ pub const HBASE_SITE_XML: &str = "hbase-site.xml";
 pub const SSL_SERVER_XML: &str = "ssl-server.xml";
 pub const SSL_CLIENT_XML: &str = "ssl-client.xml";
 
-pub const HBASE_MANAGES_ZK: &str = "HBASE_MANAGES_ZK";
-pub const HBASE_MASTER_OPTS: &str = "HBASE_MASTER_OPTS";
-pub const HBASE_REGIONSERVER_OPTS: &str = "HBASE_REGIONSERVER_OPTS";
-pub const HBASE_REST_OPTS: &str = "HBASE_REST_OPTS";
-
 pub const HBASE_CLUSTER_DISTRIBUTED: &str = "hbase.cluster.distributed";
 pub const HBASE_ROOTDIR: &str = "hbase.rootdir";
 pub const HBASE_UNSAFE_REGIONSERVER_HOSTNAME_DISABLE_MASTER_REVERSEDNS: &str =
     "hbase.unsafe.regionserver.hostname.disable.master.reversedns";
-pub const HBASE_HEAPSIZE: &str = "HBASE_HEAPSIZE";
 
 pub const HBASE_UI_PORT_NAME_HTTP: &str = "ui-http";
 pub const HBASE_UI_PORT_NAME_HTTPS: &str = "ui-https";
@@ -83,8 +77,6 @@ pub const HBASE_REST_UI_PORT: u16 = 8085;
 // This port is only used by Hbase prior to version 2.6 with a third-party JMX exporter.
 // Newer versions use the same port as the UI because Hbase provides it's own metrics API
 pub const METRICS_PORT: u16 = 9100;
-
-pub const JVM_HEAP_FACTOR: f32 = 0.8;
 
 const DEFAULT_REGION_MOVER_TIMEOUT: Duration = Duration::from_minutes_unchecked(59);
 const DEFAULT_REGION_MOVER_DELTA_TO_SHUTDOWN: Duration = Duration::from_minutes_unchecked(1);
@@ -149,15 +141,16 @@ pub struct HbaseClusterSpec {
     /// The HBase master process is responsible for assigning regions to region servers and
     /// manages the cluster.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub masters: Option<Role<HbaseConfigFragment>>,
+    pub masters: Option<Role<HbaseConfigFragment, GenericRoleConfig, JavaCommonConfig>>,
 
     /// Region servers hold the data and handle requests from clients for their region.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub region_servers: Option<Role<RegionServerConfigFragment>>,
+    pub region_servers:
+        Option<Role<RegionServerConfigFragment, GenericRoleConfig, JavaCommonConfig>>,
 
     /// Rest servers provide a REST API to interact with.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub rest_servers: Option<Role<HbaseConfigFragment>>,
+    pub rest_servers: Option<Role<HbaseConfigFragment, GenericRoleConfig, JavaCommonConfig>>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
@@ -282,6 +275,69 @@ impl HbaseRole {
     const DEFAULT_REGION_SECRET_LIFETIME: Duration = Duration::from_days_unchecked(1);
     const DEFAULT_REST_SECRET_LIFETIME: Duration = Duration::from_days_unchecked(1);
 
+    pub fn default_config(
+        &self,
+        cluster_name: &str,
+        hdfs_discovery_cm_name: &str,
+    ) -> HbaseConfigFragment {
+        let resources = match &self {
+            HbaseRole::Master => ResourcesFragment {
+                cpu: CpuLimitsFragment {
+                    min: Some(Quantity("250m".to_owned())),
+                    max: Some(Quantity("1".to_owned())),
+                },
+                memory: MemoryLimitsFragment {
+                    limit: Some(Quantity("1Gi".to_owned())),
+                    runtime_limits: NoRuntimeLimitsFragment {},
+                },
+                storage: HbaseStorageConfigFragment {},
+            },
+            HbaseRole::RegionServer => ResourcesFragment {
+                cpu: CpuLimitsFragment {
+                    min: Some(Quantity("250m".to_owned())),
+                    max: Some(Quantity("1".to_owned())),
+                },
+                memory: MemoryLimitsFragment {
+                    limit: Some(Quantity("1Gi".to_owned())),
+                    runtime_limits: NoRuntimeLimitsFragment {},
+                },
+                storage: HbaseStorageConfigFragment {},
+            },
+            HbaseRole::RestServer => ResourcesFragment {
+                cpu: CpuLimitsFragment {
+                    min: Some(Quantity("100m".to_owned())),
+                    max: Some(Quantity("400m".to_owned())),
+                },
+                memory: MemoryLimitsFragment {
+                    limit: Some(Quantity("512Mi".to_owned())),
+                    runtime_limits: NoRuntimeLimitsFragment {},
+                },
+                storage: HbaseStorageConfigFragment {},
+            },
+        };
+
+        let graceful_shutdown_timeout = match &self {
+            HbaseRole::Master => Self::DEFAULT_MASTER_GRACEFUL_SHUTDOWN_TIMEOUT,
+            HbaseRole::RegionServer => Self::DEFAULT_REGION_SERVER_GRACEFUL_SHUTDOWN_TIMEOUT,
+            HbaseRole::RestServer => Self::DEFAULT_REST_SERVER_GRACEFUL_SHUTDOWN_TIMEOUT,
+        };
+
+        let requested_secret_lifetime = match &self {
+            HbaseRole::Master => Self::DEFAULT_MASTER_SECRET_LIFETIME,
+            HbaseRole::RegionServer => Self::DEFAULT_REGION_SECRET_LIFETIME,
+            HbaseRole::RestServer => Self::DEFAULT_REST_SECRET_LIFETIME,
+        };
+
+        HbaseConfigFragment {
+            hbase_rootdir: None,
+            resources,
+            logging: product_logging::spec::default_logging(),
+            affinity: get_affinity(cluster_name, self, hdfs_discovery_cm_name),
+            graceful_shutdown_timeout: Some(graceful_shutdown_timeout),
+            requested_secret_lifetime: Some(requested_secret_lifetime),
+        }
+    }
+
     /// Returns the name of the role as it is needed by the `bin/hbase {cli_role_name} start` command.
     pub fn cli_role_name(&self) -> String {
         match self {
@@ -384,7 +440,6 @@ impl AnyConfigFragment {
             }
             HbaseRole::RestServer => AnyConfigFragment::RestServer(HbaseConfigFragment {
                 hbase_rootdir: None,
-                hbase_opts: None,
                 resources: default_resources(role),
                 logging: product_logging::spec::default_logging(),
                 affinity: get_affinity(cluster_name, role, hdfs_discovery_cm_name),
@@ -395,7 +450,6 @@ impl AnyConfigFragment {
             }),
             HbaseRole::Master => AnyConfigFragment::Master(HbaseConfigFragment {
                 hbase_rootdir: None,
-                hbase_opts: None,
                 resources: default_resources(role),
                 logging: product_logging::spec::default_logging(),
                 affinity: get_affinity(cluster_name, role, hdfs_discovery_cm_name),
@@ -462,12 +516,13 @@ pub enum Container {
 pub struct HbaseConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub hbase_rootdir: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub hbase_opts: Option<String>,
+
     #[fragment_attrs(serde(default))]
     pub resources: Resources<HbaseStorageConfig, NoRuntimeLimits>,
+
     #[fragment_attrs(serde(default))]
     pub logging: Logging<Container>,
+
     #[fragment_attrs(serde(default))]
     pub affinity: StackableAffinity,
 
@@ -832,7 +887,11 @@ impl HbaseCluster {
             String,
             (
                 Vec<PropertyNameKind>,
-                Role<impl Configuration<Configurable = HbaseCluster>>,
+                Role<
+                    impl Configuration<Configurable = HbaseCluster>,
+                    GenericRoleConfig,
+                    JavaCommonConfig,
+                >,
             ),
         >,
         Error,
@@ -1115,13 +1174,6 @@ impl AnyServiceConfig {
             AnyServiceConfig::Master(config) => &config.graceful_shutdown_timeout,
             AnyServiceConfig::RegionServer(config) => &config.graceful_shutdown_timeout,
             AnyServiceConfig::RestServer(config) => &config.graceful_shutdown_timeout,
-        }
-    }
-    pub fn hbase_opts(&self) -> &Option<String> {
-        match self {
-            AnyServiceConfig::Master(config) => &config.hbase_opts,
-            AnyServiceConfig::RegionServer(config) => &config.hbase_opts,
-            AnyServiceConfig::RestServer(config) => &config.hbase_opts,
         }
     }
     pub fn requested_secret_lifetime(&self) -> Option<Duration> {

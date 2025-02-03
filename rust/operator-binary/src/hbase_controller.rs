@@ -62,16 +62,16 @@ use stackable_operator::{
 };
 use strum::{EnumDiscriminants, IntoStaticStr, ParseError};
 
-use stackable_hbase_crd::{
-    merged_env, AnyServiceConfig, Container, HbaseCluster, HbaseClusterStatus, HbaseRole, APP_NAME,
-    CONFIG_DIR_NAME, HBASE_ENV_SH, HBASE_HEAPSIZE, HBASE_MANAGES_ZK, HBASE_MASTER_OPTS,
-    HBASE_REGIONSERVER_OPTS, HBASE_REST_OPTS, HBASE_REST_PORT_NAME_HTTP,
-    HBASE_REST_PORT_NAME_HTTPS, HBASE_SITE_XML, JVM_HEAP_FACTOR, JVM_SECURITY_PROPERTIES_FILE,
-    METRICS_PORT, SSL_CLIENT_XML, SSL_SERVER_XML,
-};
-
 use crate::product_logging::{CONTAINERDEBUG_LOG_DIRECTORY, STACKABLE_LOG_DIR};
 use crate::security::opa::HbaseOpaConfig;
+use stackable_hbase_crd::{
+    merged_env, AnyServiceConfig, Container, HbaseCluster, HbaseClusterStatus, HbaseRole, APP_NAME,
+    HBASE_ENV_SH, HBASE_REST_PORT_NAME_HTTP, HBASE_REST_PORT_NAME_HTTPS, HBASE_SITE_XML,
+    JVM_SECURITY_PROPERTIES_FILE, SSL_CLIENT_XML, SSL_SERVER_XML,
+};
+
+use crate::config::jvm::construct_hbase_heapsize_env;
+use crate::config::jvm::{construct_global_jvm_args, construct_role_specific_non_heap_jvm_args};
 use crate::{
     discovery::build_discovery_configmap,
     kerberos::{
@@ -121,6 +121,15 @@ pub enum Error {
 
     #[snafu(display("object defines no namespace"))]
     ObjectHasNoNamespace,
+
+    #[snafu(display("object defines no master role"))]
+    NoMasterRole,
+
+    #[snafu(display("the HBase role [{role}] is missing from spec"))]
+    MissingHbaseRole { role: String },
+
+    #[snafu(display("object defines no regionserver role"))]
+    NoRegionServerRole,
 
     #[snafu(display("failed to calculate global service name"))]
     GlobalServiceNameNotFound,
@@ -224,15 +233,6 @@ pub enum Error {
     #[snafu(display("failed to resolve and merge config for role and role group"))]
     FailedToResolveConfig { source: stackable_hbase_crd::Error },
 
-    #[snafu(display("invalid java heap config - missing default or value in crd?"))]
-    InvalidJavaHeapConfig,
-
-    #[snafu(display("failed to convert java heap config to unit [{unit}]"))]
-    FailedToConvertJavaHeap {
-        source: stackable_operator::memory::Error,
-        unit: String,
-    },
-
     #[snafu(display("failed to resolve the Vector aggregator address"))]
     ResolveVectorAggregatorAddress {
         source: crate::product_logging::Error,
@@ -308,6 +308,12 @@ pub enum Error {
     InvalidHBaseCluster {
         source: error_boundary::InvalidObject,
     },
+
+    #[snafu(display("failed to construct HBASE_HEAPSIZE env variable"))]
+    ConstructHbaseHeapsizeEnv { source: crate::config::jvm::Error },
+
+    #[snafu(display("failed to construct JVM arguments"))]
+    ConstructJvmArgument { source: crate::config::jvm::Error },
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -565,7 +571,7 @@ fn build_rolegroup_config_map(
     rolegroup: &RoleGroupRef<HbaseCluster>,
     rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
     zookeeper_connection_information: &ZookeeperConnectionInformation,
-    hbase_config: &AnyServiceConfig,
+    merged_config: &AnyServiceConfig,
     resolved_product_image: &ResolvedProductImage,
     hbase_opa_config: Option<&HbaseOpaConfig>,
     vector_aggregator_address: Option<&str>,
@@ -575,7 +581,7 @@ fn build_rolegroup_config_map(
     let mut ssl_server_xml = String::new();
     let mut ssl_client_xml = String::new();
 
-    let role =
+    let hbase_role =
         HbaseRole::from_str(rolegroup.role.as_ref()).with_context(|_| UnknownHbaseRoleSnafu {
             role: rolegroup.role.clone(),
         })?;
@@ -604,9 +610,11 @@ fn build_rolegroup_config_map(
             }
             PropertyNameKind::File(file_name) if file_name == HBASE_ENV_SH => {
                 let mut hbase_env_config = build_hbase_env_sh(
-                    hbase_config,
-                    &role,
-                    resolved_product_image.product_version.as_ref(),
+                    hbase,
+                    merged_config,
+                    &hbase_role,
+                    &rolegroup.role_group,
+                    &resolved_product_image.product_version,
                 )?;
 
                 // configOverride come last
@@ -694,7 +702,7 @@ fn build_rolegroup_config_map(
     extend_role_group_config_map(
         rolegroup,
         vector_aggregator_address,
-        hbase_config.logging(),
+        merged_config.logging(),
         &mut builder,
         &resolved_product_image.product_version,
     )
@@ -1095,70 +1103,49 @@ pub fn build_recommended_labels<'a>(
 
 /// The content of the HBase `hbase-env.sh` file.
 fn build_hbase_env_sh(
-    hbase_config: &AnyServiceConfig,
-    role: &HbaseRole,
-    hbase_version: &str,
+    hbase: &HbaseCluster,
+    merged_config: &AnyServiceConfig,
+    hbase_role: &HbaseRole,
+    role_group: &str,
+    product_version: &str,
 ) -> Result<BTreeMap<String, String>, Error> {
     let mut result = BTreeMap::new();
 
-    result.insert(HBASE_MANAGES_ZK.to_string(), "false".to_string());
+    result.insert("HBASE_MANAGES_ZK".to_string(), "false".to_string());
 
-    // We always enable `-Djava.security.krb5.conf` even if it's not used.
-    let all_hbase_opts = [
-        format!("-Djava.security.properties={CONFIG_DIR_NAME}/{JVM_SECURITY_PROPERTIES_FILE}"),
-        String::from("-Djava.security.krb5.conf=/stackable/kerberos/krb5.conf"),
-    ]
-    .iter()
-    .chain(jmx_system_properties(role, hbase_version).as_slice()) // Add the JMX options
-    .chain(hbase_config.hbase_opts().as_slice()) // Add the user defined options
-    .cloned()
-    .collect::<Vec<String>>()
-    .join(" ");
-
-    match role {
+    result.insert(
+        "HBASE_HEAPSIZE".to_owned(),
+        construct_hbase_heapsize_env(merged_config).context(ConstructHbaseHeapsizeEnvSnafu)?,
+    );
+    result.insert(
+        "HBASE_OPTS".to_owned(),
+        construct_global_jvm_args(hbase.has_kerberos_enabled()),
+    );
+    let role_specific_non_heap_jvm_args =
+        construct_role_specific_non_heap_jvm_args(hbase, hbase_role, role_group, product_version)
+            .context(ConstructJvmArgumentSnafu)?;
+    match hbase_role {
         HbaseRole::Master => {
-            result.insert(HBASE_MASTER_OPTS.to_string(), all_hbase_opts);
+            result.insert(
+                "HBASE_MASTER_OPTS".to_string(),
+                role_specific_non_heap_jvm_args,
+            );
         }
         HbaseRole::RegionServer => {
-            result.insert(HBASE_REGIONSERVER_OPTS.to_string(), all_hbase_opts);
+            result.insert(
+                "HBASE_REGIONSERVER_OPTS".to_string(),
+                role_specific_non_heap_jvm_args,
+            );
         }
         HbaseRole::RestServer => {
-            result.insert(HBASE_REST_OPTS.to_string(), all_hbase_opts);
+            result.insert(
+                "HBASE_REST_OPTS".to_string(),
+                role_specific_non_heap_jvm_args,
+            );
         }
     }
 
-    let memory_limit = MemoryQuantity::try_from(
-        hbase_config
-            .resources()
-            .memory
-            .limit
-            .as_ref()
-            .context(InvalidJavaHeapConfigSnafu)?,
-    )
-    .context(FailedToConvertJavaHeapSnafu {
-        unit: BinaryMultiple::Mebi.to_java_memory_unit(),
-    })?;
-    let heap_in_mebi = (memory_limit * JVM_HEAP_FACTOR)
-        .scale_to(BinaryMultiple::Mebi)
-        .format_for_java()
-        .context(FailedToConvertJavaHeapSnafu {
-            unit: BinaryMultiple::Mebi.to_java_memory_unit(),
-        })?;
-    result.insert(HBASE_HEAPSIZE.to_string(), heap_in_mebi);
-
     Ok(result)
-}
-
-/// Return the JVM system properties for the JMX exporter.
-/// Starting with HBase 2.6 these are not needed anymore
-fn jmx_system_properties(role: &HbaseRole, hbase_version: &str) -> Option<String> {
-    if hbase_version.starts_with(r"2.4") {
-        let role_name = role.to_string();
-
-        Some(format!("-javaagent:/stackable/jmx/jmx_prometheus_javaagent.jar={METRICS_PORT}:/stackable/jmx/{role_name}.yaml"))
-    } else {
-        None
-    }
 }
 
 /// Ensures that no authorization is configured for HBase versions that do not support it.

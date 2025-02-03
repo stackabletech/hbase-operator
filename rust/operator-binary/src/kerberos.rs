@@ -251,11 +251,6 @@ pub fn add_kerberos_pod_config(
 
         // Needed env vars
         cb.add_env_var("KRB5_CONFIG", "/stackable/kerberos/krb5.conf");
-        // This env var does not only affect the servers, but also the hbase shell
-        cb.add_env_var(
-            "HBASE_OPTS",
-            "-Djava.security.krb5.conf=/stackable/kerberos/krb5.conf",
-        );
     }
 
     if let Some(https_secret_class) = hbase.https_secret_class() {
