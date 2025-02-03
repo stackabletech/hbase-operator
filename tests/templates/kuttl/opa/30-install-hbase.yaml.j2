@@ -65,6 +65,7 @@ commands:
 {% endif %}
         masters:
           config:
+            gracefulShutdownTimeout: 1m
             logging:
               enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
           roleGroups:
@@ -79,6 +80,7 @@ commands:
                         configMap: hbase-log-config
         regionServers:
           config:
+            gracefulShutdownTimeout: 1m
             logging:
               enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
           roleGroups:
@@ -93,6 +95,7 @@ commands:
                         configMap: hbase-log-config
         restServers:
           config:
+            gracefulShutdownTimeout: 1m
             logging:
               enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
           roleGroups:

@@ -16,6 +16,7 @@ commands:
             containers:
               - name: access-hdfs
                 image: oci.stackable.tech/sdp/hadoop:{{ test_scenario['values']['hdfs-latest'] }}-stackable0.0.0-dev
+                imagePullPolicy: IfNotPresent
                 env:
                   - name: HADOOP_CONF_DIR
                     value: /stackable/conf/hdfs

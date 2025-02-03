@@ -2,17 +2,13 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestAssert
 metadata:
-  name: install-hbase
+  name: install-hdfs
 timeout: 600
 ---
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: test-hbase-master-default
-spec:
-  template:
-    spec:
-      terminationGracePeriodSeconds: 60
+  name: test-hdfs-namenode-default
 status:
   readyReplicas: 2
   replicas: 2
@@ -20,11 +16,7 @@ status:
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: test-hbase-regionserver-default
-spec:
-  template:
-    spec:
-      terminationGracePeriodSeconds: 60
+  name: test-hdfs-journalnode-default
 status:
   readyReplicas: 1
   replicas: 1
@@ -32,11 +24,7 @@ status:
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: test-hbase-restserver-default
-spec:
-  template:
-    spec:
-      terminationGracePeriodSeconds: 60
+  name: test-hdfs-datanode-default
 status:
   readyReplicas: 1
   replicas: 1

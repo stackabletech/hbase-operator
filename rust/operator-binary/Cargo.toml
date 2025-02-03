@@ -16,7 +16,6 @@ clap.workspace = true
 const_format.workspace = true
 fnv.workspace = true
 futures.workspace = true
-indoc.workspace = true
 product-config.workspace = true
 serde.workspace = true
 snafu.workspace = true
