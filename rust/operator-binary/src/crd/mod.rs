@@ -28,7 +28,7 @@ use stackable_operator::{
 };
 use strum::{Display, EnumIter, EnumString};
 
-use crate::{affinity::get_affinity, security::AuthorizationConfig};
+use crate::crd::{affinity::get_affinity, security::AuthorizationConfig};
 
 pub mod affinity;
 pub mod security;
@@ -708,7 +708,7 @@ mod tests {
         transform_all_roles_to_config, validate_all_roles_and_groups_config,
     };
 
-    use crate::{merged_env, HbaseCluster, HbaseRole};
+    use crate::crd::{merged_env, HbaseCluster, HbaseRole};
 
     #[test]
     pub fn test_env_overrides() {

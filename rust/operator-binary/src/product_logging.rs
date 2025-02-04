@@ -1,5 +1,4 @@
 use snafu::{OptionExt, ResultExt, Snafu};
-use stackable_hbase_crd::{Container, HbaseCluster};
 use stackable_operator::{
     builder::configmap::ConfigMapBuilder,
     client::Client,
@@ -15,7 +14,10 @@ use stackable_operator::{
     role_utils::RoleGroupRef,
 };
 
-use crate::hbase_controller::MAX_HBASE_LOG_FILES_SIZE;
+use crate::{
+    crd::{Container, HbaseCluster},
+    hbase_controller::MAX_HBASE_LOG_FILES_SIZE,
+};
 
 #[derive(Snafu, Debug)]
 pub enum Error {
@@ -35,7 +37,7 @@ pub enum Error {
     },
 
     #[snafu(display("crd validation failure"))]
-    CrdValidationFailure { source: stackable_hbase_crd::Error },
+    CrdValidationFailure { source: crate::crd::Error },
 
     #[snafu(display("vectorAggregatorConfigMapName must be set"))]
     MissingVectorAggregatorAddress,

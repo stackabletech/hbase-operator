@@ -1,11 +1,12 @@
 use snafu::{OptionExt, ResultExt, Snafu};
-use stackable_hbase_crd::{
-    HbaseConfig, HbaseConfigFragment, HbaseRole, CONFIG_DIR_NAME, JVM_SECURITY_PROPERTIES_FILE,
-    METRICS_PORT,
-};
 use stackable_operator::{
     memory::{BinaryMultiple, MemoryQuantity},
     role_utils::{self, GenericRoleConfig, JavaCommonConfig, JvmArgumentOverrides, Role},
+};
+
+use crate::crd::{
+    HbaseConfig, HbaseConfigFragment, HbaseRole, CONFIG_DIR_NAME, JVM_SECURITY_PROPERTIES_FILE,
+    METRICS_PORT,
 };
 
 const JAVA_HEAP_FACTOR: f32 = 0.8;
@@ -128,9 +129,8 @@ fn is_heap_jvm_argument(jvm_argument: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use stackable_hbase_crd::{HbaseCluster, HbaseRole};
-
     use super::*;
+    use crate::crd::{HbaseCluster, HbaseRole};
 
     #[test]
     fn test_construct_jvm_arguments_defaults() {

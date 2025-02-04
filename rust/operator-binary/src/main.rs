@@ -3,7 +3,6 @@ use std::sync::Arc;
 use clap::Parser;
 use futures::StreamExt;
 use hbase_controller::FULL_HBASE_CONTROLLER_NAME;
-use stackable_hbase_crd::{HbaseCluster, APP_NAME};
 use stackable_operator::{
     cli::{Command, ProductOperatorRun},
     k8s_openapi::api::{apps::v1::StatefulSet, core::v1::Service},
@@ -18,7 +17,10 @@ use stackable_operator::{
     CustomResourceExt,
 };
 
+use crate::crd::{HbaseCluster, APP_NAME};
+
 mod config;
+mod crd;
 mod discovery;
 mod hbase_controller;
 mod kerberos;

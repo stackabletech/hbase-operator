@@ -1,12 +1,13 @@
 use std::{collections::BTreeMap, num::ParseIntError};
 
 use snafu::{OptionExt, ResultExt, Snafu};
-use stackable_hbase_crd::HbaseCluster;
 use stackable_operator::{
     client::Client, k8s_openapi::api::core::v1::ConfigMap, kube::ResourceExt,
 };
 use strum::{EnumDiscriminants, IntoStaticStr};
 use tracing::warn;
+
+use crate::crd::HbaseCluster;
 
 const ZOOKEEPER_DISCOVERY_CM_HOSTS_ENTRY: &str = "ZOOKEEPER_HOSTS";
 const ZOOKEEPER_DISCOVERY_CM_CHROOT_ENTRY: &str = "ZOOKEEPER_CHROOT";

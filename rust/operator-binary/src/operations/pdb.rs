@@ -1,11 +1,14 @@
 use snafu::{ResultExt, Snafu};
-use stackable_hbase_crd::{HbaseCluster, HbaseRole, APP_NAME};
 use stackable_operator::{
     builder::pdb::PodDisruptionBudgetBuilder, client::Client, cluster_resources::ClusterResources,
     commons::pdb::PdbConfig, kube::ResourceExt,
 };
 
-use crate::{hbase_controller::HBASE_CONTROLLER_NAME, OPERATOR_NAME};
+use crate::{
+    crd::{HbaseCluster, HbaseRole, APP_NAME},
+    hbase_controller::HBASE_CONTROLLER_NAME,
+    OPERATOR_NAME,
+};
 
 #[derive(Snafu, Debug)]
 pub enum Error {

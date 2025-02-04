@@ -14,12 +14,6 @@ use product_config::{
     ProductConfigManager,
 };
 use snafu::{OptionExt, ResultExt, Snafu};
-use stackable_hbase_crd::{
-    merged_env, Container, HbaseCluster, HbaseClusterStatus, HbaseConfig, HbaseConfigFragment,
-    HbaseRole, APP_NAME, CONFIG_DIR_NAME, HBASE_ENV_SH, HBASE_REST_PORT_NAME_HTTP,
-    HBASE_REST_PORT_NAME_HTTPS, HBASE_SITE_XML, JVM_SECURITY_PROPERTIES_FILE, SSL_CLIENT_XML,
-    SSL_SERVER_XML,
-};
 use stackable_operator::{
     builder::{
         self,
@@ -77,6 +71,12 @@ use crate::{
         construct_global_jvm_args, construct_hbase_heapsize_env,
         construct_role_specific_non_heap_jvm_args,
     },
+    crd::{
+        merged_env, Container, HbaseCluster, HbaseClusterStatus, HbaseConfig, HbaseConfigFragment,
+        HbaseRole, APP_NAME, CONFIG_DIR_NAME, HBASE_ENV_SH, HBASE_REST_PORT_NAME_HTTP,
+        HBASE_REST_PORT_NAME_HTTPS, HBASE_SITE_XML, JVM_SECURITY_PROPERTIES_FILE, SSL_CLIENT_XML,
+        SSL_SERVER_XML,
+    },
     discovery::build_discovery_configmap,
     kerberos::{
         self, add_kerberos_pod_config, kerberos_config_properties,
@@ -88,8 +88,7 @@ use crate::{
         extend_role_group_config_map, log4j_properties_file_name,
         resolve_vector_aggregator_address, STACKABLE_LOG_DIR,
     },
-    security,
-    security::opa::HbaseOpaConfig,
+    security::{self, opa::HbaseOpaConfig},
     zookeeper::{self, ZookeeperConnectionInformation},
     OPERATOR_NAME,
 };
@@ -232,10 +231,10 @@ pub enum Error {
     },
 
     #[snafu(display("failed to retrieve Hbase role group: {source}"))]
-    UnidentifiedHbaseRoleGroup { source: stackable_hbase_crd::Error },
+    UnidentifiedHbaseRoleGroup { source: crate::crd::Error },
 
     #[snafu(display("failed to resolve and merge config for role and role group"))]
-    FailedToResolveConfig { source: stackable_hbase_crd::Error },
+    FailedToResolveConfig { source: crate::crd::Error },
 
     #[snafu(display("failed to resolve the Vector aggregator address"))]
     ResolveVectorAggregatorAddress {

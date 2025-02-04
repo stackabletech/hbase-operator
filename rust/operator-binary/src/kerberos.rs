@@ -2,9 +2,6 @@ use std::collections::BTreeMap;
 
 use indoc::formatdoc;
 use snafu::{OptionExt, ResultExt, Snafu};
-use stackable_hbase_crd::{
-    HbaseCluster, HbaseRole, TLS_STORE_DIR, TLS_STORE_PASSWORD, TLS_STORE_VOLUME_NAME,
-};
 use stackable_operator::{
     builder::{
         self,
@@ -17,6 +14,10 @@ use stackable_operator::{
     kube::{runtime::reflector::ObjectRef, ResourceExt},
     time::Duration,
     utils::cluster_info::KubernetesClusterInfo,
+};
+
+use crate::crd::{
+    HbaseCluster, HbaseRole, TLS_STORE_DIR, TLS_STORE_PASSWORD, TLS_STORE_VOLUME_NAME,
 };
 
 #[derive(Snafu, Debug)]

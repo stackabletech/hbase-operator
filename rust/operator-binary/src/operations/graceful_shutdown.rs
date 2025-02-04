@@ -1,6 +1,7 @@
 use snafu::{ResultExt, Snafu};
-use stackable_hbase_crd::HbaseConfig;
 use stackable_operator::builder::pod::PodBuilder;
+
+use crate::crd::HbaseConfig;
 
 #[derive(Debug, Snafu)]
 pub enum Error {

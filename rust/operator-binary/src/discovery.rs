@@ -2,7 +2,6 @@ use std::collections::BTreeMap;
 
 use product_config::writer::to_hadoop_xml;
 use snafu::{ResultExt, Snafu};
-use stackable_hbase_crd::{HbaseCluster, HbaseRole, HBASE_SITE_XML};
 use stackable_operator::{
     builder::{configmap::ConfigMapBuilder, meta::ObjectMetaBuilder},
     commons::product_image_selection::ResolvedProductImage,
@@ -12,6 +11,7 @@ use stackable_operator::{
 };
 
 use crate::{
+    crd::{HbaseCluster, HbaseRole, HBASE_SITE_XML},
     hbase_controller::build_recommended_labels,
     kerberos::{self, kerberos_discovery_config_properties},
     zookeeper::ZookeeperConnectionInformation,

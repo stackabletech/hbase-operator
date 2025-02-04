@@ -1,6 +1,7 @@
 use snafu::{ResultExt, Snafu};
-use stackable_hbase_crd::{security::AuthorizationConfig, HbaseCluster};
 use stackable_operator::{client::Client, commons::opa::OpaApiVersion};
+
+use crate::crd::{security::AuthorizationConfig, HbaseCluster};
 
 const DEFAULT_DRY_RUN: bool = false;
 const DEFAULT_CACHE_ACTIVE: bool = true;
