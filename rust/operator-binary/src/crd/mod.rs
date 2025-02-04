@@ -101,7 +101,7 @@ pub mod versioned {
 
         /// Configuration that applies to all roles and role groups.
         /// This includes settings for logging, ZooKeeper and HDFS connection, among other things.
-        pub cluster_config: HbaseClusterConfig,
+        pub cluster_config: v1alpha1::HbaseClusterConfig,
 
         // no doc string - See ClusterOperation struct
         #[serde(default)]
@@ -119,6 +119,43 @@ pub mod versioned {
         /// Rest servers provide a REST API to interact with.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         pub rest_servers: Option<Role<HbaseConfigFragment, GenericRoleConfig, JavaCommonConfig>>,
+    }
+
+    #[derive(Clone, Debug, Default, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
+    #[serde(rename_all = "camelCase")]
+    pub struct HbaseClusterConfig {
+        /// Name of the [discovery ConfigMap](DOCS_BASE_URL_PLACEHOLDER/concepts/service_discovery)
+        /// for an HDFS cluster.
+        pub hdfs_config_map_name: String,
+
+        /// Name of the Vector aggregator [discovery ConfigMap](DOCS_BASE_URL_PLACEHOLDER/concepts/service_discovery).
+        /// It must contain the key `ADDRESS` with the address of the Vector aggregator.
+        /// Follow the [logging tutorial](DOCS_BASE_URL_PLACEHOLDER/tutorials/logging-vector-aggregator)
+        /// to learn how to configure log aggregation with Vector.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub vector_aggregator_config_map_name: Option<String>,
+
+        /// Name of the [discovery ConfigMap](DOCS_BASE_URL_PLACEHOLDER/concepts/service_discovery)
+        /// for a ZooKeeper cluster.
+        pub zookeeper_config_map_name: String,
+
+        /// This field controls which type of Service the Operator creates for this HbaseCluster:
+        ///
+        /// * cluster-internal: Use a ClusterIP service
+        ///
+        /// * external-unstable: Use a NodePort service
+        ///
+        /// This is a temporary solution with the goal to keep yaml manifests forward compatible.
+        /// In the future, this setting will control which [ListenerClass](DOCS_BASE_URL_PLACEHOLDER/listener-operator/listenerclass.html)
+        /// will be used to expose the service, and ListenerClass names will stay the same, allowing for a non-breaking change.
+        #[serde(default)]
+        pub listener_class: CurrentlySupportedListenerClasses,
+
+        /// Settings related to user [authentication](DOCS_BASE_URL_PLACEHOLDER/usage-guide/security).
+        pub authentication: Option<AuthenticationConfig>,
+
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        pub authorization: Option<AuthorizationConfig>,
     }
 }
 
@@ -138,43 +175,6 @@ pub enum Error {
 
     #[snafu(display("fragment validation failure"))]
     FragmentValidationFailure { source: ValidationError },
-}
-
-#[derive(Clone, Debug, Default, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct HbaseClusterConfig {
-    /// Name of the [discovery ConfigMap](DOCS_BASE_URL_PLACEHOLDER/concepts/service_discovery)
-    /// for an HDFS cluster.
-    pub hdfs_config_map_name: String,
-
-    /// Name of the Vector aggregator [discovery ConfigMap](DOCS_BASE_URL_PLACEHOLDER/concepts/service_discovery).
-    /// It must contain the key `ADDRESS` with the address of the Vector aggregator.
-    /// Follow the [logging tutorial](DOCS_BASE_URL_PLACEHOLDER/tutorials/logging-vector-aggregator)
-    /// to learn how to configure log aggregation with Vector.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub vector_aggregator_config_map_name: Option<String>,
-
-    /// Name of the [discovery ConfigMap](DOCS_BASE_URL_PLACEHOLDER/concepts/service_discovery)
-    /// for a ZooKeeper cluster.
-    pub zookeeper_config_map_name: String,
-
-    /// This field controls which type of Service the Operator creates for this HbaseCluster:
-    ///
-    /// * cluster-internal: Use a ClusterIP service
-    ///
-    /// * external-unstable: Use a NodePort service
-    ///
-    /// This is a temporary solution with the goal to keep yaml manifests forward compatible.
-    /// In the future, this setting will control which [ListenerClass](DOCS_BASE_URL_PLACEHOLDER/listener-operator/listenerclass.html)
-    /// will be used to expose the service, and ListenerClass names will stay the same, allowing for a non-breaking change.
-    #[serde(default)]
-    pub listener_class: CurrentlySupportedListenerClasses,
-
-    /// Settings related to user [authentication](DOCS_BASE_URL_PLACEHOLDER/usage-guide/security).
-    pub authentication: Option<AuthenticationConfig>,
-
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub authorization: Option<AuthorizationConfig>,
 }
 
 // TODO: Temporary solution until listener-operator is finished
