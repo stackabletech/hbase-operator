@@ -28,8 +28,7 @@ use stackable_operator::{
 };
 use strum::{Display, EnumIter, EnumString};
 
-use crate::affinity::get_affinity;
-use crate::security::AuthorizationConfig;
+use crate::{affinity::get_affinity, security::AuthorizationConfig};
 
 pub mod affinity;
 pub mod security;
@@ -704,13 +703,12 @@ mod tests {
     use std::collections::{BTreeMap, HashMap};
 
     use indoc::indoc;
+    use product_config::{types::PropertyNameKind, ProductConfigManager};
     use stackable_operator::product_config_utils::{
         transform_all_roles_to_config, validate_all_roles_and_groups_config,
     };
 
     use crate::{merged_env, HbaseCluster, HbaseRole};
-
-    use product_config::{types::PropertyNameKind, ProductConfigManager};
 
     #[test]
     pub fn test_env_overrides() {
