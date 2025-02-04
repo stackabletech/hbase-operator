@@ -5,7 +5,7 @@ use stackable_operator::{
 };
 
 use crate::{
-    crd::{HbaseCluster, HbaseRole, APP_NAME},
+    crd::{v1alpha1, HbaseRole, APP_NAME},
     hbase_controller::HBASE_CONTROLLER_NAME,
     OPERATOR_NAME,
 };
@@ -27,7 +27,7 @@ pub enum Error {
 
 pub async fn add_pdbs(
     pdb: &PdbConfig,
-    hbase: &HbaseCluster,
+    hbase: &v1alpha1::HbaseCluster,
     role: &HbaseRole,
     client: &Client,
     cluster_resources: &mut ClusterResources,

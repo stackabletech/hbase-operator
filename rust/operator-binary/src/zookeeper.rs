@@ -7,7 +7,7 @@ use stackable_operator::{
 use strum::{EnumDiscriminants, IntoStaticStr};
 use tracing::warn;
 
-use crate::crd::HbaseCluster;
+use crate::crd::v1alpha1;
 
 const ZOOKEEPER_DISCOVERY_CM_HOSTS_ENTRY: &str = "ZOOKEEPER_HOSTS";
 const ZOOKEEPER_DISCOVERY_CM_CHROOT_ENTRY: &str = "ZOOKEEPER_CHROOT";
@@ -53,7 +53,7 @@ pub struct ZookeeperConnectionInformation {
 }
 
 impl ZookeeperConnectionInformation {
-    pub async fn retrieve(hbase: &HbaseCluster, client: &Client) -> Result<Self> {
+    pub async fn retrieve(hbase: &v1alpha1::HbaseCluster, client: &Client) -> Result<Self> {
         let zk_discovery_cm_name = &hbase.spec.cluster_config.zookeeper_config_map_name;
         let mut zk_discovery_cm = client
             .get::<ConfigMap>(

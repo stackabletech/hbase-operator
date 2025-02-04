@@ -91,7 +91,7 @@ mod tests {
     };
 
     use super::*;
-    use crate::HbaseCluster;
+    use crate::crd::v1alpha1;
 
     #[rstest]
     #[case(HbaseRole::Master)]
@@ -122,7 +122,8 @@ mod tests {
               default:
                 replicas: 1
         "#;
-        let hbase: HbaseCluster = serde_yaml::from_str(input).expect("illegal test input");
+        let hbase: v1alpha1::HbaseCluster =
+            serde_yaml::from_str(input).expect("illegal test input");
         let merged_config = hbase
             .merged_config(
                 &role,

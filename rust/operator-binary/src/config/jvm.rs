@@ -130,7 +130,7 @@ fn is_heap_jvm_argument(jvm_argument: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::crd::{HbaseCluster, HbaseRole};
+    use crate::crd::{v1alpha1, HbaseRole};
 
     #[test]
     fn test_construct_jvm_arguments_defaults() {
@@ -254,7 +254,8 @@ mod tests {
         String,
         String,
     ) {
-        let hbase: HbaseCluster = serde_yaml::from_str(hbase_cluster).expect("illegal test input");
+        let hbase: v1alpha1::HbaseCluster =
+            serde_yaml::from_str(hbase_cluster).expect("illegal test input");
 
         let hbase_role = HbaseRole::RegionServer;
         let merged_config = hbase

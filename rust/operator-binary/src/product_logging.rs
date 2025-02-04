@@ -15,7 +15,7 @@ use stackable_operator::{
 };
 
 use crate::{
-    crd::{Container, HbaseCluster},
+    crd::{v1alpha1, Container},
     hbase_controller::MAX_HBASE_LOG_FILES_SIZE,
 };
 
@@ -56,7 +56,7 @@ pub const STACKABLE_LOG_DIR: &str = "/stackable/log";
 /// Return the address of the Vector aggregator if the corresponding ConfigMap name is given in the
 /// cluster spec
 pub async fn resolve_vector_aggregator_address(
-    hbase: &HbaseCluster,
+    hbase: &v1alpha1::HbaseCluster,
     client: &Client,
 ) -> Result<Option<String>> {
     let vector_aggregator_address = if let Some(vector_aggregator_config_map_name) =
@@ -90,7 +90,7 @@ pub async fn resolve_vector_aggregator_address(
 
 /// Extend the role group ConfigMap with logging and Vector configurations
 pub fn extend_role_group_config_map(
-    rolegroup: &RoleGroupRef<HbaseCluster>,
+    rolegroup: &RoleGroupRef<v1alpha1::HbaseCluster>,
     vector_aggregator_address: Option<&str>,
     logging: &Logging<Container>,
     cm_builder: &mut ConfigMapBuilder,

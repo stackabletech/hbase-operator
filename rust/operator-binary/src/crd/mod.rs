@@ -26,6 +26,7 @@ use stackable_operator::{
     status::condition::{ClusterCondition, HasStatusCondition},
     time::Duration,
 };
+use stackable_versioned::versioned;
 use strum::{Display, EnumIter, EnumString};
 
 use crate::crd::{affinity::get_affinity, security::AuthorizationConfig};
@@ -72,6 +73,55 @@ pub const HBASE_REST_UI_PORT: u16 = 8085;
 // Newer versions use the same port as the UI because Hbase provides it's own metrics API
 pub const METRICS_PORT: u16 = 9100;
 
+#[versioned(version(name = "v1alpha1"))]
+pub mod versioned {
+    /// An HBase cluster stacklet. This resource is managed by the Stackable operator for Apache HBase.
+    /// Find more information on how to use it and the resources that the operator generates in the
+    /// [operator documentation](DOCS_BASE_URL_PLACEHOLDER/hbase/).
+    ///
+    /// The CRD contains three roles: `masters`, `regionServers` and `restServers`.
+    #[versioned(k8s(
+        group = "hbase.stackable.tech",
+        kind = "HbaseCluster",
+        plural = "hbaseclusters",
+        shortname = "hbase",
+        status = "HbaseClusterStatus",
+        namespaced,
+        crates(
+            kube_core = "stackable_operator::kube::core",
+            k8s_openapi = "stackable_operator::k8s_openapi",
+            schemars = "stackable_operator::schemars"
+        )
+    ))]
+    #[derive(Clone, CustomResource, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
+    #[serde(rename_all = "camelCase")]
+    pub struct HbaseClusterSpec {
+        // no doc string - See ProductImage struct
+        pub image: ProductImage,
+
+        /// Configuration that applies to all roles and role groups.
+        /// This includes settings for logging, ZooKeeper and HDFS connection, among other things.
+        pub cluster_config: HbaseClusterConfig,
+
+        // no doc string - See ClusterOperation struct
+        #[serde(default)]
+        pub cluster_operation: ClusterOperation,
+
+        /// The HBase master process is responsible for assigning regions to region servers and
+        /// manages the cluster.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        pub masters: Option<Role<HbaseConfigFragment, GenericRoleConfig, JavaCommonConfig>>,
+
+        /// Region servers hold the data and handle requests from clients for their region.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        pub region_servers: Option<Role<HbaseConfigFragment, GenericRoleConfig, JavaCommonConfig>>,
+
+        /// Rest servers provide a REST API to interact with.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        pub rest_servers: Option<Role<HbaseConfigFragment, GenericRoleConfig, JavaCommonConfig>>,
+    }
+}
+
 #[derive(Snafu, Debug)]
 pub enum Error {
     #[snafu(display("the role [{role}] is invalid and does not exist in HBase"))]
@@ -88,53 +138,6 @@ pub enum Error {
 
     #[snafu(display("fragment validation failure"))]
     FragmentValidationFailure { source: ValidationError },
-}
-
-/// An HBase cluster stacklet. This resource is managed by the Stackable operator for Apache HBase.
-/// Find more information on how to use it and the resources that the operator generates in the
-/// [operator documentation](DOCS_BASE_URL_PLACEHOLDER/hbase/).
-///
-/// The CRD contains three roles: `masters`, `regionServers` and `restServers`.
-#[derive(Clone, CustomResource, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
-#[kube(
-    group = "hbase.stackable.tech",
-    version = "v1alpha1",
-    kind = "HbaseCluster",
-    plural = "hbaseclusters",
-    shortname = "hbase",
-    status = "HbaseClusterStatus",
-    namespaced,
-    crates(
-        kube_core = "stackable_operator::kube::core",
-        k8s_openapi = "stackable_operator::k8s_openapi",
-        schemars = "stackable_operator::schemars"
-    )
-)]
-#[serde(rename_all = "camelCase")]
-pub struct HbaseClusterSpec {
-    // no doc string - See ProductImage struct
-    pub image: ProductImage,
-
-    /// Configuration that applies to all roles and role groups.
-    /// This includes settings for logging, ZooKeeper and HDFS connection, among other things.
-    pub cluster_config: HbaseClusterConfig,
-
-    // no doc string - See ClusterOperation struct
-    #[serde(default)]
-    pub cluster_operation: ClusterOperation,
-
-    /// The HBase master process is responsible for assigning regions to region servers and
-    /// manages the cluster.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub masters: Option<Role<HbaseConfigFragment, GenericRoleConfig, JavaCommonConfig>>,
-
-    /// Region servers hold the data and handle requests from clients for their region.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub region_servers: Option<Role<HbaseConfigFragment, GenericRoleConfig, JavaCommonConfig>>,
-
-    /// Rest servers provide a REST API to interact with.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub rest_servers: Option<Role<HbaseConfigFragment, GenericRoleConfig, JavaCommonConfig>>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
@@ -422,7 +425,7 @@ pub struct HbaseConfig {
 }
 
 impl Configuration for HbaseConfigFragment {
-    type Configurable = HbaseCluster;
+    type Configurable = v1alpha1::HbaseCluster;
 
     fn compute_env(
         &self,
@@ -499,7 +502,7 @@ pub struct HbaseClusterStatus {
     pub conditions: Vec<ClusterCondition>,
 }
 
-impl HasStatusCondition for HbaseCluster {
+impl HasStatusCondition for v1alpha1::HbaseCluster {
     fn conditions(&self) -> Vec<ClusterCondition> {
         match &self.status {
             Some(status) => status.conditions.clone(),
@@ -508,7 +511,7 @@ impl HasStatusCondition for HbaseCluster {
     }
 }
 
-impl HbaseCluster {
+impl v1alpha1::HbaseCluster {
     /// The name of the role-level load-balanced Kubernetes `Service`
     pub fn server_role_service_name(&self) -> Option<String> {
         self.metadata.name.clone()
@@ -519,7 +522,7 @@ impl HbaseCluster {
         &self,
         role_name: impl Into<String>,
         group_name: impl Into<String>,
-    ) -> RoleGroupRef<HbaseCluster> {
+    ) -> RoleGroupRef<v1alpha1::HbaseCluster> {
         RoleGroupRef {
             cluster: ObjectRef::from_obj(self),
             role: role_name.into(),
@@ -541,7 +544,7 @@ impl HbaseCluster {
     /// Get the RoleGroup struct for the given ref
     pub fn get_role_group(
         &self,
-        rolegroup_ref: &RoleGroupRef<HbaseCluster>,
+        rolegroup_ref: &RoleGroupRef<v1alpha1::HbaseCluster>,
     ) -> Result<&RoleGroup<HbaseConfigFragment, JavaCommonConfig>, Error> {
         let role_variant =
             HbaseRole::from_str(&rolegroup_ref.role).with_context(|_| InvalidRoleSnafu {
@@ -708,7 +711,7 @@ mod tests {
         transform_all_roles_to_config, validate_all_roles_and_groups_config,
     };
 
-    use crate::crd::{merged_env, HbaseCluster, HbaseRole};
+    use super::*;
 
     #[test]
     pub fn test_env_overrides() {
@@ -754,7 +757,7 @@ spec:
         "#};
 
         let deserializer = serde_yaml::Deserializer::from_str(input);
-        let hbase: HbaseCluster =
+        let hbase: v1alpha1::HbaseCluster =
             serde_yaml::with::singleton_map_recursive::deserialize(deserializer).unwrap();
 
         let roles = HashMap::from([(
