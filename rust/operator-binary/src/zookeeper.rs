@@ -19,7 +19,6 @@ const ZOOKEEPER_ZNODE_PARENT: &str = "zookeeper.znode.parent";
 
 #[derive(Snafu, Debug, EnumDiscriminants)]
 #[strum_discriminants(derive(IntoStaticStr))]
-#[allow(clippy::enum_variant_names)]
 pub enum Error {
     #[snafu(display("object defines no namespace"))]
     ObjectHasNoNamespace,
