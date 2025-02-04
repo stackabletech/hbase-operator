@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
-use stackable_operator::commons::opa::OpaConfig;
-use stackable_operator::schemars::{self, JsonSchema};
+use stackable_operator::{
+    commons::opa::OpaConfig,
+    schemars::{self, JsonSchema},
+};
 
 #[derive(Clone, Debug, Deserialize, Eq, Hash, JsonSchema, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]

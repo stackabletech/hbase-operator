@@ -1,10 +1,10 @@
+use std::collections::{BTreeMap, HashMap};
+
 use product_config::types::PropertyNameKind;
 use security::AuthenticationConfig;
 use serde::{Deserialize, Serialize};
 use shell_escape::escape;
 use snafu::{OptionExt, ResultExt, Snafu};
-use stackable_operator::k8s_openapi::api::core::v1::PodTemplateSpec;
-use stackable_operator::schemars::{self, JsonSchema};
 use stackable_operator::{
     commons::{
         affinity::StackableAffinity,
@@ -19,20 +19,22 @@ use stackable_operator::{
         fragment::{self, Fragment, ValidationError},
         merge::{Atomic, Merge},
     },
-    k8s_openapi::{api::core::v1::EnvVar, apimachinery::pkg::api::resource::Quantity, DeepMerge},
+    k8s_openapi::{
+        api::core::v1::{EnvVar, PodTemplateSpec},
+        apimachinery::pkg::api::resource::Quantity,
+        DeepMerge,
+    },
     kube::{runtime::reflector::ObjectRef, CustomResource, ResourceExt},
     product_config_utils::Configuration,
     product_logging::{self, spec::Logging},
     role_utils::{GenericRoleConfig, JavaCommonConfig, Role, RoleGroupRef},
+    schemars::{self, JsonSchema},
     status::condition::{ClusterCondition, HasStatusCondition},
     time::Duration,
 };
-use std::collections::BTreeMap;
-use std::collections::HashMap;
 use strum::{Display, EnumIter, EnumString};
 
-use crate::affinity::get_affinity;
-use crate::security::AuthorizationConfig;
+use crate::{affinity::get_affinity, security::AuthorizationConfig};
 
 pub mod affinity;
 pub mod security;
@@ -1242,18 +1244,16 @@ impl AnyServiceConfig {
 
 #[cfg(test)]
 mod tests {
-    use rstest::rstest;
-
     use std::collections::{BTreeMap, HashMap};
 
     use indoc::indoc;
+    use product_config::{types::PropertyNameKind, ProductConfigManager};
+    use rstest::rstest;
     use stackable_operator::product_config_utils::{
         transform_all_roles_to_config, validate_all_roles_and_groups_config,
     };
 
     use crate::{merged_env, AnyServiceConfig, HbaseCluster, HbaseRole, RegionMoverExtraCliOpts};
-
-    use product_config::{types::PropertyNameKind, ProductConfigManager};
 
     #[test]
     pub fn test_env_overrides() {

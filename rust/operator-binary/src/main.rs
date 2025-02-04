@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use clap::Parser;
 use futures::StreamExt;
 use hbase_controller::FULL_HBASE_CONTROLLER_NAME;
@@ -15,7 +17,6 @@ use stackable_operator::{
     logging::controller::report_controller_reconciled,
     CustomResourceExt,
 };
-use std::sync::Arc;
 
 mod config;
 mod discovery;

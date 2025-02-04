@@ -13,6 +13,11 @@ use product_config::{
     ProductConfigManager,
 };
 use snafu::{OptionExt, ResultExt, Snafu};
+use stackable_hbase_crd::{
+    merged_env, AnyServiceConfig, Container, HbaseCluster, HbaseClusterStatus, HbaseRole, APP_NAME,
+    HBASE_ENV_SH, HBASE_REST_PORT_NAME_HTTP, HBASE_REST_PORT_NAME_HTTPS, HBASE_SITE_XML,
+    JVM_SECURITY_PROPERTIES_FILE, SSL_CLIENT_XML, SSL_SERVER_XML,
+};
 use stackable_operator::{
     builder::{
         self,
@@ -62,25 +67,23 @@ use stackable_operator::{
 };
 use strum::{EnumDiscriminants, IntoStaticStr, ParseError};
 
-use crate::product_logging::{CONTAINERDEBUG_LOG_DIRECTORY, STACKABLE_LOG_DIR};
-use crate::security::opa::HbaseOpaConfig;
-use stackable_hbase_crd::{
-    merged_env, AnyServiceConfig, Container, HbaseCluster, HbaseClusterStatus, HbaseRole, APP_NAME,
-    HBASE_ENV_SH, HBASE_REST_PORT_NAME_HTTP, HBASE_REST_PORT_NAME_HTTPS, HBASE_SITE_XML,
-    JVM_SECURITY_PROPERTIES_FILE, SSL_CLIENT_XML, SSL_SERVER_XML,
-};
-
-use crate::config::jvm::construct_hbase_heapsize_env;
-use crate::config::jvm::{construct_global_jvm_args, construct_role_specific_non_heap_jvm_args};
 use crate::{
+    config::jvm::{
+        construct_global_jvm_args, construct_hbase_heapsize_env,
+        construct_role_specific_non_heap_jvm_args,
+    },
     discovery::build_discovery_configmap,
     kerberos::{
         self, add_kerberos_pod_config, kerberos_config_properties, kerberos_ssl_client_settings,
         kerberos_ssl_server_settings,
     },
     operations::{graceful_shutdown::add_graceful_shutdown_config, pdb::add_pdbs},
-    product_logging::{extend_role_group_config_map, resolve_vector_aggregator_address},
+    product_logging::{
+        extend_role_group_config_map, resolve_vector_aggregator_address,
+        CONTAINERDEBUG_LOG_DIRECTORY, STACKABLE_LOG_DIR,
+    },
     security,
+    security::opa::HbaseOpaConfig,
     zookeeper::{self, ZookeeperConnectionInformation},
     OPERATOR_NAME,
 };

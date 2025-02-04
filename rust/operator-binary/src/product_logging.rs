@@ -1,6 +1,5 @@
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_hbase_crd::{Container, HbaseCluster};
-use stackable_operator::product_logging::spec::AutomaticContainerLogConfig;
 use stackable_operator::{
     builder::configmap::ConfigMapBuilder,
     client::Client,
@@ -9,7 +8,9 @@ use stackable_operator::{
     memory::BinaryMultiple,
     product_logging::{
         self,
-        spec::{ContainerLogConfig, ContainerLogConfigChoice, Logging},
+        spec::{
+            AutomaticContainerLogConfig, ContainerLogConfig, ContainerLogConfigChoice, Logging,
+        },
     },
     role_utils::RoleGroupRef,
 };
