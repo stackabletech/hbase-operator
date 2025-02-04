@@ -159,6 +159,183 @@ pub mod versioned {
     }
 }
 
+impl HasStatusCondition for v1alpha1::HbaseCluster {
+    fn conditions(&self) -> Vec<ClusterCondition> {
+        match &self.status {
+            Some(status) => status.conditions.clone(),
+            None => vec![],
+        }
+    }
+}
+
+impl v1alpha1::HbaseCluster {
+    /// The name of the role-level load-balanced Kubernetes `Service`
+    pub fn server_role_service_name(&self) -> Option<String> {
+        self.metadata.name.clone()
+    }
+
+    /// Metadata about a server rolegroup
+    pub fn server_rolegroup_ref(
+        &self,
+        role_name: impl Into<String>,
+        group_name: impl Into<String>,
+    ) -> RoleGroupRef<v1alpha1::HbaseCluster> {
+        RoleGroupRef {
+            cluster: ObjectRef::from_obj(self),
+            role: role_name.into(),
+            role_group: group_name.into(),
+        }
+    }
+
+    pub fn get_role(
+        &self,
+        role: &HbaseRole,
+    ) -> Option<&Role<HbaseConfigFragment, GenericRoleConfig, JavaCommonConfig>> {
+        match role {
+            HbaseRole::Master => self.spec.masters.as_ref(),
+            HbaseRole::RegionServer => self.spec.region_servers.as_ref(),
+            HbaseRole::RestServer => self.spec.rest_servers.as_ref(),
+        }
+    }
+
+    /// Get the RoleGroup struct for the given ref
+    pub fn get_role_group(
+        &self,
+        rolegroup_ref: &RoleGroupRef<v1alpha1::HbaseCluster>,
+    ) -> Result<&RoleGroup<HbaseConfigFragment, JavaCommonConfig>, Error> {
+        let role_variant =
+            HbaseRole::from_str(&rolegroup_ref.role).with_context(|_| InvalidRoleSnafu {
+                role: rolegroup_ref.role.to_owned(),
+            })?;
+        let role = self
+            .get_role(&role_variant)
+            .with_context(|| MissingHbaseRoleSnafu {
+                role: role_variant.to_string(),
+            })?;
+        role.role_groups
+            .get(&rolegroup_ref.role_group)
+            .with_context(|| MissingHbaseRoleGroupSnafu {
+                role_group: rolegroup_ref.role_group.to_owned(),
+            })
+    }
+
+    pub fn role_config(&self, role: &HbaseRole) -> Option<&GenericRoleConfig> {
+        match role {
+            HbaseRole::Master => self.spec.masters.as_ref().map(|m| &m.role_config),
+            HbaseRole::RegionServer => self.spec.region_servers.as_ref().map(|rs| &rs.role_config),
+            HbaseRole::RestServer => self.spec.rest_servers.as_ref().map(|rs| &rs.role_config),
+        }
+    }
+
+    pub fn has_kerberos_enabled(&self) -> bool {
+        self.kerberos_secret_class().is_some()
+    }
+
+    pub fn kerberos_secret_class(&self) -> Option<String> {
+        self.spec
+            .cluster_config
+            .authentication
+            .as_ref()
+            .map(|a| &a.kerberos)
+            .map(|k| k.secret_class.clone())
+    }
+
+    pub fn has_https_enabled(&self) -> bool {
+        self.https_secret_class().is_some()
+    }
+
+    pub fn https_secret_class(&self) -> Option<String> {
+        self.spec
+            .cluster_config
+            .authentication
+            .as_ref()
+            .map(|a| a.tls_secret_class.clone())
+    }
+
+    /// Returns required port name and port number tuples depending on the role.
+    /// Hbase versions 2.4.* will have three ports for each role
+    /// Hbase versions 2.6.* will have two ports for each role. The metrics are available over the
+    /// UI port.
+    pub fn ports(&self, role: &HbaseRole, hbase_version: &str) -> Vec<(String, u16)> {
+        let result_without_metric_port: Vec<(String, u16)> = match role {
+            HbaseRole::Master => vec![
+                ("master".to_string(), HBASE_MASTER_PORT),
+                (self.ui_port_name(), HBASE_MASTER_UI_PORT),
+            ],
+            HbaseRole::RegionServer => vec![
+                ("regionserver".to_string(), HBASE_REGIONSERVER_PORT),
+                (self.ui_port_name(), HBASE_REGIONSERVER_UI_PORT),
+            ],
+            HbaseRole::RestServer => vec![
+                (
+                    if self.has_https_enabled() {
+                        HBASE_REST_PORT_NAME_HTTPS
+                    } else {
+                        HBASE_REST_PORT_NAME_HTTP
+                    }
+                    .to_string(),
+                    HBASE_REST_PORT,
+                ),
+                (self.ui_port_name(), HBASE_REST_UI_PORT),
+            ],
+        };
+        if hbase_version.starts_with(r"2.4") {
+            result_without_metric_port
+                .into_iter()
+                .chain(vec![(METRICS_PORT_NAME.to_string(), METRICS_PORT)])
+                .collect()
+        } else {
+            result_without_metric_port
+        }
+    }
+
+    /// Name of the port used by the Web UI, which depends on HTTPS usage
+    fn ui_port_name(&self) -> String {
+        if self.has_https_enabled() {
+            HBASE_UI_PORT_NAME_HTTPS
+        } else {
+            HBASE_UI_PORT_NAME_HTTP
+        }
+        .to_string()
+    }
+
+    /// Retrieve and merge resource configs for role and role groups
+    pub fn merged_config(
+        &self,
+        role: &HbaseRole,
+        role_group: &str,
+        hdfs_discovery_cm_name: &str,
+    ) -> Result<HbaseConfig, Error> {
+        // Initialize the result with all default values as baseline
+        let conf_defaults = role.default_config(&self.name_any(), hdfs_discovery_cm_name);
+
+        let role = self.get_role(role).context(MissingHbaseRoleSnafu {
+            role: role.to_string(),
+        })?;
+
+        // Retrieve role resource config
+        let mut conf_role = role.config.config.to_owned();
+
+        // Retrieve rolegroup specific resource config
+        let mut conf_rolegroup = role
+            .role_groups
+            .get(role_group)
+            .map(|rg| rg.config.config.clone())
+            .unwrap_or_default();
+
+        // Merge more specific configs into default config
+        // Hierarchy is:
+        // 1. RoleGroup
+        // 2. Role
+        // 3. Default
+        conf_role.merge(&conf_defaults);
+        conf_rolegroup.merge(&conf_role);
+
+        tracing::debug!("Merged config: {:?}", conf_rolegroup);
+        fragment::validate(conf_rolegroup).context(FragmentValidationFailureSnafu)
+    }
+}
+
 #[derive(Snafu, Debug)]
 pub enum Error {
     #[snafu(display("the role [{role}] is invalid and does not exist in HBase"))]
@@ -500,183 +677,6 @@ impl Configuration for HbaseConfigFragment {
 pub struct HbaseClusterStatus {
     #[serde(default)]
     pub conditions: Vec<ClusterCondition>,
-}
-
-impl HasStatusCondition for v1alpha1::HbaseCluster {
-    fn conditions(&self) -> Vec<ClusterCondition> {
-        match &self.status {
-            Some(status) => status.conditions.clone(),
-            None => vec![],
-        }
-    }
-}
-
-impl v1alpha1::HbaseCluster {
-    /// The name of the role-level load-balanced Kubernetes `Service`
-    pub fn server_role_service_name(&self) -> Option<String> {
-        self.metadata.name.clone()
-    }
-
-    /// Metadata about a server rolegroup
-    pub fn server_rolegroup_ref(
-        &self,
-        role_name: impl Into<String>,
-        group_name: impl Into<String>,
-    ) -> RoleGroupRef<v1alpha1::HbaseCluster> {
-        RoleGroupRef {
-            cluster: ObjectRef::from_obj(self),
-            role: role_name.into(),
-            role_group: group_name.into(),
-        }
-    }
-
-    pub fn get_role(
-        &self,
-        role: &HbaseRole,
-    ) -> Option<&Role<HbaseConfigFragment, GenericRoleConfig, JavaCommonConfig>> {
-        match role {
-            HbaseRole::Master => self.spec.masters.as_ref(),
-            HbaseRole::RegionServer => self.spec.region_servers.as_ref(),
-            HbaseRole::RestServer => self.spec.rest_servers.as_ref(),
-        }
-    }
-
-    /// Get the RoleGroup struct for the given ref
-    pub fn get_role_group(
-        &self,
-        rolegroup_ref: &RoleGroupRef<v1alpha1::HbaseCluster>,
-    ) -> Result<&RoleGroup<HbaseConfigFragment, JavaCommonConfig>, Error> {
-        let role_variant =
-            HbaseRole::from_str(&rolegroup_ref.role).with_context(|_| InvalidRoleSnafu {
-                role: rolegroup_ref.role.to_owned(),
-            })?;
-        let role = self
-            .get_role(&role_variant)
-            .with_context(|| MissingHbaseRoleSnafu {
-                role: role_variant.to_string(),
-            })?;
-        role.role_groups
-            .get(&rolegroup_ref.role_group)
-            .with_context(|| MissingHbaseRoleGroupSnafu {
-                role_group: rolegroup_ref.role_group.to_owned(),
-            })
-    }
-
-    pub fn role_config(&self, role: &HbaseRole) -> Option<&GenericRoleConfig> {
-        match role {
-            HbaseRole::Master => self.spec.masters.as_ref().map(|m| &m.role_config),
-            HbaseRole::RegionServer => self.spec.region_servers.as_ref().map(|rs| &rs.role_config),
-            HbaseRole::RestServer => self.spec.rest_servers.as_ref().map(|rs| &rs.role_config),
-        }
-    }
-
-    pub fn has_kerberos_enabled(&self) -> bool {
-        self.kerberos_secret_class().is_some()
-    }
-
-    pub fn kerberos_secret_class(&self) -> Option<String> {
-        self.spec
-            .cluster_config
-            .authentication
-            .as_ref()
-            .map(|a| &a.kerberos)
-            .map(|k| k.secret_class.clone())
-    }
-
-    pub fn has_https_enabled(&self) -> bool {
-        self.https_secret_class().is_some()
-    }
-
-    pub fn https_secret_class(&self) -> Option<String> {
-        self.spec
-            .cluster_config
-            .authentication
-            .as_ref()
-            .map(|a| a.tls_secret_class.clone())
-    }
-
-    /// Returns required port name and port number tuples depending on the role.
-    /// Hbase versions 2.4.* will have three ports for each role
-    /// Hbase versions 2.6.* will have two ports for each role. The metrics are available over the
-    /// UI port.
-    pub fn ports(&self, role: &HbaseRole, hbase_version: &str) -> Vec<(String, u16)> {
-        let result_without_metric_port: Vec<(String, u16)> = match role {
-            HbaseRole::Master => vec![
-                ("master".to_string(), HBASE_MASTER_PORT),
-                (self.ui_port_name(), HBASE_MASTER_UI_PORT),
-            ],
-            HbaseRole::RegionServer => vec![
-                ("regionserver".to_string(), HBASE_REGIONSERVER_PORT),
-                (self.ui_port_name(), HBASE_REGIONSERVER_UI_PORT),
-            ],
-            HbaseRole::RestServer => vec![
-                (
-                    if self.has_https_enabled() {
-                        HBASE_REST_PORT_NAME_HTTPS
-                    } else {
-                        HBASE_REST_PORT_NAME_HTTP
-                    }
-                    .to_string(),
-                    HBASE_REST_PORT,
-                ),
-                (self.ui_port_name(), HBASE_REST_UI_PORT),
-            ],
-        };
-        if hbase_version.starts_with(r"2.4") {
-            result_without_metric_port
-                .into_iter()
-                .chain(vec![(METRICS_PORT_NAME.to_string(), METRICS_PORT)])
-                .collect()
-        } else {
-            result_without_metric_port
-        }
-    }
-
-    /// Name of the port used by the Web UI, which depends on HTTPS usage
-    fn ui_port_name(&self) -> String {
-        if self.has_https_enabled() {
-            HBASE_UI_PORT_NAME_HTTPS
-        } else {
-            HBASE_UI_PORT_NAME_HTTP
-        }
-        .to_string()
-    }
-
-    /// Retrieve and merge resource configs for role and role groups
-    pub fn merged_config(
-        &self,
-        role: &HbaseRole,
-        role_group: &str,
-        hdfs_discovery_cm_name: &str,
-    ) -> Result<HbaseConfig, Error> {
-        // Initialize the result with all default values as baseline
-        let conf_defaults = role.default_config(&self.name_any(), hdfs_discovery_cm_name);
-
-        let role = self.get_role(role).context(MissingHbaseRoleSnafu {
-            role: role.to_string(),
-        })?;
-
-        // Retrieve role resource config
-        let mut conf_role = role.config.config.to_owned();
-
-        // Retrieve rolegroup specific resource config
-        let mut conf_rolegroup = role
-            .role_groups
-            .get(role_group)
-            .map(|rg| rg.config.config.clone())
-            .unwrap_or_default();
-
-        // Merge more specific configs into default config
-        // Hierarchy is:
-        // 1. RoleGroup
-        // 2. Role
-        // 3. Default
-        conf_role.merge(&conf_defaults);
-        conf_rolegroup.merge(&conf_role);
-
-        tracing::debug!("Merged config: {:?}", conf_rolegroup);
-        fragment::validate(conf_rolegroup).context(FragmentValidationFailureSnafu)
-    }
 }
 
 pub fn merged_env(rolegroup_config: Option<&BTreeMap<String, String>>) -> Vec<EnvVar> {
