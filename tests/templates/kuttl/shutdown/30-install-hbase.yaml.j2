@@ -30,7 +30,7 @@ spec:
         configOverrides:
           hbase-site.xml:
             # The Hbase master will take 10 minutes to observe a region server as "crashed"
-            # This gives the region mover enoug time to run and ensures that masters do not interfere.
+            # This gives the region mover enough time to run and ensures that masters do not interfere.
             zookeeper.session.timeout: "600000"
 
             # Prevent the master from re-assigning the region when the region server is
