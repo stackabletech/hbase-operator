@@ -123,13 +123,15 @@ mod tests {
                 replicas: 1
         "#;
         let hbase: HbaseCluster = serde_yaml::from_str(input).expect("illegal test input");
-        let merged_config = hbase
+        let affinity = hbase
             .merged_config(
                 &role,
                 "default",
                 &hbase.spec.cluster_config.hdfs_config_map_name,
             )
-            .unwrap();
+            .unwrap()
+            .affinity()
+            .clone();
 
         let mut expected_affinities = vec![WeightedPodAffinityTerm {
             pod_affinity_term: PodAffinityTerm {
@@ -184,7 +186,7 @@ mod tests {
         };
 
         assert_eq!(
-            merged_config.affinity,
+            affinity,
             StackableAffinity {
                 pod_affinity: Some(PodAffinity {
                     preferred_during_scheduling_ignored_during_execution: Some(expected_affinities),

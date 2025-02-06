@@ -1,10 +1,7 @@
 use std::collections::BTreeMap;
 
-use indoc::formatdoc;
 use snafu::{OptionExt, ResultExt, Snafu};
-use stackable_hbase_crd::{
-    HbaseCluster, HbaseRole, TLS_STORE_DIR, TLS_STORE_PASSWORD, TLS_STORE_VOLUME_NAME,
-};
+use stackable_hbase_crd::{HbaseCluster, TLS_STORE_DIR, TLS_STORE_PASSWORD, TLS_STORE_VOLUME_NAME};
 use stackable_operator::{
     builder::{
         self,
@@ -76,21 +73,21 @@ pub fn kerberos_config_properties(
             "hbase.master.kerberos.principal".to_string(),
             format!(
                 "{service_name}/{principal_host_part}",
-                service_name = HbaseRole::Master.kerberos_service_name()
+                service_name = kerberos_service_name()
             ),
         ),
         (
             "hbase.regionserver.kerberos.principal".to_string(),
             format!(
                 "{service_name}/{principal_host_part}",
-                service_name = HbaseRole::RegionServer.kerberos_service_name()
+                service_name = kerberos_service_name()
             ),
         ),
         (
             "hbase.rest.kerberos.principal".to_string(),
             format!(
                 "{service_name}/{principal_host_part}",
-                service_name = HbaseRole::RestServer.kerberos_service_name()
+                service_name = kerberos_service_name()
             ),
         ),
         (
@@ -157,21 +154,21 @@ pub fn kerberos_discovery_config_properties(
             "hbase.master.kerberos.principal".to_string(),
             format!(
                 "{service_name}/{principal_host_part}",
-                service_name = HbaseRole::Master.kerberos_service_name()
+                service_name = kerberos_service_name()
             ),
         ),
         (
             "hbase.regionserver.kerberos.principal".to_string(),
             format!(
                 "{service_name}/{principal_host_part}",
-                service_name = HbaseRole::RegionServer.kerberos_service_name()
+                service_name = kerberos_service_name()
             ),
         ),
         (
             "hbase.rest.kerberos.principal".to_string(),
             format!(
                 "{service_name}/{principal_host_part}",
-                service_name = HbaseRole::RestServer.kerberos_service_name()
+                service_name = kerberos_service_name()
             ),
         ),
     ]))
@@ -230,7 +227,6 @@ pub fn kerberos_ssl_client_settings(hbase: &HbaseCluster) -> BTreeMap<String, St
 
 pub fn add_kerberos_pod_config(
     hbase: &HbaseCluster,
-    role: &HbaseRole,
     cb: &mut ContainerBuilder,
     pb: &mut PodBuilder,
     requested_secret_lifetime: Duration,
@@ -240,7 +236,7 @@ pub fn add_kerberos_pod_config(
         let kerberos_secret_operator_volume =
             SecretOperatorVolumeSourceBuilder::new(kerberos_secret_class)
                 .with_service_scope(hbase.name_any())
-                .with_kerberos_service_name(role.kerberos_service_name())
+                .with_kerberos_service_name(kerberos_service_name())
                 .with_kerberos_service_name("HTTP")
                 .build()
                 .context(AddKerberosSecretVolumeSnafu)?;
@@ -280,16 +276,6 @@ pub fn add_kerberos_pod_config(
     Ok(())
 }
 
-pub fn kerberos_container_start_commands(hbase: &HbaseCluster) -> String {
-    if !hbase.has_kerberos_enabled() {
-        return String::new();
-    }
-
-    formatdoc! {"
-        export KERBEROS_REALM=$(grep -oP 'default_realm = \\K.*' /stackable/kerberos/krb5.conf)"
-    }
-}
-
 fn principal_host_part(
     hbase: &HbaseCluster,
     cluster_info: &KubernetesClusterInfo,
@@ -302,4 +288,18 @@ fn principal_host_part(
     Ok(format!(
         "{hbase_name}.{hbase_namespace}.svc.{cluster_domain}@${{env.KERBEROS_REALM}}"
     ))
+}
+
+/// We could have different service names depended on the role (e.g. "hbase-master", "hbase-regionserver" and
+/// "hbase-restserver"). However this produces error messages such as
+/// [RpcServer.priority.RWQ.Fifo.write.handler=0,queue=0,port=16020] security.ShellBasedUnixGroupsMapping: unable to return groups for user hbase-master PartialGroupNameException The user name 'hbase-master' is not found. id: 'hbase-master': no such user
+/// or
+/// Caused by: org.apache.hadoop.hbase.ipc.RemoteWithExtrasException(org.apache.hadoop.hbase.security.AccessDeniedException): org.apache.hadoop.hbase.security.AccessDeniedException: Insufficient permissions (user=hbase-master/hbase-master-default-1.hbase-master-default.kuttl-test-poetic-sunbeam.svc.cluster.local@CLUSTER.LOCAL, scope=hbase:meta, family=table:state, params=[table=hbase:meta,family=table:state],action=WRITE)
+///
+/// Also the documentation states:
+/// > A Kerberos principal has three parts, with the form username/fully.qualified.domain.name@YOUR-REALM.COM. We recommend using hbase as the username portion.
+///
+/// As a result we use "hbase" everywhere (which e.g. differs from the current hdfs implementation)
+fn kerberos_service_name() -> &'static str {
+    "hbase"
 }

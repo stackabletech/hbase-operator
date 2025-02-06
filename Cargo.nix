@@ -6963,6 +6963,17 @@ rec {
           "loom" = [ "dep:loom" ];
         };
       };
+      "shell-escape" = rec {
+        crateName = "shell-escape";
+        version = "0.1.5";
+        edition = "2015";
+        sha256 = "0kqq83dk0r1fqj4cfzddpxrni2hpz5i1y607g366c4m9iyhngfs5";
+        libName = "shell_escape";
+        authors = [
+          "Steven Fackler <sfackler@gmail.com>"
+        ];
+
+      };
       "shlex" = rec {
         crateName = "shlex";
         version = "1.3.0";
@@ -7251,6 +7262,10 @@ rec {
             packageId = "serde_json";
           }
           {
+            name = "shell-escape";
+            packageId = "shell-escape";
+          }
+          {
             name = "snafu";
             packageId = "snafu 0.8.5";
           }
@@ -7322,10 +7337,6 @@ rec {
             features = [ "compat" ];
           }
           {
-            name = "indoc";
-            packageId = "indoc";
-          }
-          {
             name = "product-config";
             packageId = "product-config";
           }
@@ -7369,6 +7380,10 @@ rec {
           }
         ];
         devDependencies = [
+          {
+            name = "indoc";
+            packageId = "indoc";
+          }
           {
             name = "rstest";
             packageId = "rstest";

@@ -39,6 +39,8 @@ spec:
     zookeeperConfigMapName: test-znode
     vectorAggregatorConfigMapName: hbase-vector-aggregator-discovery
   masters:
+    config:
+      gracefulShutdownTimeout: 1m
     roleGroups:
       automatic-log-config:
         replicas: 1
@@ -83,6 +85,8 @@ spec:
                 custom:
                   configMap: hbase-log-config
   regionServers:
+    config:
+      gracefulShutdownTimeout: 1m
     roleGroups:
       automatic-log-config:
         replicas: 1
@@ -116,6 +120,8 @@ spec:
                 custom:
                   configMap: hbase-log-config
   restServers:
+    config:
+      gracefulShutdownTimeout: 1m
     roleGroups:
       automatic-log-config:
         replicas: 1

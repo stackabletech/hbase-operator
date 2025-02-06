@@ -1,33 +1,36 @@
 ---
-apiVersion: kuttl.dev/v1beta1
-kind: TestStep
+apiVersion: hdfs.stackable.tech/v1alpha1
+kind: HdfsCluster
 metadata:
-  name: stop-hbase
-timeout: 180
----
-apiVersion: hbase.stackable.tech/v1alpha1
-kind: HbaseCluster
-metadata:
-  name: test-hbase
+  name: test-hdfs
 spec:
   image:
-{% if test_scenario['values']['hbase-latest'].find(",") > 0 %}
-    custom: "{{ test_scenario['values']['hbase-latest'].split(',')[1] }}"
-    productVersion: "{{ test_scenario['values']['hbase-latest'].split(',')[0] }}"
-{% else %}
-    productVersion: "{{ test_scenario['values']['hbase-latest'] }}"
-{% endif %}
+    productVersion: "{{ test_scenario['values']['hdfs-latest'] }}"
     pullPolicy: IfNotPresent
   clusterConfig:
-    hdfsConfigMapName: test-hdfs
     zookeeperConfigMapName: test-znode
 {% if lookup('env', 'VECTOR_AGGREGATOR') %}
     vectorAggregatorConfigMapName: vector-aggregator-discovery
 {% endif %}
-  clusterOperation:
-    stopped: true
-    reconciliationPaused: false
-  masters:
+  nameNodes:
+    config:
+      gracefulShutdownTimeout: 1m
+      listenerClass: "cluster-internal"
+      logging:
+        enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
+    roleGroups:
+      default:
+        replicas: 2
+  dataNodes:
+    config:
+      gracefulShutdownTimeout: 1m
+      listenerClass: "cluster-internal"
+      logging:
+        enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
+    roleGroups:
+      default:
+        replicas: 1
+  journalNodes:
     config:
       gracefulShutdownTimeout: 1m
       logging:
@@ -35,19 +38,3 @@ spec:
     roleGroups:
       default:
         replicas: 1
-  regionServers:
-    config:
-      gracefulShutdownTimeout: 1m
-      logging:
-        enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
-    roleGroups:
-      default:
-        replicas: 1
-  restServers:
-    config:
-      gracefulShutdownTimeout: 1m
-      logging:
-        enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
-    roleGroups:
-      default:
-        replicas: 1 # set to 0 by the operator because cluster is stopped

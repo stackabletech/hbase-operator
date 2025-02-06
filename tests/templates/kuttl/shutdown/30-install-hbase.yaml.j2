@@ -15,6 +15,7 @@ spec:
   clusterConfig:
     hdfsConfigMapName: test-hdfs
     zookeeperConfigMapName: test-znode
+    listenerClass: "cluster-internal"
 {% if lookup('env', 'VECTOR_AGGREGATOR') %}
     vectorAggregatorConfigMapName: vector-aggregator-discovery
 {% endif %}
@@ -25,15 +26,31 @@ spec:
         enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
     roleGroups:
       default:
-        replicas: 1
+        replicas: 2
+        configOverrides:
+          hbase-site.xml:
+            # The Hbase master will take 10 minutes to observe a region server as "crashed"
+            # This gives the region mover enough time to run and ensures that masters do not interfere.
+            zookeeper.session.timeout: "600000"
+
+            # Prevent the master from re-assigning the region when the region server is
+            # gone. Otherwise, the test case would not fail if the region mover fails. The
+            # default retainment wait period is larger than the test step timeout. This
+            # works only for HBase 2.6 (https://issues.apache.org/jira/browse/HBASE-27551).
+            hbase.master.scp.retain.assignment: "true"
+            hbase.master.scp.retain.assignment.force: "true"
   regionServers:
     config:
-      gracefulShutdownTimeout: 1m
+      gracefulShutdownTimeout: 2m # one minute for the region mover
       logging:
         enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
+      regionMover:
+        runBeforeShutdown: true
+        ack: true
+        maxThreads: 1
     roleGroups:
       default:
-        replicas: 1
+        replicas: 2
   restServers:
     config:
       gracefulShutdownTimeout: 1m
@@ -41,4 +58,4 @@ spec:
         enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
     roleGroups:
       default:
-        replicas: 1
+        replicas: 2

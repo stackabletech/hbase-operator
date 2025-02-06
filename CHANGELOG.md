@@ -16,8 +16,10 @@
 
 ### Changed
 
+- Support moving regions to other Pods during graceful shutdown of region servers ([#570]).
 - Default to OCI for image metadata and product image selection ([#611]).
 
+[#570]: https://github.com/stackabletech/hbase-operator/pull/570
 [#598]: https://github.com/stackabletech/hbase-operator/pull/598
 [#605]: https://github.com/stackabletech/hbase-operator/pull/605
 [#611]: https://github.com/stackabletech/hbase-operator/pull/611

@@ -134,6 +134,12 @@ tests:
       - zookeeper-latest
       - omid
       - openshift
+  - name: shutdown
+    dimensions:
+      - hbase
+      - hdfs-latest
+      - zookeeper-latest
+      - openshift
 suites:
   - name: nightly
     patch:
