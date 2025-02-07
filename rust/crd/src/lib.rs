@@ -424,7 +424,6 @@ impl AnyConfigFragment {
             HbaseRole::RegionServer => {
                 AnyConfigFragment::RegionServer(RegionServerConfigFragment {
                     hbase_rootdir: None,
-                    hbase_opts: None,
                     resources: default_resources(role),
                     logging: product_logging::spec::default_logging(),
                     affinity: get_affinity(cluster_name, role, hdfs_discovery_cm_name),
@@ -666,8 +665,6 @@ impl Atomic for RegionMoverExtraCliOpts {}
 pub struct RegionServerConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub hbase_rootdir: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub hbase_opts: Option<String>,
     #[fragment_attrs(serde(default))]
     pub resources: Resources<HbaseStorageConfig, NoRuntimeLimits>,
     #[fragment_attrs(serde(default))]

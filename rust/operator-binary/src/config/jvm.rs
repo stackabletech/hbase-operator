@@ -46,7 +46,8 @@ pub fn construct_global_jvm_args(kerberos_enabled: bool) -> String {
     jvm_args.join(" ")
 }
 
-/// Arguments that go into `HBASE_OPTS`, so *not* the heap settings (which go into `HBASE_HEAPSIZE`).
+/// JVM arguments that are specifically for the role (server), so will *not* be used e.g. by CLI tools.
+/// Heap settings are excluded, as they go into `HBASE_HEAPSIZE`.
 pub fn construct_role_specific_non_heap_jvm_args(
     hbase: &HbaseCluster,
     hbase_role: &HbaseRole,
