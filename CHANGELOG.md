@@ -9,6 +9,7 @@
 - Run a `containerdebug` process in the background of each HBase container to collect debugging information ([#605]).
 - Aggregate emitted Kubernetes events on the CustomResources ([#612]).
 - Support configuring JVM arguments ([#620]).
+- Added support for HBase 2.6.1 ([#627]):
 
 ### Removed
 
@@ -25,6 +26,7 @@
 [#611]: https://github.com/stackabletech/hbase-operator/pull/611
 [#612]: https://github.com/stackabletech/hbase-operator/pull/612
 [#620]: https://github.com/stackabletech/hbase-operator/pull/620
+[#627]: https://github.com/stackabletech/hbase-operator/pull/627
 
 ## [24.11.1] - 2025-01-09
 
