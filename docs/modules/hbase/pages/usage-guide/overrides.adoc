@@ -104,10 +104,10 @@ Using JVM argument overrides you can configure the JVM arguments xref:concepts:o
 One thing that is different for Kafka, is that all heap-related arguments will be passed in via the env variable `HBASE_HEAPSIZE`, all the other ones via `HBASE_OPTS`, `HBASE_MASTER_OPTS`, `HBASE_REGIONSERVER_OPTS` and `HBASE_REST_OPTS`.
 The `HBASE_HEAPSIZE` variable is documented as follows in the https://cwiki.apache.org/confluence/display/HADOOP2/Hbase+FAQ+Operations[HBase FAQs]:
 
-> Set the `HBASE_HEAPSIZE` environment variable in `${HBASE_HOME}/conf/hbase-env.sh` if your install needs to run with a larger heap.
+> Set the `HBASE_HEAPSIZE` environment variable in `$HBASE_HOME/conf/hbase-env.sh` if your install needs to run with a larger heap.
 > `HBASE_HEAPSIZE` is like `HADOOP_HEAPSIZE` in that its value is the desired heap size in MB.
 > The surrounding '-Xmx' and 'm' needed to make up the maximum heap size java option are added by the hbase start script
-> (See how `HBASE_HEAPSIZE` is used in the `${HBASE_HOME}/bin/hbase` script for clarification).
+> (See how `HBASE_HEAPSIZE` is used in the `$HBASE_HOME/bin/hbase` script for clarification).
 
 Looking at `bin/hbase`, you can actually add the `m` suffix to make the unit more clear, the script will detect this https://github.com/apache/hbase/blob/777010361abb203b8b17673d84acf4f7f1d0283a/bin/hbase#L165[here] and work correctly.
 
