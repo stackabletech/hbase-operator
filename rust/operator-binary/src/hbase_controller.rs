@@ -1199,9 +1199,9 @@ mod test {
     use super::*;
 
     #[rstest]
-    #[case("2.6.0", HbaseRole::Master, vec!["master", "ui-http"])]
-    #[case("2.6.0", HbaseRole::RegionServer, vec!["regionserver", "ui-http"])]
-    #[case("2.6.0", HbaseRole::RestServer, vec!["rest-http", "ui-http"])]
+    #[case("2.6.1", HbaseRole::Master, vec!["master", "ui-http"])]
+    #[case("2.6.1", HbaseRole::RegionServer, vec!["regionserver", "ui-http"])]
+    #[case("2.6.1", HbaseRole::RestServer, vec!["rest-http", "ui-http"])]
     #[case("2.4.14", HbaseRole::Master, vec!["master", "ui-http", "metrics"])]
     #[case("2.4.14", HbaseRole::RegionServer, vec!["regionserver", "ui-http", "metrics"])]
     #[case("2.4.14", HbaseRole::RestServer, vec!["rest-http", "ui-http", "metrics"])]
