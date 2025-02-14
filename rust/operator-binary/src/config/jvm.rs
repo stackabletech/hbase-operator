@@ -198,7 +198,7 @@ mod tests {
           name: simple-hbase
         spec:
           image:
-            productVersion: 2.4.18
+            productVersion: 2.6.1
           clusterConfig:
             hdfsConfigMapName: simple-hdfs
             zookeeperConfigMapName: simple-znode
@@ -250,7 +250,6 @@ mod tests {
         assert_eq!(
             role_specific_non_heap_jvm_args,
             "-Djava.security.properties=/stackable/conf/security.properties \
-            -javaagent:/stackable/jmx/jmx_prometheus_javaagent.jar=9100:/stackable/jmx/regionserver.yaml \
             -Djava.security.krb5.conf=/stackable/kerberos/krb5.conf \
             -Dhttps.proxyHost=proxy.my.corp \
             -Djava.net.preferIPv4Stack=true \
