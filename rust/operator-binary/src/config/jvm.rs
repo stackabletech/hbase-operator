@@ -1,11 +1,12 @@
 use snafu::{OptionExt, ResultExt, Snafu};
-use stackable_hbase_crd::{
-    AnyServiceConfig, HbaseCluster, HbaseRole, CONFIG_DIR_NAME, JVM_SECURITY_PROPERTIES_FILE,
-    METRICS_PORT,
-};
 use stackable_operator::{
     memory::{BinaryMultiple, MemoryQuantity},
     role_utils::{self, JvmArgumentOverrides},
+};
+
+use crate::crd::{
+    v1alpha1, AnyServiceConfig, HbaseRole, CONFIG_DIR_NAME, JVM_SECURITY_PROPERTIES_FILE,
+    METRICS_PORT,
 };
 
 const JAVA_HEAP_FACTOR: f32 = 0.8;
@@ -49,7 +50,7 @@ pub fn construct_global_jvm_args(kerberos_enabled: bool) -> String {
 /// JVM arguments that are specifically for the role (server), so will *not* be used e.g. by CLI tools.
 /// Heap settings are excluded, as they go into `HBASE_HEAPSIZE`.
 pub fn construct_role_specific_non_heap_jvm_args(
-    hbase: &HbaseCluster,
+    hbase: &v1alpha1::HbaseCluster,
     hbase_role: &HbaseRole,
     role_group: &str,
     product_version: &str,
@@ -142,9 +143,8 @@ fn is_heap_jvm_argument(jvm_argument: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use stackable_hbase_crd::{HbaseCluster, HbaseRole};
-
     use super::*;
+    use crate::crd::{v1alpha1, HbaseRole};
 
     #[test]
     fn test_construct_jvm_arguments_defaults() {
@@ -260,8 +260,15 @@ mod tests {
 
     fn construct_boilerplate(
         hbase_cluster: &str,
-    ) -> (HbaseCluster, HbaseRole, AnyServiceConfig, String, String) {
-        let hbase: HbaseCluster = serde_yaml::from_str(hbase_cluster).expect("illegal test input");
+    ) -> (
+        v1alpha1::HbaseCluster,
+        HbaseRole,
+        AnyServiceConfig,
+        String,
+        String,
+    ) {
+        let hbase: v1alpha1::HbaseCluster =
+            serde_yaml::from_str(hbase_cluster).expect("illegal test input");
 
         let hbase_role = HbaseRole::RegionServer;
         let merged_config = hbase

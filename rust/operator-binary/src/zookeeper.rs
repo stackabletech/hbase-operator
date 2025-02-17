@@ -1,12 +1,13 @@
 use std::{collections::BTreeMap, num::ParseIntError};
 
 use snafu::{OptionExt, ResultExt, Snafu};
-use stackable_hbase_crd::HbaseCluster;
 use stackable_operator::{
     client::Client, k8s_openapi::api::core::v1::ConfigMap, kube::ResourceExt,
 };
 use strum::{EnumDiscriminants, IntoStaticStr};
 use tracing::warn;
+
+use crate::crd::v1alpha1;
 
 const ZOOKEEPER_DISCOVERY_CM_HOSTS_ENTRY: &str = "ZOOKEEPER_HOSTS";
 const ZOOKEEPER_DISCOVERY_CM_CHROOT_ENTRY: &str = "ZOOKEEPER_CHROOT";
@@ -18,7 +19,6 @@ const ZOOKEEPER_ZNODE_PARENT: &str = "zookeeper.znode.parent";
 
 #[derive(Snafu, Debug, EnumDiscriminants)]
 #[strum_discriminants(derive(IntoStaticStr))]
-#[allow(clippy::enum_variant_names)]
 pub enum Error {
     #[snafu(display("object defines no namespace"))]
     ObjectHasNoNamespace,
@@ -53,7 +53,7 @@ pub struct ZookeeperConnectionInformation {
 }
 
 impl ZookeeperConnectionInformation {
-    pub async fn retrieve(hbase: &HbaseCluster, client: &Client) -> Result<Self> {
+    pub async fn retrieve(hbase: &v1alpha1::HbaseCluster, client: &Client) -> Result<Self> {
         let zk_discovery_cm_name = &hbase.spec.cluster_config.zookeeper_config_map_name;
         let mut zk_discovery_cm = client
             .get::<ConfigMap>(

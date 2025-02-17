@@ -1,7 +1,6 @@
 use std::collections::BTreeMap;
 
 use snafu::{OptionExt, ResultExt, Snafu};
-use stackable_hbase_crd::{HbaseCluster, TLS_STORE_DIR, TLS_STORE_PASSWORD, TLS_STORE_VOLUME_NAME};
 use stackable_operator::{
     builder::{
         self,
@@ -16,10 +15,14 @@ use stackable_operator::{
     utils::cluster_info::KubernetesClusterInfo,
 };
 
+use crate::crd::{v1alpha1, TLS_STORE_DIR, TLS_STORE_PASSWORD, TLS_STORE_VOLUME_NAME};
+
 #[derive(Snafu, Debug)]
 pub enum Error {
     #[snafu(display("object {hbase} is missing namespace"))]
-    ObjectMissingNamespace { hbase: ObjectRef<HbaseCluster> },
+    ObjectMissingNamespace {
+        hbase: ObjectRef<v1alpha1::HbaseCluster>,
+    },
 
     #[snafu(display("failed to add Kerberos secret volume"))]
     AddKerberosSecretVolume {
@@ -41,7 +44,7 @@ pub enum Error {
 }
 
 pub fn kerberos_config_properties(
-    hbase: &HbaseCluster,
+    hbase: &v1alpha1::HbaseCluster,
     cluster_info: &KubernetesClusterInfo,
 ) -> Result<BTreeMap<String, String>, Error> {
     if !hbase.has_kerberos_enabled() {
@@ -134,7 +137,7 @@ pub fn kerberos_config_properties(
 }
 
 pub fn kerberos_discovery_config_properties(
-    hbase: &HbaseCluster,
+    hbase: &v1alpha1::HbaseCluster,
     cluster_info: &KubernetesClusterInfo,
 ) -> Result<BTreeMap<String, String>, Error> {
     if !hbase.has_kerberos_enabled() {
@@ -174,7 +177,7 @@ pub fn kerberos_discovery_config_properties(
     ]))
 }
 
-pub fn kerberos_ssl_server_settings(hbase: &HbaseCluster) -> BTreeMap<String, String> {
+pub fn kerberos_ssl_server_settings(hbase: &v1alpha1::HbaseCluster) -> BTreeMap<String, String> {
     if !hbase.has_https_enabled() {
         return BTreeMap::new();
     }
@@ -204,7 +207,7 @@ pub fn kerberos_ssl_server_settings(hbase: &HbaseCluster) -> BTreeMap<String, St
     ])
 }
 
-pub fn kerberos_ssl_client_settings(hbase: &HbaseCluster) -> BTreeMap<String, String> {
+pub fn kerberos_ssl_client_settings(hbase: &v1alpha1::HbaseCluster) -> BTreeMap<String, String> {
     if !hbase.has_https_enabled() {
         return BTreeMap::new();
     }
@@ -226,7 +229,7 @@ pub fn kerberos_ssl_client_settings(hbase: &HbaseCluster) -> BTreeMap<String, St
 }
 
 pub fn add_kerberos_pod_config(
-    hbase: &HbaseCluster,
+    hbase: &v1alpha1::HbaseCluster,
     cb: &mut ContainerBuilder,
     pb: &mut PodBuilder,
     requested_secret_lifetime: Duration,
@@ -277,7 +280,7 @@ pub fn add_kerberos_pod_config(
 }
 
 fn principal_host_part(
-    hbase: &HbaseCluster,
+    hbase: &v1alpha1::HbaseCluster,
     cluster_info: &KubernetesClusterInfo,
 ) -> Result<String, Error> {
     let hbase_name = hbase.name_any();

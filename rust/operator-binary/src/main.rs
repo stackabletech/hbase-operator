@@ -3,7 +3,6 @@ use std::sync::Arc;
 use clap::Parser;
 use futures::StreamExt;
 use hbase_controller::FULL_HBASE_CONTROLLER_NAME;
-use stackable_hbase_crd::{HbaseCluster, APP_NAME};
 use stackable_operator::{
     cli::{Command, ProductOperatorRun},
     k8s_openapi::api::{apps::v1::StatefulSet, core::v1::Service},
@@ -15,10 +14,14 @@ use stackable_operator::{
         },
     },
     logging::controller::report_controller_reconciled,
-    CustomResourceExt,
+    shared::yaml::SerializeOptions,
+    YamlSchema,
 };
 
+use crate::crd::{v1alpha1, HbaseCluster, APP_NAME};
+
 mod config;
+mod crd;
 mod discovery;
 mod hbase_controller;
 mod kerberos;
@@ -45,7 +48,8 @@ async fn main() -> anyhow::Result<()> {
     let opts = Opts::parse();
     match opts.cmd {
         Command::Crd => {
-            HbaseCluster::print_yaml_schema(built_info::PKG_VERSION)?;
+            HbaseCluster::merged_crd(HbaseCluster::V1Alpha1)?
+                .print_yaml_schema(built_info::PKG_VERSION, SerializeOptions::default())?;
         }
         Command::Run(ProductOperatorRun {
             product_config,
@@ -85,7 +89,7 @@ async fn main() -> anyhow::Result<()> {
             ));
 
             Controller::new(
-                watch_namespace.get_api::<DeserializeGuard<HbaseCluster>>(&client),
+                watch_namespace.get_api::<DeserializeGuard<v1alpha1::HbaseCluster>>(&client),
                 watcher::Config::default(),
             )
             .owns(

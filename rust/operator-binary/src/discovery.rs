@@ -2,7 +2,6 @@ use std::collections::BTreeMap;
 
 use product_config::writer::to_hadoop_xml;
 use snafu::{ResultExt, Snafu};
-use stackable_hbase_crd::{HbaseCluster, HbaseRole, HBASE_SITE_XML};
 use stackable_operator::{
     builder::{configmap::ConfigMapBuilder, meta::ObjectMetaBuilder},
     commons::product_image_selection::ResolvedProductImage,
@@ -12,6 +11,7 @@ use stackable_operator::{
 };
 
 use crate::{
+    crd::{v1alpha1, HbaseRole, HBASE_SITE_XML},
     hbase_controller::build_recommended_labels,
     kerberos::{self, kerberos_discovery_config_properties},
     zookeeper::ZookeeperConnectionInformation,
@@ -24,7 +24,7 @@ pub enum Error {
     #[snafu(display("object {hbase} is missing metadata to build owner reference"))]
     ObjectMissingMetadataForOwnerRef {
         source: stackable_operator::builder::meta::Error,
-        hbase: ObjectRef<HbaseCluster>,
+        hbase: ObjectRef<v1alpha1::HbaseCluster>,
     },
 
     #[snafu(display("failed to build ConfigMap"))]
@@ -43,7 +43,7 @@ pub enum Error {
 
 /// Creates a discovery config map containing the `hbase-site.xml` for clients.
 pub fn build_discovery_configmap(
-    hbase: &HbaseCluster,
+    hbase: &v1alpha1::HbaseCluster,
     cluster_info: &KubernetesClusterInfo,
     zookeeper_connection_information: &ZookeeperConnectionInformation,
     resolved_product_image: &ResolvedProductImage,

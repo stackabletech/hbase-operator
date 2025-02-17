@@ -1,4 +1,5 @@
-//! Ensures that `Pod`s are configured and running for each [`HbaseCluster`]
+//! Ensures that `Pod`s are configured and running for each [`v1alpha1::HbaseCluster`]
+
 use std::{
     collections::{BTreeMap, HashMap},
     fmt::Write,
@@ -13,11 +14,6 @@ use product_config::{
     ProductConfigManager,
 };
 use snafu::{OptionExt, ResultExt, Snafu};
-use stackable_hbase_crd::{
-    merged_env, AnyServiceConfig, Container, HbaseCluster, HbaseClusterStatus, HbaseRole, APP_NAME,
-    HBASE_ENV_SH, HBASE_REST_PORT_NAME_HTTP, HBASE_REST_PORT_NAME_HTTPS, HBASE_SITE_XML,
-    JVM_SECURITY_PROPERTIES_FILE, SSL_CLIENT_XML, SSL_SERVER_XML,
-};
 use stackable_operator::{
     builder::{
         self,
@@ -72,6 +68,11 @@ use crate::{
         construct_global_jvm_args, construct_hbase_heapsize_env,
         construct_role_specific_non_heap_jvm_args,
     },
+    crd::{
+        merged_env, v1alpha1, AnyServiceConfig, Container, HbaseClusterStatus, HbaseRole, APP_NAME,
+        HBASE_ENV_SH, HBASE_REST_PORT_NAME_HTTP, HBASE_REST_PORT_NAME_HTTPS, HBASE_SITE_XML,
+        JVM_SECURITY_PROPERTIES_FILE, SSL_CLIENT_XML, SSL_SERVER_XML,
+    },
     discovery::build_discovery_configmap,
     kerberos::{
         self, add_kerberos_pod_config, kerberos_config_properties, kerberos_ssl_client_settings,
@@ -82,8 +83,7 @@ use crate::{
         extend_role_group_config_map, resolve_vector_aggregator_address,
         CONTAINERDEBUG_LOG_DIRECTORY, STACKABLE_LOG_DIR,
     },
-    security,
-    security::opa::HbaseOpaConfig,
+    security::{self, opa::HbaseOpaConfig},
     zookeeper::{self, ZookeeperConnectionInformation},
     OPERATOR_NAME,
 };
@@ -111,10 +111,9 @@ pub struct Ctx {
 
 #[derive(Snafu, Debug, EnumDiscriminants)]
 #[strum_discriminants(derive(IntoStaticStr))]
-#[allow(clippy::enum_variant_names)]
 pub enum Error {
     #[snafu(display("invalid role properties"))]
-    RoleProperties { source: stackable_hbase_crd::Error },
+    RoleProperties { source: crate::crd::Error },
 
     #[snafu(display("missing secret lifetime"))]
     MissingSecretLifetime,
@@ -155,7 +154,7 @@ pub enum Error {
     #[snafu(display("failed to apply Service for {}", rolegroup))]
     ApplyRoleGroupService {
         source: stackable_operator::cluster_resources::Error,
-        rolegroup: RoleGroupRef<HbaseCluster>,
+        rolegroup: RoleGroupRef<v1alpha1::HbaseCluster>,
     },
 
     #[snafu(display("failed to apply discovery configmap"))]
@@ -169,19 +168,19 @@ pub enum Error {
     #[snafu(display("failed to build ConfigMap for {}", rolegroup))]
     BuildRoleGroupConfig {
         source: stackable_operator::builder::configmap::Error,
-        rolegroup: RoleGroupRef<HbaseCluster>,
+        rolegroup: RoleGroupRef<v1alpha1::HbaseCluster>,
     },
 
     #[snafu(display("failed to apply ConfigMap for {}", rolegroup))]
     ApplyRoleGroupConfig {
         source: stackable_operator::cluster_resources::Error,
-        rolegroup: RoleGroupRef<HbaseCluster>,
+        rolegroup: RoleGroupRef<v1alpha1::HbaseCluster>,
     },
 
     #[snafu(display("failed to apply StatefulSet for {}", rolegroup))]
     ApplyRoleGroupStatefulSet {
         source: stackable_operator::cluster_resources::Error,
-        rolegroup: RoleGroupRef<HbaseCluster>,
+        rolegroup: RoleGroupRef<v1alpha1::HbaseCluster>,
     },
 
     #[snafu(display("failed to generate product config"))]
@@ -231,10 +230,10 @@ pub enum Error {
     },
 
     #[snafu(display("failed to retrieve Hbase role group: {source}"))]
-    UnidentifiedHbaseRoleGroup { source: stackable_hbase_crd::Error },
+    UnidentifiedHbaseRoleGroup { source: crate::crd::Error },
 
     #[snafu(display("failed to resolve and merge config for role and role group"))]
-    FailedToResolveConfig { source: stackable_hbase_crd::Error },
+    FailedToResolveConfig { source: crate::crd::Error },
 
     #[snafu(display("failed to resolve the Vector aggregator address"))]
     ResolveVectorAggregatorAddress {
@@ -266,7 +265,7 @@ pub enum Error {
     ))]
     SerializeJvmSecurity {
         source: PropertiesWriterError,
-        rolegroup: RoleGroupRef<HbaseCluster>,
+        rolegroup: RoleGroupRef<v1alpha1::HbaseCluster>,
     },
 
     #[snafu(display("failed to create PodDisruptionBudget"))]
@@ -328,7 +327,7 @@ impl ReconcilerError for Error {
 }
 
 pub async fn reconcile_hbase(
-    hbase: Arc<DeserializeGuard<HbaseCluster>>,
+    hbase: Arc<DeserializeGuard<v1alpha1::HbaseCluster>>,
     ctx: Arc<Ctx>,
 ) -> Result<Action> {
     tracing::info!("Starting reconcile");
@@ -516,7 +515,7 @@ pub async fn reconcile_hbase(
 /// The server-role service is the primary endpoint that should be used by clients that do not perform internal load balancing,
 /// including targets outside of the cluster.
 pub fn build_region_server_role_service(
-    hbase: &HbaseCluster,
+    hbase: &v1alpha1::HbaseCluster,
     resolved_product_image: &ResolvedProductImage,
 ) -> Result<Service> {
     let role = HbaseRole::RegionServer;
@@ -569,9 +568,9 @@ pub fn build_region_server_role_service(
 /// The rolegroup [`ConfigMap`] configures the rolegroup based on the configuration given by the administrator
 #[allow(clippy::too_many_arguments)]
 fn build_rolegroup_config_map(
-    hbase: &HbaseCluster,
+    hbase: &v1alpha1::HbaseCluster,
     cluster_info: &KubernetesClusterInfo,
-    rolegroup: &RoleGroupRef<HbaseCluster>,
+    rolegroup: &RoleGroupRef<v1alpha1::HbaseCluster>,
     rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
     zookeeper_connection_information: &ZookeeperConnectionInformation,
     merged_config: &AnyServiceConfig,
@@ -723,9 +722,9 @@ fn build_rolegroup_config_map(
 ///
 /// This is mostly useful for internal communication between peers, or for clients that perform client-side load balancing.
 fn build_rolegroup_service(
-    hbase: &HbaseCluster,
+    hbase: &v1alpha1::HbaseCluster,
     hbase_role: &HbaseRole,
-    rolegroup: &RoleGroupRef<HbaseCluster>,
+    rolegroup: &RoleGroupRef<v1alpha1::HbaseCluster>,
     resolved_product_image: &ResolvedProductImage,
 ) -> Result<Service> {
     let ports = hbase
@@ -783,10 +782,10 @@ fn build_rolegroup_service(
 /// The [`Pod`](`stackable_operator::k8s_openapi::api::core::v1::Pod`)s are accessible through the corresponding [`Service`] (from [`build_rolegroup_service`]).
 #[allow(clippy::too_many_arguments)]
 fn build_rolegroup_statefulset(
-    hbase: &HbaseCluster,
+    hbase: &v1alpha1::HbaseCluster,
     cluster_info: &KubernetesClusterInfo,
     hbase_role: &HbaseRole,
-    rolegroup_ref: &RoleGroupRef<HbaseCluster>,
+    rolegroup_ref: &RoleGroupRef<v1alpha1::HbaseCluster>,
     rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
     merged_config: &AnyServiceConfig,
     resolved_product_image: &ResolvedProductImage,
@@ -1076,7 +1075,7 @@ where
 }
 
 pub fn error_policy(
-    _obj: Arc<DeserializeGuard<HbaseCluster>>,
+    _obj: Arc<DeserializeGuard<v1alpha1::HbaseCluster>>,
     error: &Error,
     _ctx: Arc<Ctx>,
 ) -> Action {
@@ -1088,11 +1087,11 @@ pub fn error_policy(
 }
 
 pub fn build_recommended_labels<'a>(
-    owner: &'a HbaseCluster,
+    owner: &'a v1alpha1::HbaseCluster,
     app_version: &'a str,
     role: &'a str,
     role_group: &'a str,
-) -> ObjectLabels<'a, HbaseCluster> {
+) -> ObjectLabels<'a, v1alpha1::HbaseCluster> {
     ObjectLabels {
         owner,
         app_name: APP_NAME,
@@ -1106,7 +1105,7 @@ pub fn build_recommended_labels<'a>(
 
 /// The content of the HBase `hbase-env.sh` file.
 fn build_hbase_env_sh(
-    hbase: &HbaseCluster,
+    hbase: &v1alpha1::HbaseCluster,
     merged_config: &AnyServiceConfig,
     hbase_role: &HbaseRole,
     role_group: &str,
@@ -1155,7 +1154,7 @@ fn build_hbase_env_sh(
 /// In the future, such validations should be moved to the CRD CEL rules which are much more flexible
 /// and have to added benefit that invalid CRs are rejected by the API server.
 /// A requirement for this is that the minimum supported Kubernetes version is 1.29.
-fn validate_cr(hbase: &HbaseCluster) -> Result<()> {
+fn validate_cr(hbase: &v1alpha1::HbaseCluster) -> Result<()> {
     tracing::info!("Begin CR validation");
 
     let hbase_version = hbase.spec.image.product_version();
@@ -1174,8 +1173,8 @@ fn validate_cr(hbase: &HbaseCluster) -> Result<()> {
 /// by appending it to the `HOSTNAME` environment variable.
 /// This name is required by the RegionMover to function properly.
 fn hbase_service_domain_name(
-    hbase: &HbaseCluster,
-    rolegroup_ref: &RoleGroupRef<HbaseCluster>,
+    hbase: &v1alpha1::HbaseCluster,
+    rolegroup_ref: &RoleGroupRef<v1alpha1::HbaseCluster>,
     cluster_info: &KubernetesClusterInfo,
 ) -> Result<String, Error> {
     let hbase_cluster_name = rolegroup_ref.object_name();
@@ -1237,7 +1236,8 @@ mod test {
                 replicas: 1
         "
         );
-        let hbase: HbaseCluster = serde_yaml::from_str(&input).expect("illegal test input");
+        let hbase: v1alpha1::HbaseCluster =
+            serde_yaml::from_str(&input).expect("illegal test input");
 
         let resolved_image = ResolvedProductImage {
             image: format!("oci.stackable.tech/sdp/hbase:{hbase_version}-stackable0.0.0-dev"),
@@ -1248,7 +1248,7 @@ mod test {
         };
 
         let role_group_ref = RoleGroupRef {
-            cluster: ObjectRef::<HbaseCluster>::from_obj(&hbase),
+            cluster: ObjectRef::<v1alpha1::HbaseCluster>::from_obj(&hbase),
             role: role.to_string(),
             role_group: "default".to_string(),
         };

@@ -5,7 +5,7 @@ use stackable_operator::{
     k8s_openapi::api::core::v1::{PodAffinity, PodAntiAffinity},
 };
 
-use crate::{HbaseRole, APP_NAME};
+use crate::crd::{HbaseRole, APP_NAME};
 
 pub fn get_affinity(
     cluster_name: &str,
@@ -91,7 +91,7 @@ mod tests {
     };
 
     use super::*;
-    use crate::HbaseCluster;
+    use crate::crd::v1alpha1;
 
     #[rstest]
     #[case(HbaseRole::Master)]
@@ -122,7 +122,8 @@ mod tests {
               default:
                 replicas: 1
         "#;
-        let hbase: HbaseCluster = serde_yaml::from_str(input).expect("illegal test input");
+        let hbase: v1alpha1::HbaseCluster =
+            serde_yaml::from_str(input).expect("illegal test input");
         let affinity = hbase
             .merged_config(
                 &role,
