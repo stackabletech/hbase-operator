@@ -101,7 +101,7 @@ Read the xref:concepts:overrides.adoc#pod-overrides[Pod overrides documentation]
 Stackable operators automatically determine the set of needed JVM arguments, such as memory settings or trust- and keystores.
 Using JVM argument overrides you can configure the JVM arguments xref:concepts:overrides.adoc#jvm-argument-overrides[according to the concepts page].
 
-One thing that is different for Kafka, is that all heap-related arguments will be passed in via the env variable `HBASE_HEAPSIZE`, all the other ones via `HBASE_OPTS`, `HBASE_MASTER_OPTS`, `HBASE_REGIONSERVER_OPTS` and `HBASE_REST_OPTS`.
+One thing that is different for HBase, is that all heap-related arguments will be passed in via the env variable `HBASE_HEAPSIZE`, all the other ones via `HBASE_OPTS`, `HBASE_MASTER_OPTS`, `HBASE_REGIONSERVER_OPTS` and `HBASE_REST_OPTS`.
 The `HBASE_HEAPSIZE` variable is documented as follows in the https://cwiki.apache.org/confluence/display/HADOOP2/Hbase+FAQ+Operations[HBase FAQs]:
 
 > Set the `HBASE_HEAPSIZE` environment variable in `$HBASE_HOME/conf/hbase-env.sh` if your install needs to run with a larger heap.
