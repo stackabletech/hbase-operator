@@ -1,6 +1,5 @@
-//! Ensures that `Pod`s are configured and running for each [`HbaseCluster`][v1alpha1]
-//!
-//! [v1alpha1]: crate::crd::v1alpha1::HbaseCluster
+//! Ensures that `Pod`s are configured and running for each [`v1alpha1::HbaseCluster`]
+
 use std::{
     collections::{BTreeMap, HashMap},
     fmt::Write,
