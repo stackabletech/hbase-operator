@@ -9,7 +9,6 @@ use std::{
 };
 
 use const_format::concatcp;
-use indoc::formatdoc;
 use product_config::{
     types::PropertyNameKind,
     writer::{to_hadoop_xml, to_java_properties_string, PropertiesWriterError},
@@ -32,12 +31,11 @@ use stackable_operator::{
         api::{
             apps::v1::{StatefulSet, StatefulSetSpec},
             core::v1::{
-                ConfigMap, ConfigMapVolumeSource, ContainerPort, Probe, Service, ServiceAccount,
-                ServicePort, ServiceSpec, TCPSocketAction, Volume,
+                ConfigMap, ConfigMapVolumeSource, ContainerPort, EnvVar, Probe, Service,
+                ServiceAccount, ServicePort, ServiceSpec, TCPSocketAction, Volume,
             },
         },
         apimachinery::pkg::{apis::meta::v1::LabelSelector, util::intstr::IntOrString},
-        DeepMerge,
     },
     kube::{
         core::{error_boundary, DeserializeGuard},
@@ -50,21 +48,19 @@ use stackable_operator::{
     product_config_utils::{transform_all_roles_to_config, validate_all_roles_and_groups_config},
     product_logging::{
         self,
-        framework::{
-            create_vector_shutdown_file_command, remove_vector_shutdown_file_command, LoggingError,
-        },
+        framework::LoggingError,
         spec::{
             ConfigMapLogConfig, ContainerLogConfig, ContainerLogConfigChoice,
             CustomContainerLogConfig,
         },
     },
-    role_utils::{GenericRoleConfig, JavaCommonConfig, Role, RoleGroupRef},
+    role_utils::{GenericRoleConfig, RoleGroupRef},
     status::condition::{
         compute_conditions, operations::ClusterOperationsConditionBuilder,
         statefulset::StatefulSetConditionBuilder,
     },
     time::Duration,
-    utils::{cluster_info::KubernetesClusterInfo, COMMON_BASH_TRAP_FUNCTIONS},
+    utils::cluster_info::KubernetesClusterInfo,
 };
 use strum::{EnumDiscriminants, IntoStaticStr, ParseError};
 
@@ -74,21 +70,19 @@ use crate::{
         construct_role_specific_non_heap_jvm_args,
     },
     crd::{
-        merged_env, v1alpha1, Container, HbaseClusterStatus, HbaseConfig, HbaseConfigFragment,
-        HbaseRole, APP_NAME, CONFIG_DIR_NAME, HBASE_ENV_SH, HBASE_REST_PORT_NAME_HTTP,
-        HBASE_REST_PORT_NAME_HTTPS, HBASE_SITE_XML, JVM_SECURITY_PROPERTIES_FILE, SSL_CLIENT_XML,
-        SSL_SERVER_XML,
+        merged_env, v1alpha1, AnyServiceConfig, Container, HbaseClusterStatus, HbaseRole, APP_NAME,
+        HBASE_ENV_SH, HBASE_REST_PORT_NAME_HTTP, HBASE_REST_PORT_NAME_HTTPS, HBASE_SITE_XML,
+        JVM_SECURITY_PROPERTIES_FILE, SSL_CLIENT_XML, SSL_SERVER_XML,
     },
     discovery::build_discovery_configmap,
     kerberos::{
-        self, add_kerberos_pod_config, kerberos_config_properties,
-        kerberos_container_start_commands, kerberos_ssl_client_settings,
+        self, add_kerberos_pod_config, kerberos_config_properties, kerberos_ssl_client_settings,
         kerberos_ssl_server_settings,
     },
     operations::{graceful_shutdown::add_graceful_shutdown_config, pdb::add_pdbs},
     product_logging::{
-        extend_role_group_config_map, log4j_properties_file_name,
-        resolve_vector_aggregator_address, STACKABLE_LOG_DIR,
+        extend_role_group_config_map, resolve_vector_aggregator_address,
+        CONTAINERDEBUG_LOG_DIRECTORY, STACKABLE_LOG_DIR,
     },
     security::{self, opa::HbaseOpaConfig},
     zookeeper::{self, ZookeeperConnectionInformation},
@@ -102,6 +96,8 @@ pub const MAX_HBASE_LOG_FILES_SIZE: MemoryQuantity = MemoryQuantity {
     unit: BinaryMultiple::Mebi,
 };
 
+// These constants are hard coded in hbase-entrypoint.sh
+// You need to change them there too.
 const HDFS_DISCOVERY_TMP_DIR: &str = "/stackable/tmp/hdfs";
 const HBASE_CONFIG_TMP_DIR: &str = "/stackable/tmp/hbase";
 const HBASE_LOG_CONFIG_TMP_DIR: &str = "/stackable/tmp/log_config";
@@ -117,6 +113,9 @@ pub struct Ctx {
 #[derive(Snafu, Debug, EnumDiscriminants)]
 #[strum_discriminants(derive(IntoStaticStr))]
 pub enum Error {
+    #[snafu(display("invalid role properties"))]
+    RoleProperties { source: crate::crd::Error },
+
     #[snafu(display("missing secret lifetime"))]
     MissingSecretLifetime,
 
@@ -356,7 +355,7 @@ pub async fn reconcile_hbase(
         .await
         .context(ResolveVectorAggregatorAddressSnafu)?;
 
-    let roles = build_roles(hbase)?;
+    let roles = hbase.build_role_properties().context(RolePropertiesSnafu)?;
 
     let validated_config = validate_all_roles_and_groups_config(
         &resolved_product_image.app_version_label,
@@ -429,11 +428,6 @@ pub async fn reconcile_hbase(
             role: role_name.to_string(),
         })?;
         for (rolegroup_name, rolegroup_config) in group_config.iter() {
-            let role = hbase
-                .get_role(&hbase_role)
-                .with_context(|| MissingHbaseRoleSnafu {
-                    role: hbase_role.to_string(),
-                })?;
             let rolegroup = hbase.server_rolegroup_ref(role_name, rolegroup_name);
 
             let merged_config = hbase
@@ -449,7 +443,6 @@ pub async fn reconcile_hbase(
             let rg_configmap = build_rolegroup_config_map(
                 hbase,
                 &client.kubernetes_cluster_info,
-                role,
                 &rolegroup,
                 rolegroup_config,
                 &zookeeper_connection_information,
@@ -460,6 +453,7 @@ pub async fn reconcile_hbase(
             )?;
             let rg_statefulset = build_rolegroup_statefulset(
                 hbase,
+                &client.kubernetes_cluster_info,
                 &hbase_role,
                 &rolegroup,
                 rolegroup_config,
@@ -577,11 +571,10 @@ pub fn build_region_server_role_service(
 fn build_rolegroup_config_map(
     hbase: &v1alpha1::HbaseCluster,
     cluster_info: &KubernetesClusterInfo,
-    role: &Role<HbaseConfigFragment, GenericRoleConfig, JavaCommonConfig>,
     rolegroup: &RoleGroupRef<v1alpha1::HbaseCluster>,
     rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
     zookeeper_connection_information: &ZookeeperConnectionInformation,
-    merged_config: &HbaseConfig,
+    merged_config: &AnyServiceConfig,
     resolved_product_image: &ResolvedProductImage,
     hbase_opa_config: Option<&HbaseOpaConfig>,
     vector_aggregator_address: Option<&str>,
@@ -623,7 +616,6 @@ fn build_rolegroup_config_map(
                     hbase,
                     merged_config,
                     &hbase_role,
-                    role,
                     &rolegroup.role_group,
                     &resolved_product_image.product_version,
                 )?;
@@ -713,7 +705,7 @@ fn build_rolegroup_config_map(
     extend_role_group_config_map(
         rolegroup,
         vector_aggregator_address,
-        &merged_config.logging,
+        merged_config.logging(),
         &mut builder,
         &resolved_product_image.product_version,
     )
@@ -789,20 +781,18 @@ fn build_rolegroup_service(
 /// The rolegroup [`StatefulSet`] runs the rolegroup, as configured by the administrator.
 ///
 /// The [`Pod`](`stackable_operator::k8s_openapi::api::core::v1::Pod`)s are accessible through the corresponding [`Service`] (from [`build_rolegroup_service`]).
+#[allow(clippy::too_many_arguments)]
 fn build_rolegroup_statefulset(
     hbase: &v1alpha1::HbaseCluster,
+    cluster_info: &KubernetesClusterInfo,
     hbase_role: &HbaseRole,
     rolegroup_ref: &RoleGroupRef<v1alpha1::HbaseCluster>,
     rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
-    merged_config: &HbaseConfig,
+    merged_config: &AnyServiceConfig,
     resolved_product_image: &ResolvedProductImage,
     service_account: &ServiceAccount,
 ) -> Result<StatefulSet> {
     let hbase_version = &resolved_product_image.app_version_label;
-
-    // In hbase-op the restserver role is optional :/
-    let role = hbase.get_role(hbase_role);
-    let role_group = role.and_then(|r| r.role_groups.get(&rolegroup_ref.role_group));
 
     let ports = hbase
         .ports(hbase_role, &resolved_product_image.product_version)
@@ -869,49 +859,40 @@ fn build_rolegroup_statefulset(
         ..probe_template
     };
 
-    let merged_env = merged_env(rolegroup_config.get(&PropertyNameKind::Env));
+    let mut merged_env = merged_env(rolegroup_config.get(&PropertyNameKind::Env));
+    // This env var is set for all roles to avoid bash's "unbound variable" errors
+    merged_env.extend([
+        EnvVar {
+            name: "REGION_MOVER_OPTS".to_string(),
+            value: Some(merged_config.region_mover_args()),
+            ..EnvVar::default()
+        },
+        EnvVar {
+            name: "RUN_REGION_MOVER".to_string(),
+            value: Some(merged_config.run_region_mover().to_string()),
+            ..EnvVar::default()
+        },
+        EnvVar {
+            name: "STACKABLE_LOG_DIR".to_string(),
+            value: Some(STACKABLE_LOG_DIR.to_string()),
+            ..EnvVar::default()
+        },
+    ]);
 
-    let log4j_properties_file_name =
-        log4j_properties_file_name(&resolved_product_image.product_version);
     let mut hbase_container = ContainerBuilder::new("hbase").expect("ContainerBuilder not created");
     hbase_container
         .image_from_product_image(resolved_product_image)
-        .command(vec![
-            "/bin/bash".to_string(),
-            "-x".to_string(),
-            "-euo".to_string(),
-            "pipefail".to_string(),
-            "-c".to_string(),
+        .command(vec!["/stackable/hbase/bin/hbase-entrypoint.sh".to_string()])
+        .args(vec![
+            hbase_role.cli_role_name(),
+            hbase_service_domain_name(hbase, rolegroup_ref, cluster_info)?,
+            hbase.service_port(hbase_role).to_string(),
         ])
-        .args(vec![formatdoc! {"
-            mkdir -p {CONFIG_DIR_NAME}
-            cp {HDFS_DISCOVERY_TMP_DIR}/hdfs-site.xml {CONFIG_DIR_NAME}
-            cp {HDFS_DISCOVERY_TMP_DIR}/core-site.xml {CONFIG_DIR_NAME}
-            cp {HBASE_CONFIG_TMP_DIR}/* {CONFIG_DIR_NAME}
-            cp {HBASE_LOG_CONFIG_TMP_DIR}/{log4j_properties_file_name} {CONFIG_DIR_NAME}
-
-            {kerberos_container_start_commands}
-
-            {COMMON_BASH_TRAP_FUNCTIONS}
-            {remove_vector_shutdown_file_command}
-            prepare_signal_handlers
-            containerdebug --output={STACKABLE_LOG_DIR}/containerdebug-state.json --loop &
-            bin/hbase {hbase_role_name_in_command} start &
-            wait_for_termination $!
-            {create_vector_shutdown_file_command}
-            ",
-            hbase_role_name_in_command = hbase_role.cli_role_name(),
-            kerberos_container_start_commands = kerberos_container_start_commands(hbase),
-            remove_vector_shutdown_file_command =
-                remove_vector_shutdown_file_command(STACKABLE_LOG_DIR),
-            create_vector_shutdown_file_command =
-                create_vector_shutdown_file_command(STACKABLE_LOG_DIR),
-        }])
         .add_env_vars(merged_env)
         // Needed for the `containerdebug` process to log it's tracing information to.
         .add_env_var(
             "CONTAINERDEBUG_LOG_DIRECTORY",
-            format!("{STACKABLE_LOG_DIR}/containerdebug"),
+            &*CONTAINERDEBUG_LOG_DIRECTORY,
         )
         .add_volume_mount("hbase-config", HBASE_CONFIG_TMP_DIR)
         .context(AddVolumeMountSnafu)?
@@ -922,7 +903,7 @@ fn build_rolegroup_statefulset(
         .add_volume_mount("log", STACKABLE_LOG_DIR)
         .context(AddVolumeMountSnafu)?
         .add_container_ports(ports)
-        .resources(merged_config.resources.clone().into())
+        .resources(merged_config.resources().clone().into())
         .startup_probe(startup_probe)
         .liveness_probe(liveness_probe)
         .readiness_probe(readiness_probe);
@@ -942,7 +923,7 @@ fn build_rolegroup_statefulset(
     pod_builder
         .metadata(pb_metadata)
         .image_pull_secrets_from_product_image(resolved_product_image)
-        .affinity(&merged_config.affinity)
+        .affinity(merged_config.affinity())
         .add_volume(stackable_operator::k8s_openapi::api::core::v1::Volume {
             name: "hbase-config".to_string(),
             config_map: Some(ConfigMapVolumeSource {
@@ -982,7 +963,7 @@ fn build_rolegroup_statefulset(
             Some(ContainerLogConfigChoice::Custom(CustomContainerLogConfig {
                 custom: ConfigMapLogConfig { config_map },
             })),
-    }) = merged_config.logging.containers.get(&Container::Hbase)
+    }) = merged_config.logging().containers.get(&Container::Hbase)
     {
         pod_builder
             .add_volume(Volume {
@@ -1011,11 +992,10 @@ fn build_rolegroup_statefulset(
     if hbase.has_kerberos_enabled() {
         add_kerberos_pod_config(
             hbase,
-            hbase_role,
             &mut hbase_container,
             &mut pod_builder,
             merged_config
-                .requested_secret_lifetime
+                .requested_secret_lifetime()
                 .context(MissingSecretLifetimeSnafu)?,
         )
         .context(AddKerberosConfigSnafu)?;
@@ -1023,13 +1003,13 @@ fn build_rolegroup_statefulset(
     pod_builder.add_container(hbase_container.build());
 
     // Vector sidecar shall be the last container in the list
-    if merged_config.logging.enable_vector_agent {
+    if merged_config.logging().enable_vector_agent {
         pod_builder.add_container(
             product_logging::framework::vector_container(
                 resolved_product_image,
                 "hbase-config",
                 "log",
-                merged_config.logging.containers.get(&Container::Vector),
+                merged_config.logging().containers.get(&Container::Vector),
                 ResourceRequirementsBuilder::new()
                     .with_cpu_request("250m")
                     .with_cpu_limit("500m")
@@ -1042,13 +1022,7 @@ fn build_rolegroup_statefulset(
     }
 
     let mut pod_template = pod_builder.build_template();
-
-    if let Some(role) = role {
-        pod_template.merge_from(role.config.pod_overrides.clone());
-    }
-    if let Some(role_group) = role_group {
-        pod_template.merge_from(role_group.config.pod_overrides.clone());
-    }
+    hbase.merge_pod_overrides(&mut pod_template, hbase_role, rolegroup_ref);
 
     let metadata = ObjectMetaBuilder::new()
         .name_and_namespace(hbase)
@@ -1074,7 +1048,7 @@ fn build_rolegroup_statefulset(
 
     let statefulset_spec = StatefulSetSpec {
         pod_management_policy: Some("Parallel".to_string()),
-        replicas: role_group.and_then(|rg| rg.replicas).map(i32::from),
+        replicas: hbase.replicas(hbase_role, rolegroup_ref),
         selector: LabelSelector {
             match_labels: Some(statefulset_match_labels.into()),
             ..LabelSelector::default()
@@ -1089,61 +1063,6 @@ fn build_rolegroup_statefulset(
         spec: Some(statefulset_spec),
         status: None,
     })
-}
-
-// The result type is only defined once, there is no value in extracting it into a type definition.
-#[allow(clippy::type_complexity)]
-fn build_roles(
-    hbase: &v1alpha1::HbaseCluster,
-) -> Result<
-    HashMap<
-        String,
-        (
-            Vec<PropertyNameKind>,
-            Role<HbaseConfigFragment, GenericRoleConfig, JavaCommonConfig>,
-        ),
-    >,
-> {
-    let config_types = vec![
-        PropertyNameKind::Env,
-        PropertyNameKind::File(HBASE_ENV_SH.to_string()),
-        PropertyNameKind::File(HBASE_SITE_XML.to_string()),
-        PropertyNameKind::File(SSL_SERVER_XML.to_string()),
-        PropertyNameKind::File(SSL_CLIENT_XML.to_string()),
-        PropertyNameKind::File(JVM_SECURITY_PROPERTIES_FILE.to_string()),
-    ];
-
-    let mut roles = HashMap::from([
-        (
-            HbaseRole::Master.to_string(),
-            (
-                config_types.to_owned(),
-                hbase
-                    .get_role(&HbaseRole::Master)
-                    .cloned()
-                    .context(NoMasterRoleSnafu)?,
-            ),
-        ),
-        (
-            HbaseRole::RegionServer.to_string(),
-            (
-                config_types.to_owned(),
-                hbase
-                    .get_role(&HbaseRole::RegionServer)
-                    .cloned()
-                    .context(NoRegionServerRoleSnafu)?,
-            ),
-        ),
-    ]);
-
-    if let Some(rest_servers) = hbase.get_role(&HbaseRole::RestServer) {
-        roles.insert(
-            HbaseRole::RestServer.to_string(),
-            (config_types, rest_servers.to_owned()),
-        );
-    }
-
-    Ok(roles)
 }
 
 fn write_hbase_env_sh<'a, T>(properties: T) -> String
@@ -1188,9 +1107,8 @@ pub fn build_recommended_labels<'a>(
 /// The content of the HBase `hbase-env.sh` file.
 fn build_hbase_env_sh(
     hbase: &v1alpha1::HbaseCluster,
-    merged_config: &HbaseConfig,
+    merged_config: &AnyServiceConfig,
     hbase_role: &HbaseRole,
-    role: &Role<HbaseConfigFragment, GenericRoleConfig, JavaCommonConfig>,
     role_group: &str,
     product_version: &str,
 ) -> Result<BTreeMap<String, String>, Error> {
@@ -1206,14 +1124,9 @@ fn build_hbase_env_sh(
         "HBASE_OPTS".to_owned(),
         construct_global_jvm_args(hbase.has_kerberos_enabled()),
     );
-    let role_specific_non_heap_jvm_args = construct_role_specific_non_heap_jvm_args(
-        hbase_role,
-        role,
-        role_group,
-        product_version,
-        hbase.has_kerberos_enabled(),
-    )
-    .context(ConstructJvmArgumentSnafu)?;
+    let role_specific_non_heap_jvm_args =
+        construct_role_specific_non_heap_jvm_args(hbase, hbase_role, role_group, product_version)
+            .context(ConstructJvmArgumentSnafu)?;
     match hbase_role {
         HbaseRole::Master => {
             result.insert(
@@ -1256,6 +1169,28 @@ fn validate_cr(hbase: &v1alpha1::HbaseCluster) -> Result<()> {
     Ok(())
 }
 
+/// Build the domain name of an HBase service pod.
+/// The hbase-entrypoint.sh script uses this to build the fully qualified name of a pod
+/// by appending it to the `HOSTNAME` environment variable.
+/// This name is required by the RegionMover to function properly.
+fn hbase_service_domain_name(
+    hbase: &v1alpha1::HbaseCluster,
+    rolegroup_ref: &RoleGroupRef<v1alpha1::HbaseCluster>,
+    cluster_info: &KubernetesClusterInfo,
+) -> Result<String, Error> {
+    let hbase_cluster_name = rolegroup_ref.object_name();
+    let pod_namespace = hbase
+        .metadata
+        .namespace
+        .clone()
+        .context(ObjectHasNoNamespaceSnafu)?;
+    let cluster_domain = &cluster_info.cluster_domain;
+
+    Ok(format!(
+        "{hbase_cluster_name}.{pod_namespace}.svc.{cluster_domain}"
+    ))
+}
+
 #[cfg(test)]
 mod test {
     use rstest::rstest;
@@ -1264,9 +1199,9 @@ mod test {
     use super::*;
 
     #[rstest]
-    #[case("2.6.0", HbaseRole::Master, vec!["master", "ui-http"])]
-    #[case("2.6.0", HbaseRole::RegionServer, vec!["regionserver", "ui-http"])]
-    #[case("2.6.0", HbaseRole::RestServer, vec!["rest-http", "ui-http"])]
+    #[case("2.6.1", HbaseRole::Master, vec!["master", "ui-http"])]
+    #[case("2.6.1", HbaseRole::RegionServer, vec!["regionserver", "ui-http"])]
+    #[case("2.6.1", HbaseRole::RestServer, vec!["rest-http", "ui-http"])]
     #[case("2.4.14", HbaseRole::Master, vec!["master", "ui-http", "metrics"])]
     #[case("2.4.14", HbaseRole::RegionServer, vec!["regionserver", "ui-http", "metrics"])]
     #[case("2.4.14", HbaseRole::RestServer, vec!["rest-http", "ui-http", "metrics"])]

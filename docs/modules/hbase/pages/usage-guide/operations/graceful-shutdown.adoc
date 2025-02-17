@@ -1,6 +1,6 @@
 = Graceful shutdown
 
-You can configure the graceful shutdown as described in xref:concepts:operations/graceful_shutdown.adoc[].
+You can configure the graceful shutdown grace period as described in xref:concepts:operations/graceful_shutdown.adoc[].
 
 == Masters
 
@@ -15,7 +15,7 @@ However, there is no message in the log acknowledging the graceful shutdown.
 
 == RegionServers
 
-As a default, RegionServers have `60 minutes` to shut down gracefully.
+By default, RegionServers have `60 minutes` to shut down gracefully.
 
 They use the same mechanism described above.
 In contrast to the Master servers, they will, however, acknowledge the graceful shutdown with a message in the logs:
@@ -25,6 +25,61 @@ In contrast to the Master servers, they will, however, acknowledge the graceful 
 2023-10-11 12:38:05,059 INFO  [shutdown-hook-0] regionserver.ShutdownHook: Shutdown hook starting; hbase.shutdown.hook=true; fsShutdownHook=org.apache.hadoop.fs.FileSystem$Cache$ClientFinalizer@5875de6a
 2023-10-11 12:38:05,060 INFO  [shutdown-hook-0] regionserver.HRegionServer: ***** STOPPING region server 'test-hbase-regionserver-default-0.test-hbase-regionserver-default.kuttl-test-topical-parakeet.svc.cluster.local,16020,1697027870348' *****
 ----
+
+The operator allows for finer control over the shutdown process of region servers.
+For each region server pod, the region mover tool may be invoked before terminating the region server's pod.
+The affected regions are transferred to other pods thus ensuring that the data is still available.
+
+Here is an example:
+
+[source,yaml]
+----
+spec:
+  regionServers:
+    config:
+      regionMover:
+        runBeforeShutdown: true # <1>
+        maxThreads: 5 # <2>
+        ack: false # <3>
+        additionalMoverOptions: ["--designatedFile", "/path/to/designatedFile"] # <4>
+----
+<1>: Run the region mover tool before shutting down the region server. Default is `false`.
+<2>: Maximum number of threads to use for moving regions. Default is 1.
+<3>: Enable or disable region confirmation on the present and target servers. Default is `true`.
+<4>: Extra options to pass to the region mover tool.
+
+For a list of additional options accepted by the region mover use the `--help` option first:
+
+[source]
+----
+$ /stackable/hbase/bin/hbase org.apache.hadoop.hbase.util.RegionMover --help
+usage: hbase org.apache.hadoop.hbase.util.RegionMover <options>
+Options:
+ -r,--regionserverhost <arg>   region server <hostname>|<hostname:port>
+ -o,--operation <arg>          Expected: load/unload/unload_from_rack/isolate_regions
+ -m,--maxthreads <arg>         Define the maximum number of threads to use to unload and reload the regions
+ -i,--isolateRegionIds <arg>   Comma separated list of Region IDs hash to isolate on a RegionServer and put region
+                               server in draining mode. This option should only be used with '-o isolate_regions'. By
+                               putting region server in decommission/draining mode, master can't assign any new region
+                               on this server. If one or more regions are not found OR failed to isolate successfully,
+                               utility will exist without putting RS in draining/decommission mode. Ex.
+                               --isolateRegionIds id1,id2,id3 OR -i id1,id2,id3
+ -x,--excludefile <arg>        File with <hostname:port> per line to exclude as unload targets; default excludes only
+                               target host; useful for rack decommisioning.
+ -d,--designatedfile <arg>     File with <hostname:port> per line as unload targets;default is all online hosts
+ -f,--filename <arg>           File to save regions list into unloading, or read from loading; default
+                               /tmp/<usernamehostname:port>
+ -n,--noack                    Turn on No-Ack mode(default: false) which won't check if region is online on target
+                               RegionServer, hence best effort. This is more performant in unloading and loading but
+                               might lead to region being unavailable for some time till master reassigns it in case the
+                               move failed
+ -t,--timeout <arg>            timeout in seconds after which the tool will exit irrespective of whether it finished or
+                               not;default Integer.MAX_VALUE
+----
+
+NOTE: There is no need to explicitly specify a timeout for the region movement. The operator will compute an appropriate timeout that cannot exceed the `gracefulShutdownTimeout` for region servers.
+
+IMPORTANT: The ZooKeeper connection must be available during the time the region mover is running for the graceful shutdown process to succeed.
 
 == RestServers
 

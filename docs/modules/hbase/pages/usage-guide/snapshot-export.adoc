@@ -33,6 +33,7 @@ $ export \
     AWS_SSL_ENABLED=true \
     AWS_PATH_STYLE_ACCESS=true
 $ export-snapshot-to-s3 \
+    --no-checksum-verify \
     --snapshot my-snapshot \
     --copy-to s3a://my-bucket/my-snapshot
 ----
@@ -42,6 +43,7 @@ Snapshots can also be imported from S3 into HDFS:
 [source,shell]
 ----
 $ export-snapshot-to-s3 \
+    --no-checksum-verify \
     --snapshot snap \
     --copy-from s3a://my-bucket/my-snapshot \
     --copy-to hdfs://simple-hdfs/hbase

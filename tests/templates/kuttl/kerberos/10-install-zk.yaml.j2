@@ -6,6 +6,7 @@ metadata:
 spec:
   image:
     productVersion: "{{ test_scenario['values']['zookeeper-latest'] }}"
+    pullPolicy: IfNotPresent
   clusterConfig:
     listenerClass: {{ test_scenario['values']['listener-class'] }}
 {% if lookup('env', 'VECTOR_AGGREGATOR') %}
@@ -13,6 +14,7 @@ spec:
 {% endif %}
   servers:
     config:
+      gracefulShutdownTimeout: 1m
       logging:
         enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
     roleGroups:

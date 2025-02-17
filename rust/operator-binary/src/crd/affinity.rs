@@ -105,7 +105,7 @@ mod tests {
           name: simple-hbase
         spec:
           image:
-            productVersion: 2.4.18
+            productVersion: 2.6.1
           clusterConfig:
             hdfsConfigMapName: simple-hdfs
             zookeeperConfigMapName: simple-znode
@@ -124,13 +124,15 @@ mod tests {
         "#;
         let hbase: v1alpha1::HbaseCluster =
             serde_yaml::from_str(input).expect("illegal test input");
-        let merged_config = hbase
+        let affinity = hbase
             .merged_config(
                 &role,
                 "default",
                 &hbase.spec.cluster_config.hdfs_config_map_name,
             )
-            .unwrap();
+            .unwrap()
+            .affinity()
+            .clone();
 
         let mut expected_affinities = vec![WeightedPodAffinityTerm {
             pod_affinity_term: PodAffinityTerm {
@@ -185,7 +187,7 @@ mod tests {
         };
 
         assert_eq!(
-            merged_config.affinity,
+            affinity,
             StackableAffinity {
                 pod_affinity: Some(PodAffinity {
                     preferred_during_scheduling_ignored_during_execution: Some(expected_affinities),

@@ -8,7 +8,7 @@ spec:
     spec:
       containers:
       - name: hbase
-        image: oci.stackable.tech/sdp/hbase:2.4.18-stackable{{ versions.hbase }}
+        image: oci.stackable.tech/sdp/hbase:2.6.1-stackable{{ versions.hbase }}
         volumeMounts:
         - name: hbase-config
           mountPath: /stackable/conf
@@ -40,6 +40,7 @@ spec:
         - my-snapshot
         - --copy-to
         - s3a://hbase/my-snapshot
+        - --no-checksum-verify
       volumes:
       - name: hbase-config
         projected:

@@ -13,7 +13,9 @@ hbase shell create-snapshot.hbase 2>&1 | \
     grep '=> \["snap"\]' > /dev/null
 
 # Export local snapshot to S3
+# --no-checksum-verify is needed for HBase 2.6.1 until this is fixed: https://issues.apache.org/jira/browse/HBASE-28998
 export-snapshot-to-s3 \
+        --no-checksum-verify \
         --snapshot snap \
         --copy-to s3a://hbase/snap \
         --overwrite 2>&1 | \
@@ -24,7 +26,9 @@ hbase shell delete-snapshot.hbase 2>&1 | \
     grep '=> \[\]' > /dev/null
 
 # Import snapshot from S3
+# --no-checksum-verify is needed for HBase 2.6.1 until this is fixed: https://issues.apache.org/jira/browse/HBASE-28998
 export-snapshot-to-s3 \
+        --no-checksum-verify \
         --snapshot snap \
         --copy-from s3a://hbase/snap \
         --copy-to hdfs://test-hdfs/hbase \
