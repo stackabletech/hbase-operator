@@ -17,6 +17,7 @@
 
 ### Changed
 
+- Bump `stackable-operator` to 0.87.0 and `stackable-versioned` to 0.6.0 ([#634]).
 - Support moving regions to other Pods during graceful shutdown of region servers ([#570]).
 - Default to OCI for image metadata and product image selection ([#611]).
 
@@ -27,6 +28,7 @@
 [#612]: https://github.com/stackabletech/hbase-operator/pull/612
 [#620]: https://github.com/stackabletech/hbase-operator/pull/620
 [#627]: https://github.com/stackabletech/hbase-operator/pull/627
+[#634]: https://github.com/stackabletech/hbase-operator/pull/634
 
 ## [24.11.1] - 2025-01-09
 
