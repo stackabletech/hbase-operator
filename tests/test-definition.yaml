@@ -21,9 +21,10 @@ dimensions:
       - 3.3.4
       - 3.3.6
       - 3.4.0
+      - 3.4.1
   - name: hdfs-latest
     values:
-      - 3.4.0
+      - 3.4.1
   - name: zookeeper
     values:
       - 3.9.2
