@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [25.3.0] - 2025-03-21
+
 ### Added
 
 - The lifetime of auto generated TLS certificates is now configurable with the role and roleGroup
