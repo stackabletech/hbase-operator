@@ -8,7 +8,7 @@ spec:
     spec:
       containers:
       - name: hbase
-        image: oci.stackable.tech/sdp/hbase:2.6.1-stackable0.0.0-dev
+        image: oci.stackable.tech/sdp/hbase:2.6.1-stackable25.3.0
         volumeMounts:
         - name: hbase-config
           mountPath: /stackable/conf
