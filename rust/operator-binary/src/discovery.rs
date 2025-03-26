@@ -6,12 +6,12 @@ use stackable_operator::{
     builder::{configmap::ConfigMapBuilder, meta::ObjectMetaBuilder},
     commons::product_image_selection::ResolvedProductImage,
     k8s_openapi::api::core::v1::ConfigMap,
-    kube::runtime::reflector::ObjectRef,
+    kube::{runtime::reflector::ObjectRef, ResourceExt},
     utils::cluster_info::KubernetesClusterInfo,
 };
 
 use crate::{
-    crd::{v1alpha1, HbaseRole, HBASE_SITE_XML},
+    crd::{v1alpha1, HbasePodRef, HbaseRole, HBASE_SITE_XML},
     hbase_controller::build_recommended_labels,
     kerberos::{self, kerberos_discovery_config_properties},
     zookeeper::ZookeeperConnectionInformation,
@@ -81,6 +81,35 @@ pub fn build_discovery_configmap(
                     .iter(),
             ),
         )
+        .build()
+        .context(BuildConfigMapSnafu)
+}
+
+pub fn build_endpoint_configmap(
+    hbase: &v1alpha1::HbaseCluster,
+    resolved_product_image: &ResolvedProductImage,
+    _role_podrefs: &[HbasePodRef],
+) -> Result<ConfigMap> {
+    let name = hbase.name_unchecked();
+    ConfigMapBuilder::new()
+        .metadata(
+            ObjectMetaBuilder::new()
+                .name_and_namespace(hbase)
+                .name(format!("{name}-endpoint"))
+                .ownerreference_from_resource(hbase, None, Some(true))
+                .with_context(|_| ObjectMissingMetadataForOwnerRefSnafu {
+                    hbase: ObjectRef::from_obj(hbase),
+                })?
+                .with_recommended_labels(build_recommended_labels(
+                    hbase,
+                    &resolved_product_image.app_version_label,
+                    &HbaseRole::RegionServer.to_string(),
+                    "discovery",
+                ))
+                .context(ObjectMetaSnafu)?
+                .build(),
+        )
+        .add_data("XXX", "YYY")
         .build()
         .context(BuildConfigMapSnafu)
 }
