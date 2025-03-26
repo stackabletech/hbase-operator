@@ -561,7 +561,7 @@ impl v1alpha1::HbaseCluster {
     }
 
     /// Name of the port used by the Web UI, which depends on HTTPS usage
-    fn ui_port_name(&self) -> String {
+    pub fn ui_port_name(&self) -> String {
         if self.has_https_enabled() {
             HBASE_UI_PORT_NAME_HTTPS
         } else {

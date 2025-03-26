@@ -88,28 +88,50 @@ pub fn build_discovery_configmap(
 pub fn build_endpoint_configmap(
     hbase: &v1alpha1::HbaseCluster,
     resolved_product_image: &ResolvedProductImage,
-    _role_podrefs: &[HbasePodRef],
+    role_podrefs: BTreeMap<String, Vec<HbasePodRef>>,
 ) -> Result<ConfigMap> {
     let name = hbase.name_unchecked();
-    ConfigMapBuilder::new()
-        .metadata(
-            ObjectMetaBuilder::new()
-                .name_and_namespace(hbase)
-                .name(format!("{name}-endpoint"))
-                .ownerreference_from_resource(hbase, None, Some(true))
-                .with_context(|_| ObjectMissingMetadataForOwnerRefSnafu {
-                    hbase: ObjectRef::from_obj(hbase),
-                })?
-                .with_recommended_labels(build_recommended_labels(
-                    hbase,
-                    &resolved_product_image.app_version_label,
-                    &HbaseRole::RegionServer.to_string(),
-                    "discovery",
-                ))
-                .context(ObjectMetaSnafu)?
-                .build(),
-        )
-        .add_data("XXX", "YYY")
-        .build()
-        .context(BuildConfigMapSnafu)
+    let mut cm = ConfigMapBuilder::new();
+
+    let cmm = cm.metadata(
+        ObjectMetaBuilder::new()
+            .name_and_namespace(hbase)
+            .name(format!("{name}-ui-endpoints"))
+            .ownerreference_from_resource(hbase, None, Some(true))
+            .with_context(|_| ObjectMissingMetadataForOwnerRefSnafu {
+                hbase: ObjectRef::from_obj(hbase),
+            })?
+            .with_recommended_labels(build_recommended_labels(
+                hbase,
+                &resolved_product_image.app_version_label,
+                "hbase-ui",
+                "discovery",
+            ))
+            .context(ObjectMetaSnafu)?
+            .build(),
+    );
+
+    for role_podref in role_podrefs {
+        let role_name = role_podref.0;
+        for podref in role_podref.1 {
+            if let HbasePodRef {
+                fqdn_override: Some(fqdn_override),
+                ports,
+                ..
+            } = podref
+            {
+                if let Some(ui_port) = ports.get(&hbase.ui_port_name()) {
+                    cmm.add_data(
+                        format!("hbase.{role_name}.ui"),
+                        format!("{fqdn_override}:{ui_port}"),
+                    );
+                    // the UI endpoint for one replica per role
+                    // is enough for the config map
+                    break;
+                }
+            }
+        }
+    }
+
+    cm.build().context(BuildConfigMapSnafu)
 }

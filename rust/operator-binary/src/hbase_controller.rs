@@ -482,10 +482,11 @@ pub async fn reconcile_hbase(
         }
     }
 
-    let mut listener_refs = Vec::<HbasePodRef>::new();
+    let mut listener_refs: BTreeMap<String, Vec<HbasePodRef>> = BTreeMap::new();
 
     for role in HbaseRole::iter() {
-        listener_refs.extend(
+        listener_refs.insert(
+            role.to_string(),
             hbase
                 .listener_refs(client, &role, &resolved_product_image.product_version)
                 .await
@@ -493,9 +494,12 @@ pub async fn reconcile_hbase(
         );
     }
 
-    tracing::info!("Listener references: {:#?}", listener_refs);
+    tracing::info!(
+        "Listener references written to the ConfigMap: {:?}",
+        listener_refs
+    );
 
-    let endpoint_cm = build_endpoint_configmap(hbase, &resolved_product_image, &listener_refs)
+    let endpoint_cm = build_endpoint_configmap(hbase, &resolved_product_image, listener_refs)
         .context(BuildDiscoveryConfigMapSnafu)?;
     cluster_resources
         .add(client, endpoint_cm)
