@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Added
+
+- Added listener support for HBase ([#639]).
+
+[#639]: https://github.com/stackabletech/hbase-operator/pull/639
+
 ## [25.3.0] - 2025-03-21
 
 ### Added
