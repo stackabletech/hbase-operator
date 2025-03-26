@@ -495,8 +495,8 @@ pub async fn reconcile_hbase(
     }
 
     tracing::info!(
-        "Listener references written to the ConfigMap: {:?}",
-        listener_refs
+        ?listener_refs,
+        "Listener references written to the ConfigMap"
     );
 
     let endpoint_cm = build_endpoint_configmap(hbase, &resolved_product_image, listener_refs)
