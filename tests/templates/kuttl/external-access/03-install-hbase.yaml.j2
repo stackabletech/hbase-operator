@@ -1,0 +1,47 @@
+---
+apiVersion: hbase.stackable.tech/v1alpha1
+kind: HbaseCluster
+metadata:
+  name: test-hbase
+spec:
+  image:
+{% if test_scenario['values']['hbase'].find(",") > 0 %}
+    custom: "{{ test_scenario['values']['hbase'].split(',')[1] }}"
+    productVersion: "{{ test_scenario['values']['hbase'].split(',')[0] }}"
+{% else %}
+    productVersion: "{{ test_scenario['values']['hbase'] }}"
+{% endif %}
+    pullPolicy: IfNotPresent
+  clusterConfig:
+    hdfsConfigMapName: test-hdfs-namenode-default
+    zookeeperConfigMapName: test-znode
+{% if lookup('env', 'VECTOR_AGGREGATOR') %}
+    vectorAggregatorConfigMapName: vector-aggregator-discovery
+{% endif %}
+  masters:
+    config:
+      gracefulShutdownTimeout: 1m
+      logging:
+        enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
+      listenerClass: external-stable
+    roleGroups:
+      default:
+        replicas: 2
+  regionServers:
+    config:
+      gracefulShutdownTimeout: 1m
+      logging:
+        enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
+      listenerClass: external-unstable
+    roleGroups:
+      default:
+        replicas: 2
+  restServers:
+    config:
+      gracefulShutdownTimeout: 1m
+      logging:
+        enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
+      listenerClass: cluster-internal
+    roleGroups:
+      default:
+        replicas: 2
