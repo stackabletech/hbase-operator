@@ -1082,7 +1082,7 @@ pub struct HbaseConfig {
     pub requested_secret_lifetime: Option<Duration>,
 
     /// This field controls which [ListenerClass](DOCS_BASE_URL_PLACEHOLDER/listener-operator/listenerclass.html) is used to expose this rolegroup.
-    /// All roles should have a stable ListenerClass, such as `cluster-internal` or `external-stable`.
+    /// All roles should have a direct ListenerClass, such as `cluster-internal` or `external-unstable`.
     pub listener_class: String,
 }
 
@@ -1239,7 +1239,7 @@ pub struct RegionServerConfig {
     pub region_mover: RegionMover,
 
     /// This field controls which [ListenerClass](DOCS_BASE_URL_PLACEHOLDER/listener-operator/listenerclass.html) is used to expose this rolegroup.
-    /// All roles should have a stable ListenerClass, such as `cluster-internal` or `external-stable`.
+    /// All roles should have a direct ListenerClass, such as `cluster-internal` or `external-unstable`.
     pub listener_class: String,
 }
 
