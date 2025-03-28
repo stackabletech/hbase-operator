@@ -28,7 +28,6 @@ commands:
         clusterConfig:
           hdfsConfigMapName: hdfs
           zookeeperConfigMapName: hbase-znode
-          listenerClass: {{ test_scenario['values']['listener-class'] }}
           authentication:
             tlsSecretClass: tls
             kerberos:
@@ -41,6 +40,7 @@ commands:
             gracefulShutdownTimeout: 1m
             logging:
               enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
+            listenerClass: {{ test_scenario['values']['listener-class'] }}
             resources:
               memory:
                 limit: 1536Mi
@@ -52,6 +52,7 @@ commands:
             gracefulShutdownTimeout: 1m
             logging:
               enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
+            listenerClass: {{ test_scenario['values']['listener-class'] }}
           roleGroups:
             default:
               replicas: 2
@@ -60,6 +61,7 @@ commands:
             gracefulShutdownTimeout: 1m
             logging:
               enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
+            listenerClass: {{ test_scenario['values']['listener-class'] }}
           roleGroups:
             default:
               replicas: 1

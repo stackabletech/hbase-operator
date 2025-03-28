@@ -19,21 +19,36 @@ spec:
             - /bin/bash
             - /tmp/script/script.sh
           env:
-            - name: MASTER_UI
+            - name: MASTER_UI_0
               valueFrom:
                 configMapKeyRef:
                   name: test-hbase-ui-endpoints
-                  key: hbase.master.ui
-            - name: REGIONSERVER_UI
+                  key: hbase.master-0.ui
+            - name: MASTER_UI_1
               valueFrom:
                 configMapKeyRef:
                   name: test-hbase-ui-endpoints
-                  key: hbase.regionserver.ui
-            - name: RESTSERVER_UI
+                  key: hbase.master-1.ui
+            - name: REGIONSERVER_UI_0
               valueFrom:
                 configMapKeyRef:
                   name: test-hbase-ui-endpoints
-                  key: hbase.restserver.ui
+                  key: hbase.regionserver-0.ui
+            - name: REGIONSERVER_UI_1
+              valueFrom:
+                configMapKeyRef:
+                  name: test-hbase-ui-endpoints
+                  key: hbase.regionserver-1.ui
+            - name: RESTSERVER_UI_0
+              valueFrom:
+                configMapKeyRef:
+                  name: test-hbase-ui-endpoints
+                  key: hbase.restserver-0.ui
+            - name: RESTSERVER_UI_1
+              valueFrom:
+                configMapKeyRef:
+                  name: test-hbase-ui-endpoints
+                  key: hbase.restserver-1.ui
           volumeMounts:
             - name: script
               mountPath: /tmp/script
@@ -55,11 +70,18 @@ data:
   script.sh: |
     set -euxo pipefail
 
-    echo "Attempting to reach master at $MASTER_UI..."
-    curl --retry 0 -f -s -o /dev/null -w "%{http_code}" $MASTER_UI | grep 200
-    echo "Attempting to reach region-server at $REGIONSERVER_UI..."
-    curl --retry 0 -f -s -o /dev/null -w "%{http_code}" $REGIONSERVER_UI | grep 200
-    echo "Attempting to reach rest-server at $RESTSERVER_UI..."
-    curl --retry 0 -f -s -o /dev/null -w "%{http_code}" $RESTSERVER_UI | grep 200
+    echo "Attempting to reach master at $MASTER_UI_0..."
+    curl --retry 0 -f -s -o /dev/null -w "%{http_code}" "${MASTER_UI_0}" | grep 200
+    echo "Attempting to reach region-server at $REGIONSERVER_UI_0..."
+    curl --retry 0 -f -s -o /dev/null -w "%{http_code}" "${REGIONSERVER_UI_0}" | grep 200
+    echo "Attempting to reach rest-server at $RESTSERVER_UI_0..."
+    curl --retry 0 -f -s -o /dev/null -w "%{http_code}" "${RESTSERVER_UI_0}" | grep 200
+
+    echo "Attempting to reach master at $MASTER_UI_1..."
+    curl --retry 0 -f -s -o /dev/null -w "%{http_code}" "${MASTER_UI_1}" | grep 200
+    echo "Attempting to reach region-server at $REGIONSERVER_UI_1..."
+    curl --retry 0 -f -s -o /dev/null -w "%{http_code}" "${REGIONSERVER_UI_1}" | grep 200
+    echo "Attempting to reach rest-server at $RESTSERVER_UI_1..."
+    curl --retry 0 -f -s -o /dev/null -w "%{http_code}" "${RESTSERVER_UI_1}" | grep 200
 
     echo "All tests successful!"

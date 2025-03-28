@@ -113,6 +113,9 @@ pub fn build_endpoint_configmap(
 
     for role_podref in role_podrefs {
         let role_name = role_podref.0;
+        // podrefs are written into the collection by replica index
+        // and can be retrieved in the same order
+        let mut i = 0;
         for podref in role_podref.1 {
             if let HbasePodRef {
                 fqdn_override: Some(fqdn_override),
@@ -122,12 +125,10 @@ pub fn build_endpoint_configmap(
             {
                 if let Some(ui_port) = ports.get(&hbase.ui_port_name()) {
                     cmm.add_data(
-                        format!("hbase.{role_name}.ui"),
+                        format!("hbase.{role_name}-{i}.ui"),
                         format!("{fqdn_override}:{ui_port}"),
                     );
-                    // the UI endpoint for one replica per role
-                    // is enough for the config map
-                    break;
+                    i += 1;
                 }
             }
         }

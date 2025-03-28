@@ -484,27 +484,36 @@ pub async fn reconcile_hbase(
 
     let mut listener_refs: BTreeMap<String, Vec<HbasePodRef>> = BTreeMap::new();
 
-    for role in HbaseRole::iter() {
-        listener_refs.insert(
-            role.to_string(),
-            hbase
-                .listener_refs(client, &role, &resolved_product_image.product_version)
-                .await
-                .context(CollectDiscoveryConfigSnafu)?,
+    // TODO if the listeners are persisted then they will still be present in the
+    // cluster and can all be found. Or move this up into the role loop above and
+    // only process those rolegroups where the listener class requires persistence.
+    if hbase.spec.cluster_operation.reconciliation_paused || hbase.spec.cluster_operation.stopped {
+        tracing::info!(
+            "Cluster is in a transitional state so do not attempt to collect listener
+        information that will only be active once cluster has exited transitional state."
         );
+    } else {
+        for role in HbaseRole::iter() {
+            listener_refs.insert(
+                role.to_string(),
+                hbase
+                    .listener_refs(client, &role, &resolved_product_image.product_version)
+                    .await
+                    .context(CollectDiscoveryConfigSnafu)?,
+            );
+        }
+        tracing::info!(
+            "Listener references written to the ConfigMap {:#?}",
+            listener_refs
+        );
+
+        let endpoint_cm = build_endpoint_configmap(hbase, &resolved_product_image, listener_refs)
+            .context(BuildDiscoveryConfigMapSnafu)?;
+        cluster_resources
+            .add(client, endpoint_cm)
+            .await
+            .context(ApplyDiscoveryConfigMapSnafu)?;
     }
-
-    tracing::info!(
-        ?listener_refs,
-        "Listener references written to the ConfigMap"
-    );
-
-    let endpoint_cm = build_endpoint_configmap(hbase, &resolved_product_image, listener_refs)
-        .context(BuildDiscoveryConfigMapSnafu)?;
-    cluster_resources
-        .add(client, endpoint_cm)
-        .await
-        .context(ApplyDiscoveryConfigMapSnafu)?;
 
     // Discovery CM will fail to build until the rest of the cluster has been deployed, so do it last
     // so that failure won't inhibit the rest of the cluster from booting up.
