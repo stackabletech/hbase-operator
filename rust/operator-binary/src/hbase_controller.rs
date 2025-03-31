@@ -8,6 +8,7 @@ use std::{
 };
 
 use const_format::concatcp;
+use indoc::formatdoc;
 use product_config::{
     types::PropertyNameKind,
     writer::{to_hadoop_xml, to_java_properties_string, PropertiesWriterError},
@@ -861,14 +862,24 @@ fn build_rolegroup_statefulset(
         },
     ]);
 
+    let role_name = hbase_role.cli_role_name();
     let mut hbase_container = ContainerBuilder::new("hbase").expect("ContainerBuilder not created");
     hbase_container
         .image_from_product_image(resolved_product_image)
-        .command(vec!["/stackable/hbase/bin/hbase-entrypoint.sh".to_string()])
-        .args(vec![
-            hbase_role.cli_role_name(),
-            hbase_service_domain_name(hbase, rolegroup_ref, cluster_info)?,
-            hbase.service_port(hbase_role).to_string(),
+        .command(command())
+        .args(vec![formatdoc!{"
+            {export_address}
+            {export_port}
+            {export_hostname}
+            {entrypoint} {role} {domain} {port}",
+            export_address = format!("export HBASE_CONF_hbase_{role_name}_hostname=$(cat /stackable/listener/default-address/address);").to_string(),
+            export_port = format!("export HBASE_CONF_hbase_{role_name}_port=$(cat /stackable/listener/default-address/ports/ui-http);").to_string(),
+            export_hostname = "export HOSTNAME=$(cat /stackable/listener/default-address/address);".to_string(),
+            entrypoint = "/stackable/hbase/bin/hbase-entrypoint.sh".to_string(),
+            role = role_name,
+            domain = hbase_service_domain_name(hbase, rolegroup_ref, cluster_info)?,
+            port = hbase.service_port(hbase_role).to_string(),
+        }
         ])
         .add_env_vars(merged_env)
         // Needed for the `containerdebug` process to log it's tracing information to.
@@ -1057,6 +1068,17 @@ fn build_rolegroup_statefulset(
         spec: Some(statefulset_spec),
         status: None,
     })
+}
+
+/// Returns the container command.
+fn command() -> Vec<String> {
+    vec![
+        "/bin/bash".to_string(),
+        "-x".to_string(),
+        "-euo".to_string(),
+        "pipefail".to_string(),
+        "-c".to_string(),
+    ]
 }
 
 fn write_hbase_env_sh<'a, T>(properties: T) -> String
