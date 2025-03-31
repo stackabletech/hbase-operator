@@ -1136,17 +1136,22 @@ fn build_hbase_env_sh(
     let role_specific_non_heap_jvm_args =
         construct_role_specific_non_heap_jvm_args(hbase, hbase_role, role_group, product_version)
             .context(ConstructJvmArgumentSnafu)?;
+    let port_name = &hbase.ui_port_name();
     match hbase_role {
         HbaseRole::Master => {
             result.insert(
                 "HBASE_MASTER_OPTS".to_string(),
-                role_specific_non_heap_jvm_args,
+                format!(
+                    "{role_specific_non_heap_jvm_args} -Dhbase.master.hostname=$(cat {LISTENER_VOLUME_DIR}/default-address/address) -Dhbase.master.port=$(cat {LISTENER_VOLUME_DIR}/default-address/ports/{port_name})"
+                )
             );
         }
         HbaseRole::RegionServer => {
             result.insert(
                 "HBASE_REGIONSERVER_OPTS".to_string(),
-                role_specific_non_heap_jvm_args,
+                format!(
+                    "{role_specific_non_heap_jvm_args} -Dhbase.regionserver.hostname=$(cat {LISTENER_VOLUME_DIR}/default-address/address) -Dhbase.regionserver.port=$(cat {LISTENER_VOLUME_DIR}/default-address/ports/{port_name})"
+                )
             );
         }
         HbaseRole::RestServer => {
