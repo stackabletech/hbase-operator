@@ -584,6 +584,39 @@ fn build_rolegroup_config_map(
                 hbase_site_config
                     .extend(hbase_opa_config.map_or(vec![], |config| config.hbase_site_config()));
 
+                match hbase_role {
+                    HbaseRole::Master => {
+                        hbase_site_config.insert(
+                            "hbase.master.hostname".to_string(),
+                            "${HBASE_SERVICE_HOST}".to_string(),
+                        );
+                        hbase_site_config.insert(
+                            "hbase.master.port".to_string(),
+                            "${HBASE_SERVICE_PORT}".to_string(),
+                        )
+                    }
+                    HbaseRole::RegionServer => {
+                        hbase_site_config.insert(
+                            "hbase.regionserver.hostname".to_string(),
+                            "${HBASE_SERVICE_HOST}".to_string(),
+                        );
+                        hbase_site_config.insert(
+                            "hbase.regionserver.port".to_string(),
+                            "${HBASE_SERVICE_PORT}".to_string(),
+                        )
+                    }
+                    HbaseRole::RestServer => {
+                        hbase_site_config.insert(
+                            "hbase.rest.hostname".to_string(),
+                            "${HBASE_SERVICE_HOST}".to_string(),
+                        );
+                        hbase_site_config.insert(
+                            "hbase.rest.port".to_string(),
+                            "${HBASE_SERVICE_PORT}".to_string(),
+                        )
+                    }
+                };
+
                 // configOverride come last
                 hbase_site_config.extend(config.clone());
                 hbase_site_xml = to_hadoop_xml(
@@ -868,7 +901,15 @@ fn build_rolegroup_statefulset(
         .image_from_product_image(resolved_product_image)
         .command(command())
         .args(vec![formatdoc! {"
+            {wait}
+            {list}
+            {update_host}
+            {update_port}
             {entrypoint} {role} {domain} {port}",
+            wait = "until [ -f /stackable/conf/hbase-site.xml ]; do sleep 1; done;".to_string(),
+            list = "ls -al /stackable/conf/hbase-site.xml".to_string(),
+            update_host = "sed -i 's|\\${HBASE_SERVICE_HOST}|${HBASE_SERVICE_HOST}|g' /stackable/conf/hbase-site.xml".to_string(),
+            update_port = "sed -i 's|\\${HBASE_SERVICE_PORT}|${HBASE_SERVICE_PORT}|g' /stackable/conf/hbase-site.xml".to_string(),
             entrypoint = "/stackable/hbase/bin/hbase-entrypoint.sh".to_string(),
             role = role_name,
             domain = hbase_service_domain_name(hbase, rolegroup_ref, cluster_info)?,
@@ -1137,21 +1178,27 @@ fn build_hbase_env_sh(
         construct_role_specific_non_heap_jvm_args(hbase, hbase_role, role_group, product_version)
             .context(ConstructJvmArgumentSnafu)?;
     let port_name = &hbase.ui_port_name();
+
+    result.insert(
+        "HBASE_SERVICE_HOST".to_owned(),
+        format!("$(cat {LISTENER_VOLUME_DIR}/default-address/address)"),
+    );
+    result.insert(
+        "HBASE_SERVICE_PORT".to_owned(),
+        format!("$(cat {LISTENER_VOLUME_DIR}/default-address/ports/{port_name})"),
+    );
+
     match hbase_role {
         HbaseRole::Master => {
             result.insert(
                 "HBASE_MASTER_OPTS".to_string(),
-                format!(
-                    "{role_specific_non_heap_jvm_args} -Dhbase.master.hostname=$(cat {LISTENER_VOLUME_DIR}/default-address/address) -Dhbase.master.port=$(cat {LISTENER_VOLUME_DIR}/default-address/ports/{port_name})"
-                )
+                role_specific_non_heap_jvm_args,
             );
         }
         HbaseRole::RegionServer => {
             result.insert(
                 "HBASE_REGIONSERVER_OPTS".to_string(),
-                format!(
-                    "{role_specific_non_heap_jvm_args} -Dhbase.regionserver.hostname=$(cat {LISTENER_VOLUME_DIR}/default-address/address) -Dhbase.regionserver.port=$(cat {LISTENER_VOLUME_DIR}/default-address/ports/{port_name})"
-                )
+                role_specific_non_heap_jvm_args,
             );
         }
         HbaseRole::RestServer => {
