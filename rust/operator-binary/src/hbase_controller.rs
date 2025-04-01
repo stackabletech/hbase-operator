@@ -584,39 +584,6 @@ fn build_rolegroup_config_map(
                 hbase_site_config
                     .extend(hbase_opa_config.map_or(vec![], |config| config.hbase_site_config()));
 
-                match hbase_role {
-                    HbaseRole::Master => {
-                        hbase_site_config.insert(
-                            "hbase.master.hostname".to_string(),
-                            "${HBASE_SERVICE_HOST}".to_string(),
-                        );
-                        hbase_site_config.insert(
-                            "hbase.master.port".to_string(),
-                            "${HBASE_SERVICE_PORT}".to_string(),
-                        )
-                    }
-                    HbaseRole::RegionServer => {
-                        hbase_site_config.insert(
-                            "hbase.regionserver.hostname".to_string(),
-                            "${HBASE_SERVICE_HOST}".to_string(),
-                        );
-                        hbase_site_config.insert(
-                            "hbase.regionserver.port".to_string(),
-                            "${HBASE_SERVICE_PORT}".to_string(),
-                        )
-                    }
-                    HbaseRole::RestServer => {
-                        hbase_site_config.insert(
-                            "hbase.rest.hostname".to_string(),
-                            "${HBASE_SERVICE_HOST}".to_string(),
-                        );
-                        hbase_site_config.insert(
-                            "hbase.rest.port".to_string(),
-                            "${HBASE_SERVICE_PORT}".to_string(),
-                        )
-                    }
-                };
-
                 // configOverride come last
                 hbase_site_config.extend(config.clone());
                 hbase_site_xml = to_hadoop_xml(
