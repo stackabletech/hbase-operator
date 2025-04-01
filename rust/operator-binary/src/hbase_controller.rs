@@ -901,19 +901,12 @@ fn build_rolegroup_statefulset(
         .image_from_product_image(resolved_product_image)
         .command(command())
         .args(vec![formatdoc! {"
-            {wait}
-            {list}
-            {update_host}
-            {update_port}
-            {entrypoint} {role} {domain} {port}",
-            wait = "until [ -f /stackable/conf/hbase-site.xml ]; do sleep 1; done;".to_string(),
-            list = "ls -al /stackable/conf/hbase-site.xml".to_string(),
-            update_host = "sed -i 's|\\${HBASE_SERVICE_HOST}|${HBASE_SERVICE_HOST}|g' /stackable/conf/hbase-site.xml".to_string(),
-            update_port = "sed -i 's|\\${HBASE_SERVICE_PORT}|${HBASE_SERVICE_PORT}|g' /stackable/conf/hbase-site.xml".to_string(),
+            {entrypoint} {role} {domain} {port} {port_name}",
             entrypoint = "/stackable/hbase/bin/hbase-entrypoint.sh".to_string(),
             role = role_name,
             domain = hbase_service_domain_name(hbase, rolegroup_ref, cluster_info)?,
             port = hbase.service_port(hbase_role).to_string(),
+            port_name = hbase.ui_port_name(),
         }])
         .add_env_vars(merged_env)
         // Needed for the `containerdebug` process to log it's tracing information to.
@@ -1177,16 +1170,6 @@ fn build_hbase_env_sh(
     let role_specific_non_heap_jvm_args =
         construct_role_specific_non_heap_jvm_args(hbase, hbase_role, role_group, product_version)
             .context(ConstructJvmArgumentSnafu)?;
-    let port_name = &hbase.ui_port_name();
-
-    result.insert(
-        "HBASE_SERVICE_HOST".to_owned(),
-        format!("$(cat {LISTENER_VOLUME_DIR}/default-address/address)"),
-    );
-    result.insert(
-        "HBASE_SERVICE_PORT".to_owned(),
-        format!("$(cat {LISTENER_VOLUME_DIR}/default-address/ports/{port_name})"),
-    );
 
     match hbase_role {
         HbaseRole::Master => {
