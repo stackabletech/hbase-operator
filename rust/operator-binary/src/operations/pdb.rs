@@ -5,9 +5,9 @@ use stackable_operator::{
 };
 
 use crate::{
-    crd::{v1alpha1, HbaseRole, APP_NAME},
-    hbase_controller::HBASE_CONTROLLER_NAME,
     OPERATOR_NAME,
+    crd::{APP_NAME, HbaseRole, v1alpha1},
+    hbase_controller::HBASE_CONTROLLER_NAME,
 };
 
 #[derive(Snafu, Debug)]

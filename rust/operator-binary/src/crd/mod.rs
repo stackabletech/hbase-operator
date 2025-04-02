@@ -20,11 +20,11 @@ use stackable_operator::{
         merge::{Atomic, Merge},
     },
     k8s_openapi::{
+        DeepMerge,
         api::core::v1::{EnvVar, PodTemplateSpec},
         apimachinery::pkg::api::resource::Quantity,
-        DeepMerge,
     },
-    kube::{runtime::reflector::ObjectRef, CustomResource, ResourceExt},
+    kube::{CustomResource, ResourceExt, runtime::reflector::ObjectRef},
     product_config_utils::Configuration,
     product_logging::{self, spec::Logging},
     role_utils::{GenericRoleConfig, JavaCommonConfig, Role, RoleGroupRef},
@@ -640,15 +640,14 @@ pub enum HbaseRole {
 
 impl HbaseRole {
     const DEFAULT_MASTER_GRACEFUL_SHUTDOWN_TIMEOUT: Duration = Duration::from_minutes_unchecked(20);
-    const DEFAULT_REGION_SERVER_GRACEFUL_SHUTDOWN_TIMEOUT: Duration =
-        Duration::from_minutes_unchecked(60);
-    const DEFAULT_REST_SERVER_GRACEFUL_SHUTDOWN_TIMEOUT: Duration =
-        Duration::from_minutes_unchecked(5);
-
     // Auto TLS certificate lifetime
     const DEFAULT_MASTER_SECRET_LIFETIME: Duration = Duration::from_days_unchecked(1);
     const DEFAULT_REGION_SECRET_LIFETIME: Duration = Duration::from_days_unchecked(1);
+    const DEFAULT_REGION_SERVER_GRACEFUL_SHUTDOWN_TIMEOUT: Duration =
+        Duration::from_minutes_unchecked(60);
     const DEFAULT_REST_SECRET_LIFETIME: Duration = Duration::from_days_unchecked(1);
+    const DEFAULT_REST_SERVER_GRACEFUL_SHUTDOWN_TIMEOUT: Duration =
+        Duration::from_minutes_unchecked(5);
 
     pub fn default_config(
         &self,
@@ -1153,6 +1152,7 @@ impl AnyServiceConfig {
             AnyServiceConfig::RestServer(config) => &config.resources,
         }
     }
+
     pub fn logging(&self) -> &Logging<Container> {
         match self {
             AnyServiceConfig::Master(config) => &config.logging,
@@ -1160,6 +1160,7 @@ impl AnyServiceConfig {
             AnyServiceConfig::RestServer(config) => &config.logging,
         }
     }
+
     pub fn affinity(&self) -> &StackableAffinity {
         match self {
             AnyServiceConfig::Master(config) => &config.affinity,
@@ -1167,6 +1168,7 @@ impl AnyServiceConfig {
             AnyServiceConfig::RestServer(config) => &config.affinity,
         }
     }
+
     pub fn graceful_shutdown_timeout(&self) -> &Option<Duration> {
         match self {
             AnyServiceConfig::Master(config) => &config.graceful_shutdown_timeout,
@@ -1174,6 +1176,7 @@ impl AnyServiceConfig {
             AnyServiceConfig::RestServer(config) => &config.graceful_shutdown_timeout,
         }
     }
+
     pub fn requested_secret_lifetime(&self) -> Option<Duration> {
         match self {
             AnyServiceConfig::Master(config) => config.requested_secret_lifetime,
@@ -1243,7 +1246,7 @@ mod tests {
     use std::collections::{BTreeMap, HashMap};
 
     use indoc::indoc;
-    use product_config::{types::PropertyNameKind, ProductConfigManager};
+    use product_config::{ProductConfigManager, types::PropertyNameKind};
     use rstest::rstest;
     use stackable_operator::product_config_utils::{
         transform_all_roles_to_config, validate_all_roles_and_groups_config,
