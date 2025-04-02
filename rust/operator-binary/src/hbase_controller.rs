@@ -21,8 +21,14 @@ use stackable_operator::{
         configmap::ConfigMapBuilder,
         meta::ObjectMetaBuilder,
         pod::{
-            container::ContainerBuilder, resources::ResourceRequirementsBuilder,
-            security::PodSecurityContextBuilder, PodBuilder,
+            container::ContainerBuilder,
+            resources::ResourceRequirementsBuilder,
+            security::PodSecurityContextBuilder,
+            volume::{
+                ListenerOperatorVolumeSourceBuilder, ListenerOperatorVolumeSourceBuilderError,
+                ListenerReference,
+            },
+            PodBuilder,
         },
     },
     cluster_resources::{ClusterResourceApplyStrategy, ClusterResources},
@@ -62,7 +68,7 @@ use stackable_operator::{
     time::Duration,
     utils::cluster_info::KubernetesClusterInfo,
 };
-use strum::{EnumDiscriminants, IntoEnumIterator, IntoStaticStr, ParseError};
+use strum::{EnumDiscriminants, IntoStaticStr, ParseError};
 
 use crate::{
     config::jvm::{
@@ -326,6 +332,11 @@ pub enum Error {
 
     #[snafu(display("cannot collect discovery configuration"))]
     CollectDiscoveryConfig { source: crate::crd::Error },
+
+    #[snafu(display("failed to build listener volume"))]
+    BuildListenerVolume {
+        source: ListenerOperatorVolumeSourceBuilderError,
+    },
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -411,6 +422,7 @@ pub async fn reconcile_hbase(
         .context(ApplyRoleBindingSnafu)?;
 
     let mut ss_cond_builder = StatefulSetConditionBuilder::default();
+    let mut listener_refs: BTreeMap<String, Vec<HbasePodRef>> = BTreeMap::new();
 
     for (role_name, group_config) in validated_config.iter() {
         let hbase_role = HbaseRole::from_str(role_name).context(UnidentifiedHbaseRoleSnafu {
@@ -470,6 +482,30 @@ pub async fn reconcile_hbase(
                         rolegroup: rolegroup.clone(),
                     })?,
             );
+            // if the replicas are changed at the same time as the reconciliation
+            // being paused, it may be possible to have listeners that are *expected*
+            // (according to their replica number) but which are not yet created, so
+            // deactivate this action in such cases.
+            if hbase.spec.cluster_operation.reconciliation_paused
+                || hbase.spec.cluster_operation.stopped
+            {
+                tracing::info!(
+                    "Cluster is in a transitional state so do not attempt to collect listener information that will only be active once cluster has returned to a non-transitional state."
+                );
+            } else {
+                listener_refs.insert(
+                    hbase_role.to_string(),
+                    hbase
+                        .listener_refs(
+                            client,
+                            &hbase_role,
+                            &merged_config,
+                            &resolved_product_image.product_version,
+                        )
+                        .await
+                        .context(CollectDiscoveryConfigSnafu)?,
+                );
+            }
         }
 
         let role_config = hbase.role_config(&hbase_role);
@@ -483,31 +519,12 @@ pub async fn reconcile_hbase(
         }
     }
 
-    let mut listener_refs: BTreeMap<String, Vec<HbasePodRef>> = BTreeMap::new();
+    tracing::debug!(
+        "Listener references prepared for the ConfigMap {:#?}",
+        listener_refs
+    );
 
-    // TODO if the listeners are persisted then they will still be present in the
-    // cluster and can all be found. Or move this up into the role loop above and
-    // only process those rolegroups where the listener class requires persistence.
-    if hbase.spec.cluster_operation.reconciliation_paused || hbase.spec.cluster_operation.stopped {
-        tracing::info!(
-            "Cluster is in a transitional state so do not attempt to collect listener
-        information that will only be active once cluster has exited transitional state."
-        );
-    } else {
-        for role in HbaseRole::iter() {
-            listener_refs.insert(
-                role.to_string(),
-                hbase
-                    .listener_refs(client, &role, &resolved_product_image.product_version)
-                    .await
-                    .context(CollectDiscoveryConfigSnafu)?,
-            );
-        }
-        tracing::info!(
-            "Listener references written to the ConfigMap {:#?}",
-            listener_refs
-        );
-
+    if !listener_refs.is_empty() {
         let endpoint_cm = build_endpoint_configmap(hbase, &resolved_product_image, listener_refs)
             .context(BuildDiscoveryConfigMapSnafu)?;
         cluster_resources
@@ -941,12 +958,6 @@ fn build_rolegroup_statefulset(
             )),
         )
         .context(AddVolumeSnafu)?
-        .add_listener_volume_by_listener_class(
-            LISTENER_VOLUME_NAME,
-            &merged_config.listener_class(),
-            &recommended_labels,
-        )
-        .context(AddVolumeSnafu)?
         .service_account_name(service_account.name_any())
         .security_context(
             PodSecurityContextBuilder::new()
@@ -955,6 +966,26 @@ fn build_rolegroup_statefulset(
                 .fs_group(1000)
                 .build(),
         );
+
+    let pvcs = if merged_config.listener_class().discoverable() {
+        let pvc = ListenerOperatorVolumeSourceBuilder::new(
+            &ListenerReference::ListenerClass(merged_config.listener_class().to_string()),
+            &recommended_labels,
+        )
+        .context(BuildListenerVolumeSnafu)?
+        .build_pvc(LISTENER_VOLUME_NAME.to_string())
+        .context(BuildListenerVolumeSnafu)?;
+        Some(vec![pvc])
+    } else {
+        pod_builder
+            .add_listener_volume_by_listener_class(
+                LISTENER_VOLUME_NAME,
+                &merged_config.listener_class().to_string(),
+                &recommended_labels,
+            )
+            .context(AddVolumeSnafu)?;
+        None
+    };
 
     if let Some(ContainerLogConfig {
         choice:
@@ -1053,6 +1084,7 @@ fn build_rolegroup_statefulset(
         },
         service_name: rolegroup_ref.object_name(),
         template: pod_template,
+        volume_claim_templates: pvcs,
         ..StatefulSetSpec::default()
     };
 

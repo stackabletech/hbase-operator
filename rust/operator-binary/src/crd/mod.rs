@@ -88,7 +88,8 @@ pub const HBASE_REST_UI_PORT: u16 = 8085;
 // Newer versions use the same port as the UI because Hbase provides it's own metrics API
 pub const METRICS_PORT: u16 = 9100;
 
-pub const DEFAULT_LISTENER_CLASS: &str = "cluster-internal";
+pub const DEFAULT_LISTENER_CLASS: SupportedListenerClasses =
+    SupportedListenerClasses::ClusterInternal;
 pub const LISTENER_VOLUME_NAME: &str = "listener";
 pub const LISTENER_VOLUME_DIR: &str = "/stackable/listener";
 
@@ -666,46 +667,54 @@ impl v1alpha1::HbaseCluster {
         &self,
         client: &stackable_operator::client::Client,
         role: &HbaseRole,
+        merged_config: &AnyServiceConfig,
         hbase_version: &str,
     ) -> Result<Vec<HbasePodRef>, Error> {
-        let pod_refs = self.pod_refs(role, hbase_version)?;
-        try_join_all(pod_refs.into_iter().map(|pod_ref| async {
-            let listener_name = format!("{}-{LISTENER_VOLUME_NAME}", pod_ref.pod_name);
-            let listener_ref =
-                || ObjectRef::<Listener>::new(&listener_name).within(&pod_ref.namespace);
-            let pod_obj_ref =
-                || ObjectRef::<Pod>::new(&pod_ref.pod_name).within(&pod_ref.namespace);
-            let listener = client
-                .get::<Listener>(&listener_name, &pod_ref.namespace)
-                .await
-                .context(GetPodListenerSnafu {
-                    listener: listener_ref(),
-                    pod: pod_obj_ref(),
-                })?;
-            let listener_address = listener
-                .status
-                .and_then(|s| s.ingress_addresses?.into_iter().next())
-                .context(PodListenerHasNoAddressSnafu {
-                    listener: listener_ref(),
-                    pod: pod_obj_ref(),
-                })?;
-            Ok(HbasePodRef {
-                fqdn_override: Some(listener_address.address),
-                ports: listener_address
-                    .ports
-                    .into_iter()
-                    .map(|(port_name, port)| {
-                        let port = u16::try_from(port).context(PortOutOfBoundsSnafu {
-                            port_name: &port_name,
-                            port,
-                        })?;
-                        Ok((port_name, port))
-                    })
-                    .collect::<Result<_, _>>()?,
-                ..pod_ref
-            })
-        }))
-        .await
+        // only externally-reachable listeners are relevant
+        if merged_config.listener_class().discoverable() {
+            let pod_refs = self.pod_refs(role, hbase_version)?;
+            try_join_all(pod_refs.into_iter().map(|pod_ref| async {
+                // N.B. use the naming convention for persistent listener volumes as we
+                // have specified above that we only want externally-reachable endpoints.
+                let listener_name = format!("{LISTENER_VOLUME_NAME}-{}", pod_ref.pod_name);
+                let listener_ref =
+                    || ObjectRef::<Listener>::new(&listener_name).within(&pod_ref.namespace);
+                let pod_obj_ref =
+                    || ObjectRef::<Pod>::new(&pod_ref.pod_name).within(&pod_ref.namespace);
+                let listener = client
+                    .get::<Listener>(&listener_name, &pod_ref.namespace)
+                    .await
+                    .context(GetPodListenerSnafu {
+                        listener: listener_ref(),
+                        pod: pod_obj_ref(),
+                    })?;
+                let listener_address = listener
+                    .status
+                    .and_then(|s| s.ingress_addresses?.into_iter().next())
+                    .context(PodListenerHasNoAddressSnafu {
+                        listener: listener_ref(),
+                        pod: pod_obj_ref(),
+                    })?;
+                Ok(HbasePodRef {
+                    fqdn_override: Some(listener_address.address),
+                    ports: listener_address
+                        .ports
+                        .into_iter()
+                        .map(|(port_name, port)| {
+                            let port = u16::try_from(port).context(PortOutOfBoundsSnafu {
+                                port_name: &port_name,
+                                port,
+                            })?;
+                            Ok((port_name, port))
+                        })
+                        .collect::<Result<_, _>>()?,
+                    ..pod_ref
+                })
+            }))
+            .await
+        } else {
+            Ok(vec![])
+        }
     }
 }
 
@@ -878,7 +887,7 @@ impl HbaseRole {
             affinity: get_affinity(cluster_name, self, hdfs_discovery_cm_name),
             graceful_shutdown_timeout: Some(graceful_shutdown_timeout),
             requested_secret_lifetime: Some(requested_secret_lifetime),
-            listener_class: Some(DEFAULT_LISTENER_CLASS.to_string()),
+            listener_class: Some(DEFAULT_LISTENER_CLASS),
         }
     }
 
@@ -979,7 +988,7 @@ impl AnyConfigFragment {
                         cli_opts: None,
                     },
                     requested_secret_lifetime: Some(HbaseRole::DEFAULT_REGION_SECRET_LIFETIME),
-                    listener_class: Some(DEFAULT_LISTENER_CLASS.to_string()),
+                    listener_class: Some(DEFAULT_LISTENER_CLASS),
                 })
             }
             HbaseRole::RestServer => AnyConfigFragment::RestServer(HbaseConfigFragment {
@@ -991,7 +1000,7 @@ impl AnyConfigFragment {
                     HbaseRole::DEFAULT_REST_SERVER_GRACEFUL_SHUTDOWN_TIMEOUT,
                 ),
                 requested_secret_lifetime: Some(HbaseRole::DEFAULT_REST_SECRET_LIFETIME),
-                listener_class: Some(DEFAULT_LISTENER_CLASS.to_string()),
+                listener_class: Some(DEFAULT_LISTENER_CLASS),
             }),
             HbaseRole::Master => AnyConfigFragment::Master(HbaseConfigFragment {
                 hbase_rootdir: None,
@@ -1002,7 +1011,7 @@ impl AnyConfigFragment {
                     HbaseRole::DEFAULT_MASTER_GRACEFUL_SHUTDOWN_TIMEOUT,
                 ),
                 requested_secret_lifetime: Some(HbaseRole::DEFAULT_MASTER_SECRET_LIFETIME),
-                listener_class: Some(DEFAULT_LISTENER_CLASS.to_string()),
+                listener_class: Some(DEFAULT_LISTENER_CLASS),
             }),
         }
     }
@@ -1082,8 +1091,7 @@ pub struct HbaseConfig {
     pub requested_secret_lifetime: Option<Duration>,
 
     /// This field controls which [ListenerClass](DOCS_BASE_URL_PLACEHOLDER/listener-operator/listenerclass.html) is used to expose this rolegroup.
-    /// All roles should have a direct ListenerClass, such as `cluster-internal` or `external-unstable`.
-    pub listener_class: String,
+    pub listener_class: SupportedListenerClasses,
 }
 
 impl Configuration for HbaseConfigFragment {
@@ -1239,8 +1247,7 @@ pub struct RegionServerConfig {
     pub region_mover: RegionMover,
 
     /// This field controls which [ListenerClass](DOCS_BASE_URL_PLACEHOLDER/listener-operator/listenerclass.html) is used to expose this rolegroup.
-    /// All roles should have a direct ListenerClass, such as `cluster-internal` or `external-unstable`.
-    pub listener_class: String,
+    pub listener_class: SupportedListenerClasses,
 }
 
 impl Configuration for RegionServerConfigFragment {
@@ -1312,6 +1319,35 @@ impl Configuration for RegionServerConfigFragment {
     }
 }
 
+#[derive(Clone, Debug, Default, Display, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
+#[serde(rename_all = "PascalCase")]
+pub enum SupportedListenerClasses {
+    #[default]
+    #[serde(rename = "cluster-internal")]
+    #[strum(serialize = "cluster-internal")]
+    ClusterInternal,
+
+    #[serde(rename = "external-unstable")]
+    #[strum(serialize = "external-unstable")]
+    ExternalUnstable,
+
+    #[serde(rename = "external-stable")]
+    #[strum(serialize = "external-stable")]
+    ExternalStable,
+}
+
+impl Atomic for SupportedListenerClasses {}
+
+impl SupportedListenerClasses {
+    pub fn discoverable(&self) -> bool {
+        match self {
+            SupportedListenerClasses::ClusterInternal => false,
+            SupportedListenerClasses::ExternalUnstable => true,
+            SupportedListenerClasses::ExternalStable => true,
+        }
+    }
+}
+
 #[derive(Clone, Debug, Default, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct HbaseClusterStatus {
@@ -1361,7 +1397,7 @@ impl AnyServiceConfig {
             AnyServiceConfig::RestServer(config) => config.requested_secret_lifetime,
         }
     }
-    pub fn listener_class(&self) -> String {
+    pub fn listener_class(&self) -> SupportedListenerClasses {
         match self {
             AnyServiceConfig::Master(config) => config.listener_class.clone(),
             AnyServiceConfig::RegionServer(config) => config.listener_class.clone(),

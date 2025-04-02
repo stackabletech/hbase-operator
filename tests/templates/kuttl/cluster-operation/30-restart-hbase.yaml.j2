@@ -32,6 +32,7 @@ spec:
       gracefulShutdownTimeout: 1m
       logging:
         enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
+      listenerClass: external-stable
     roleGroups:
       default:
         replicas: 1
@@ -40,6 +41,7 @@ spec:
       gracefulShutdownTimeout: 1m
       logging:
         enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
+      listenerClass: external-stable
     roleGroups:
       default:
         replicas: 1
@@ -48,6 +50,7 @@ spec:
       gracefulShutdownTimeout: 1m
       logging:
         enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
+      listenerClass: external-stable
     roleGroups:
       default:
         replicas: 1

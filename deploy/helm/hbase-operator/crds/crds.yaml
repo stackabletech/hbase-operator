@@ -197,7 +197,11 @@ spec:
                           nullable: true
                           type: string
                         listenerClass:
-                          description: This field controls which [ListenerClass](https://docs.stackable.tech/home/nightly/listener-operator/listenerclass.html) is used to expose this rolegroup. All roles should have a direct ListenerClass, such as `cluster-internal` or `external-unstable`.
+                          description: This field controls which [ListenerClass](https://docs.stackable.tech/home/nightly/listener-operator/listenerclass.html) is used to expose this rolegroup.
+                          enum:
+                            - cluster-internal
+                            - external-unstable
+                            - external-stable
                           nullable: true
                           type: string
                         logging:
@@ -451,7 +455,11 @@ spec:
                                 nullable: true
                                 type: string
                               listenerClass:
-                                description: This field controls which [ListenerClass](https://docs.stackable.tech/home/nightly/listener-operator/listenerclass.html) is used to expose this rolegroup. All roles should have a direct ListenerClass, such as `cluster-internal` or `external-unstable`.
+                                description: This field controls which [ListenerClass](https://docs.stackable.tech/home/nightly/listener-operator/listenerclass.html) is used to expose this rolegroup.
+                                enum:
+                                  - cluster-internal
+                                  - external-unstable
+                                  - external-stable
                                 nullable: true
                                 type: string
                               logging:
@@ -686,7 +694,11 @@ spec:
                           nullable: true
                           type: string
                         listenerClass:
-                          description: This field controls which [ListenerClass](https://docs.stackable.tech/home/nightly/listener-operator/listenerclass.html) is used to expose this rolegroup. All roles should have a direct ListenerClass, such as `cluster-internal` or `external-unstable`.
+                          description: This field controls which [ListenerClass](https://docs.stackable.tech/home/nightly/listener-operator/listenerclass.html) is used to expose this rolegroup.
+                          enum:
+                            - cluster-internal
+                            - external-unstable
+                            - external-stable
                           nullable: true
                           type: string
                         logging:
@@ -968,7 +980,11 @@ spec:
                                 nullable: true
                                 type: string
                               listenerClass:
-                                description: This field controls which [ListenerClass](https://docs.stackable.tech/home/nightly/listener-operator/listenerclass.html) is used to expose this rolegroup. All roles should have a direct ListenerClass, such as `cluster-internal` or `external-unstable`.
+                                description: This field controls which [ListenerClass](https://docs.stackable.tech/home/nightly/listener-operator/listenerclass.html) is used to expose this rolegroup.
+                                enum:
+                                  - cluster-internal
+                                  - external-unstable
+                                  - external-stable
                                 nullable: true
                                 type: string
                               logging:
@@ -1231,7 +1247,11 @@ spec:
                           nullable: true
                           type: string
                         listenerClass:
-                          description: This field controls which [ListenerClass](https://docs.stackable.tech/home/nightly/listener-operator/listenerclass.html) is used to expose this rolegroup. All roles should have a direct ListenerClass, such as `cluster-internal` or `external-unstable`.
+                          description: This field controls which [ListenerClass](https://docs.stackable.tech/home/nightly/listener-operator/listenerclass.html) is used to expose this rolegroup.
+                          enum:
+                            - cluster-internal
+                            - external-unstable
+                            - external-stable
                           nullable: true
                           type: string
                         logging:
@@ -1485,7 +1505,11 @@ spec:
                                 nullable: true
                                 type: string
                               listenerClass:
-                                description: This field controls which [ListenerClass](https://docs.stackable.tech/home/nightly/listener-operator/listenerclass.html) is used to expose this rolegroup. All roles should have a direct ListenerClass, such as `cluster-internal` or `external-unstable`.
+                                description: This field controls which [ListenerClass](https://docs.stackable.tech/home/nightly/listener-operator/listenerclass.html) is used to expose this rolegroup.
+                                enum:
+                                  - cluster-internal
+                                  - external-unstable
+                                  - external-stable
                                 nullable: true
                                 type: string
                               logging:
