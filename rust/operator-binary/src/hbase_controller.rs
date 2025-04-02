@@ -967,6 +967,7 @@ fn build_rolegroup_statefulset(
                 .build(),
         );
 
+    // externally-reachable listener endpoints should use a pvc volume...
     let pvcs = if merged_config.listener_class().discoverable() {
         let pvc = ListenerOperatorVolumeSourceBuilder::new(
             &ListenerReference::ListenerClass(merged_config.listener_class().to_string()),
@@ -977,6 +978,7 @@ fn build_rolegroup_statefulset(
         .context(BuildListenerVolumeSnafu)?;
         Some(vec![pvc])
     } else {
+        // ...whereas others will use ephemeral volumes
         pod_builder
             .add_listener_volume_by_listener_class(
                 LISTENER_VOLUME_NAME,
