@@ -5,17 +5,17 @@ use stackable_operator::{
     builder::{
         self,
         pod::{
+            PodBuilder,
             container::ContainerBuilder,
             volume::{SecretFormat, SecretOperatorVolumeSourceBuilder, VolumeBuilder},
-            PodBuilder,
         },
     },
-    kube::{runtime::reflector::ObjectRef, ResourceExt},
+    kube::{ResourceExt, runtime::reflector::ObjectRef},
     time::Duration,
     utils::cluster_info::KubernetesClusterInfo,
 };
 
-use crate::crd::{v1alpha1, TLS_STORE_DIR, TLS_STORE_PASSWORD, TLS_STORE_VOLUME_NAME};
+use crate::crd::{TLS_STORE_DIR, TLS_STORE_PASSWORD, TLS_STORE_VOLUME_NAME, v1alpha1};
 
 #[derive(Snafu, Debug)]
 pub enum Error {
