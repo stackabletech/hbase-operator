@@ -4,21 +4,22 @@ use clap::Parser;
 use futures::StreamExt;
 use hbase_controller::FULL_HBASE_CONTROLLER_NAME;
 use stackable_operator::{
+    YamlSchema,
     cli::{Command, ProductOperatorRun},
     k8s_openapi::api::{apps::v1::StatefulSet, core::v1::Service},
     kube::{
         core::DeserializeGuard,
         runtime::{
+            Controller,
             events::{Recorder, Reporter},
-            watcher, Controller,
+            watcher,
         },
     },
     logging::controller::report_controller_reconciled,
     shared::yaml::SerializeOptions,
-    YamlSchema,
 };
 
-use crate::crd::{v1alpha1, HbaseCluster, APP_NAME};
+use crate::crd::{APP_NAME, HbaseCluster, v1alpha1};
 
 mod config;
 mod crd;
@@ -80,13 +81,10 @@ async fn main() -> anyhow::Result<()> {
             )
             .await?;
 
-            let event_recorder = Arc::new(Recorder::new(
-                client.as_kube_client(),
-                Reporter {
-                    controller: FULL_HBASE_CONTROLLER_NAME.to_string(),
-                    instance: None,
-                },
-            ));
+            let event_recorder = Arc::new(Recorder::new(client.as_kube_client(), Reporter {
+                controller: FULL_HBASE_CONTROLLER_NAME.to_string(),
+                instance: None,
+            }));
 
             Controller::new(
                 watch_namespace.get_api::<DeserializeGuard<v1alpha1::HbaseCluster>>(&client),

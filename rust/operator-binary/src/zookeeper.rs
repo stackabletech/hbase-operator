@@ -105,9 +105,11 @@ impl ZookeeperConnectionInformation {
 
         // Check if a user points to a discovery CM of a HBaseCluster rather than a ZNode.
         if chroot == "/" {
-            warn!("It is recommended to let the HBase cluster point to a discovery ConfigMap of a ZNode rater than a ZookeeperCluster. \
+            warn!(
+                "It is recommended to let the HBase cluster point to a discovery ConfigMap of a ZNode rater than a ZookeeperCluster. \
             This prevents accidental reuse of the same Zookeeper path for multiple product instances. \
-            See https://docs.stackable.tech/home/stable/zookeeper/getting_started/first_steps for details");
+            See https://docs.stackable.tech/home/stable/zookeeper/getting_started/first_steps for details"
+            );
             chroot = "/hbase".to_string();
         } else {
             chroot = format!("{chroot}/hbase");

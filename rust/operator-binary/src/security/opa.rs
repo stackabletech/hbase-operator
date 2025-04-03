@@ -46,6 +46,7 @@ impl HbaseOpaConfig {
             ..HbaseOpaConfig::default()
         }
     }
+
     pub async fn from_opa_config(
         client: &Client,
         hbase: &v1alpha1::HbaseCluster,

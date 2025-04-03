@@ -6,12 +6,12 @@ use stackable_operator::{
     builder::{configmap::ConfigMapBuilder, meta::ObjectMetaBuilder},
     commons::product_image_selection::ResolvedProductImage,
     k8s_openapi::api::core::v1::ConfigMap,
-    kube::{runtime::reflector::ObjectRef, ResourceExt},
+    kube::{ResourceExt, runtime::reflector::ObjectRef},
     utils::cluster_info::KubernetesClusterInfo,
 };
 
 use crate::{
-    crd::{v1alpha1, HbasePodRef, HbaseRole, HBASE_SITE_XML},
+    crd::{HBASE_SITE_XML, HbasePodRef, HbaseRole, v1alpha1},
     hbase_controller::build_recommended_labels,
     kerberos::{self, kerberos_discovery_config_properties},
     zookeeper::ZookeeperConnectionInformation,
