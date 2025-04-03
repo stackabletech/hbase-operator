@@ -11,7 +11,7 @@ use stackable_operator::{
 };
 
 use crate::{
-    crd::{v1alpha1, HbaseRole, HBASE_SITE_XML},
+    crd::{HBASE_SITE_XML, HbaseRole, v1alpha1},
     hbase_controller::build_recommended_labels,
     kerberos::{self, kerberos_discovery_config_properties},
     zookeeper::ZookeeperConnectionInformation,
