@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Added
+
+- Inject the vector aggregator address into the vector config using the env var `VECTOR_AGGREGATOR_ADDRESS` ([#645]).
+
+### Fixed
+
+- Fix a bug where changes to ConfigMaps that are referenced in the HbaseCluster spec didn't trigger a reconciliation ([#645]).
+
+[#645]: https://github.com/stackabletech/airflow-operator/pull/645
+
 ## [25.3.0] - 2025-03-21
 
 ### Added
