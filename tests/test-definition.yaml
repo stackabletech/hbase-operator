@@ -142,6 +142,13 @@ tests:
       - hdfs-latest
       - zookeeper-latest
       - openshift
+  - name: external-access
+    dimensions:
+      - hbase
+      - hdfs-latest
+      - zookeeper-latest
+      - openshift
+      - listener-class
 suites:
   - name: nightly
     patch:
