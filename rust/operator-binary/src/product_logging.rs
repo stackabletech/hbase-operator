@@ -12,7 +12,7 @@ use stackable_operator::{
 };
 
 use crate::{
-    crd::{v1alpha1, Container},
+    crd::{Container, v1alpha1},
     hbase_controller::MAX_HBASE_LOG_FILES_SIZE,
 };
 

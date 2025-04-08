@@ -9,9 +9,9 @@ use std::{
 
 use const_format::concatcp;
 use product_config::{
-    types::PropertyNameKind,
-    writer::{to_hadoop_xml, to_java_properties_string, PropertiesWriterError},
     ProductConfigManager,
+    types::PropertyNameKind,
+    writer::{PropertiesWriterError, to_hadoop_xml, to_java_properties_string},
 };
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
@@ -20,8 +20,8 @@ use stackable_operator::{
         configmap::ConfigMapBuilder,
         meta::ObjectMetaBuilder,
         pod::{
-            container::ContainerBuilder, resources::ResourceRequirementsBuilder,
-            security::PodSecurityContextBuilder, PodBuilder,
+            PodBuilder, container::ContainerBuilder, resources::ResourceRequirementsBuilder,
+            security::PodSecurityContextBuilder,
         },
     },
     cluster_resources::{ClusterResourceApplyStrategy, ClusterResources},
@@ -37,9 +37,9 @@ use stackable_operator::{
         apimachinery::pkg::{apis::meta::v1::LabelSelector, util::intstr::IntOrString},
     },
     kube::{
-        core::{error_boundary, DeserializeGuard},
-        runtime::controller::Action,
         Resource, ResourceExt,
+        core::{DeserializeGuard, error_boundary},
+        runtime::controller::Action,
     },
     kvp::{Label, LabelError, Labels, ObjectLabels},
     logging::controller::ReconcilerError,
@@ -64,14 +64,15 @@ use stackable_operator::{
 use strum::{EnumDiscriminants, IntoStaticStr, ParseError};
 
 use crate::{
+    OPERATOR_NAME,
     config::jvm::{
         construct_global_jvm_args, construct_hbase_heapsize_env,
         construct_role_specific_non_heap_jvm_args,
     },
     crd::{
-        merged_env, v1alpha1, AnyServiceConfig, Container, HbaseClusterStatus, HbaseRole, APP_NAME,
-        HBASE_ENV_SH, HBASE_REST_PORT_NAME_HTTP, HBASE_REST_PORT_NAME_HTTPS, HBASE_SITE_XML,
-        JVM_SECURITY_PROPERTIES_FILE, SSL_CLIENT_XML, SSL_SERVER_XML,
+        APP_NAME, AnyServiceConfig, Container, HBASE_ENV_SH, HBASE_REST_PORT_NAME_HTTP,
+        HBASE_REST_PORT_NAME_HTTPS, HBASE_SITE_XML, HbaseClusterStatus, HbaseRole,
+        JVM_SECURITY_PROPERTIES_FILE, SSL_CLIENT_XML, SSL_SERVER_XML, merged_env, v1alpha1,
     },
     discovery::build_discovery_configmap,
     kerberos::{
@@ -80,11 +81,10 @@ use crate::{
     },
     operations::{graceful_shutdown::add_graceful_shutdown_config, pdb::add_pdbs},
     product_logging::{
-        extend_role_group_config_map, CONTAINERDEBUG_LOG_DIRECTORY, STACKABLE_LOG_DIR,
+        CONTAINERDEBUG_LOG_DIRECTORY, STACKABLE_LOG_DIR, extend_role_group_config_map,
     },
     security::{self, opa::HbaseOpaConfig},
     zookeeper::{self, ZookeeperConnectionInformation},
-    OPERATOR_NAME,
 };
 
 pub const HBASE_CONTROLLER_NAME: &str = "hbasecluster";

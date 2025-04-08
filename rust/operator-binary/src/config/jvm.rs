@@ -5,8 +5,8 @@ use stackable_operator::{
 };
 
 use crate::crd::{
-    v1alpha1, AnyServiceConfig, HbaseRole, CONFIG_DIR_NAME, JVM_SECURITY_PROPERTIES_FILE,
-    METRICS_PORT,
+    AnyServiceConfig, CONFIG_DIR_NAME, HbaseRole, JVM_SECURITY_PROPERTIES_FILE, METRICS_PORT,
+    v1alpha1,
 };
 
 const JAVA_HEAP_FACTOR: f32 = 0.8;
@@ -144,7 +144,7 @@ fn is_heap_jvm_argument(jvm_argument: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::crd::{v1alpha1, HbaseRole};
+    use crate::crd::{HbaseRole, v1alpha1};
 
     #[test]
     fn test_construct_jvm_arguments_defaults() {
