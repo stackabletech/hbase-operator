@@ -6,7 +6,15 @@
 
 - Added listener support for HBase ([#639]).
 
+### Changed
+
+- Replace stackable-operator `initialize_logging` with stackable-telemetry `Tracing` ([#640]).
+  - BREAKING: The file log directory was set by `HBASE_OPERATOR_LOG_DIRECTORY`, and is now set by `ROLLING_LOGS`
+    (or via `--rolling-logs <DIRECTORY>`).
+  - Replace stackable-operator `print_startup_string` with `tracing::info!` with fields.
+
 [#639]: https://github.com/stackabletech/hbase-operator/pull/639
+[#640]: https://github.com/stackabletech/hbase-operator/pull/640
 
 ## [25.3.0] - 2025-03-21
 
