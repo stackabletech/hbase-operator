@@ -23,7 +23,7 @@ spec:
       gracefulShutdownTimeout: 1m
       logging:
         enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
-      listenerClass: {{ test_scenario['values']['listener-class'] }}
+      listenerClass: external-unstable
     roleGroups:
       default:
         replicas: 2
@@ -32,16 +32,24 @@ spec:
       gracefulShutdownTimeout: 1m
       logging:
         enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
-      listenerClass: {{ test_scenario['values']['listener-class'] }}
+      listenerClass: external-unstable
     roleGroups:
       default:
-        replicas: 2
+        replicas: 1
+      cluster-internal:
+        replicas: 1
+        config:
+          listenerClass: cluster-internal
   restServers:
     config:
       gracefulShutdownTimeout: 1m
       logging:
         enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
-      listenerClass: {{ test_scenario['values']['listener-class'] }}
+      listenerClass: cluster-internal
     roleGroups:
       default:
-        replicas: 2
+        replicas: 1
+      external-unstable:
+        replicas: 1
+        config:
+          listenerClass: external-unstable

@@ -482,30 +482,6 @@ pub async fn reconcile_hbase(
                         rolegroup: rolegroup.clone(),
                     })?,
             );
-            // if the replicas are changed at the same time as the reconciliation
-            // being paused, it may be possible to have listeners that are *expected*
-            // (according to their replica number) but which are not yet created, so
-            // deactivate this action in such cases.
-            if hbase.spec.cluster_operation.reconciliation_paused
-                || hbase.spec.cluster_operation.stopped
-            {
-                tracing::info!(
-                    "Cluster is in a transitional state so do not attempt to collect listener information that will only be active once cluster has returned to a non-transitional state."
-                );
-            } else {
-                listener_refs.insert(
-                    hbase_role.to_string(),
-                    hbase
-                        .listener_refs(
-                            client,
-                            &hbase_role,
-                            &merged_config,
-                            &resolved_product_image.product_version,
-                        )
-                        .await
-                        .context(CollectDiscoveryConfigSnafu)?,
-                );
-            }
         }
 
         let role_config = hbase.role_config(&hbase_role);
@@ -516,6 +492,26 @@ pub async fn reconcile_hbase(
             add_pdbs(pdb, hbase, &hbase_role, client, &mut cluster_resources)
                 .await
                 .context(FailedToCreatePdbSnafu)?;
+        }
+
+        // if the replicas are changed at the same time as the reconciliation
+        // being paused, it may be possible to have listeners that are *expected*
+        // (according to their replica number) but which are not yet created, so
+        // deactivate this action in such cases.
+        if hbase.spec.cluster_operation.reconciliation_paused
+            || hbase.spec.cluster_operation.stopped
+        {
+            tracing::info!(
+                "Cluster is in a transitional state so do not attempt to collect listener information that will only be active once cluster has returned to a non-transitional state."
+            );
+        } else {
+            listener_refs.insert(
+                hbase_role.to_string(),
+                hbase
+                    .listener_refs(client, &hbase_role, &resolved_product_image.product_version)
+                    .await
+                    .context(CollectDiscoveryConfigSnafu)?,
+            );
         }
     }
 

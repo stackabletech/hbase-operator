@@ -148,7 +148,6 @@ tests:
       - hdfs-latest
       - zookeeper-latest
       - openshift
-      - listener-class
 suites:
   - name: nightly
     patch:

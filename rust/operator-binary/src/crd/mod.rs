@@ -583,6 +583,12 @@ impl v1alpha1::HbaseCluster {
         }
     }
 
+    /// Returns rolegroup and replica information for a specific role.
+    /// We can't pass through the merged config for a particular role-group
+    /// here as we need more than the config. As this will be called by role,
+    /// the merged listener-class is called so that only role-group information
+    /// for externally-reachable services (based on their listener class) are
+    /// included in the collection.
     pub fn rolegroup_ref_and_replicas(
         &self,
         role: &HbaseRole,
@@ -596,6 +602,9 @@ impl v1alpha1::HbaseCluster {
                 // Order rolegroups consistently, to avoid spurious downstream rewrites
                 .collect::<BTreeMap<_, _>>()
                 .into_iter()
+                .filter(|(rolegroup_name, _)| {
+                    self.resolved_listener_class_discoverable(role, rolegroup_name)
+                })
                 .map(|(rolegroup_name, role_group)| {
                     (
                         self.rolegroup_ref(HbaseRole::Master.to_string(), rolegroup_name),
@@ -611,6 +620,9 @@ impl v1alpha1::HbaseCluster {
                 // Order rolegroups consistently, to avoid spurious downstream rewrites
                 .collect::<BTreeMap<_, _>>()
                 .into_iter()
+                .filter(|(rolegroup_name, _)| {
+                    self.resolved_listener_class_discoverable(role, rolegroup_name)
+                })
                 .map(|(rolegroup_name, role_group)| {
                     (
                         self.rolegroup_ref(HbaseRole::RegionServer.to_string(), rolegroup_name),
@@ -626,6 +638,9 @@ impl v1alpha1::HbaseCluster {
                 // Order rolegroups consistently, to avoid spurious downstream rewrites
                 .collect::<BTreeMap<_, _>>()
                 .into_iter()
+                .filter(|(rolegroup_name, _)| {
+                    self.resolved_listener_class_discoverable(role, rolegroup_name)
+                })
                 .map(|(rolegroup_name, role_group)| {
                     (
                         self.rolegroup_ref(HbaseRole::RestServer.to_string(), rolegroup_name),
@@ -633,6 +648,19 @@ impl v1alpha1::HbaseCluster {
                     )
                 })
                 .collect(),
+        }
+    }
+
+    fn resolved_listener_class_discoverable(
+        &self,
+        role: &HbaseRole,
+        rolegroup_name: &&String,
+    ) -> bool {
+        let listener_class = self.merged_listener_class(role, rolegroup_name);
+        if let Some(listener_class) = listener_class {
+            listener_class.discoverable()
+        } else {
+            false
         }
     }
 
@@ -667,53 +695,113 @@ impl v1alpha1::HbaseCluster {
         &self,
         client: &stackable_operator::client::Client,
         role: &HbaseRole,
-        merged_config: &AnyServiceConfig,
         hbase_version: &str,
     ) -> Result<Vec<HbasePodRef>, Error> {
-        // only externally-reachable listeners are relevant
-        if merged_config.listener_class().discoverable() {
-            let pod_refs = self.pod_refs(role, hbase_version)?;
-            try_join_all(pod_refs.into_iter().map(|pod_ref| async {
-                // N.B. use the naming convention for persistent listener volumes as we
-                // have specified above that we only want externally-reachable endpoints.
-                let listener_name = format!("{LISTENER_VOLUME_NAME}-{}", pod_ref.pod_name);
-                let listener_ref =
-                    || ObjectRef::<Listener>::new(&listener_name).within(&pod_ref.namespace);
-                let pod_obj_ref =
-                    || ObjectRef::<Pod>::new(&pod_ref.pod_name).within(&pod_ref.namespace);
-                let listener = client
-                    .get::<Listener>(&listener_name, &pod_ref.namespace)
-                    .await
-                    .context(GetPodListenerSnafu {
-                        listener: listener_ref(),
-                        pod: pod_obj_ref(),
-                    })?;
-                let listener_address = listener
-                    .status
-                    .and_then(|s| s.ingress_addresses?.into_iter().next())
-                    .context(PodListenerHasNoAddressSnafu {
-                        listener: listener_ref(),
-                        pod: pod_obj_ref(),
-                    })?;
-                Ok(HbasePodRef {
-                    fqdn_override: Some(listener_address.address),
-                    ports: listener_address
-                        .ports
-                        .into_iter()
-                        .map(|(port_name, port)| {
-                            let port = u16::try_from(port).context(PortOutOfBoundsSnafu {
-                                port_name: &port_name,
-                                port,
-                            })?;
-                            Ok((port_name, port))
-                        })
-                        .collect::<Result<_, _>>()?,
-                    ..pod_ref
-                })
-            }))
-            .await
-        } else {
-            Ok(vec![])
+        let pod_refs = self.pod_refs(role, hbase_version)?;
+        try_join_all(pod_refs.into_iter().map(|pod_ref| async {
+            // N.B. use the naming convention for persistent listener volumes as we
+            // have specified above that we only want externally-reachable endpoints.
+            let listener_name = format!("{LISTENER_VOLUME_NAME}-{}", pod_ref.pod_name);
+            let listener_ref =
+                || ObjectRef::<Listener>::new(&listener_name).within(&pod_ref.namespace);
+            let pod_obj_ref =
+                || ObjectRef::<Pod>::new(&pod_ref.pod_name).within(&pod_ref.namespace);
+            let listener = client
+                .get::<Listener>(&listener_name, &pod_ref.namespace)
+                .await
+                .context(GetPodListenerSnafu {
+                    listener: listener_ref(),
+                    pod: pod_obj_ref(),
+                })?;
+            let listener_address = listener
+                .status
+                .and_then(|s| s.ingress_addresses?.into_iter().next())
+                .context(PodListenerHasNoAddressSnafu {
+                    listener: listener_ref(),
+                    pod: pod_obj_ref(),
+                })?;
+            Ok(HbasePodRef {
+                fqdn_override: Some(listener_address.address),
+                ports: listener_address
+                    .ports
+                    .into_iter()
+                    .map(|(port_name, port)| {
+                        let port = u16::try_from(port).context(PortOutOfBoundsSnafu {
+                            port_name: &port_name,
+                            port,
+                        })?;
+                        Ok((port_name, port))
+                    })
+                    .collect::<Result<_, _>>()?,
+                ..pod_ref
+            })
+        }))
+        .await
+    }
+
+    pub fn merged_listener_class(
+        &self,
+        role: &HbaseRole,
+        rolegroup_name: &String,
+    ) -> Option<SupportedListenerClasses> {
+        match role {
+            HbaseRole::Master => {
+                if let Some(masters) = self.spec.masters.as_ref() {
+                    let conf_defaults = Some(SupportedListenerClasses::ClusterInternal);
+                    let mut conf_role = masters.config.config.listener_class.to_owned();
+                    let mut conf_rolegroup = masters
+                        .role_groups
+                        .get(rolegroup_name)
+                        .map(|rg| rg.config.config.listener_class.clone())
+                        .unwrap_or_default();
+
+                    conf_role.merge(&conf_defaults);
+                    conf_rolegroup.merge(&conf_role);
+
+                    tracing::debug!("Merged listener-class: {:?} for {role}", conf_rolegroup);
+                    conf_rolegroup
+                } else {
+                    None
+                }
+            }
+            HbaseRole::RegionServer => {
+                if let Some(region_servers) = self.spec.region_servers.as_ref() {
+                    let conf_defaults = Some(SupportedListenerClasses::ClusterInternal);
+                    let mut conf_role = region_servers.config.config.listener_class.to_owned();
+                    let mut conf_rolegroup = region_servers
+                        .role_groups
+                        .get(rolegroup_name)
+                        .map(|rg| rg.config.config.listener_class.clone())
+                        .unwrap_or_default();
+
+                    conf_role.merge(&conf_defaults);
+                    conf_rolegroup.merge(&conf_role);
+
+                    tracing::debug!("Merged listener-class: {:?} for {role}", conf_rolegroup);
+                    conf_rolegroup
+                } else {
+                    None
+                }
+            }
+            HbaseRole::RestServer => {
+                if let Some(rest_servers) = self.spec.rest_servers.as_ref() {
+                    let conf_defaults = Some(SupportedListenerClasses::ClusterInternal);
+                    let mut conf_role = rest_servers.config.config.listener_class.to_owned();
+                    let mut conf_rolegroup = rest_servers
+                        .role_groups
+                        .get(rolegroup_name)
+                        .map(|rg| rg.config.config.listener_class.clone())
+                        .unwrap_or_default();
+
+                    conf_role.merge(&conf_defaults);
+                    conf_rolegroup.merge(&conf_role);
+
+                    tracing::debug!("Merged listener-class: {:?} for {role}", conf_rolegroup);
+                    conf_rolegroup
+                } else {
+                    None
+                }
+            }
         }
     }
 }

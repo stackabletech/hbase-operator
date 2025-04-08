@@ -16,13 +16,29 @@ kind: StatefulSet
 metadata:
   name: test-hbase-regionserver-default
 status:
-  readyReplicas: 2
-  replicas: 2
+  readyReplicas: 1
+  replicas: 1
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: test-hbase-regionserver-cluster-internal
+status:
+  readyReplicas: 1
+  replicas: 1
 ---
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: test-hbase-restserver-default
 status:
-  readyReplicas: 2
-  replicas: 2
+  readyReplicas: 1
+  replicas: 1
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: test-hbase-restserver-external-unstable
+status:
+  readyReplicas: 1
+  replicas: 1
