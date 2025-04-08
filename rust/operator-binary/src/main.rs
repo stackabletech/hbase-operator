@@ -6,13 +6,17 @@ use hbase_controller::FULL_HBASE_CONTROLLER_NAME;
 use stackable_operator::{
     YamlSchema,
     cli::{Command, ProductOperatorRun, RollingPeriod},
-    k8s_openapi::api::{apps::v1::StatefulSet, core::v1::Service},
+    k8s_openapi::api::{
+        apps::v1::StatefulSet,
+        core::v1::{ConfigMap, Service},
+    },
     kube::{
         ResourceExt,
         core::DeserializeGuard,
         runtime::{
             Controller,
             events::{Recorder, Reporter},
+            reflector::ObjectRef,
             watcher,
         },
     },
