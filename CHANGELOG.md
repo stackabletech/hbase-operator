@@ -9,7 +9,12 @@
     (or via `--rolling-logs <DIRECTORY>`).
   - Replace stackable-operator `print_startup_string` with `tracing::info!` with fields.
 
+### Fixed
+
+- Use `json` file extension for log files ([#647]).
+
 [#640]: https://github.com/stackabletech/hbase-operator/pull/640
+[#647]: https://github.com/stackabletech/hbase-operator/pull/647
 
 ## [25.3.0] - 2025-03-21
 
