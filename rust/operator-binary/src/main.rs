@@ -203,7 +203,7 @@ fn references_config_map(
 
     hbase.spec.cluster_config.zookeeper_config_map_name == config_map.name_any()
         || hbase.spec.cluster_config.hdfs_config_map_name == config_map.name_any()
-        || match hbase.spec.cluster_config.authorization.to_owned() {
+        || match &hbase.spec.cluster_config.authorization {
             Some(hbase_authorization) => {
                 hbase_authorization.opa.config_map_name == config_map.name_any()
             }

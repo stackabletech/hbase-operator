@@ -993,11 +993,8 @@ fn build_rolegroup_statefulset(
 
     // Vector sidecar shall be the last container in the list
     if merged_config.logging().enable_vector_agent {
-        if let Some(vector_aggregator_config_map_name) = hbase
-            .spec
-            .cluster_config
-            .vector_aggregator_config_map_name
-            .to_owned()
+        if let Some(vector_aggregator_config_map_name) =
+            &hbase.spec.cluster_config.vector_aggregator_config_map_name
         {
             pod_builder.add_container(
                 product_logging::framework::vector_container(
@@ -1011,7 +1008,7 @@ fn build_rolegroup_statefulset(
                         .with_memory_request("128Mi")
                         .with_memory_limit("128Mi")
                         .build(),
-                    &vector_aggregator_config_map_name,
+                    vector_aggregator_config_map_name,
                 )
                 .context(ConfigureLoggingSnafu)?,
             );
