@@ -17,7 +17,7 @@
 - Fix a bug where changes to ConfigMaps that are referenced in the HbaseCluster spec didn't trigger a reconciliation ([#645]).
 
 [#640]: https://github.com/stackabletech/hbase-operator/pull/640
-[#645]: https://github.com/stackabletech/airflow-operator/pull/645
+[#645]: https://github.com/stackabletech/hbase-operator/pull/645
 [#647]: https://github.com/stackabletech/hbase-operator/pull/647
 
 ## [25.3.0] - 2025-03-21
