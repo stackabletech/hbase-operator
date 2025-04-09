@@ -8,6 +8,7 @@ use std::{
 };
 
 use const_format::concatcp;
+use indoc::formatdoc;
 use product_config::{
     ProductConfigManager,
     types::PropertyNameKind,
@@ -20,8 +21,14 @@ use stackable_operator::{
         configmap::ConfigMapBuilder,
         meta::ObjectMetaBuilder,
         pod::{
-            PodBuilder, container::ContainerBuilder, resources::ResourceRequirementsBuilder,
+            PodBuilder,
+            container::ContainerBuilder,
+            resources::ResourceRequirementsBuilder,
             security::PodSecurityContextBuilder,
+            volume::{
+                ListenerOperatorVolumeSourceBuilder, ListenerOperatorVolumeSourceBuilderError,
+                ListenerReference,
+            },
         },
     },
     cluster_resources::{ClusterResourceApplyStrategy, ClusterResources},
@@ -71,10 +78,11 @@ use crate::{
     },
     crd::{
         APP_NAME, AnyServiceConfig, Container, HBASE_ENV_SH, HBASE_REST_PORT_NAME_HTTP,
-        HBASE_REST_PORT_NAME_HTTPS, HBASE_SITE_XML, HbaseClusterStatus, HbaseRole,
-        JVM_SECURITY_PROPERTIES_FILE, SSL_CLIENT_XML, SSL_SERVER_XML, merged_env, v1alpha1,
+        HBASE_REST_PORT_NAME_HTTPS, HBASE_SITE_XML, HbaseClusterStatus, HbasePodRef, HbaseRole,
+        JVM_SECURITY_PROPERTIES_FILE, LISTENER_VOLUME_DIR, LISTENER_VOLUME_NAME, SSL_CLIENT_XML,
+        SSL_SERVER_XML, merged_env, v1alpha1,
     },
-    discovery::build_discovery_configmap,
+    discovery::{build_discovery_configmap, build_endpoint_configmap},
     kerberos::{
         self, add_kerberos_pod_config, kerberos_config_properties, kerberos_ssl_client_settings,
         kerberos_ssl_server_settings,
@@ -313,6 +321,19 @@ pub enum Error {
 
     #[snafu(display("failed to construct JVM arguments"))]
     ConstructJvmArgument { source: crate::config::jvm::Error },
+
+    #[snafu(display("failed to build Labels"))]
+    LabelBuild {
+        source: stackable_operator::kvp::LabelError,
+    },
+
+    #[snafu(display("cannot collect discovery configuration"))]
+    CollectDiscoveryConfig { source: crate::crd::Error },
+
+    #[snafu(display("failed to build listener volume"))]
+    BuildListenerVolume {
+        source: ListenerOperatorVolumeSourceBuilderError,
+    },
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -376,26 +397,6 @@ pub async fn reconcile_hbase(
     )
     .context(CreateClusterResourcesSnafu)?;
 
-    let region_server_role_service =
-        build_region_server_role_service(hbase, &resolved_product_image)?;
-    cluster_resources
-        .add(client, region_server_role_service)
-        .await
-        .context(ApplyRoleServiceSnafu)?;
-
-    // discovery config map
-    let discovery_cm = build_discovery_configmap(
-        hbase,
-        &client.kubernetes_cluster_info,
-        &zookeeper_connection_information,
-        &resolved_product_image,
-    )
-    .context(BuildDiscoveryConfigMapSnafu)?;
-    cluster_resources
-        .add(client, discovery_cm)
-        .await
-        .context(ApplyDiscoveryConfigMapSnafu)?;
-
     let (rbac_sa, rbac_rolebinding) = build_rbac_resources(
         hbase,
         APP_NAME,
@@ -414,6 +415,7 @@ pub async fn reconcile_hbase(
         .context(ApplyRoleBindingSnafu)?;
 
     let mut ss_cond_builder = StatefulSetConditionBuilder::default();
+    let mut listener_refs: BTreeMap<String, Vec<HbasePodRef>> = BTreeMap::new();
 
     for (role_name, group_config) in validated_config.iter() {
         let hbase_role = HbaseRole::from_str(role_name).context(UnidentifiedHbaseRoleSnafu {
@@ -483,7 +485,55 @@ pub async fn reconcile_hbase(
                 .await
                 .context(FailedToCreatePdbSnafu)?;
         }
+
+        // if the replicas are changed at the same time as the reconciliation
+        // being paused, it may be possible to have listeners that are *expected*
+        // (according to their replica number) but which are not yet created, so
+        // deactivate this action in such cases.
+        if hbase.spec.cluster_operation.reconciliation_paused
+            || hbase.spec.cluster_operation.stopped
+        {
+            tracing::info!(
+                "Cluster is in a transitional state so do not attempt to collect listener information that will only be active once cluster has returned to a non-transitional state."
+            );
+        } else {
+            listener_refs.insert(
+                hbase_role.to_string(),
+                hbase
+                    .listener_refs(client, &hbase_role, &resolved_product_image.product_version)
+                    .await
+                    .context(CollectDiscoveryConfigSnafu)?,
+            );
+        }
     }
+
+    tracing::debug!(
+        "Listener references prepared for the ConfigMap {:#?}",
+        listener_refs
+    );
+
+    if !listener_refs.is_empty() {
+        let endpoint_cm = build_endpoint_configmap(hbase, &resolved_product_image, listener_refs)
+            .context(BuildDiscoveryConfigMapSnafu)?;
+        cluster_resources
+            .add(client, endpoint_cm)
+            .await
+            .context(ApplyDiscoveryConfigMapSnafu)?;
+    }
+
+    // Discovery CM will fail to build until the rest of the cluster has been deployed, so do it last
+    // so that failure won't inhibit the rest of the cluster from booting up.
+    let discovery_cm = build_discovery_configmap(
+        hbase,
+        &client.kubernetes_cluster_info,
+        &zookeeper_connection_information,
+        &resolved_product_image,
+    )
+    .context(BuildDiscoveryConfigMapSnafu)?;
+    cluster_resources
+        .add(client, discovery_cm)
+        .await
+        .context(ApplyDiscoveryConfigMapSnafu)?;
 
     let cluster_operation_cond_builder =
         ClusterOperationsConditionBuilder::new(&hbase.spec.cluster_operation);
@@ -502,59 +552,6 @@ pub async fn reconcile_hbase(
         .context(ApplyStatusSnafu)?;
 
     Ok(Action::await_change())
-}
-
-/// The server-role service is the primary endpoint that should be used by clients that do not perform internal load balancing,
-/// including targets outside of the cluster.
-pub fn build_region_server_role_service(
-    hbase: &v1alpha1::HbaseCluster,
-    resolved_product_image: &ResolvedProductImage,
-) -> Result<Service> {
-    let role = HbaseRole::RegionServer;
-    let role_name = role.to_string();
-    let role_svc_name = hbase
-        .server_role_service_name()
-        .context(GlobalServiceNameNotFoundSnafu)?;
-    let ports = hbase
-        .ports(&role, &resolved_product_image.product_version)
-        .into_iter()
-        .map(|(name, value)| ServicePort {
-            name: Some(name),
-            port: i32::from(value),
-            protocol: Some("TCP".to_string()),
-            ..ServicePort::default()
-        })
-        .collect();
-
-    let metadata = ObjectMetaBuilder::new()
-        .name_and_namespace(hbase)
-        .name(&role_svc_name)
-        .ownerreference_from_resource(hbase, None, Some(true))
-        .context(ObjectMissingMetadataForOwnerRefSnafu)?
-        .with_recommended_labels(build_recommended_labels(
-            hbase,
-            &resolved_product_image.app_version_label,
-            &role_name,
-            "global",
-        ))
-        .context(ObjectMetaSnafu)?
-        .build();
-
-    let service_selector_labels =
-        Labels::role_selector(hbase, APP_NAME, &role_name).context(BuildLabelSnafu)?;
-
-    let service_spec = ServiceSpec {
-        type_: Some(hbase.spec.cluster_config.listener_class.k8s_service_type()),
-        ports: Some(ports),
-        selector: Some(service_selector_labels.into()),
-        ..ServiceSpec::default()
-    };
-
-    Ok(Service {
-        metadata,
-        spec: Some(service_spec),
-        status: None,
-    })
 }
 
 /// The rolegroup [`ConfigMap`] configures the rolegroup based on the configuration given by the administrator
@@ -868,15 +865,18 @@ fn build_rolegroup_statefulset(
         },
     ]);
 
+    let role_name = hbase_role.cli_role_name();
     let mut hbase_container = ContainerBuilder::new("hbase").expect("ContainerBuilder not created");
     hbase_container
         .image_from_product_image(resolved_product_image)
-        .command(vec!["/stackable/hbase/bin/hbase-entrypoint.sh".to_string()])
-        .args(vec![
-            hbase_role.cli_role_name(),
-            hbase_service_domain_name(hbase, rolegroup_ref, cluster_info)?,
-            hbase.service_port(hbase_role).to_string(),
-        ])
+        .command(command())
+        .args(vec![formatdoc! {"
+            {entrypoint} {role} {domain} {port}",
+            entrypoint = "/stackable/hbase/bin/hbase-entrypoint.sh".to_string(),
+            role = role_name,
+            domain = hbase_service_domain_name(hbase, rolegroup_ref, cluster_info)?,
+            port = hbase.service_port(hbase_role).to_string(),
+        }])
         .add_env_vars(merged_env)
         // Needed for the `containerdebug` process to log it's tracing information to.
         .add_env_var(
@@ -891,6 +891,8 @@ fn build_rolegroup_statefulset(
         .context(AddVolumeMountSnafu)?
         .add_volume_mount("log", STACKABLE_LOG_DIR)
         .context(AddVolumeMountSnafu)?
+        .add_volume_mount(LISTENER_VOLUME_NAME, LISTENER_VOLUME_DIR)
+        .context(AddVolumeMountSnafu)?
         .add_container_ports(ports)
         .resources(merged_config.resources().clone().into())
         .startup_probe(startup_probe)
@@ -899,13 +901,17 @@ fn build_rolegroup_statefulset(
 
     let mut pod_builder = PodBuilder::new();
 
+    let recommended_object_labels = build_recommended_labels(
+        hbase,
+        hbase_version,
+        &rolegroup_ref.role,
+        &rolegroup_ref.role_group,
+    );
+    let recommended_labels =
+        Labels::recommended(recommended_object_labels.clone()).context(LabelBuildSnafu)?;
+
     let pb_metadata = ObjectMetaBuilder::new()
-        .with_recommended_labels(build_recommended_labels(
-            hbase,
-            hbase_version,
-            &rolegroup_ref.role,
-            &rolegroup_ref.role_group,
-        ))
+        .with_recommended_labels(recommended_object_labels)
         .context(ObjectMetaSnafu)?
         .build();
 
@@ -946,6 +952,28 @@ fn build_rolegroup_statefulset(
                 .fs_group(1000)
                 .build(),
         );
+
+    // externally-reachable listener endpoints should use a pvc volume...
+    let pvcs = if merged_config.listener_class().discoverable() {
+        let pvc = ListenerOperatorVolumeSourceBuilder::new(
+            &ListenerReference::ListenerClass(merged_config.listener_class().to_string()),
+            &recommended_labels,
+        )
+        .context(BuildListenerVolumeSnafu)?
+        .build_pvc(LISTENER_VOLUME_NAME.to_string())
+        .context(BuildListenerVolumeSnafu)?;
+        Some(vec![pvc])
+    } else {
+        // ...whereas others will use ephemeral volumes
+        pod_builder
+            .add_listener_volume_by_listener_class(
+                LISTENER_VOLUME_NAME,
+                &merged_config.listener_class().to_string(),
+                &recommended_labels,
+            )
+            .context(AddVolumeSnafu)?;
+        None
+    };
 
     if let Some(ContainerLogConfig {
         choice:
@@ -1051,6 +1079,7 @@ fn build_rolegroup_statefulset(
         },
         service_name: rolegroup_ref.object_name(),
         template: pod_template,
+        volume_claim_templates: pvcs,
         ..StatefulSetSpec::default()
     };
 
@@ -1059,6 +1088,17 @@ fn build_rolegroup_statefulset(
         spec: Some(statefulset_spec),
         status: None,
     })
+}
+
+/// Returns the container command.
+fn command() -> Vec<String> {
+    vec![
+        "/bin/bash".to_string(),
+        "-x".to_string(),
+        "-euo".to_string(),
+        "pipefail".to_string(),
+        "-c".to_string(),
+    ]
 }
 
 fn write_hbase_env_sh<'a, T>(properties: T) -> String
@@ -1123,6 +1163,7 @@ fn build_hbase_env_sh(
     let role_specific_non_heap_jvm_args =
         construct_role_specific_non_heap_jvm_args(hbase, hbase_role, role_group, product_version)
             .context(ConstructJvmArgumentSnafu)?;
+
     match hbase_role {
         HbaseRole::Master => {
             result.insert(

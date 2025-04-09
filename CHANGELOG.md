@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- Added listener support for HBase ([#639]).
+
 ### Changed
 
 - Replace stackable-operator `initialize_logging` with stackable-telemetry `Tracing` ([#640]).
@@ -20,6 +24,7 @@
 
 - Use `json` file extension for log files ([#647]).
 
+[#639]: https://github.com/stackabletech/hbase-operator/pull/639
 [#640]: https://github.com/stackabletech/hbase-operator/pull/640
 [#645]: https://github.com/stackabletech/hbase-operator/pull/645
 [#647]: https://github.com/stackabletech/hbase-operator/pull/647
