@@ -6,12 +6,17 @@ use hbase_controller::FULL_HBASE_CONTROLLER_NAME;
 use stackable_operator::{
     YamlSchema,
     cli::{Command, ProductOperatorRun, RollingPeriod},
-    k8s_openapi::api::{apps::v1::StatefulSet, core::v1::Service},
+    k8s_openapi::api::{
+        apps::v1::StatefulSet,
+        core::v1::{ConfigMap, Service},
+    },
     kube::{
+        ResourceExt,
         core::DeserializeGuard,
         runtime::{
             Controller,
             events::{Recorder, Reporter},
+            reflector::ObjectRef,
             watcher,
         },
     },
@@ -128,46 +133,77 @@ async fn main() -> anyhow::Result<()> {
                 instance: None,
             }));
 
-            Controller::new(
+            let hbase_controller = Controller::new(
                 watch_namespace.get_api::<DeserializeGuard<v1alpha1::HbaseCluster>>(&client),
                 watcher::Config::default(),
-            )
-            .owns(
-                watch_namespace.get_api::<Service>(&client),
-                watcher::Config::default(),
-            )
-            .owns(
-                watch_namespace.get_api::<StatefulSet>(&client),
-                watcher::Config::default(),
-            )
-            .shutdown_on_signal()
-            .run(
-                hbase_controller::reconcile_hbase,
-                hbase_controller::error_policy,
-                Arc::new(hbase_controller::Ctx {
-                    client: client.clone(),
-                    product_config,
-                }),
-            )
-            .for_each_concurrent(
-                16, // concurrency limit
-                |result| {
-                    // The event_recorder needs to be shared across all invocations, so that
-                    // events are correctly aggregated
-                    let event_recorder = event_recorder.clone();
-                    async move {
-                        report_controller_reconciled(
-                            &event_recorder,
-                            FULL_HBASE_CONTROLLER_NAME,
-                            &result,
-                        )
-                        .await;
-                    }
-                },
-            )
-            .await;
+            );
+            let config_map_store = hbase_controller.store();
+            hbase_controller
+                .owns(
+                    watch_namespace.get_api::<Service>(&client),
+                    watcher::Config::default(),
+                )
+                .owns(
+                    watch_namespace.get_api::<StatefulSet>(&client),
+                    watcher::Config::default(),
+                )
+                .shutdown_on_signal()
+                .watches(
+                    watch_namespace.get_api::<DeserializeGuard<ConfigMap>>(&client),
+                    watcher::Config::default(),
+                    move |config_map| {
+                        config_map_store
+                            .state()
+                            .into_iter()
+                            .filter(move |hbase| references_config_map(hbase, &config_map))
+                            .map(|hbase| ObjectRef::from_obj(&*hbase))
+                    },
+                )
+                .run(
+                    hbase_controller::reconcile_hbase,
+                    hbase_controller::error_policy,
+                    Arc::new(hbase_controller::Ctx {
+                        client: client.clone(),
+                        product_config,
+                    }),
+                )
+                .for_each_concurrent(
+                    16, // concurrency limit
+                    |result| {
+                        // The event_recorder needs to be shared across all invocations, so that
+                        // events are correctly aggregated
+                        let event_recorder = event_recorder.clone();
+                        async move {
+                            report_controller_reconciled(
+                                &event_recorder,
+                                FULL_HBASE_CONTROLLER_NAME,
+                                &result,
+                            )
+                            .await;
+                        }
+                    },
+                )
+                .await;
         }
     }
 
     Ok(())
+}
+
+fn references_config_map(
+    hbase: &DeserializeGuard<v1alpha1::HbaseCluster>,
+    config_map: &DeserializeGuard<ConfigMap>,
+) -> bool {
+    let Ok(hbase) = &hbase.0 else {
+        return false;
+    };
+
+    hbase.spec.cluster_config.zookeeper_config_map_name == config_map.name_any()
+        || hbase.spec.cluster_config.hdfs_config_map_name == config_map.name_any()
+        || match &hbase.spec.cluster_config.authorization {
+            Some(hbase_authorization) => {
+                hbase_authorization.opa.config_map_name == config_map.name_any()
+            }
+            None => false,
+        }
 }

@@ -82,7 +82,6 @@ use crate::{
     operations::{graceful_shutdown::add_graceful_shutdown_config, pdb::add_pdbs},
     product_logging::{
         CONTAINERDEBUG_LOG_DIRECTORY, STACKABLE_LOG_DIR, extend_role_group_config_map,
-        resolve_vector_aggregator_address,
     },
     security::{self, opa::HbaseOpaConfig},
     zookeeper::{self, ZookeeperConnectionInformation},
@@ -235,10 +234,8 @@ pub enum Error {
     #[snafu(display("failed to resolve and merge config for role and role group"))]
     FailedToResolveConfig { source: crate::crd::Error },
 
-    #[snafu(display("failed to resolve the Vector aggregator address"))]
-    ResolveVectorAggregatorAddress {
-        source: crate::product_logging::Error,
-    },
+    #[snafu(display("vector agent is enabled but vector aggregator ConfigMap is missing"))]
+    VectorAggregatorConfigMapMissing,
 
     #[snafu(display("failed to add the logging configuration to the ConfigMap [{cm_name}]"))]
     InvalidLoggingConfig {
@@ -350,10 +347,6 @@ pub async fn reconcile_hbase(
         .await
         .context(RetrieveZookeeperConnectionInformationSnafu)?;
 
-    let vector_aggregator_address = resolve_vector_aggregator_address(hbase, client)
-        .await
-        .context(ResolveVectorAggregatorAddressSnafu)?;
-
     let roles = hbase.build_role_properties().context(RolePropertiesSnafu)?;
 
     let validated_config = validate_all_roles_and_groups_config(
@@ -448,7 +441,6 @@ pub async fn reconcile_hbase(
                 &merged_config,
                 &resolved_product_image,
                 hbase_opa_config.as_ref(),
-                vector_aggregator_address.as_deref(),
             )?;
             let rg_statefulset = build_rolegroup_statefulset(
                 hbase,
@@ -576,7 +568,6 @@ fn build_rolegroup_config_map(
     merged_config: &AnyServiceConfig,
     resolved_product_image: &ResolvedProductImage,
     hbase_opa_config: Option<&HbaseOpaConfig>,
-    vector_aggregator_address: Option<&str>,
 ) -> Result<ConfigMap, Error> {
     let mut hbase_site_xml = String::new();
     let mut hbase_env_sh = String::new();
@@ -703,7 +694,6 @@ fn build_rolegroup_config_map(
 
     extend_role_group_config_map(
         rolegroup,
-        vector_aggregator_address,
         merged_config.logging(),
         &mut builder,
         &resolved_product_image.product_version,
@@ -1003,21 +993,28 @@ fn build_rolegroup_statefulset(
 
     // Vector sidecar shall be the last container in the list
     if merged_config.logging().enable_vector_agent {
-        pod_builder.add_container(
-            product_logging::framework::vector_container(
-                resolved_product_image,
-                "hbase-config",
-                "log",
-                merged_config.logging().containers.get(&Container::Vector),
-                ResourceRequirementsBuilder::new()
-                    .with_cpu_request("250m")
-                    .with_cpu_limit("500m")
-                    .with_memory_request("128Mi")
-                    .with_memory_limit("128Mi")
-                    .build(),
-            )
-            .context(ConfigureLoggingSnafu)?,
-        );
+        if let Some(vector_aggregator_config_map_name) =
+            &hbase.spec.cluster_config.vector_aggregator_config_map_name
+        {
+            pod_builder.add_container(
+                product_logging::framework::vector_container(
+                    resolved_product_image,
+                    "hbase-config",
+                    "log",
+                    merged_config.logging().containers.get(&Container::Vector),
+                    ResourceRequirementsBuilder::new()
+                        .with_cpu_request("250m")
+                        .with_cpu_limit("500m")
+                        .with_memory_request("128Mi")
+                        .with_memory_limit("128Mi")
+                        .build(),
+                    vector_aggregator_config_map_name,
+                )
+                .context(ConfigureLoggingSnafu)?,
+            );
+        } else {
+            VectorAggregatorConfigMapMissingSnafu.fail()?;
+        }
     }
 
     let mut pod_template = pod_builder.build_template();
