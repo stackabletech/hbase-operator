@@ -140,7 +140,7 @@ async fn main() -> anyhow::Result<()> {
                 watch_namespace.get_api::<DeserializeGuard<v1alpha1::HbaseCluster>>(&client),
                 watcher::Config::default(),
             );
-            let hbase_store_1 = hbase_controller.store();
+            let config_map_store = hbase_controller.store();
             hbase_controller
                 .owns(
                     watch_namespace.get_api::<Service>(&client),
@@ -155,7 +155,7 @@ async fn main() -> anyhow::Result<()> {
                     watch_namespace.get_api::<DeserializeGuard<ConfigMap>>(&client),
                     watcher::Config::default(),
                     move |config_map| {
-                        hbase_store_1
+                        config_map_store
                             .state()
                             .into_iter()
                             .filter(move |hbase| references_config_map(hbase, &config_map))
