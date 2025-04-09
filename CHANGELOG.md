@@ -13,11 +13,8 @@
 
 ### Fixed
 
-- Fix a bug where changes to ConfigMaps that are referenced in the HbaseCluster spec didn't trigger a reconciliation ([#645]).
-
-### Fixed
-
 - Use `json` file extension for log files ([#647]).
+- Fix a bug where changes to ConfigMaps that are referenced in the HbaseCluster spec didn't trigger a reconciliation ([#645]).
 
 [#640]: https://github.com/stackabletech/hbase-operator/pull/640
 [#645]: https://github.com/stackabletech/airflow-operator/pull/645
