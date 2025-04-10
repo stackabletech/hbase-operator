@@ -31,8 +31,8 @@ use stackable_operator::{
     schemars::{self, JsonSchema},
     status::condition::{ClusterCondition, HasStatusCondition},
     time::Duration,
+    versioned::versioned,
 };
-use stackable_versioned::versioned;
 use strum::{Display, EnumIter, EnumString};
 
 use crate::crd::{affinity::get_affinity, security::AuthorizationConfig};
@@ -110,6 +110,8 @@ pub enum Error {
 
 #[versioned(version(name = "v1alpha1"))]
 pub mod versioned {
+    use stackable_operator::versioned::versioned;
+
     /// An HBase cluster stacklet. This resource is managed by the Stackable operator for Apache HBase.
     /// Find more information on how to use it and the resources that the operator generates in the
     /// [operator documentation](DOCS_BASE_URL_PLACEHOLDER/hbase/).

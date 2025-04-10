@@ -1,11 +1,11 @@
-use std::{ops::Deref as _, sync::Arc};
+use std::sync::Arc;
 
 use clap::Parser;
 use futures::StreamExt;
 use hbase_controller::FULL_HBASE_CONTROLLER_NAME;
 use stackable_operator::{
     YamlSchema,
-    cli::{Command, ProductOperatorRun, RollingPeriod},
+    cli::{Command, ProductOperatorRun},
     k8s_openapi::api::{
         apps::v1::StatefulSet,
         core::v1::{ConfigMap, Service},
@@ -22,8 +22,11 @@ use stackable_operator::{
     },
     logging::controller::report_controller_reconciled,
     shared::yaml::SerializeOptions,
+    telemetry::{
+        Tracing,
+        tracing::{RollingPeriod, settings::Settings},
+    },
 };
-use stackable_telemetry::{Tracing, tracing::settings::Settings};
 use tracing::level_filters::LevelFilter;
 
 use crate::crd::{HbaseCluster, v1alpha1};
@@ -84,7 +87,6 @@ async fn main() -> anyhow::Result<()> {
                     let rotation_period = telemetry_arguments
                         .rolling_logs_period
                         .unwrap_or(RollingPeriod::Hourly)
-                        .deref()
                         .clone();
 
                     Settings::builder()
