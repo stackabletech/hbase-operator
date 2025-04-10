@@ -4,9 +4,11 @@
 
 ### Changed
 
-- Replace stackable-operator `initialize_logging` with stackable-telemetry `Tracing` ([#640]).
-  - BREAKING: The file log directory was set by `HBASE_OPERATOR_LOG_DIRECTORY`, and is now set by `ROLLING_LOGS`
-    (or via `--rolling-logs <DIRECTORY>`).
+- BREAKING: Replace stackable-operator `initialize_logging` with stackable-telemetry `Tracing` ([#640], [#648]).
+  - The console log level was set by `HBASE_OPERATOR_LOG`, and is now set by `CONSOLE_LOG`.
+  - The file log level was set by `HBASE_OPERATOR_LOG`, and is now set by `FILE_LOG`.
+  - The file log directory was set by `HBASE_OPERATOR_LOG_DIRECTORY`, and is now set
+    by `ROLLING_LOGS_DIR` (or via `--rolling-logs <DIRECTORY>`).
   - Replace stackable-operator `print_startup_string` with `tracing::info!` with fields.
 - BREAKING: Inject the vector aggregator address into the vector config using the env var `VECTOR_AGGREGATOR_ADDRESS` instead
     of having the operator write it to the vector config ([#645]).
@@ -16,13 +18,10 @@
 - Use `json` file extension for log files ([#647]).
 - Fix a bug where changes to ConfigMaps that are referenced in the HbaseCluster spec didn't trigger a reconciliation ([#645]).
 
-### Fixed
-
-- Use `json` file extension for log files ([#647]).
-
 [#640]: https://github.com/stackabletech/hbase-operator/pull/640
 [#645]: https://github.com/stackabletech/hbase-operator/pull/645
 [#647]: https://github.com/stackabletech/hbase-operator/pull/647
+[#648]: https://github.com/stackabletech/hbase-operator/pull/648
 
 ## [25.3.0] - 2025-03-21
 

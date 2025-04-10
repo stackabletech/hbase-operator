@@ -31,8 +31,8 @@ use stackable_operator::{
     schemars::{self, JsonSchema},
     status::condition::{ClusterCondition, HasStatusCondition},
     time::Duration,
+    versioned::versioned,
 };
-use stackable_versioned::versioned;
 use strum::{Display, EnumIter, EnumString};
 
 use crate::crd::{affinity::get_affinity, security::AuthorizationConfig};
