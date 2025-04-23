@@ -597,6 +597,30 @@ fn build_rolegroup_config_map(
                 hbase_site_config
                     .extend(hbase_opa_config.map_or(vec![], |config| config.hbase_site_config()));
 
+                match hbase_role {
+                    HbaseRole::Master => {
+                        hbase_site_config.insert(
+                            "hbase.listener.master.hostname".to_string(),
+                            "${HBASE_SERVICE_HOST}".to_string(),
+                        );
+                        hbase_site_config.insert(
+                            "hbase.listener.master.port".to_string(),
+                            "${HBASE_SERVICE_PORT}".to_string(),
+                        )
+                    }
+                    HbaseRole::RegionServer => {
+                        hbase_site_config.insert(
+                            "hbase.listener.regionserver.hostname".to_string(),
+                            "${HBASE_SERVICE_HOST}".to_string(),
+                        );
+                        hbase_site_config.insert(
+                            "hbase.listener.regionserver.port".to_string(),
+                            "${HBASE_SERVICE_PORT}".to_string(),
+                        )
+                    }
+                    HbaseRole::RestServer => None,
+                };
+
                 // configOverride come last
                 hbase_site_config.extend(config.clone());
                 hbase_site_xml = to_hadoop_xml(
@@ -881,11 +905,12 @@ fn build_rolegroup_statefulset(
         .image_from_product_image(resolved_product_image)
         .command(command())
         .args(vec![formatdoc! {"
-            {entrypoint} {role} {domain} {port}",
+            {entrypoint} {role} {domain} {port} {port_name}",
             entrypoint = "/stackable/hbase/bin/hbase-entrypoint.sh".to_string(),
             role = role_name,
             domain = hbase_service_domain_name(hbase, rolegroup_ref, cluster_info)?,
             port = hbase.service_port(hbase_role).to_string(),
+            port_name = hbase.ui_port_name(),
         }])
         .add_env_vars(merged_env)
         // Needed for the `containerdebug` process to log it's tracing information to.
