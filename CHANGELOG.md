@@ -4,6 +4,7 @@
 
 ### Added
 
+- Added listener support for HBase ([#639]).
 - Adds new telemetry CLI arguments and environment variables ([#652]).
   - Use `--file-log-max-files` (or `FILE_LOG_MAX_FILES`) to limit the number of log files kept.
   - Use `--file-log-rotation-period` (or `FILE_LOG_ROTATION_PERIOD`) to configure the frequency of rotation.
@@ -25,6 +26,7 @@
 - Use `json` file extension for log files ([#647]).
 - Fix a bug where changes to ConfigMaps that are referenced in the HbaseCluster spec didn't trigger a reconciliation ([#645]).
 
+[#639]: https://github.com/stackabletech/hbase-operator/pull/639
 [#640]: https://github.com/stackabletech/hbase-operator/pull/640
 [#645]: https://github.com/stackabletech/hbase-operator/pull/645
 [#647]: https://github.com/stackabletech/hbase-operator/pull/647

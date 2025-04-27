@@ -15,7 +15,6 @@ spec:
   clusterConfig:
     hdfsConfigMapName: test-hdfs
     zookeeperConfigMapName: test-znode
-    listenerClass: {{ test_scenario['values']['listener-class'] }}
 {% if lookup('env', 'VECTOR_AGGREGATOR') %}
     vectorAggregatorConfigMapName: vector-aggregator-discovery
 {% endif %}
@@ -23,6 +22,7 @@ spec:
     config:
       logging:
         enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
+      listenerClass: {{ test_scenario['values']['listener-class'] }}
     roleGroups:
       default:
         configOverrides:
@@ -34,6 +34,7 @@ spec:
     config:
       logging:
         enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
+      listenerClass: {{ test_scenario['values']['listener-class'] }}
     roleGroups:
       default:
         configOverrides:
@@ -45,6 +46,7 @@ spec:
     config:
       logging:
         enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
+      listenerClass: {{ test_scenario['values']['listener-class'] }}
       resources:
         memory:
           limit: 1Gi
