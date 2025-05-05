@@ -18,9 +18,6 @@ dimensions:
       # - 2.4.18,oci.stackable.tech/sandbox/hbase:2.4.18-stackable0.0.0-dev
   - name: hdfs
     values:
-      - 3.3.4
-      - 3.3.6
-      - 3.4.0
       - 3.4.1
   - name: hdfs-latest
     values:
