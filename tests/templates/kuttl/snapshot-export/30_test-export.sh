@@ -1,9 +1,13 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2034
 set -euxo pipefail
 
 export \
     AWS_ACCESS_KEY_ID=hbaseAccessKey \
+    # Used by AWS bundle 1.12.367 via Hadoop 3.3.6
     AWS_SECRET_KEY=hbaseSecretKey \
+    # Used by AWS bundle 2.24.6 via Hadoop 3.4.1
+    AWS_SECRET_ACCESS_KEY=hbaseSecretKey \
     AWS_ENDPOINT=http://minio:9000/ \
     AWS_SSL_ENABLED=false \
     AWS_PATH_STYLE_ACCESS=true
