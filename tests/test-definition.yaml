@@ -2,19 +2,18 @@
 dimensions:
   - name: hbase
     values:
-      - 2.4.18
       - 2.6.1
+      - 2.6.2
       # To use a custom image, add a comma and the full name after the product version
-      # - 2.6.1,oci.stackable.tech/sandbox/hbase:2.6.1-stackable0.0.0-dev
-      # - 2.4.18,oci.stackable.tech/sandbox/hbase:2.4.18-stackable0.0.0-dev
+      # - 2.6.2,oci.stackable.tech/sandbox/hbase:2.6.2-stackable0.0.0-dev
   - name: hbase-opa
     values:
-      - 2.6.1
+      - 2.6.2
       # To use a custom image, add a comma and the full name after the product version
-      # - 2.6.1,oci.stackable.tech/sandbox/hbase:2.6.1-stackable0.0.0-dev
+      # - 2.6.2,oci.stackable.tech/sandbox/hbase:2.6.2-stackable0.0.0-dev
   - name: hbase-latest
     values:
-      - 2.6.1
+      - 2.6.2
       # - 2.4.18,oci.stackable.tech/sandbox/hbase:2.4.18-stackable0.0.0-dev
   - name: hdfs
     values:
@@ -33,7 +32,7 @@ dimensions:
       - 1.21.1
   - name: opa
     values:
-      - 1.0.1
+      - 1.4.2
   # Used for zookeeper, hdfs and hbase
   - name: listener-class
     values:
