@@ -25,6 +25,7 @@
   - The `runAsUser` and `runAsGroup` fields will not be set anymore by the operator
   - The defaults from the docker images itself will now apply, which will be different from 1000/0 going forward
   - This is marked as breaking because tools and policies might exist, which require these fields to be set
+
 ### Fixed
 
 - Use `json` file extension for log files ([#647]).
