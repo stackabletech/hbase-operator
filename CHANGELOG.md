@@ -20,9 +20,11 @@
 - BREAKING: Inject the vector aggregator address into the vector config using the env var `VECTOR_AGGREGATOR_ADDRESS` instead
     of having the operator write it to the vector config ([#645]).
 - test: Bump to Vector `0.46.1` ([#657]).
-- Previously this operator would hardcode the UID and GID of the Pods being created to 1000/0, this has changed now ([#660])
+- test: Bump OPA to `1.4.2` ([#661]).
+- BREAKING: Previously this operator would hardcode the UID and GID of the Pods being created to 1000/0, this has changed now ([#660])
+  - The `runAsUser` and `runAsGroup` fields will not be set anymore by the operator
   - The defaults from the docker images itself will now apply, which will be different from 1000/0 going forward
-
+  - This is marked as breaking because tools and policies might exist, which require these fields to be set
 ### Fixed
 
 - Use `json` file extension for log files ([#647]).
@@ -42,6 +44,7 @@
 [#655]: https://github.com/stackabletech/hbase-operator/pull/655
 [#657]: https://github.com/stackabletech/hbase-operator/pull/657
 [#660]: https://github.com/stackabletech/hbase-operator/pull/660
+[#661]: https://github.com/stackabletech/hbase-operator/pull/661
 
 ## [25.3.0] - 2025-03-21
 
