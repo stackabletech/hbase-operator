@@ -101,7 +101,6 @@ const HBASE_CONFIG_TMP_DIR: &str = "/stackable/tmp/hbase";
 const HBASE_LOG_CONFIG_TMP_DIR: &str = "/stackable/tmp/log_config";
 
 const DOCKER_IMAGE_BASE_NAME: &str = "hbase";
-const HBASE_UID: i64 = 1000;
 
 pub struct Ctx {
     pub client: stackable_operator::client::Client,
@@ -939,13 +938,7 @@ fn build_rolegroup_statefulset(
         )
         .context(AddVolumeSnafu)?
         .service_account_name(service_account.name_any())
-        .security_context(
-            PodSecurityContextBuilder::new()
-                .run_as_user(HBASE_UID)
-                .run_as_group(0)
-                .fs_group(1000)
-                .build(),
-        );
+        .security_context(PodSecurityContextBuilder::new().fs_group(1000).build());
 
     if let Some(ContainerLogConfig {
         choice:
