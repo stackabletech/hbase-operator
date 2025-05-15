@@ -8,6 +8,7 @@
   - Use `--file-log-max-files` (or `FILE_LOG_MAX_FILES`) to limit the number of log files kept.
   - Use `--file-log-rotation-period` (or `FILE_LOG_ROTATION_PERIOD`) to configure the frequency of rotation.
   - Use `--console-log-format` (or `CONSOLE_LOG_FORMAT`) to set the format to `plain` (default) or `json`.
+- Added support for HBase 2.6.2 ([#659]):
 
 ### Changed
 
@@ -35,6 +36,7 @@
 
 - test: ZooKeeper 3.9.2 removed ([#654]).
 - test: Remove HDFS `3.3.4`, `3.3.6`, and `3.4.0` ([#655]).
+- test: HBase 2.4.18 removed ([#659]):
 
 [#640]: https://github.com/stackabletech/hbase-operator/pull/640
 [#645]: https://github.com/stackabletech/hbase-operator/pull/645
@@ -44,6 +46,7 @@
 [#654]: https://github.com/stackabletech/hbase-operator/pull/654
 [#655]: https://github.com/stackabletech/hbase-operator/pull/655
 [#657]: https://github.com/stackabletech/hbase-operator/pull/657
+[#659]: https://github.com/stackabletech/hbase-operator/pull/659
 [#660]: https://github.com/stackabletech/hbase-operator/pull/660
 [#661]: https://github.com/stackabletech/hbase-operator/pull/661
 

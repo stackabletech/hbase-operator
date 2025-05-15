@@ -1191,9 +1191,9 @@ mod test {
     #[case("2.6.1", HbaseRole::Master, vec!["master", "ui-http"])]
     #[case("2.6.1", HbaseRole::RegionServer, vec!["regionserver", "ui-http"])]
     #[case("2.6.1", HbaseRole::RestServer, vec!["rest-http", "ui-http"])]
-    #[case("2.4.14", HbaseRole::Master, vec!["master", "ui-http", "metrics"])]
-    #[case("2.4.14", HbaseRole::RegionServer, vec!["regionserver", "ui-http", "metrics"])]
-    #[case("2.4.14", HbaseRole::RestServer, vec!["rest-http", "ui-http", "metrics"])]
+    #[case("2.6.2", HbaseRole::Master, vec!["master", "ui-http"])]
+    #[case("2.6.2", HbaseRole::RegionServer, vec!["regionserver", "ui-http"])]
+    #[case("2.6.2", HbaseRole::RestServer, vec!["rest-http", "ui-http"])]
     fn test_rolegroup_service_ports(
         #[case] hbase_version: &str,
         #[case] role: HbaseRole,

@@ -3,4 +3,4 @@
 // Stackable Platform documentation.
 
 - 2.6.1 (LTS)
-- 2.4.18 (Deprecated)
+- 2.6.2
