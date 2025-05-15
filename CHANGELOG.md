@@ -36,6 +36,7 @@
 
 - test: ZooKeeper 3.9.2 removed ([#654]).
 - test: Remove HDFS `3.3.4`, `3.3.6`, and `3.4.0` ([#655]).
+- test: HBase 2.4.18 removed ([#659]):
 
 [#640]: https://github.com/stackabletech/hbase-operator/pull/640
 [#645]: https://github.com/stackabletech/hbase-operator/pull/645
