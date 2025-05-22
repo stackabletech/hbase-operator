@@ -1042,7 +1042,7 @@ fn build_rolegroup_statefulset(
             match_labels: Some(statefulset_match_labels.into()),
             ..LabelSelector::default()
         },
-        service_name: rolegroup_ref.object_name(),
+        service_name: Some(rolegroup_ref.object_name()),
         template: pod_template,
         ..StatefulSetSpec::default()
     };
