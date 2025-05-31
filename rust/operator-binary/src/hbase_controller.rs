@@ -588,6 +588,13 @@ fn build_rolegroup_config_map(
                 hbase_site_config
                     .extend(hbase_opa_config.map_or(vec![], |config| config.hbase_site_config()));
 
+                // Get more useful stack traces...
+                // The default Netty impl gives us netty garbage and nothing else
+                hbase_site_config.insert(
+                    "hbase.rpc.client.impl".to_string(),
+                    "org.apache.hadoop.hbase.ipc.BlockingRpcClient".to_string(),
+                );
+
                 match hbase_role {
                     HbaseRole::Master => {
                         hbase_site_config.insert(
@@ -597,7 +604,21 @@ fn build_rolegroup_config_map(
                         hbase_site_config.insert(
                             "hbase.listener.master.port".to_string(),
                             "${HBASE_SERVICE_PORT}".to_string(),
-                        )
+                        );
+                        hbase_site_config.insert(
+                            "hbase.master.ipc.address".to_string(),
+                            "0.0.0.0".to_string(),
+                        );
+                        hbase_site_config
+                            .insert("hbase.master.ipc.port".to_string(), "16000".to_string());
+                        hbase_site_config.insert(
+                            "hbase.master.hostname".to_string(),
+                            "${HBASE_SERVICE_HOST}".to_string(),
+                        );
+                        hbase_site_config.insert(
+                            "hbase.master.port".to_string(),
+                            "${HBASE_SERVICE_PORT}".to_string(),
+                        );
                     }
                     HbaseRole::RegionServer => {
                         hbase_site_config.insert(
@@ -607,9 +628,25 @@ fn build_rolegroup_config_map(
                         hbase_site_config.insert(
                             "hbase.listener.regionserver.port".to_string(),
                             "${HBASE_SERVICE_PORT}".to_string(),
-                        )
+                        );
+                        hbase_site_config.insert(
+                            "hbase.regionserver.ipc.address".to_string(),
+                            "0.0.0.0".to_string(),
+                        );
+                        hbase_site_config.insert(
+                            "hbase.regionserver.ipc.port".to_string(),
+                            "16020".to_string(),
+                        );
+                        hbase_site_config.insert(
+                            "hbase.unsafe.regionserver.hostname".to_string(),
+                            "${HBASE_SERVICE_HOST}".to_string(),
+                        );
+                        hbase_site_config.insert(
+                            "hbase.regionserver.port".to_string(),
+                            "${HBASE_SERVICE_PORT}".to_string(),
+                        );
                     }
-                    HbaseRole::RestServer => None,
+                    HbaseRole::RestServer => {}
                 };
 
                 // configOverride come last
@@ -900,7 +937,13 @@ fn build_rolegroup_statefulset(
             role = role_name,
             domain = hbase_service_domain_name(hbase, rolegroup_ref, cluster_info)?,
             port = hbase.service_port(hbase_role).to_string(),
-            port_name = hbase.ui_port_name(),
+                               port_name = match hbase_role {
+                                HbaseRole::Master => "master",
+                                HbaseRole::RegionServer => "regionserver",
+                                HbaseRole::RestServer => "restserver",
+                               }
+                               // port_name = hbase.ports(hbase_role, "").first().unwrap().1
+            // port_name = hbase.ui_port_name(),
         }])
         .add_env_vars(merged_env)
         // Needed for the `containerdebug` process to log it's tracing information to.

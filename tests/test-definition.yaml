@@ -4,6 +4,7 @@ dimensions:
     values:
       - 2.4.18
       - 2.6.1
+      - 2.6.1,k3d-registry:5000/sdp/hbase:2.6.1-stackable0.0.0-dev
       # To use a custom image, add a comma and the full name after the product version
       # - 2.6.1,oci.stackable.tech/sandbox/hbase:2.6.1-stackable0.0.0-dev
       # - 2.4.18,oci.stackable.tech/sandbox/hbase:2.4.18-stackable0.0.0-dev
