@@ -9,6 +9,7 @@
   - Use `--file-log-max-files` (or `FILE_LOG_MAX_FILES`) to limit the number of log files kept.
   - Use `--file-log-rotation-period` (or `FILE_LOG_ROTATION_PERIOD`) to configure the frequency of rotation.
   - Use `--console-log-format` (or `CONSOLE_LOG_FORMAT`) to set the format to `plain` (default) or `json`.
+- Added support for HBase 2.6.2 ([#659]):
 
 ### Changed
 
@@ -20,11 +21,23 @@
   - Replace stackable-operator `print_startup_string` with `tracing::info!` with fields.
 - BREAKING: Inject the vector aggregator address into the vector config using the env var `VECTOR_AGGREGATOR_ADDRESS` instead
     of having the operator write it to the vector config ([#645]).
+- test: Bump to Vector `0.46.1` ([#657]).
+- test: Bump OPA to `1.4.2` ([#661]).
+- BREAKING: Previously this operator would hardcode the UID and GID of the Pods being created to 1000/0, this has changed now ([#660])
+  - The `runAsUser` and `runAsGroup` fields will not be set anymore by the operator
+  - The defaults from the docker images itself will now apply, which will be different from 1000/0 going forward
+  - This is marked as breaking because tools and policies might exist, which require these fields to be set
 
 ### Fixed
 
 - Use `json` file extension for log files ([#647]).
 - Fix a bug where changes to ConfigMaps that are referenced in the HbaseCluster spec didn't trigger a reconciliation ([#645]).
+
+### Removed
+
+- test: ZooKeeper 3.9.2 removed ([#654]).
+- test: Remove HDFS `3.3.4`, `3.3.6`, and `3.4.0` ([#655]).
+- test: HBase 2.4.18 removed ([#659]):
 
 [#639]: https://github.com/stackabletech/hbase-operator/pull/639
 [#640]: https://github.com/stackabletech/hbase-operator/pull/640
@@ -32,6 +45,12 @@
 [#647]: https://github.com/stackabletech/hbase-operator/pull/647
 [#648]: https://github.com/stackabletech/hbase-operator/pull/648
 [#652]: https://github.com/stackabletech/hbase-operator/pull/652
+[#654]: https://github.com/stackabletech/hbase-operator/pull/654
+[#655]: https://github.com/stackabletech/hbase-operator/pull/655
+[#657]: https://github.com/stackabletech/hbase-operator/pull/657
+[#659]: https://github.com/stackabletech/hbase-operator/pull/659
+[#660]: https://github.com/stackabletech/hbase-operator/pull/660
+[#661]: https://github.com/stackabletech/hbase-operator/pull/661
 
 ## [25.3.0] - 2025-03-21
 

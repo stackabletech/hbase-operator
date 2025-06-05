@@ -19,20 +19,14 @@ cd "$(dirname "$0")"
 
 case "$1" in
 "helm")
-echo "Adding 'stackable-dev' Helm Chart repository"
-# tag::helm-add-repo[]
-helm repo add stackable-dev https://repo.stackable.tech/repository/helm-dev/
-# end::helm-add-repo[]
-echo "Updating Helm repo"
-helm repo update
 echo "Installing Operators with Helm"
 # tag::helm-install-operators[]
-helm install --wait zookeeper-operator stackable-dev/zookeeper-operator --version 0.0.0-dev &
-helm install --wait hdfs-operator stackable-dev/hdfs-operator --version 0.0.0-dev &
-helm install --wait commons-operator stackable-dev/commons-operator --version 0.0.0-dev &
-helm install --wait secret-operator stackable-dev/secret-operator --version 0.0.0-dev &
-helm install --wait listener-operator stackable-dev/listener-operator --version 0.0.0-dev &
-helm install --wait hbase-operator stackable-dev/hbase-operator --version 0.0.0-dev &
+helm install --wait zookeeper-operator oci://oci.stackable.tech/sdp-charts/zookeeper-operator --version 0.0.0-dev &
+helm install --wait hdfs-operator oci://oci.stackable.tech/sdp-charts/hdfs-operator --version 0.0.0-dev &
+helm install --wait commons-operator oci://oci.stackable.tech/sdp-charts/commons-operator --version 0.0.0-dev &
+helm install --wait secret-operator oci://oci.stackable.tech/sdp-charts/secret-operator --version 0.0.0-dev &
+helm install --wait listener-operator oci://oci.stackable.tech/sdp-charts/listener-operator --version 0.0.0-dev &
+helm install --wait hbase-operator oci://oci.stackable.tech/sdp-charts/hbase-operator --version 0.0.0-dev &
 wait
 # end::helm-install-operators[]
 ;;
@@ -135,7 +129,7 @@ version() {
 echo "Check cluster version..."
 cluster_version=$(version | jq -r '.Version')
 
-if [ "$cluster_version" == "2.6.1" ]; then
+if [ "$cluster_version" == "2.6.2" ]; then
   echo "Cluster version: $cluster_version"
 else
   echo "Unexpected version: $cluster_version"

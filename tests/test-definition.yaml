@@ -2,33 +2,27 @@
 dimensions:
   - name: hbase
     values:
-      - 2.4.18
       - 2.6.1
-      - 2.6.1,k3d-registry:5000/sdp/hbase:2.6.1-stackable0.0.0-dev
+      - 2.6.2
       # To use a custom image, add a comma and the full name after the product version
-      # - 2.6.1,oci.stackable.tech/sandbox/hbase:2.6.1-stackable0.0.0-dev
-      # - 2.4.18,oci.stackable.tech/sandbox/hbase:2.4.18-stackable0.0.0-dev
+      # - 2.6.2,oci.stackable.tech/sandbox/hbase:2.6.2-stackable0.0.0-dev
   - name: hbase-opa
     values:
-      - 2.6.1
+      - 2.6.2
       # To use a custom image, add a comma and the full name after the product version
-      # - 2.6.1,oci.stackable.tech/sandbox/hbase:2.6.1-stackable0.0.0-dev
+      # - 2.6.2,oci.stackable.tech/sandbox/hbase:2.6.2-stackable0.0.0-dev
   - name: hbase-latest
     values:
-      - 2.6.1
+      - 2.6.2
       # - 2.4.18,oci.stackable.tech/sandbox/hbase:2.4.18-stackable0.0.0-dev
   - name: hdfs
     values:
-      - 3.3.4
-      - 3.3.6
-      - 3.4.0
       - 3.4.1
   - name: hdfs-latest
     values:
       - 3.4.1
   - name: zookeeper
     values:
-      - 3.9.2
       - 3.9.3
   - name: zookeeper-latest
     values:
@@ -38,7 +32,7 @@ dimensions:
       - 1.21.1
   - name: opa
     values:
-      - 1.0.1
+      - 1.4.2
   # Used for zookeeper, hdfs and hbase
   - name: listener-class
     values:
@@ -59,9 +53,9 @@ dimensions:
       - "false"
   - name: omid
     values:
-      - 1.1.2
+      - 1.1.3
       # To use a custom image, add a comma and the full name after the product version
-      # - 1.1.0,oci.stackable.tech/sandbox/omid:1.1.0-stackable0.0.0-dev
+      # - 1.1.3,oci.stackable.tech/sandbox/omid:1.1.3-stackable0.0.0-dev
 tests:
   - name: smoke
     dimensions:
