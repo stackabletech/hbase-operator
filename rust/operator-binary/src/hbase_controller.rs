@@ -77,10 +77,11 @@ use crate::{
         construct_role_specific_non_heap_jvm_args,
     },
     crd::{
-        APP_NAME, AnyServiceConfig, Container, HBASE_ENV_SH, HBASE_REST_PORT_NAME_HTTP,
-        HBASE_REST_PORT_NAME_HTTPS, HBASE_SITE_XML, HbaseClusterStatus, HbasePodRef, HbaseRole,
-        JVM_SECURITY_PROPERTIES_FILE, LISTENER_VOLUME_DIR, LISTENER_VOLUME_NAME, SSL_CLIENT_XML,
-        SSL_SERVER_XML, merged_env, v1alpha1,
+        APP_NAME, AnyServiceConfig, Container, HBASE_ENV_SH, HBASE_MASTER_PORT,
+        HBASE_REGIONSERVER_PORT, HBASE_REST_PORT_NAME_HTTP, HBASE_REST_PORT_NAME_HTTPS,
+        HBASE_SITE_XML, HbaseClusterStatus, HbasePodRef, HbaseRole, JVM_SECURITY_PROPERTIES_FILE,
+        LISTENER_VOLUME_DIR, LISTENER_VOLUME_NAME, SSL_CLIENT_XML, SSL_SERVER_XML, merged_env,
+        v1alpha1,
     },
     discovery::{build_discovery_configmap, build_endpoint_configmap},
     kerberos::{
@@ -598,19 +599,13 @@ fn build_rolegroup_config_map(
                 match hbase_role {
                     HbaseRole::Master => {
                         hbase_site_config.insert(
-                            "hbase.listener.master.hostname".to_string(),
-                            "${HBASE_SERVICE_HOST}".to_string(),
-                        );
-                        hbase_site_config.insert(
-                            "hbase.listener.master.port".to_string(),
-                            "${HBASE_SERVICE_PORT}".to_string(),
-                        );
-                        hbase_site_config.insert(
                             "hbase.master.ipc.address".to_string(),
                             "0.0.0.0".to_string(),
                         );
-                        hbase_site_config
-                            .insert("hbase.master.ipc.port".to_string(), "16000".to_string());
+                        hbase_site_config.insert(
+                            "hbase.master.ipc.port".to_string(),
+                            HBASE_MASTER_PORT.to_string(),
+                        );
                         hbase_site_config.insert(
                             "hbase.master.hostname".to_string(),
                             "${HBASE_SERVICE_HOST}".to_string(),
@@ -622,20 +617,12 @@ fn build_rolegroup_config_map(
                     }
                     HbaseRole::RegionServer => {
                         hbase_site_config.insert(
-                            "hbase.listener.regionserver.hostname".to_string(),
-                            "${HBASE_SERVICE_HOST}".to_string(),
-                        );
-                        hbase_site_config.insert(
-                            "hbase.listener.regionserver.port".to_string(),
-                            "${HBASE_SERVICE_PORT}".to_string(),
-                        );
-                        hbase_site_config.insert(
                             "hbase.regionserver.ipc.address".to_string(),
                             "0.0.0.0".to_string(),
                         );
                         hbase_site_config.insert(
                             "hbase.regionserver.ipc.port".to_string(),
-                            "16020".to_string(),
+                            HBASE_REGIONSERVER_PORT.to_string(),
                         );
                         hbase_site_config.insert(
                             "hbase.unsafe.regionserver.hostname".to_string(),
@@ -928,6 +915,7 @@ fn build_rolegroup_statefulset(
 
     let role_name = hbase_role.cli_role_name();
     let mut hbase_container = ContainerBuilder::new("hbase").expect("ContainerBuilder not created");
+
     hbase_container
         .image_from_product_image(resolved_product_image)
         .command(command())
@@ -940,10 +928,8 @@ fn build_rolegroup_statefulset(
                                port_name = match hbase_role {
                                 HbaseRole::Master => "master",
                                 HbaseRole::RegionServer => "regionserver",
-                                HbaseRole::RestServer => "restserver",
+                                HbaseRole::RestServer => "rest-http",
                                }
-                               // port_name = hbase.ports(hbase_role, "").first().unwrap().1
-            // port_name = hbase.ui_port_name(),
         }])
         .add_env_vars(merged_env)
         // Needed for the `containerdebug` process to log it's tracing information to.

@@ -66,8 +66,6 @@ pub const SSL_CLIENT_XML: &str = "ssl-client.xml";
 
 pub const HBASE_CLUSTER_DISTRIBUTED: &str = "hbase.cluster.distributed";
 pub const HBASE_ROOTDIR: &str = "hbase.rootdir";
-pub const HBASE_UNSAFE_REGIONSERVER_HOSTNAME_DISABLE_MASTER_REVERSEDNS: &str =
-    "hbase.unsafe.regionserver.hostname.disable.master.reversedns";
 
 pub const HBASE_UI_PORT_NAME_HTTP: &str = "ui-http";
 pub const HBASE_UI_PORT_NAME_HTTPS: &str = "ui-https";
