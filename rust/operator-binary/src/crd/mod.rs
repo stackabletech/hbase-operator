@@ -1235,10 +1235,6 @@ impl Configuration for HbaseConfigFragment {
                     HBASE_CLUSTER_DISTRIBUTED.to_string(),
                     Some("true".to_string()),
                 );
-                // result.insert(
-                //     HBASE_UNSAFE_REGIONSERVER_HOSTNAME_DISABLE_MASTER_REVERSEDNS.to_string(),
-                //     Some("true".to_string()),
-                // );
                 result.insert(HBASE_ROOTDIR.to_string(), self.hbase_rootdir.clone());
             }
             _ => {}
@@ -1389,10 +1385,6 @@ impl Configuration for RegionServerConfigFragment {
                     HBASE_CLUSTER_DISTRIBUTED.to_string(),
                     Some("true".to_string()),
                 );
-                // result.insert(
-                //     HBASE_UNSAFE_REGIONSERVER_HOSTNAME_DISABLE_MASTER_REVERSEDNS.to_string(),
-                //     Some("true".to_string()),
-                // );
                 result.insert(HBASE_ROOTDIR.to_string(), self.hbase_rootdir.clone());
             }
             _ => {}
