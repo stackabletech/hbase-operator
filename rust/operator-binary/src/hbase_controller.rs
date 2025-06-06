@@ -777,7 +777,7 @@ fn build_rolegroup_service(
 
     let metadata = ObjectMetaBuilder::new()
         .name_and_namespace(hbase)
-        .name(rolegroup.object_name())
+        .name(format!("{name}-metrics", name = rolegroup.object_name()))
         .ownerreference_from_resource(hbase, None, Some(true))
         .context(ObjectMissingMetadataForOwnerRefSnafu)?
         .with_recommended_labels(build_recommended_labels(
@@ -915,6 +915,12 @@ fn build_rolegroup_statefulset(
     let role_name = hbase_role.cli_role_name();
     let mut hbase_container = ContainerBuilder::new("hbase").expect("ContainerBuilder not created");
 
+    let rest_http_port_name = if hbase.has_https_enabled() {
+        HBASE_REST_PORT_NAME_HTTPS
+    } else {
+        HBASE_REST_PORT_NAME_HTTP
+    };
+
     hbase_container
         .image_from_product_image(resolved_product_image)
         .command(command())
@@ -924,11 +930,11 @@ fn build_rolegroup_statefulset(
             role = role_name,
             domain = hbase_service_domain_name(hbase, rolegroup_ref, cluster_info)?,
             port = hbase.service_port(hbase_role).to_string(),
-                               port_name = match hbase_role {
-                                HbaseRole::Master => "master",
-                                HbaseRole::RegionServer => "regionserver",
-                                HbaseRole::RestServer => "rest-http",
-                               }
+            port_name = match hbase_role {
+                HbaseRole::Master => "master",
+                HbaseRole::RegionServer => "regionserver",
+                HbaseRole::RestServer => rest_http_port_name,
+            }
         }])
         .add_env_vars(merged_env)
         // Needed for the `containerdebug` process to log it's tracing information to.
@@ -1001,26 +1007,13 @@ fn build_rolegroup_statefulset(
         .security_context(PodSecurityContextBuilder::new().fs_group(1000).build());
 
     // externally-reachable listener endpoints should use a pvc volume...
-    let pvcs = if merged_config.listener_class().discoverable() {
-        let pvc = ListenerOperatorVolumeSourceBuilder::new(
-            &ListenerReference::ListenerClass(merged_config.listener_class().to_string()),
-            &recommended_labels,
-        )
-        .context(BuildListenerVolumeSnafu)?
-        .build_pvc(LISTENER_VOLUME_NAME.to_string())
-        .context(BuildListenerVolumeSnafu)?;
-        Some(vec![pvc])
-    } else {
-        // ...whereas others will use ephemeral volumes
-        pod_builder
-            .add_listener_volume_by_listener_class(
-                LISTENER_VOLUME_NAME,
-                &merged_config.listener_class().to_string(),
-                &recommended_labels,
-            )
-            .context(AddVolumeSnafu)?;
-        None
-    };
+    let pvc = ListenerOperatorVolumeSourceBuilder::new(
+        &ListenerReference::ListenerClass(merged_config.listener_class().to_string()),
+        &recommended_labels,
+    )
+    .context(BuildListenerVolumeSnafu)?
+    .build_pvc(LISTENER_VOLUME_NAME.to_string())
+    .context(BuildListenerVolumeSnafu)?;
 
     if let Some(ContainerLogConfig {
         choice:
@@ -1124,9 +1117,12 @@ fn build_rolegroup_statefulset(
             match_labels: Some(statefulset_match_labels.into()),
             ..LabelSelector::default()
         },
-        service_name: Some(rolegroup_ref.object_name()),
+        service_name: Some(format!(
+            "{name}-metrics",
+            name = rolegroup_ref.object_name()
+        )),
         template: pod_template,
-        volume_claim_templates: pvcs,
+        volume_claim_templates: Some(vec![pvc]),
         ..StatefulSetSpec::default()
     };
 

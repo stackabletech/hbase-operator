@@ -85,9 +85,6 @@ pub const HBASE_REST_UI_PORT: u16 = 8085;
 // This port is only used by Hbase prior to version 2.6 with a third-party JMX exporter.
 // Newer versions use the same port as the UI because Hbase provides it's own metrics API
 pub const METRICS_PORT: u16 = 9100;
-
-pub const DEFAULT_LISTENER_CLASS: SupportedListenerClasses =
-    SupportedListenerClasses::ClusterInternal;
 pub const LISTENER_VOLUME_NAME: &str = "listener";
 pub const LISTENER_VOLUME_DIR: &str = "/stackable/listener";
 
@@ -600,9 +597,6 @@ impl v1alpha1::HbaseCluster {
                 // Order rolegroups consistently, to avoid spurious downstream rewrites
                 .collect::<BTreeMap<_, _>>()
                 .into_iter()
-                .filter(|(rolegroup_name, _)| {
-                    self.resolved_listener_class_discoverable(role, rolegroup_name)
-                })
                 .map(|(rolegroup_name, role_group)| {
                     (
                         self.rolegroup_ref(HbaseRole::Master.to_string(), rolegroup_name),
@@ -618,9 +612,6 @@ impl v1alpha1::HbaseCluster {
                 // Order rolegroups consistently, to avoid spurious downstream rewrites
                 .collect::<BTreeMap<_, _>>()
                 .into_iter()
-                .filter(|(rolegroup_name, _)| {
-                    self.resolved_listener_class_discoverable(role, rolegroup_name)
-                })
                 .map(|(rolegroup_name, role_group)| {
                     (
                         self.rolegroup_ref(HbaseRole::RegionServer.to_string(), rolegroup_name),
@@ -636,9 +627,6 @@ impl v1alpha1::HbaseCluster {
                 // Order rolegroups consistently, to avoid spurious downstream rewrites
                 .collect::<BTreeMap<_, _>>()
                 .into_iter()
-                .filter(|(rolegroup_name, _)| {
-                    self.resolved_listener_class_discoverable(role, rolegroup_name)
-                })
                 .map(|(rolegroup_name, role_group)| {
                     (
                         self.rolegroup_ref(HbaseRole::RestServer.to_string(), rolegroup_name),
@@ -646,19 +634,6 @@ impl v1alpha1::HbaseCluster {
                     )
                 })
                 .collect(),
-        }
-    }
-
-    fn resolved_listener_class_discoverable(
-        &self,
-        role: &HbaseRole,
-        rolegroup_name: &&String,
-    ) -> bool {
-        let listener_class = self.merged_listener_class(role, rolegroup_name);
-        if let Some(listener_class) = listener_class {
-            listener_class.discoverable()
-        } else {
-            false
         }
     }
 
@@ -735,72 +710,6 @@ impl v1alpha1::HbaseCluster {
             })
         }))
         .await
-    }
-
-    pub fn merged_listener_class(
-        &self,
-        role: &HbaseRole,
-        rolegroup_name: &String,
-    ) -> Option<SupportedListenerClasses> {
-        match role {
-            HbaseRole::Master => {
-                if let Some(masters) = self.spec.masters.as_ref() {
-                    let conf_defaults = Some(SupportedListenerClasses::ClusterInternal);
-                    let mut conf_role = masters.config.config.listener_class.to_owned();
-                    let mut conf_rolegroup = masters
-                        .role_groups
-                        .get(rolegroup_name)
-                        .map(|rg| rg.config.config.listener_class.clone())
-                        .unwrap_or_default();
-
-                    conf_role.merge(&conf_defaults);
-                    conf_rolegroup.merge(&conf_role);
-
-                    tracing::debug!("Merged listener-class: {:?} for {role}", conf_rolegroup);
-                    conf_rolegroup
-                } else {
-                    None
-                }
-            }
-            HbaseRole::RegionServer => {
-                if let Some(region_servers) = self.spec.region_servers.as_ref() {
-                    let conf_defaults = Some(SupportedListenerClasses::ClusterInternal);
-                    let mut conf_role = region_servers.config.config.listener_class.to_owned();
-                    let mut conf_rolegroup = region_servers
-                        .role_groups
-                        .get(rolegroup_name)
-                        .map(|rg| rg.config.config.listener_class.clone())
-                        .unwrap_or_default();
-
-                    conf_role.merge(&conf_defaults);
-                    conf_rolegroup.merge(&conf_role);
-
-                    tracing::debug!("Merged listener-class: {:?} for {role}", conf_rolegroup);
-                    conf_rolegroup
-                } else {
-                    None
-                }
-            }
-            HbaseRole::RestServer => {
-                if let Some(rest_servers) = self.spec.rest_servers.as_ref() {
-                    let conf_defaults = Some(SupportedListenerClasses::ClusterInternal);
-                    let mut conf_role = rest_servers.config.config.listener_class.to_owned();
-                    let mut conf_rolegroup = rest_servers
-                        .role_groups
-                        .get(rolegroup_name)
-                        .map(|rg| rg.config.config.listener_class.clone())
-                        .unwrap_or_default();
-
-                    conf_role.merge(&conf_defaults);
-                    conf_rolegroup.merge(&conf_role);
-
-                    tracing::debug!("Merged listener-class: {:?} for {role}", conf_rolegroup);
-                    conf_rolegroup
-                } else {
-                    None
-                }
-            }
-        }
     }
 }
 
@@ -972,7 +881,7 @@ impl HbaseRole {
             affinity: get_affinity(cluster_name, self, hdfs_discovery_cm_name),
             graceful_shutdown_timeout: Some(graceful_shutdown_timeout),
             requested_secret_lifetime: Some(requested_secret_lifetime),
-            listener_class: Some(DEFAULT_LISTENER_CLASS),
+            listener_class: Some("cluster-internal".to_string()),
         }
     }
 
@@ -1073,7 +982,7 @@ impl AnyConfigFragment {
                         cli_opts: None,
                     },
                     requested_secret_lifetime: Some(HbaseRole::DEFAULT_REGION_SECRET_LIFETIME),
-                    listener_class: Some(DEFAULT_LISTENER_CLASS),
+                    listener_class: Some("cluster-internal".to_string()),
                 })
             }
             HbaseRole::RestServer => AnyConfigFragment::RestServer(HbaseConfigFragment {
@@ -1085,7 +994,7 @@ impl AnyConfigFragment {
                     HbaseRole::DEFAULT_REST_SERVER_GRACEFUL_SHUTDOWN_TIMEOUT,
                 ),
                 requested_secret_lifetime: Some(HbaseRole::DEFAULT_REST_SECRET_LIFETIME),
-                listener_class: Some(DEFAULT_LISTENER_CLASS),
+                listener_class: Some("cluster-internal".to_string()),
             }),
             HbaseRole::Master => AnyConfigFragment::Master(HbaseConfigFragment {
                 hbase_rootdir: None,
@@ -1096,7 +1005,7 @@ impl AnyConfigFragment {
                     HbaseRole::DEFAULT_MASTER_GRACEFUL_SHUTDOWN_TIMEOUT,
                 ),
                 requested_secret_lifetime: Some(HbaseRole::DEFAULT_MASTER_SECRET_LIFETIME),
-                listener_class: Some(DEFAULT_LISTENER_CLASS),
+                listener_class: Some("cluster-internal".to_string()),
             }),
         }
     }
@@ -1176,7 +1085,7 @@ pub struct HbaseConfig {
     pub requested_secret_lifetime: Option<Duration>,
 
     /// This field controls which [ListenerClass](DOCS_BASE_URL_PLACEHOLDER/listener-operator/listenerclass.html) is used to expose this rolegroup.
-    pub listener_class: SupportedListenerClasses,
+    pub listener_class: String,
 }
 
 impl Configuration for HbaseConfigFragment {
@@ -1328,7 +1237,7 @@ pub struct RegionServerConfig {
     pub region_mover: RegionMover,
 
     /// This field controls which [ListenerClass](DOCS_BASE_URL_PLACEHOLDER/listener-operator/listenerclass.html) is used to expose this rolegroup.
-    pub listener_class: SupportedListenerClasses,
+    pub listener_class: String,
 }
 
 impl Configuration for RegionServerConfigFragment {
@@ -1396,35 +1305,6 @@ impl Configuration for RegionServerConfigFragment {
     }
 }
 
-#[derive(Clone, Debug, Default, Display, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
-#[serde(rename_all = "PascalCase")]
-pub enum SupportedListenerClasses {
-    #[default]
-    #[serde(rename = "cluster-internal")]
-    #[strum(serialize = "cluster-internal")]
-    ClusterInternal,
-
-    #[serde(rename = "external-unstable")]
-    #[strum(serialize = "external-unstable")]
-    ExternalUnstable,
-
-    #[serde(rename = "external-stable")]
-    #[strum(serialize = "external-stable")]
-    ExternalStable,
-}
-
-impl Atomic for SupportedListenerClasses {}
-
-impl SupportedListenerClasses {
-    pub fn discoverable(&self) -> bool {
-        match self {
-            SupportedListenerClasses::ClusterInternal => false,
-            SupportedListenerClasses::ExternalUnstable => true,
-            SupportedListenerClasses::ExternalStable => true,
-        }
-    }
-}
-
 #[derive(Clone, Debug, Default, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct HbaseClusterStatus {
@@ -1479,7 +1359,7 @@ impl AnyServiceConfig {
         }
     }
 
-    pub fn listener_class(&self) -> SupportedListenerClasses {
+    pub fn listener_class(&self) -> String {
         match self {
             AnyServiceConfig::Master(config) => config.listener_class.clone(),
             AnyServiceConfig::RegionServer(config) => config.listener_class.clone(),
