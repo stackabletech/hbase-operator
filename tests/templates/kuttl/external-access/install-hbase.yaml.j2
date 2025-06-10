@@ -23,7 +23,7 @@ spec:
       gracefulShutdownTimeout: 1m
       logging:
         enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
-      listenerClass: external-unstable
+      listenerClass: test-external-unstable-$NAMESPACE
     roleGroups:
       external-unstable:
         replicas: 2
@@ -32,24 +32,24 @@ spec:
       gracefulShutdownTimeout: 1m
       logging:
         enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
-      listenerClass: external-unstable
+      listenerClass: test-external-unstable-$NAMESPACE
     roleGroups:
       external-unstable:
         replicas: 1
       external-stable:
         replicas: 1
         config:
-          listenerClass: external-stable
+          listenerClass: test-external-stable-$NAMESPACE
   restServers:
     config:
       gracefulShutdownTimeout: 1m
       logging:
         enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
-      listenerClass: external-stable
+      listenerClass: test-external-stable-$NAMESPACE
     roleGroups:
       external-stable:
         replicas: 1
       external-unstable:
         replicas: 1
         config:
-          listenerClass: external-unstable
+          listenerClass: test-external-unstable-$NAMESPACE

@@ -79,11 +79,11 @@ use crate::{
     crd::{
         APP_NAME, AnyServiceConfig, Container, HBASE_ENV_SH, HBASE_MASTER_PORT,
         HBASE_REGIONSERVER_PORT, HBASE_REST_PORT_NAME_HTTP, HBASE_REST_PORT_NAME_HTTPS,
-        HBASE_SITE_XML, HbaseClusterStatus, HbasePodRef, HbaseRole, JVM_SECURITY_PROPERTIES_FILE,
+        HBASE_SITE_XML, HbaseClusterStatus, HbaseRole, JVM_SECURITY_PROPERTIES_FILE,
         LISTENER_VOLUME_DIR, LISTENER_VOLUME_NAME, SSL_CLIENT_XML, SSL_SERVER_XML, merged_env,
         v1alpha1,
     },
-    discovery::{build_discovery_configmap, build_endpoint_configmap},
+    discovery::build_discovery_configmap,
     kerberos::{
         self, add_kerberos_pod_config, kerberos_config_properties, kerberos_ssl_client_settings,
         kerberos_ssl_server_settings,
@@ -415,7 +415,6 @@ pub async fn reconcile_hbase(
         .context(ApplyRoleBindingSnafu)?;
 
     let mut ss_cond_builder = StatefulSetConditionBuilder::default();
-    let mut listener_refs: BTreeMap<String, Vec<HbasePodRef>> = BTreeMap::new();
 
     for (role_name, group_config) in validated_config.iter() {
         let hbase_role = HbaseRole::from_str(role_name).context(UnidentifiedHbaseRoleSnafu {
@@ -485,40 +484,6 @@ pub async fn reconcile_hbase(
                 .await
                 .context(FailedToCreatePdbSnafu)?;
         }
-
-        // if the replicas are changed at the same time as the reconciliation
-        // being paused, it may be possible to have listeners that are *expected*
-        // (according to their replica number) but which are not yet created, so
-        // deactivate this action in such cases.
-        if hbase.spec.cluster_operation.reconciliation_paused
-            || hbase.spec.cluster_operation.stopped
-        {
-            tracing::info!(
-                "Cluster is in a transitional state so do not attempt to collect listener information that will only be active once cluster has returned to a non-transitional state."
-            );
-        } else {
-            listener_refs.insert(
-                hbase_role.to_string(),
-                hbase
-                    .listener_refs(client, &hbase_role, &resolved_product_image.product_version)
-                    .await
-                    .context(CollectDiscoveryConfigSnafu)?,
-            );
-        }
-    }
-
-    tracing::debug!(
-        "Listener references prepared for the ConfigMap {:#?}",
-        listener_refs
-    );
-
-    if !listener_refs.is_empty() {
-        let endpoint_cm = build_endpoint_configmap(hbase, &resolved_product_image, listener_refs)
-            .context(BuildDiscoveryConfigMapSnafu)?;
-        cluster_resources
-            .add(client, endpoint_cm)
-            .await
-            .context(ApplyDiscoveryConfigMapSnafu)?;
     }
 
     // Discovery CM will fail to build until the rest of the cluster has been deployed, so do it last

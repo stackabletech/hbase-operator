@@ -6,12 +6,12 @@ use stackable_operator::{
     builder::{configmap::ConfigMapBuilder, meta::ObjectMetaBuilder},
     commons::product_image_selection::ResolvedProductImage,
     k8s_openapi::api::core::v1::ConfigMap,
-    kube::{ResourceExt, runtime::reflector::ObjectRef},
+    kube::runtime::reflector::ObjectRef,
     utils::cluster_info::KubernetesClusterInfo,
 };
 
 use crate::{
-    crd::{HBASE_SITE_XML, HbasePodRef, HbaseRole, v1alpha1},
+    crd::{HBASE_SITE_XML, HbaseRole, v1alpha1},
     hbase_controller::build_recommended_labels,
     kerberos::{self, kerberos_discovery_config_properties},
     zookeeper::ZookeeperConnectionInformation,
@@ -83,49 +83,4 @@ pub fn build_discovery_configmap(
         )
         .build()
         .context(BuildConfigMapSnafu)
-}
-
-pub fn build_endpoint_configmap(
-    hbase: &v1alpha1::HbaseCluster,
-    resolved_product_image: &ResolvedProductImage,
-    role_podrefs: BTreeMap<String, Vec<HbasePodRef>>,
-) -> Result<ConfigMap> {
-    let name = hbase.name_unchecked();
-    let mut cm = ConfigMapBuilder::new();
-
-    let cmm = cm.metadata(
-        ObjectMetaBuilder::new()
-            .name_and_namespace(hbase)
-            .name(format!("{name}-ui-endpoints"))
-            .ownerreference_from_resource(hbase, None, Some(true))
-            .with_context(|_| ObjectMissingMetadataForOwnerRefSnafu {
-                hbase: ObjectRef::from_obj(hbase),
-            })?
-            .with_recommended_labels(build_recommended_labels(
-                hbase,
-                &resolved_product_image.app_version_label,
-                "hbase-ui",
-                "discovery",
-            ))
-            .context(ObjectMetaSnafu)?
-            .build(),
-    );
-
-    for role_podref in role_podrefs {
-        for podref in role_podref.1 {
-            if let HbasePodRef {
-                fqdn_override: Some(fqdn_override),
-                ports,
-                pod_name,
-                ..
-            } = podref
-            {
-                if let Some(ui_port) = ports.get(&hbase.ui_port_name()) {
-                    cmm.add_data(pod_name, format!("{fqdn_override}:{ui_port}"));
-                }
-            }
-        }
-    }
-
-    cm.build().context(BuildConfigMapSnafu)
 }
