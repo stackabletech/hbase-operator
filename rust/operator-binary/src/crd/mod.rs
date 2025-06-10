@@ -136,6 +136,9 @@ pub enum Error {
         port_name: String,
         port: i32,
     },
+
+    #[snafu(display("role-group is not valid"))]
+    NoRoleGroup,
 }
 
 #[versioned(version(name = "v1alpha1"))]
@@ -234,6 +237,11 @@ impl v1alpha1::HbaseCluster {
         let defaults =
             AnyConfigFragment::default_for(role, &self.name_any(), hdfs_discovery_cm_name);
 
+        // Trivial values for role-groups are not allowed
+        if role_group.is_empty() {
+            return Err(Error::NoRoleGroup);
+        }
+
         let (mut role_config, mut role_group_config) = match role {
             HbaseRole::RegionServer => {
                 let role = self
@@ -249,7 +257,9 @@ impl v1alpha1::HbaseCluster {
                     .role_groups
                     .get(role_group)
                     .map(|rg| rg.config.config.clone())
-                    .unwrap_or_default();
+                    .expect(
+                        "Cannot be empty as trivial values of role-group have already been checked",
+                    );
 
                 (
                     AnyConfigFragment::RegionServer(role_config),
@@ -271,7 +281,9 @@ impl v1alpha1::HbaseCluster {
                     .role_groups
                     .get(role_group)
                     .map(|rg| rg.config.config.clone())
-                    .unwrap_or_default();
+                    .expect(
+                        "Cannot be empty as trivial values of role-group have already been checked",
+                    );
 
                 // Retrieve role resource config
                 (
@@ -291,7 +303,9 @@ impl v1alpha1::HbaseCluster {
                     .role_groups
                     .get(role_group)
                     .map(|rg| rg.config.config.clone())
-                    .unwrap_or_default();
+                    .expect(
+                        "Cannot be empty as trivial values of role-group have already been checked",
+                    );
 
                 // Retrieve role resource config
                 (

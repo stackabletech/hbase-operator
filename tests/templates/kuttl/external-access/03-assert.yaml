@@ -6,7 +6,7 @@ timeout: 600
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: test-hbase-master-default
+  name: test-hbase-master-external-unstable
 status:
   readyReplicas: 2
   replicas: 2
@@ -14,7 +14,7 @@ status:
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: test-hbase-regionserver-default
+  name: test-hbase-regionserver-external-unstable
 status:
   readyReplicas: 1
   replicas: 1
@@ -22,15 +22,7 @@ status:
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: test-hbase-regionserver-cluster-internal
-status:
-  readyReplicas: 1
-  replicas: 1
----
-apiVersion: apps/v1
-kind: StatefulSet
-metadata:
-  name: test-hbase-restserver-default
+  name: test-hbase-regionserver-external-stable
 status:
   readyReplicas: 1
   replicas: 1
@@ -39,6 +31,14 @@ apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: test-hbase-restserver-external-unstable
+status:
+  readyReplicas: 1
+  replicas: 1
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: test-hbase-restserver-external-stable
 status:
   readyReplicas: 1
   replicas: 1

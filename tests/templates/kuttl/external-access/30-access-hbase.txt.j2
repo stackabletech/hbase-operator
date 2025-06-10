@@ -23,22 +23,32 @@ spec:
               valueFrom:
                 configMapKeyRef:
                   name: test-hbase-ui-endpoints
-                  key: test-hbase-master-default-0.http
+                  key: test-hbase-master-external-unstable-0
             - name: MASTER_UI_1
               valueFrom:
                 configMapKeyRef:
                   name: test-hbase-ui-endpoints
-                  key: test-hbase-master-default-0.http
+                  key: test-hbase-master-external-unstable-1
             - name: REGIONSERVER_UI_0
               valueFrom:
                 configMapKeyRef:
                   name: test-hbase-ui-endpoints
-                  key: test-hbase-regionserver-default-0.http
+                  key: test-hbase-regionserver-external-stable-0
+            - name: REGIONSERVER_UI_1
+              valueFrom:
+                configMapKeyRef:
+                  name: test-hbase-ui-endpoints
+                  key: test-hbase-regionserver-external-unstable-0
             - name: RESTSERVER_UI_0
               valueFrom:
                 configMapKeyRef:
                   name: test-hbase-ui-endpoints
-                  key: test-hbase-restserver-external-unstable-0.http
+                  key: test-hbase-restserver-external-stable-0
+            - name: RESTSERVER_UI_1
+              valueFrom:
+                configMapKeyRef:
+                  name: test-hbase-ui-endpoints
+                  key: test-hbase-restserver-external-unstable-0
           volumeMounts:
             - name: script
               mountPath: /tmp/script
@@ -69,7 +79,13 @@ data:
     echo "Attempting to reach region-server at $REGIONSERVER_UI_0..."
     curl --retry 0 -f -s -o /dev/null -w "%{http_code}" "${REGIONSERVER_UI_0}" | grep 200
 
+    echo "Attempting to reach region-server at $REGIONSERVER_UI_1..."
+    curl --retry 0 -f -s -o /dev/null -w "%{http_code}" "${REGIONSERVER_UI_1}" | grep 200
+
     echo "Attempting to reach rest-server at $RESTSERVER_UI_0..."
     curl --retry 0 -f -s -o /dev/null -w "%{http_code}" "${RESTSERVER_UI_0}" | grep 200
+
+    echo "Attempting to reach rest-server at $RESTSERVER_UI_1..."
+    curl --retry 0 -f -s -o /dev/null -w "%{http_code}" "${RESTSERVER_UI_1}" | grep 200
 
     echo "All tests successful!"

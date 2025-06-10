@@ -121,10 +121,7 @@ pub fn build_endpoint_configmap(
             } = podref
             {
                 if let Some(ui_port) = ports.get(&hbase.ui_port_name()) {
-                    cmm.add_data(
-                        format!("{pod_name}.http"),
-                        format!("{fqdn_override}:{ui_port}"),
-                    );
+                    cmm.add_data(pod_name, format!("{fqdn_override}:{ui_port}"));
                 }
             }
         }
