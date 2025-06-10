@@ -595,6 +595,16 @@ fn build_rolegroup_config_map(
                     "org.apache.hadoop.hbase.ipc.BlockingRpcClient".to_string(),
                 );
 
+                // Set listener endpoint information with generic properties
+                hbase_site_config.insert(
+                    "hbase.listener.endpoint".to_string(),
+                    "${HBASE_LISTENER_ENDPOINT}".to_string(),
+                );
+                hbase_site_config.insert(
+                    "hbase.info.port".to_string(),
+                    "${HBASE_INFO_PORT}".to_string(),
+                );
+
                 match hbase_role {
                     HbaseRole::Master => {
                         hbase_site_config.insert(
