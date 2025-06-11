@@ -1,7 +1,4 @@
-use std::{
-    collections::{BTreeMap, HashMap},
-    num::TryFromIntError,
-};
+use std::collections::{BTreeMap, HashMap};
 
 use product_config::types::PropertyNameKind;
 use security::AuthenticationConfig;
@@ -22,10 +19,9 @@ use stackable_operator::{
         fragment::{self, Fragment, ValidationError},
         merge::{Atomic, Merge},
     },
-    crd::listener::v1alpha1::Listener,
     k8s_openapi::{
         DeepMerge,
-        api::core::v1::{EnvVar, Pod, PodTemplateSpec},
+        api::core::v1::{EnvVar, PodTemplateSpec},
         apimachinery::pkg::api::resource::Quantity,
     },
     kube::{CustomResource, ResourceExt, runtime::reflector::ObjectRef},
@@ -110,29 +106,6 @@ pub enum Error {
 
     #[snafu(display("incompatible merge types"))]
     IncompatibleMergeTypes,
-
-    #[snafu(display("object has no associated namespace"))]
-    NoNamespace,
-
-    #[snafu(display("unable to get {listener} (for {pod})"))]
-    GetPodListener {
-        source: stackable_operator::client::Error,
-        listener: ObjectRef<Listener>,
-        pod: ObjectRef<Pod>,
-    },
-
-    #[snafu(display("{listener} (for {pod}) has no address"))]
-    PodListenerHasNoAddress {
-        listener: ObjectRef<Listener>,
-        pod: ObjectRef<Pod>,
-    },
-
-    #[snafu(display("port {port} ({port_name:?}) is out of bounds, must be within {range:?}", range = 0..=u16::MAX))]
-    PortOutOfBounds {
-        source: TryFromIntError,
-        port_name: String,
-        port: i32,
-    },
 
     #[snafu(display("role-group is not valid"))]
     NoRoleGroup,
