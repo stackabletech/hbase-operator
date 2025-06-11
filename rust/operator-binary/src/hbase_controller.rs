@@ -327,9 +327,6 @@ pub enum Error {
         source: stackable_operator::kvp::LabelError,
     },
 
-    #[snafu(display("cannot collect discovery configuration"))]
-    CollectDiscoveryConfig { source: crate::crd::Error },
-
     #[snafu(display("failed to build listener volume"))]
     BuildListenerVolume {
         source: ListenerOperatorVolumeSourceBuilderError,
