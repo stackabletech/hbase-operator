@@ -4,5 +4,5 @@ kind: TestAssert
 metadata:
   name: test-hbase
 commands:
-  - script: kubectl exec --namespace=$NAMESPACE hbase-test-runner-0 -- python /tmp/test-hbase.py http://test-hbase-restserver-default:8080
+  - script: kubectl exec --namespace=$NAMESPACE hbase-test-runner-0 -- python /tmp/test-hbase.py http://test-hbase-restserver-default-metrics:8080
 timeout: 240

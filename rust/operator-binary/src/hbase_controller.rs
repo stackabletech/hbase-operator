@@ -897,7 +897,7 @@ fn build_rolegroup_statefulset(
         .image_from_product_image(resolved_product_image)
         .command(command())
         .args(vec![formatdoc! {"
-            {entrypoint} {role} {domain} {port} {port_name}",
+            {entrypoint} {role} {domain} {port} {port_name} {ui_port_name}",
             entrypoint = "/stackable/hbase/bin/hbase-entrypoint.sh".to_string(),
             role = role_name,
             domain = hbase_service_domain_name(hbase, rolegroup_ref, cluster_info)?,
@@ -906,7 +906,8 @@ fn build_rolegroup_statefulset(
                 HbaseRole::Master => "master",
                 HbaseRole::RegionServer => "regionserver",
                 HbaseRole::RestServer => rest_http_port_name,
-            }
+            },
+            ui_port_name = hbase.ui_port_name(),
         }])
         .add_env_vars(merged_env)
         // Needed for the `containerdebug` process to log it's tracing information to.
