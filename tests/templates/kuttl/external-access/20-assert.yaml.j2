@@ -1,0 +1,96 @@
+---
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+metadata:
+  name: test-available-condition
+timeout: 600
+commands:
+  - script: kubectl -n $NAMESPACE wait --for=condition=available hbaseclusters.hbase.stackable.tech/hbase --timeout 301s
+---
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+metadata:
+  name: test-hbase
+timeout: 1200
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: test-hbase-master-external-unstable
+status:
+  readyReplicas: 2
+  replicas: 2
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: test-hbase-regionserver-external-unstable
+status:
+  readyReplicas: 1
+  replicas: 1
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: test-hbase-regionserver-external-stable
+status:
+  readyReplicas: 1
+  replicas: 1
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: test-hbase-restserver-external-unstable
+status:
+  readyReplicas: 1
+  replicas: 1
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: test-hbase-restserver-external-stable
+status:
+  readyReplicas: 1
+  replicas: 1
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: listener-test-hbase-master-external-unstable-0
+spec:
+  type: NodePort
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: listener-test-hbase-master-external-unstable-1
+spec:
+  type: NodePort
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: listener-test-hbase-regionserver-external-stable-0
+spec:
+  type: NodePort
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: listener-test-hbase-regionserver-external-unstable-0
+spec:
+  type: NodePort
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: listener-test-hbase-restserver-external-stable-0
+spec:
+  type: NodePort
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: listener-test-hbase-restserver-external-unstable-0
+spec:
+  type: NodePort

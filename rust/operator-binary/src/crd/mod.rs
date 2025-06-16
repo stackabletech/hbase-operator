@@ -59,8 +59,6 @@ pub const SSL_CLIENT_XML: &str = "ssl-client.xml";
 
 pub const HBASE_CLUSTER_DISTRIBUTED: &str = "hbase.cluster.distributed";
 pub const HBASE_ROOTDIR: &str = "hbase.rootdir";
-pub const HBASE_UNSAFE_REGIONSERVER_HOSTNAME_DISABLE_MASTER_REVERSEDNS: &str =
-    "hbase.unsafe.regionserver.hostname.disable.master.reversedns";
 
 pub const HBASE_UI_PORT_NAME_HTTP: &str = "ui-http";
 pub const HBASE_UI_PORT_NAME_HTTPS: &str = "ui-https";
@@ -80,6 +78,8 @@ pub const HBASE_REST_UI_PORT: u16 = 8085;
 // This port is only used by Hbase prior to version 2.6 with a third-party JMX exporter.
 // Newer versions use the same port as the UI because Hbase provides it's own metrics API
 pub const METRICS_PORT: u16 = 9100;
+pub const LISTENER_VOLUME_NAME: &str = "listener";
+pub const LISTENER_VOLUME_DIR: &str = "/stackable/listener";
 
 const DEFAULT_REGION_MOVER_TIMEOUT: Duration = Duration::from_minutes_unchecked(59);
 const DEFAULT_REGION_MOVER_DELTA_TO_SHUTDOWN: Duration = Duration::from_minutes_unchecked(1);
@@ -106,6 +106,9 @@ pub enum Error {
 
     #[snafu(display("incompatible merge types"))]
     IncompatibleMergeTypes,
+
+    #[snafu(display("role-group is not valid"))]
+    NoRoleGroup,
 }
 
 #[versioned(version(name = "v1alpha1"))]
@@ -175,18 +178,6 @@ pub mod versioned {
         /// for a ZooKeeper cluster.
         pub zookeeper_config_map_name: String,
 
-        /// This field controls which type of Service the Operator creates for this HbaseCluster:
-        ///
-        /// * cluster-internal: Use a ClusterIP service
-        ///
-        /// * external-unstable: Use a NodePort service
-        ///
-        /// This is a temporary solution with the goal to keep yaml manifests forward compatible.
-        /// In the future, this setting will control which [ListenerClass](DOCS_BASE_URL_PLACEHOLDER/listener-operator/listenerclass.html)
-        /// will be used to expose the service, and ListenerClass names will stay the same, allowing for a non-breaking change.
-        #[serde(default)]
-        pub listener_class: CurrentlySupportedListenerClasses,
-
         /// Settings related to user [authentication](DOCS_BASE_URL_PLACEHOLDER/usage-guide/security).
         pub authentication: Option<AuthenticationConfig>,
 
@@ -216,6 +207,11 @@ impl v1alpha1::HbaseCluster {
         let defaults =
             AnyConfigFragment::default_for(role, &self.name_any(), hdfs_discovery_cm_name);
 
+        // Trivial values for role-groups are not allowed
+        if role_group.is_empty() {
+            return Err(Error::NoRoleGroup);
+        }
+
         let (mut role_config, mut role_group_config) = match role {
             HbaseRole::RegionServer => {
                 let role = self
@@ -231,7 +227,9 @@ impl v1alpha1::HbaseCluster {
                     .role_groups
                     .get(role_group)
                     .map(|rg| rg.config.config.clone())
-                    .unwrap_or_default();
+                    .expect(
+                        "Cannot be empty as trivial values of role-group have already been checked",
+                    );
 
                 (
                     AnyConfigFragment::RegionServer(role_config),
@@ -253,7 +251,9 @@ impl v1alpha1::HbaseCluster {
                     .role_groups
                     .get(role_group)
                     .map(|rg| rg.config.config.clone())
-                    .unwrap_or_default();
+                    .expect(
+                        "Cannot be empty as trivial values of role-group have already been checked",
+                    );
 
                 // Retrieve role resource config
                 (
@@ -273,7 +273,9 @@ impl v1alpha1::HbaseCluster {
                     .role_groups
                     .get(role_group)
                     .map(|rg| rg.config.config.clone())
-                    .unwrap_or_default();
+                    .expect(
+                        "Cannot be empty as trivial values of role-group have already been checked",
+                    );
 
                 // Retrieve role resource config
                 (
@@ -539,7 +541,7 @@ impl v1alpha1::HbaseCluster {
     }
 
     /// Name of the port used by the Web UI, which depends on HTTPS usage
-    fn ui_port_name(&self) -> String {
+    pub fn ui_port_name(&self) -> String {
         if self.has_https_enabled() {
             HBASE_UI_PORT_NAME_HTTPS
         } else {
@@ -563,27 +565,6 @@ pub fn merged_env(rolegroup_config: Option<&BTreeMap<String, String>>) -> Vec<En
         vec![]
     };
     merged_env
-}
-
-// TODO: Temporary solution until listener-operator is finished
-#[derive(Clone, Debug, Default, Display, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
-#[serde(rename_all = "PascalCase")]
-pub enum CurrentlySupportedListenerClasses {
-    #[default]
-    #[serde(rename = "cluster-internal")]
-    ClusterInternal,
-
-    #[serde(rename = "external-unstable")]
-    ExternalUnstable,
-}
-
-impl CurrentlySupportedListenerClasses {
-    pub fn k8s_service_type(&self) -> String {
-        match self {
-            CurrentlySupportedListenerClasses::ClusterInternal => "ClusterIP".to_string(),
-            CurrentlySupportedListenerClasses::ExternalUnstable => "NodePort".to_string(),
-        }
-    }
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, Hash, JsonSchema, PartialEq, Serialize)]
@@ -709,6 +690,7 @@ impl HbaseRole {
             affinity: get_affinity(cluster_name, self, hdfs_discovery_cm_name),
             graceful_shutdown_timeout: Some(graceful_shutdown_timeout),
             requested_secret_lifetime: Some(requested_secret_lifetime),
+            listener_class: Some("cluster-internal".to_string()),
         }
     }
 
@@ -809,6 +791,7 @@ impl AnyConfigFragment {
                         cli_opts: None,
                     },
                     requested_secret_lifetime: Some(HbaseRole::DEFAULT_REGION_SECRET_LIFETIME),
+                    listener_class: Some("cluster-internal".to_string()),
                 })
             }
             HbaseRole::RestServer => AnyConfigFragment::RestServer(HbaseConfigFragment {
@@ -820,6 +803,7 @@ impl AnyConfigFragment {
                     HbaseRole::DEFAULT_REST_SERVER_GRACEFUL_SHUTDOWN_TIMEOUT,
                 ),
                 requested_secret_lifetime: Some(HbaseRole::DEFAULT_REST_SECRET_LIFETIME),
+                listener_class: Some("cluster-internal".to_string()),
             }),
             HbaseRole::Master => AnyConfigFragment::Master(HbaseConfigFragment {
                 hbase_rootdir: None,
@@ -830,6 +814,7 @@ impl AnyConfigFragment {
                     HbaseRole::DEFAULT_MASTER_GRACEFUL_SHUTDOWN_TIMEOUT,
                 ),
                 requested_secret_lifetime: Some(HbaseRole::DEFAULT_MASTER_SECRET_LIFETIME),
+                listener_class: Some("cluster-internal".to_string()),
             }),
         }
     }
@@ -907,6 +892,9 @@ pub struct HbaseConfig {
     /// Please note that this can be shortened by the `maxCertificateLifetime` setting on the SecretClass issuing the TLS certificate.
     #[fragment_attrs(serde(default))]
     pub requested_secret_lifetime: Option<Duration>,
+
+    /// This field controls which [ListenerClass](DOCS_BASE_URL_PLACEHOLDER/listener-operator/listenerclass.html) is used to expose this rolegroup.
+    pub listener_class: String,
 }
 
 impl Configuration for HbaseConfigFragment {
@@ -963,10 +951,6 @@ impl Configuration for HbaseConfigFragment {
             HBASE_SITE_XML => {
                 result.insert(
                     HBASE_CLUSTER_DISTRIBUTED.to_string(),
-                    Some("true".to_string()),
-                );
-                result.insert(
-                    HBASE_UNSAFE_REGIONSERVER_HOSTNAME_DISABLE_MASTER_REVERSEDNS.to_string(),
                     Some("true".to_string()),
                 );
                 result.insert(HBASE_ROOTDIR.to_string(), self.hbase_rootdir.clone());
@@ -1060,6 +1044,9 @@ pub struct RegionServerConfig {
     /// The operator will compute a timeout period for the region move that will not exceed the graceful shutdown timeout.
     #[fragment_attrs(serde(default))]
     pub region_mover: RegionMover,
+
+    /// This field controls which [ListenerClass](DOCS_BASE_URL_PLACEHOLDER/listener-operator/listenerclass.html) is used to expose this rolegroup.
+    pub listener_class: String,
 }
 
 impl Configuration for RegionServerConfigFragment {
@@ -1114,10 +1101,6 @@ impl Configuration for RegionServerConfigFragment {
             HBASE_SITE_XML => {
                 result.insert(
                     HBASE_CLUSTER_DISTRIBUTED.to_string(),
-                    Some("true".to_string()),
-                );
-                result.insert(
-                    HBASE_UNSAFE_REGIONSERVER_HOSTNAME_DISABLE_MASTER_REVERSEDNS.to_string(),
                     Some("true".to_string()),
                 );
                 result.insert(HBASE_ROOTDIR.to_string(), self.hbase_rootdir.clone());
@@ -1182,6 +1165,14 @@ impl AnyServiceConfig {
             AnyServiceConfig::Master(config) => config.requested_secret_lifetime,
             AnyServiceConfig::RegionServer(config) => config.requested_secret_lifetime,
             AnyServiceConfig::RestServer(config) => config.requested_secret_lifetime,
+        }
+    }
+
+    pub fn listener_class(&self) -> String {
+        match self {
+            AnyServiceConfig::Master(config) => config.listener_class.clone(),
+            AnyServiceConfig::RegionServer(config) => config.listener_class.clone(),
+            AnyServiceConfig::RestServer(config) => config.listener_class.clone(),
         }
     }
 
