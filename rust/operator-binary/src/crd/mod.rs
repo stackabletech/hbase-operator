@@ -66,7 +66,6 @@ pub const HBASE_UI_PORT_NAME_HTTP: &str = "ui-http";
 pub const HBASE_UI_PORT_NAME_HTTPS: &str = "ui-https";
 pub const HBASE_REST_PORT_NAME_HTTP: &str = "rest-http";
 pub const HBASE_REST_PORT_NAME_HTTPS: &str = "rest-https";
-pub const METRICS_PORT_NAME: &str = "metrics";
 
 pub const HBASE_MASTER_PORT: u16 = 16000;
 // HBase always uses 16010, regardless of http or https. On 2024-01-17 we decided in Arch-meeting that we want to stick
@@ -77,9 +76,6 @@ pub const HBASE_REGIONSERVER_PORT: u16 = 16020;
 pub const HBASE_REGIONSERVER_UI_PORT: u16 = 16030;
 pub const HBASE_REST_PORT: u16 = 8080;
 pub const HBASE_REST_UI_PORT: u16 = 8085;
-// This port is only used by Hbase prior to version 2.6 with a third-party JMX exporter.
-// Newer versions use the same port as the UI because Hbase provides it's own metrics API
-pub const METRICS_PORT: u16 = 9100;
 
 const DEFAULT_REGION_MOVER_TIMEOUT: Duration = Duration::from_minutes_unchecked(59);
 const DEFAULT_REGION_MOVER_DELTA_TO_SHUTDOWN: Duration = Duration::from_minutes_unchecked(1);
@@ -494,11 +490,10 @@ impl v1alpha1::HbaseCluster {
     }
 
     /// Returns required port name and port number tuples depending on the role.
-    /// Hbase versions 2.4.* will have three ports for each role
     /// Hbase versions 2.6.* will have two ports for each role. The metrics are available over the
     /// UI port.
-    pub fn ports(&self, role: &HbaseRole, hbase_version: &str) -> Vec<(String, u16)> {
-        let result_without_metric_port: Vec<(String, u16)> = match role {
+    pub fn ports(&self, role: &HbaseRole, _hbase_version: &str) -> Vec<(String, u16)> {
+        match role {
             HbaseRole::Master => vec![
                 ("master".to_string(), HBASE_MASTER_PORT),
                 (self.ui_port_name(), HBASE_MASTER_UI_PORT),
@@ -519,14 +514,6 @@ impl v1alpha1::HbaseCluster {
                 ),
                 (self.ui_port_name(), HBASE_REST_UI_PORT),
             ],
-        };
-        if hbase_version.starts_with(r"2.4") {
-            result_without_metric_port
-                .into_iter()
-                .chain(vec![(METRICS_PORT_NAME.to_string(), METRICS_PORT)])
-                .collect()
-        } else {
-            result_without_metric_port
         }
     }
 
@@ -956,7 +943,7 @@ impl Configuration for HbaseConfigFragment {
             HBASE_ENV_SH => {
                 // The contents of this file cannot be built entirely here because we don't have
                 // access to the clusterConfig or product version.
-                // These are needed to set up Kerberos and JMX exporter settings.
+                // These are needed to set up Kerberos.
                 // To avoid fragmentation of the code needed to build this file, we moved the
                 // implementation to the hbase_controller::build_hbase_env_sh() function.
             }
@@ -1107,7 +1094,7 @@ impl Configuration for RegionServerConfigFragment {
             HBASE_ENV_SH => {
                 // The contents of this file cannot be built entirely here because we don't have
                 // access to the clusterConfig or product version.
-                // These are needed to set up Kerberos and JMX exporter settings.
+                // These are needed to set up Kerberos.
                 // To avoid fragmentation of the code needed to build this file, we moved the
                 // implementation to the hbase_controller::build_hbase_env_sh() function.
             }
