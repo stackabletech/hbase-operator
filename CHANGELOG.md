@@ -37,6 +37,7 @@
 - test: ZooKeeper 3.9.2 removed ([#654]).
 - test: Remove HDFS `3.3.4`, `3.3.6`, and `3.4.0` ([#655]).
 - test: HBase 2.4.18 removed ([#659]):
+- Remove operator support for HBase 2.4 including the JMX exporter ([#672]).
 
 [#640]: https://github.com/stackabletech/hbase-operator/pull/640
 [#645]: https://github.com/stackabletech/hbase-operator/pull/645
@@ -49,6 +50,7 @@
 [#659]: https://github.com/stackabletech/hbase-operator/pull/659
 [#660]: https://github.com/stackabletech/hbase-operator/pull/660
 [#661]: https://github.com/stackabletech/hbase-operator/pull/661
+[#672]: https://github.com/stackabletech/hbase-operator/pull/672
 
 ## [25.3.0] - 2025-03-21
 

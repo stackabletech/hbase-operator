@@ -336,8 +336,6 @@ pub async fn reconcile_hbase(
 
     let client = &ctx.client;
 
-    validate_cr(hbase)?;
-
     let resolved_product_image = hbase
         .spec
         .image
@@ -515,7 +513,7 @@ pub fn build_region_server_role_service(
         .server_role_service_name()
         .context(GlobalServiceNameNotFoundSnafu)?;
     let ports = hbase
-        .ports(&role, &resolved_product_image.product_version)
+        .ports(&role)
         .into_iter()
         .map(|(name, value)| ServicePort {
             name: Some(name),
@@ -601,13 +599,8 @@ fn build_rolegroup_config_map(
                 );
             }
             PropertyNameKind::File(file_name) if file_name == HBASE_ENV_SH => {
-                let mut hbase_env_config = build_hbase_env_sh(
-                    hbase,
-                    merged_config,
-                    &hbase_role,
-                    &rolegroup.role_group,
-                    &resolved_product_image.product_version,
-                )?;
+                let mut hbase_env_config =
+                    build_hbase_env_sh(hbase, merged_config, &hbase_role, &rolegroup.role_group)?;
 
                 // configOverride come last
                 hbase_env_config.extend(config.clone());
@@ -691,15 +684,11 @@ fn build_rolegroup_config_map(
         builder.add_data(SSL_CLIENT_XML, ssl_client_xml);
     }
 
-    extend_role_group_config_map(
-        rolegroup,
-        merged_config.logging(),
-        &mut builder,
-        &resolved_product_image.product_version,
-    )
-    .context(InvalidLoggingConfigSnafu {
-        cm_name: rolegroup.object_name(),
-    })?;
+    extend_role_group_config_map(rolegroup, merged_config.logging(), &mut builder).context(
+        InvalidLoggingConfigSnafu {
+            cm_name: rolegroup.object_name(),
+        },
+    )?;
 
     builder.build().map_err(|e| Error::BuildRoleGroupConfig {
         source: e,
@@ -717,7 +706,7 @@ fn build_rolegroup_service(
     resolved_product_image: &ResolvedProductImage,
 ) -> Result<Service> {
     let ports = hbase
-        .ports(hbase_role, &resolved_product_image.product_version)
+        .ports(hbase_role)
         .into_iter()
         .map(|(name, value)| ServicePort {
             name: Some(name),
@@ -783,7 +772,7 @@ fn build_rolegroup_statefulset(
     let hbase_version = &resolved_product_image.app_version_label;
 
     let ports = hbase
-        .ports(hbase_role, &resolved_product_image.product_version)
+        .ports(hbase_role)
         .into_iter()
         .map(|(name, value)| ContainerPort {
             name: Some(name),
@@ -1099,7 +1088,6 @@ fn build_hbase_env_sh(
     merged_config: &AnyServiceConfig,
     hbase_role: &HbaseRole,
     role_group: &str,
-    product_version: &str,
 ) -> Result<BTreeMap<String, String>, Error> {
     let mut result = BTreeMap::new();
 
@@ -1114,7 +1102,7 @@ fn build_hbase_env_sh(
         construct_global_jvm_args(hbase.has_kerberos_enabled()),
     );
     let role_specific_non_heap_jvm_args =
-        construct_role_specific_non_heap_jvm_args(hbase, hbase_role, role_group, product_version)
+        construct_role_specific_non_heap_jvm_args(hbase, hbase_role, role_group)
             .context(ConstructJvmArgumentSnafu)?;
     match hbase_role {
         HbaseRole::Master => {
@@ -1138,24 +1126,6 @@ fn build_hbase_env_sh(
     }
 
     Ok(result)
-}
-
-/// Ensures that no authorization is configured for HBase versions that do not support it.
-/// In the future, such validations should be moved to the CRD CEL rules which are much more flexible
-/// and have to added benefit that invalid CRs are rejected by the API server.
-/// A requirement for this is that the minimum supported Kubernetes version is 1.29.
-fn validate_cr(hbase: &v1alpha1::HbaseCluster) -> Result<()> {
-    tracing::info!("Begin CR validation");
-
-    let hbase_version = hbase.spec.image.product_version();
-    let authorization = hbase.spec.cluster_config.authorization.is_some();
-
-    if hbase_version.starts_with("2.4") && authorization {
-        tracing::error!("Invalid custom resource");
-        return Err(Error::AuthorizationNotSupported);
-    }
-    tracing::info!("End CR validation");
-    Ok(())
 }
 
 /// Build the domain name of an HBase service pod.

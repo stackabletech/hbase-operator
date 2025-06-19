@@ -43,9 +43,7 @@ pub enum Error {
 type Result<T, E = Error> = std::result::Result<T, E>;
 
 const CONSOLE_CONVERSION_PATTERN: &str = "%d{ISO8601} %-5p [%t] %c{2}: %.1000m%n";
-const HBASE_LOG4J_FILE: &str = "hbase.log4j.xml";
 const HBASE_LOG4J2_FILE: &str = "hbase.log4j2.xml";
-pub const LOG4J_CONFIG_FILE: &str = "log4j.properties";
 pub const LOG4J2_CONFIG_FILE: &str = "log4j2.properties";
 pub const STACKABLE_LOG_DIR: &str = "/stackable/log";
 pub static CONTAINERDEBUG_LOG_DIRECTORY: std::sync::LazyLock<String> =
@@ -56,16 +54,12 @@ pub fn extend_role_group_config_map(
     rolegroup: &RoleGroupRef<v1alpha1::HbaseCluster>,
     logging: &Logging<Container>,
     cm_builder: &mut ConfigMapBuilder,
-    hbase_version: &str,
 ) -> Result<()> {
     if let Some(ContainerLogConfig {
         choice: Some(ContainerLogConfigChoice::Automatic(log_config)),
     }) = logging.containers.get(&Container::Hbase)
     {
-        cm_builder.add_data(
-            log4j_properties_file_name(hbase_version),
-            log4j_config(hbase_version, log_config),
-        );
+        cm_builder.add_data(LOG4J2_CONFIG_FILE, log4j_config(log_config));
     }
 
     let vector_log_config = if let Some(ContainerLogConfig {
@@ -87,41 +81,15 @@ pub fn extend_role_group_config_map(
     Ok(())
 }
 
-pub fn log4j_properties_file_name(hbase_version: &str) -> &'static str {
-    if needs_log4j2(hbase_version) {
-        LOG4J2_CONFIG_FILE
-    } else {
-        LOG4J_CONFIG_FILE
-    }
-}
-
-fn log4j_config(hbase_version: &str, log_config: &AutomaticContainerLogConfig) -> String {
-    if needs_log4j2(hbase_version) {
-        product_logging::framework::create_log4j2_config(
-            &format!("{STACKABLE_LOG_DIR}/hbase"),
-            HBASE_LOG4J2_FILE,
-            MAX_HBASE_LOG_FILES_SIZE
-                .scale_to(BinaryMultiple::Mebi)
-                .floor()
-                .value as u32,
-            CONSOLE_CONVERSION_PATTERN,
-            log_config,
-        )
-    } else {
-        product_logging::framework::create_log4j_config(
-            &format!("{STACKABLE_LOG_DIR}/hbase"),
-            HBASE_LOG4J_FILE,
-            MAX_HBASE_LOG_FILES_SIZE
-                .scale_to(BinaryMultiple::Mebi)
-                .floor()
-                .value as u32,
-            CONSOLE_CONVERSION_PATTERN,
-            log_config,
-        )
-    }
-}
-
-// HBase 2.6 moved from log4j to log4j2
-fn needs_log4j2(hbase_version: &str) -> bool {
-    !hbase_version.starts_with(r"2.4")
+fn log4j_config(log_config: &AutomaticContainerLogConfig) -> String {
+    product_logging::framework::create_log4j2_config(
+        &format!("{STACKABLE_LOG_DIR}/hbase"),
+        HBASE_LOG4J2_FILE,
+        MAX_HBASE_LOG_FILES_SIZE
+            .scale_to(BinaryMultiple::Mebi)
+            .floor()
+            .value as u32,
+        CONSOLE_CONVERSION_PATTERN,
+        log_config,
+    )
 }

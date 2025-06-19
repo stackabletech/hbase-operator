@@ -5,8 +5,7 @@ use stackable_operator::{
 };
 
 use crate::crd::{
-    AnyServiceConfig, CONFIG_DIR_NAME, HbaseRole, JVM_SECURITY_PROPERTIES_FILE, METRICS_PORT,
-    v1alpha1,
+    AnyServiceConfig, CONFIG_DIR_NAME, HbaseRole, JVM_SECURITY_PROPERTIES_FILE, v1alpha1,
 };
 
 const JAVA_HEAP_FACTOR: f32 = 0.8;
@@ -53,18 +52,11 @@ pub fn construct_role_specific_non_heap_jvm_args(
     hbase: &v1alpha1::HbaseCluster,
     hbase_role: &HbaseRole,
     role_group: &str,
-    product_version: &str,
 ) -> Result<String, Error> {
     let mut jvm_args = vec![format!(
         "-Djava.security.properties={CONFIG_DIR_NAME}/{JVM_SECURITY_PROPERTIES_FILE}"
     )];
 
-    // Starting with HBase 2.6 the JVM exporter is not needed anymore
-    if product_version.starts_with("2.4") || product_version.starts_with("2.5") {
-        jvm_args.push(
-            format!("-javaagent:/stackable/jmx/jmx_prometheus_javaagent.jar={METRICS_PORT}:/stackable/jmx/{hbase_role}.yaml")
-        );
-    }
     if hbase.has_kerberos_enabled() {
         jvm_args.push("-Djava.security.krb5.conf=/stackable/kerberos/krb5.conf".to_owned());
     }
@@ -168,17 +160,11 @@ mod tests {
               default:
                 replicas: 1
         "#;
-        let (hbase, hbase_role, merged_config, role_group, product_version) =
-            construct_boilerplate(input);
+        let (hbase, hbase_role, merged_config, role_group) = construct_boilerplate(input);
 
         let global_jvm_args = construct_global_jvm_args(false);
-        let role_specific_non_heap_jvm_args = construct_role_specific_non_heap_jvm_args(
-            &hbase,
-            &hbase_role,
-            &role_group,
-            &product_version,
-        )
-        .unwrap();
+        let role_specific_non_heap_jvm_args =
+            construct_role_specific_non_heap_jvm_args(&hbase, &hbase_role, &role_group).unwrap();
         let hbase_heapsize_env = construct_hbase_heapsize_env(&merged_config).unwrap();
 
         assert_eq!(global_jvm_args, "");
@@ -230,17 +216,11 @@ mod tests {
                     - -Xmx40000m # This has no effect!
                     - -Dhttps.proxyPort=1234
         "#;
-        let (hbase, hbase_role, merged_config, role_group, product_version) =
-            construct_boilerplate(input);
+        let (hbase, hbase_role, merged_config, role_group) = construct_boilerplate(input);
 
         let global_jvm_args = construct_global_jvm_args(hbase.has_kerberos_enabled());
-        let role_specific_non_heap_jvm_args = construct_role_specific_non_heap_jvm_args(
-            &hbase,
-            &hbase_role,
-            &role_group,
-            &product_version,
-        )
-        .unwrap();
+        let role_specific_non_heap_jvm_args =
+            construct_role_specific_non_heap_jvm_args(&hbase, &hbase_role, &role_group).unwrap();
         let hbase_heapsize_env = construct_hbase_heapsize_env(&merged_config).unwrap();
 
         assert_eq!(
@@ -260,13 +240,7 @@ mod tests {
 
     fn construct_boilerplate(
         hbase_cluster: &str,
-    ) -> (
-        v1alpha1::HbaseCluster,
-        HbaseRole,
-        AnyServiceConfig,
-        String,
-        String,
-    ) {
+    ) -> (v1alpha1::HbaseCluster, HbaseRole, AnyServiceConfig, String) {
         let hbase: v1alpha1::HbaseCluster =
             serde_yaml::from_str(hbase_cluster).expect("illegal test input");
 
@@ -274,14 +248,7 @@ mod tests {
         let merged_config = hbase
             .merged_config(&hbase_role, "default", "my-hdfs")
             .unwrap();
-        let product_version = hbase.spec.image.product_version().to_owned();
 
-        (
-            hbase,
-            hbase_role,
-            merged_config,
-            "default".to_owned(),
-            product_version,
-        )
+        (hbase, hbase_role, merged_config, "default".to_owned())
     }
 }
