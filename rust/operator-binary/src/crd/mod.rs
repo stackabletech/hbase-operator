@@ -492,7 +492,7 @@ impl v1alpha1::HbaseCluster {
     /// Returns required port name and port number tuples depending on the role.
     /// Hbase versions 2.6.* will have two ports for each role. The metrics are available over the
     /// UI port.
-    pub fn ports(&self, role: &HbaseRole, _hbase_version: &str) -> Vec<(String, u16)> {
+    pub fn ports(&self, role: &HbaseRole) -> Vec<(String, u16)> {
         match role {
             HbaseRole::Master => vec![
                 ("master".to_string(), HBASE_MASTER_PORT),

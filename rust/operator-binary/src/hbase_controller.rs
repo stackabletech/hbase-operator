@@ -513,7 +513,7 @@ pub fn build_region_server_role_service(
         .server_role_service_name()
         .context(GlobalServiceNameNotFoundSnafu)?;
     let ports = hbase
-        .ports(&role, &resolved_product_image.product_version)
+        .ports(&role)
         .into_iter()
         .map(|(name, value)| ServicePort {
             name: Some(name),
@@ -706,7 +706,7 @@ fn build_rolegroup_service(
     resolved_product_image: &ResolvedProductImage,
 ) -> Result<Service> {
     let ports = hbase
-        .ports(hbase_role, &resolved_product_image.product_version)
+        .ports(hbase_role)
         .into_iter()
         .map(|(name, value)| ServicePort {
             name: Some(name),
@@ -772,7 +772,7 @@ fn build_rolegroup_statefulset(
     let hbase_version = &resolved_product_image.app_version_label;
 
     let ports = hbase
-        .ports(hbase_role, &resolved_product_image.product_version)
+        .ports(hbase_role)
         .into_iter()
         .map(|(name, value)| ContainerPort {
             name: Some(name),
