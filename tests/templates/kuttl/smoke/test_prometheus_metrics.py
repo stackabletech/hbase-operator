@@ -37,9 +37,7 @@ def check_master_metrics(
 def check_regionserver_metrics(
     namespace: str,
 ) -> None:
-    expected_metrics: list[str] = [
-        "table_requests_namespace_hbase_table_meta_table_write_query_per_second_count"
-    ]
+    expected_metrics: list[str] = ["region_server_queue_size"]
 
     check_metrics(namespace, "regionserver", 16030, expected_metrics)
 
