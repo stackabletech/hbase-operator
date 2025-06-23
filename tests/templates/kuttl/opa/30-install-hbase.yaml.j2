@@ -28,12 +28,6 @@ commands:
          appender.console.name = STDOUT
          appender.console.layout.type = PatternLayout
          appender.console.layout.pattern = [%-5level] %d{yyyy-MM-dd HH:mm:ss.SSS} [%t] %c{1} - %msg%n
-       log4j.properties: |
-         # Used by HBase 2.4
-         log4j.rootLogger=INFO, FILE
-         log4j.appender.FILE=org.apache.log4j.FileAppender
-         log4j.appender.FILE.File=/stackable/log/hbase/hbase.log4j.xml
-         log4j.appender.FILE.layout=org.apache.log4j.xml.XMLLayout
       ---
       apiVersion: hbase.stackable.tech/v1alpha1
       kind: HbaseCluster

@@ -8,4 +8,3 @@ Starting with HBase 2.6 the URL for Prometheus metrics has changed.
 This is because HBase offers now a built-in endpoint for this purpose.
 This endpoint is available from the UI service.
 For example, in the case of the master service, the URL is `http://<master-service>:16010/prometheus`.
-The old URL `http://<master-service>:9100` is still available for HBase 2.4.
