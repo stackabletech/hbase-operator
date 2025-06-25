@@ -3,3 +3,4 @@ apiVersion: kuttl.dev/v1beta1
 kind: TestStep
 commands:
   - script: kubectl cp --namespace=$NAMESPACE ./test-hbase.py hbase-test-runner-0:/tmp
+  - script: kubectl cp --namespace=$NAMESPACE ./test_prometheus_metrics.py hbase-test-runner-0:/tmp
