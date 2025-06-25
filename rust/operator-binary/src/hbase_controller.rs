@@ -556,14 +556,19 @@ fn build_rolegroup_config_map(
                     "org.apache.hadoop.hbase.ipc.BlockingRpcClient".to_string(),
                 );
 
-                // Set listener endpoint information with generic properties
+                // Set listener endpoint information
                 hbase_site_config.insert(
                     "hbase.listener.endpoint".to_string(),
                     "${HBASE_LISTENER_ENDPOINT}".to_string(),
                 );
+
+                // Set flag to override default behaviour, which is that the
+                // RPC client should bind the client address (forcing outgoing
+                // RPC traffic to happen from the same network interface that
+                // the RPC server is bound on).
                 hbase_site_config.insert(
-                    "hbase.info.port".to_string(),
-                    "${HBASE_INFO_PORT}".to_string(),
+                    "hbase.client.rpc.bind.address".to_string(),
+                    "false".to_string(),
                 );
 
                 match hbase_role {
@@ -584,6 +589,10 @@ fn build_rolegroup_config_map(
                             "hbase.master.port".to_string(),
                             "${HBASE_SERVICE_PORT}".to_string(),
                         );
+                        hbase_site_config.insert(
+                            "hbase.master.bound.info.port".to_string(),
+                            "${HBASE_INFO_PORT}".to_string(),
+                        );
                     }
                     HbaseRole::RegionServer => {
                         hbase_site_config.insert(
@@ -601,6 +610,10 @@ fn build_rolegroup_config_map(
                         hbase_site_config.insert(
                             "hbase.regionserver.port".to_string(),
                             "${HBASE_SERVICE_PORT}".to_string(),
+                        );
+                        hbase_site_config.insert(
+                            "hbase.regionserver.bound.info.port".to_string(),
+                            "${HBASE_INFO_PORT}".to_string(),
                         );
                     }
                     HbaseRole::RestServer => {}
