@@ -10,7 +10,7 @@ def check_metrics(
     namespace: str, role: str, port: int, expected_metrics: list[str]
 ) -> None:
     response: requests.Response = requests.get(
-        f"http://test-hbase-{role}-default-0.test-hbase-{role}-default.{namespace}.svc.cluster.local:{port}/prometheus",
+        f"http://test-hbase-{role}-default-metrics:{port}/prometheus",
         timeout=10,
     )
     assert response.ok, "Requesting metrics failed"
