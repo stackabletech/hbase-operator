@@ -18,7 +18,7 @@ spec:
       listenerClass: external-unstable
 ----
 <1> Specify one of `external-stable`, `external-unstable`, `cluster-internal` (the default setting is `cluster-internal`).
-This can be set separately for all three roles.
+This can be set separately for all roles.
 
 Externally-reachable endpoints (i.e. where listener-class = `external-unstable` or `external-unstable`) are written to a ConfigMap called `<cluster-name>-ui-endpoints`, listing each rolegroup by replica:
 
