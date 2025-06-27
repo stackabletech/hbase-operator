@@ -80,6 +80,8 @@ pub const LISTENER_VOLUME_DIR: &str = "/stackable/listener";
 const DEFAULT_REGION_MOVER_TIMEOUT: Duration = Duration::from_minutes_unchecked(59);
 const DEFAULT_REGION_MOVER_DELTA_TO_SHUTDOWN: Duration = Duration::from_minutes_unchecked(1);
 
+const DEFAULT_LISTENER_CLASS: &str = "cluster-internal";
+
 #[derive(Snafu, Debug)]
 pub enum Error {
     #[snafu(display("the role [{role}] is invalid and does not exist in HBase"))]
@@ -677,7 +679,7 @@ impl HbaseRole {
             affinity: get_affinity(cluster_name, self, hdfs_discovery_cm_name),
             graceful_shutdown_timeout: Some(graceful_shutdown_timeout),
             requested_secret_lifetime: Some(requested_secret_lifetime),
-            listener_class: Some("cluster-internal".to_string()),
+            listener_class: Some(DEFAULT_LISTENER_CLASS.to_string()),
         }
     }
 
@@ -778,7 +780,7 @@ impl AnyConfigFragment {
                         cli_opts: None,
                     },
                     requested_secret_lifetime: Some(HbaseRole::DEFAULT_REGION_SECRET_LIFETIME),
-                    listener_class: Some("cluster-internal".to_string()),
+                    listener_class: Some(DEFAULT_LISTENER_CLASS.to_string()),
                 })
             }
             HbaseRole::RestServer => AnyConfigFragment::RestServer(HbaseConfigFragment {
@@ -790,7 +792,7 @@ impl AnyConfigFragment {
                     HbaseRole::DEFAULT_REST_SERVER_GRACEFUL_SHUTDOWN_TIMEOUT,
                 ),
                 requested_secret_lifetime: Some(HbaseRole::DEFAULT_REST_SECRET_LIFETIME),
-                listener_class: Some("cluster-internal".to_string()),
+                listener_class: Some(DEFAULT_LISTENER_CLASS.to_string()),
             }),
             HbaseRole::Master => AnyConfigFragment::Master(HbaseConfigFragment {
                 hbase_rootdir: None,
@@ -801,7 +803,7 @@ impl AnyConfigFragment {
                     HbaseRole::DEFAULT_MASTER_GRACEFUL_SHUTDOWN_TIMEOUT,
                 ),
                 requested_secret_lifetime: Some(HbaseRole::DEFAULT_MASTER_SECRET_LIFETIME),
-                listener_class: Some("cluster-internal".to_string()),
+                listener_class: Some(DEFAULT_LISTENER_CLASS.to_string()),
             }),
         }
     }
