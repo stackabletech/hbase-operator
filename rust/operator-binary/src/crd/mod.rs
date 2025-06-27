@@ -107,6 +107,9 @@ pub enum Error {
 
     #[snafu(display("role-group is not valid"))]
     NoRoleGroup,
+
+    #[snafu(display("role-group not found by name"))]
+    RoleGroupNotFound,
 }
 
 #[versioned(version(name = "v1alpha1"))]
@@ -225,9 +228,7 @@ impl v1alpha1::HbaseCluster {
                     .role_groups
                     .get(role_group)
                     .map(|rg| rg.config.config.clone())
-                    .expect(
-                        "Cannot be empty as trivial values of role-group have already been checked",
-                    );
+                    .context(RoleGroupNotFoundSnafu)?;
 
                 (
                     AnyConfigFragment::RegionServer(role_config),
@@ -249,9 +250,7 @@ impl v1alpha1::HbaseCluster {
                     .role_groups
                     .get(role_group)
                     .map(|rg| rg.config.config.clone())
-                    .expect(
-                        "Cannot be empty as trivial values of role-group have already been checked",
-                    );
+                    .context(RoleGroupNotFoundSnafu)?;
 
                 // Retrieve role resource config
                 (
@@ -271,9 +270,7 @@ impl v1alpha1::HbaseCluster {
                     .role_groups
                     .get(role_group)
                     .map(|rg| rg.config.config.clone())
-                    .expect(
-                        "Cannot be empty as trivial values of role-group have already been checked",
-                    );
+                    .context(RoleGroupNotFoundSnafu)?;
 
                 // Retrieve role resource config
                 (
