@@ -111,6 +111,9 @@ const HBASE_LOG_CONFIG_TMP_DIR: &str = "/stackable/tmp/log_config";
 
 const DOCKER_IMAGE_BASE_NAME: &str = "hbase";
 
+const HBASE_MASTER_PORT_NAME: &str = "master";
+const HBASE_REGIONSERVER_PORT_NAME: &str = "regionserver";
+
 pub struct Ctx {
     pub client: stackable_operator::client::Client,
     pub product_config: ProductConfigManager,
@@ -140,9 +143,6 @@ pub enum Error {
     #[snafu(display("object defines no regionserver role"))]
     NoRegionServerRole,
 
-    #[snafu(display("failed to calculate global service name"))]
-    GlobalServiceNameNotFound,
-
     #[snafu(display("failed to create cluster resources"))]
     CreateClusterResources {
         source: stackable_operator::cluster_resources::Error,
@@ -150,11 +150,6 @@ pub enum Error {
 
     #[snafu(display("failed to delete orphaned resources"))]
     DeleteOrphanedResources {
-        source: stackable_operator::cluster_resources::Error,
-    },
-
-    #[snafu(display("failed to apply global Service"))]
-    ApplyRoleService {
         source: stackable_operator::cluster_resources::Error,
     },
 
@@ -750,7 +745,7 @@ fn build_rolegroup_service(
 
     let metadata = ObjectMetaBuilder::new()
         .name_and_namespace(hbase)
-        .name(format!("{name}-metrics", name = rolegroup.object_name()))
+        .name(headless_service_name(&rolegroup.object_name()))
         .ownerreference_from_resource(hbase, None, Some(true))
         .context(ObjectMissingMetadataForOwnerRefSnafu)?
         .with_recommended_labels(build_recommended_labels(
@@ -813,14 +808,14 @@ fn build_rolegroup_statefulset(
     let probe_template = match hbase_role {
         HbaseRole::Master => Probe {
             tcp_socket: Some(TCPSocketAction {
-                port: IntOrString::String("master".to_string()),
+                port: IntOrString::String(HBASE_MASTER_PORT_NAME.to_string()),
                 ..TCPSocketAction::default()
             }),
             ..Probe::default()
         },
         HbaseRole::RegionServer => Probe {
             tcp_socket: Some(TCPSocketAction {
-                port: IntOrString::String("regionserver".to_string()),
+                port: IntOrString::String(HBASE_REGIONSERVER_PORT_NAME.to_string()),
                 ..TCPSocketAction::default()
             }),
             ..Probe::default()
@@ -902,8 +897,8 @@ fn build_rolegroup_statefulset(
             role = role_name,
             port = hbase.service_port(hbase_role).to_string(),
             port_name = match hbase_role {
-                HbaseRole::Master => "master",
-                HbaseRole::RegionServer => "regionserver",
+                HbaseRole::Master => HBASE_MASTER_PORT_NAME,
+                HbaseRole::RegionServer => HBASE_REGIONSERVER_PORT_NAME,
                 HbaseRole::RestServer => rest_http_port_name,
             },
             ui_port_name = hbase.ui_port_name(),
@@ -1089,10 +1084,7 @@ fn build_rolegroup_statefulset(
             match_labels: Some(statefulset_match_labels.into()),
             ..LabelSelector::default()
         },
-        service_name: Some(format!(
-            "{name}-metrics",
-            name = rolegroup_ref.object_name()
-        )),
+        service_name: Some(headless_service_name(&rolegroup_ref.object_name())),
         template: pod_template,
         volume_claim_templates: Some(vec![pvc]),
         ..StatefulSetSpec::default()
@@ -1200,6 +1192,10 @@ fn build_hbase_env_sh(
     }
 
     Ok(result)
+}
+
+fn headless_service_name(role_group_name: &str) -> String {
+    format!("{name}-metrics", name = role_group_name)
 }
 
 #[cfg(test)]

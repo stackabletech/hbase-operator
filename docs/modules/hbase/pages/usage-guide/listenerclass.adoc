@@ -20,18 +20,12 @@ spec:
 <1> Specify one of `external-stable`, `external-unstable`, `cluster-internal` (the default setting is `cluster-internal`).
 This can be set separately for all roles.
 
-Externally-reachable endpoints (i.e. where listener-class = `external-unstable` or `external-unstable`) are written to a ConfigMap called `<cluster-name>-ui-endpoints`, listing each rolegroup by replica:
+Listener endpoints are written to `hbase-site.xml` like this:
 
-[source,yaml]
+[source,xml]
 ----
-apiVersion: v1
-data:
-  hbase.master-0.ui: 172.19.0.3:32353
-  hbase.master-1.ui: 172.19.0.5:31817
-  hbase.regionserver-0.ui: 172.19.0.3:31719
-  hbase.regionserver-1.ui: 172.19.0.5:30626
-  hbase.restserver-0.ui: 172.19.0.3:31790
-  hbase.restserver-1.ui: 172.19.0.5:32292
-kind: ConfigMap
-...
+  <property>
+    <name>hbase.listener.endpoint</name>
+    <value>172.19.0.3:32445</value>
+  </property>
 ----
