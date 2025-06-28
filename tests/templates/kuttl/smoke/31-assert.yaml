@@ -4,6 +4,6 @@ apiVersion: kuttl.dev/v1beta1
 kind: TestAssert
 timeout: 600
 commands:
-  - script: kubectl exec -n $NAMESPACE --container hbase test-hbase-master-default-0 -- cat /stackable/log/containerdebug-state.json | jq --exit-status '"valif JSON"'
-  - script: kubectl exec -n $NAMESPACE --container hbase test-hbase-regionserver-default-0 -- cat /stackable/log/containerdebug-state.json | jq --exit-status  '"valif JSON"'
-  - script: kubectl exec -n $NAMESPACE --container hbase test-hbase-restserver-default-0 -- cat /stackable/log/containerdebug-state.json | jq --exit-status '"valif JSON"'
+  - script: kubectl exec -n $NAMESPACE --container hbase test-hbase-master-default-0 -- cat /stackable/log/containerdebug-state.json | jq --exit-status '"valid JSON"'
+  - script: kubectl exec -n $NAMESPACE --container hbase test-hbase-regionserver-default-0 -- cat /stackable/log/containerdebug-state.json | jq --exit-status  '"valid JSON"'
+  - script: kubectl exec -n $NAMESPACE --container hbase test-hbase-restserver-default-0 -- cat /stackable/log/containerdebug-state.json | jq --exit-status '"valid JSON"'
