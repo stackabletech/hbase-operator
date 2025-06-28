@@ -78,10 +78,10 @@ use crate::{
     },
     crd::{
         APP_NAME, AnyServiceConfig, Container, HBASE_ENV_SH, HBASE_MASTER_PORT,
-        HBASE_REGIONSERVER_PORT, HBASE_REST_PORT_NAME_HTTP, HBASE_REST_PORT_NAME_HTTPS,
-        HBASE_SITE_XML, HbaseClusterStatus, HbaseRole, JVM_SECURITY_PROPERTIES_FILE,
-        LISTENER_VOLUME_DIR, LISTENER_VOLUME_NAME, SSL_CLIENT_XML, SSL_SERVER_XML, merged_env,
-        v1alpha1,
+        HBASE_MASTER_UI_PORT, HBASE_REGIONSERVER_PORT, HBASE_REGIONSERVER_UI_PORT,
+        HBASE_REST_PORT_NAME_HTTP, HBASE_REST_PORT_NAME_HTTPS, HBASE_SITE_XML, HbaseClusterStatus,
+        HbaseRole, JVM_SECURITY_PROPERTIES_FILE, LISTENER_VOLUME_DIR, LISTENER_VOLUME_NAME,
+        SSL_CLIENT_XML, SSL_SERVER_XML, merged_env, v1alpha1,
     },
     discovery::build_discovery_configmap,
     kerberos::{
@@ -586,6 +586,10 @@ fn build_rolegroup_config_map(
                             "hbase.master.info.port".to_string(),
                             "${HBASE_INFO_PORT}".to_string(),
                         );
+                        hbase_site_config.insert(
+                            "hbase.master.bound.info.port".to_string(),
+                            HBASE_MASTER_UI_PORT.to_string(),
+                        );
                     }
                     HbaseRole::RegionServer => {
                         hbase_site_config.insert(
@@ -607,6 +611,10 @@ fn build_rolegroup_config_map(
                         hbase_site_config.insert(
                             "hbase.regionserver.info.port".to_string(),
                             "${HBASE_INFO_PORT}".to_string(),
+                        );
+                        hbase_site_config.insert(
+                            "hbase.regionserver.bound.info.port".to_string(),
+                            HBASE_REGIONSERVER_UI_PORT.to_string(),
                         );
                     }
                     HbaseRole::RestServer => {}
