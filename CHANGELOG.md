@@ -4,7 +4,7 @@
 
 ### Added
 
-- BREAKING: Adds listener support for HBase ([#639]).
+- BREAKING: Add listener support for HBase ([#639]).
 - Adds new telemetry CLI arguments and environment variables ([#652]).
   - Use `--file-log-max-files` (or `FILE_LOG_MAX_FILES`) to limit the number of log files kept.
   - Use `--file-log-rotation-period` (or `FILE_LOG_ROTATION_PERIOD`) to configure the frequency of rotation.
