@@ -542,19 +542,6 @@ fn build_rolegroup_config_map(
                 hbase_site_config
                     .extend(hbase_opa_config.map_or(vec![], |config| config.hbase_site_config()));
 
-                // Get more useful stack traces...
-                // The default Netty impl gives us netty garbage and nothing else
-                hbase_site_config.insert(
-                    "hbase.rpc.client.impl".to_string(),
-                    "org.apache.hadoop.hbase.ipc.BlockingRpcClient".to_string(),
-                );
-
-                // Set listener endpoint information
-                hbase_site_config.insert(
-                    "hbase.listener.endpoint".to_string(),
-                    "${HBASE_LISTENER_ENDPOINT}".to_string(),
-                );
-
                 // Set flag to override default behaviour, which is that the
                 // RPC client should bind the client address (forcing outgoing
                 // RPC traffic to happen from the same network interface that
