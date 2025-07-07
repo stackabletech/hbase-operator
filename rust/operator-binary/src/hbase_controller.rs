@@ -1190,7 +1190,7 @@ fn build_hbase_env_sh(
 }
 
 fn headless_service_name(role_group_name: &str) -> String {
-    format!("{name}-metrics", name = role_group_name)
+    format!("{name}-headless", name = role_group_name)
 }
 
 #[cfg(test)]

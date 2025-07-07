@@ -55,7 +55,7 @@ def fetch_flamegraph(service_url, refresh_path):
 
 
 def test_profiling(role, port):
-    service_url = f"http://test-hbase-{role}-default-metrics:{port}"
+    service_url = f"http://test-hbase-{role}-default-headless:{port}"
 
     print(f"Test profiling on {service_url}")
 
