@@ -105,8 +105,8 @@ pub enum Error {
     #[snafu(display("incompatible merge types"))]
     IncompatibleMergeTypes,
 
-    #[snafu(display("role-group is not valid"))]
-    NoRoleGroup,
+    #[snafu(display("empty values for role-group are not permitted"))]
+    EmptyRoleGroup,
 
     #[snafu(display("role-group not found by name"))]
     RoleGroupNotFound,
@@ -210,7 +210,7 @@ impl v1alpha1::HbaseCluster {
 
         // Trivial values for role-groups are not allowed
         if role_group.is_empty() {
-            return Err(Error::NoRoleGroup);
+            return Err(Error::EmptyRoleGroup);
         }
 
         let (mut role_config, mut role_group_config) = match role {
