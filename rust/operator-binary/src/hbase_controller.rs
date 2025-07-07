@@ -21,14 +21,8 @@ use stackable_operator::{
         configmap::ConfigMapBuilder,
         meta::ObjectMetaBuilder,
         pod::{
-            PodBuilder,
-            container::ContainerBuilder,
-            resources::ResourceRequirementsBuilder,
+            PodBuilder, container::ContainerBuilder, resources::ResourceRequirementsBuilder,
             security::PodSecurityContextBuilder,
-            volume::{
-                ListenerOperatorVolumeSourceBuilder, ListenerOperatorVolumeSourceBuilderError,
-                ListenerReference,
-            },
         },
     },
     cluster_resources::{ClusterResourceApplyStrategy, ClusterResources},
@@ -323,9 +317,10 @@ pub enum Error {
     },
 
     #[snafu(display("failed to build listener volume"))]
-    BuildListenerVolume {
-        source: ListenerOperatorVolumeSourceBuilderError,
-    },
+    ListenerVolume { source: crate::crd::Error },
+
+    #[snafu(display("failed to build listener persistent volume claim"))]
+    ListenerPersistentVolumeClaim { source: crate::crd::Error },
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -968,15 +963,6 @@ fn build_rolegroup_statefulset(
         .service_account_name(service_account.name_any())
         .security_context(PodSecurityContextBuilder::new().fs_group(1000).build());
 
-    // externally-reachable listener endpoints should use a pvc volume...
-    let pvc = ListenerOperatorVolumeSourceBuilder::new(
-        &ListenerReference::ListenerClass(merged_config.listener_class().to_string()),
-        &recommended_labels,
-    )
-    .context(BuildListenerVolumeSnafu)?
-    .build_pvc(LISTENER_VOLUME_NAME.to_string())
-    .context(BuildListenerVolumeSnafu)?;
-
     if let Some(ContainerLogConfig {
         choice:
             Some(ContainerLogConfigChoice::Custom(CustomContainerLogConfig {
@@ -1047,7 +1033,21 @@ fn build_rolegroup_statefulset(
         }
     }
 
+    let listener_pvc = hbase_role
+        .listener_pvc(merged_config, &recommended_labels)
+        .context(ListenerPersistentVolumeClaimSnafu)?;
+
+    if let Some(listener_volume) = hbase_role
+        .listener_volume(merged_config, &recommended_labels)
+        .context(ListenerVolumeSnafu)?
+    {
+        pod_builder
+            .add_volume(listener_volume)
+            .context(AddVolumeSnafu)?;
+    };
+
     let mut pod_template = pod_builder.build_template();
+
     hbase.merge_pod_overrides(&mut pod_template, hbase_role, rolegroup_ref);
 
     let metadata = ObjectMetaBuilder::new()
@@ -1081,7 +1081,7 @@ fn build_rolegroup_statefulset(
         },
         service_name: Some(headless_service_name(&rolegroup_ref.object_name())),
         template: pod_template,
-        volume_claim_templates: Some(vec![pvc]),
+        volume_claim_templates: listener_pvc,
         ..StatefulSetSpec::default()
     };
 
