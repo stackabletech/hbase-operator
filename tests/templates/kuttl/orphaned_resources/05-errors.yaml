@@ -17,4 +17,4 @@ metadata:
 apiVersion: v1
 kind: Service
 metadata:
-  name: test-hbase-regionserver-default
+  name: test-hbase-regionserver-default-listener

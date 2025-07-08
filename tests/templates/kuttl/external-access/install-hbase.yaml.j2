@@ -1,56 +1,55 @@
 ---
-apiVersion: kuttl.dev/v1beta1
-kind: TestStep
-metadata:
-  name: pause-hbase
-timeout: 180
----
 apiVersion: hbase.stackable.tech/v1alpha1
 kind: HbaseCluster
 metadata:
   name: test-hbase
 spec:
   image:
-{% if test_scenario['values']['hbase-latest'].find(",") > 0 %}
-    custom: "{{ test_scenario['values']['hbase-latest'].split(',')[1] }}"
-    productVersion: "{{ test_scenario['values']['hbase-latest'].split(',')[0] }}"
+{% if test_scenario['values']['hbase'].find(",") > 0 %}
+    custom: "{{ test_scenario['values']['hbase'].split(',')[1] }}"
+    productVersion: "{{ test_scenario['values']['hbase'].split(',')[0] }}"
 {% else %}
-    productVersion: "{{ test_scenario['values']['hbase-latest'] }}"
+    productVersion: "{{ test_scenario['values']['hbase'] }}"
 {% endif %}
     pullPolicy: IfNotPresent
   clusterConfig:
-    hdfsConfigMapName: test-hdfs
+    hdfsConfigMapName: test-hdfs-namenode-default
     zookeeperConfigMapName: test-znode
 {% if lookup('env', 'VECTOR_AGGREGATOR') %}
     vectorAggregatorConfigMapName: vector-aggregator-discovery
 {% endif %}
-  clusterOperation:
-    stopped: false
-    reconciliationPaused: true
   masters:
     config:
       gracefulShutdownTimeout: 1m
       logging:
         enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
-      listenerClass: external-stable
+      listenerClass: test-external-unstable-$NAMESPACE
     roleGroups:
-      default:
-        replicas: 1
+      external-unstable:
+        replicas: 2
   regionServers:
     config:
       gracefulShutdownTimeout: 1m
       logging:
         enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
-      listenerClass: external-stable
+      listenerClass: test-external-unstable-$NAMESPACE
     roleGroups:
-      default:
+      external-unstable:
         replicas: 1
+      external-stable:
+        replicas: 1
+        config:
+          listenerClass: test-external-stable-$NAMESPACE
   restServers:
     config:
       gracefulShutdownTimeout: 1m
       logging:
         enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
-      listenerClass: external-stable
+      listenerClass: test-external-stable-$NAMESPACE
     roleGroups:
-      default:
-        replicas: 2 # ignored because reconciliation is paused
+      external-stable:
+        replicas: 1
+      external-unstable:
+        replicas: 1
+        config:
+          listenerClass: test-external-unstable-$NAMESPACE

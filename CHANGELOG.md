@@ -4,6 +4,7 @@
 
 ### Added
 
+- BREAKING: Add listener support for HBase ([#639]).
 - Adds new telemetry CLI arguments and environment variables ([#652]).
   - Use `--file-log-max-files` (or `FILE_LOG_MAX_FILES`) to limit the number of log files kept.
   - Use `--file-log-rotation-period` (or `FILE_LOG_ROTATION_PERIOD`) to configure the frequency of rotation.
@@ -39,6 +40,7 @@
 - test: HBase 2.4.18 removed ([#659]):
 - Remove operator support for HBase 2.4 including the JMX exporter ([#672]).
 
+[#639]: https://github.com/stackabletech/hbase-operator/pull/639
 [#640]: https://github.com/stackabletech/hbase-operator/pull/640
 [#645]: https://github.com/stackabletech/hbase-operator/pull/645
 [#647]: https://github.com/stackabletech/hbase-operator/pull/647
