@@ -45,7 +45,5 @@ spec:
                   name: test-hdfs
       securityContext:
         fsGroup: 1000
-        runAsGroup: 1000
-        runAsUser: 1000
       serviceAccountName: test-sa
       restartPolicy: OnFailure
