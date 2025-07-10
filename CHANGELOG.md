@@ -28,11 +28,16 @@
   - The `runAsUser` and `runAsGroup` fields will not be set anymore by the operator
   - The defaults from the docker images itself will now apply, which will be different from 1000/0 going forward
   - This is marked as breaking because tools and policies might exist, which require these fields to be set
+- BREAKING: Bump stackable-operator to 0.94.0 and update other dependencies ([#xxx]).
+  - The default Kubernetes cluster domain name is now fetched from the kubelet API unless explicitly configured.
+  - This requires operators to have the RBAC permission to get nodes/proxy in the apiGroup "". The helm-chart takes care of this.
+  - The CLI argument `--kubernetes-node-name` or env variable `KUBERNETES_NODE_NAME` needs to be set. The helm-chart takes care of this.
 
 ### Fixed
 
 - Use `json` file extension for log files ([#647]).
 - Fix a bug where changes to ConfigMaps that are referenced in the HbaseCluster spec didn't trigger a reconciliation ([#645]).
+- Allow uppercase characters in domain names ([#xxx]).
 
 ### Removed
 
@@ -40,6 +45,8 @@
 - test: Remove HDFS `3.3.4`, `3.3.6`, and `3.4.0` ([#655]).
 - test: HBase 2.4.18 removed ([#659]):
 - Remove operator support for HBase 2.4 including the JMX exporter ([#672]).
+- Remove the `lastUpdateTime` field from the stacklet status ([#xxx]).
+- Remove role binding to legacy service accounts ([#xxx]).
 
 [#639]: https://github.com/stackabletech/hbase-operator/pull/639
 [#640]: https://github.com/stackabletech/hbase-operator/pull/640
@@ -54,6 +61,7 @@
 [#660]: https://github.com/stackabletech/hbase-operator/pull/660
 [#661]: https://github.com/stackabletech/hbase-operator/pull/661
 [#672]: https://github.com/stackabletech/hbase-operator/pull/672
+[#xxx]: https://github.com/stackabletech/hbase-operator/pull/xxx
 
 ## [25.3.0] - 2025-03-21
 

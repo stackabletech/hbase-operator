@@ -25,7 +25,7 @@ use stackable_operator::{
     telemetry::Tracing,
 };
 
-use crate::crd::{HbaseCluster, v1alpha1};
+use crate::crd::{HbaseCluster, HbaseClusterVersion, v1alpha1};
 
 mod config;
 mod crd;
@@ -55,7 +55,7 @@ async fn main() -> anyhow::Result<()> {
     let opts = Opts::parse();
     match opts.cmd {
         Command::Crd => {
-            HbaseCluster::merged_crd(HbaseCluster::V1Alpha1)?
+            HbaseCluster::merged_crd(HbaseClusterVersion::V1Alpha1)?
                 .print_yaml_schema(built_info::PKG_VERSION, SerializeOptions::default())?;
         }
         Command::Run(ProductOperatorRun {
