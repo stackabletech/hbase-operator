@@ -132,25 +132,29 @@ pub enum Error {
     },
 }
 
-#[versioned(version(name = "v1alpha1"))]
+#[versioned(
+    version(name = "v1alpha1"),
+    crates(
+        kube_core = "stackable_operator::kube::core",
+        kube_client = "stackable_operator::kube::client",
+        k8s_openapi = "stackable_operator::k8s_openapi",
+        schemars = "stackable_operator::schemars",
+        versioned = "stackable_operator::versioned"
+    )
+)]
 pub mod versioned {
     /// An HBase cluster stacklet. This resource is managed by the Stackable operator for Apache HBase.
     /// Find more information on how to use it and the resources that the operator generates in the
     /// [operator documentation](DOCS_BASE_URL_PLACEHOLDER/hbase/).
     ///
     /// The CRD contains three roles: `masters`, `regionServers` and `restServers`.
-    #[versioned(k8s(
+    #[versioned(crd(
         group = "hbase.stackable.tech",
         kind = "HbaseCluster",
         plural = "hbaseclusters",
         shortname = "hbase",
         status = "HbaseClusterStatus",
-        namespaced,
-        crates(
-            kube_core = "stackable_operator::kube::core",
-            k8s_openapi = "stackable_operator::k8s_openapi",
-            schemars = "stackable_operator::schemars"
-        )
+        namespaced
     ))]
     #[derive(Clone, CustomResource, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
     #[serde(rename_all = "camelCase")]
@@ -727,7 +731,6 @@ impl HbaseRole {
                             ),
                             recommended_labels,
                         )
-                        .context(ListenerVolumeSourceSnafu)?
                         .build_ephemeral()
                         .context(BuildListenerVolumeSnafu)?,
                     )
@@ -750,7 +753,6 @@ impl HbaseRole {
                     &ListenerReference::ListenerClass(merged_config.listener_class().to_string()),
                     recommended_labels,
                 )
-                .context(ListenerVolumeSourceSnafu)?
                 .build_pvc(LISTENER_VOLUME_NAME.to_string())
                 .context(BuildListenerPvcSnafu)?,
             ]),
