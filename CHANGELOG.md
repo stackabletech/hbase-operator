@@ -10,6 +10,7 @@
   - Use `--file-log-rotation-period` (or `FILE_LOG_ROTATION_PERIOD`) to configure the frequency of rotation.
   - Use `--console-log-format` (or `CONSOLE_LOG_FORMAT`) to set the format to `plain` (default) or `json`.
 - Added support for HBase 2.6.2 ([#659]):
+- Add RBAC rule to helm template for automatic cluster domain detection ([#xxx]).
 
 ### Changed
 
