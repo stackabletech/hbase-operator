@@ -122,14 +122,14 @@ kubectl rollout status --watch statefulset/simple-hbase-restserver-default --tim
 version() {
   # tag::cluster-version[]
   kubectl exec -n default simple-hbase-restserver-default-0 -- \
-  curl -s -XGET -H "Accept: application/json" "http://simple-hbase-restserver-default:8080/version/cluster"
+  curl -s -XGET -H "Accept: application/json" "http://simple-hbase-restserver-default-headless:8080/version/cluster"
   # end::cluster-version[]
 }
 
 echo "Check cluster version..."
 cluster_version=$(version | jq -r '.Version')
 
-if [ "$cluster_version" == "2.6.2" ]; then
+if [ "$cluster_version" == "2.6.2-stackable0.0.0-dev" ]; then
   echo "Cluster version: $cluster_version"
 else
   echo "Unexpected version: $cluster_version"
@@ -139,26 +139,26 @@ fi
 echo "Check cluster status..."
 # tag::cluster-status[]
 kubectl exec -n default simple-hbase-restserver-default-0 \
--- curl -s -XGET -H "Accept: application/json" "http://simple-hbase-restserver-default:8080/status/cluster" | json_pp
+-- curl -s -XGET -H "Accept: application/json" "http://simple-hbase-restserver-default-headless:8080/status/cluster" | json_pp
 # end::cluster-status[]
 
 echo "Check table via REST API..."
 # tag::create-table[]
 kubectl exec -n default simple-hbase-restserver-default-0 \
 -- curl -s -XPUT -H "Accept: text/xml" -H "Content-Type: text/xml" \
-"http://simple-hbase-restserver-default:8080/users/schema" \
+"http://simple-hbase-restserver-default-headless:8080/users/schema" \
 -d '<TableSchema name="users"><ColumnSchema name="cf" /></TableSchema>'
 # end::create-table[]
 
 # tag::get-table[]
 kubectl exec -n default simple-hbase-restserver-default-0 \
--- curl -s -XGET -H "Accept: application/json" "http://simple-hbase-restserver-default:8080/users/schema" | json_pp
+-- curl -s -XGET -H "Accept: application/json" "http://simple-hbase-restserver-default-headless:8080/users/schema" | json_pp
 # end::get-table[]
 
 get_all() {
   # tag::get-tables[]
   kubectl exec -n default simple-hbase-restserver-default-0 \
-  -- curl -s -XGET -H "Accept: application/json" "http://simple-hbase-restserver-default:8080/" |  json_pp
+  -- curl -s -XGET -H "Accept: application/json" "http://simple-hbase-restserver-default-headless:8080/" |  json_pp
   # end::get-tables[]
 }
 
