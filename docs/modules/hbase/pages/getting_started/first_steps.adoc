@@ -102,31 +102,45 @@ which displays cluster metadata that looks like this (only the first region is i
          "Region" : [
             {
                "currentCompactedKVs" : 0,
-               "memStoreSizeMB" : 0,
-               "name" : "U1lTVEVNLkNBVEFMT0csLDE2NjExNjA0NDM2NjcuYmYwMzA1YmM4ZjFmOGIwZWMwYjhmMGNjMWI5N2RmMmUu",
-               "readRequestsCount" : 104,
-               "rootIndexSizeKB" : 1,
-               "storefileIndexSizeKB" : 1,
-               "storefileSizeMB" : 1,
-               "storefiles" : 1,
+               "memStoreSizeMB" : 1,
+               "name" : "aGJhc2U6bWV0YSwsMQ==",
+               "readRequestsCount" : 4,
+               "rootIndexSizeKB" : 0,
+               "storefileIndexSizeKB" : 0,
+               "storefileSizeMB" : 0,
+               "storefiles" : 0,
+               "stores" : 3,
+               "totalCompactingKVs" : 0,
+               "totalStaticBloomSizeKB" : 0,
+               "totalStaticIndexSizeKB" : 0,
+               "writeRequestsCount" : 5
+            },
+            {
+               "currentCompactedKVs" : 0,
+               "memStoreSizeMB" : 1,
+               "name" : "aGJhc2U6bmFtZXNwYWNlLCwxNzUyNDk0MTQzMDQ0LjA1MTA1NWM1NzhhMDQyOWJmZTIwZTFkYTBiY2M4MWE3Lg==",
+               "readRequestsCount" : 6,
+               "rootIndexSizeKB" : 0,
+               "storefileIndexSizeKB" : 0,
+               "storefileSizeMB" : 0,
+               "storefiles" : 0,
                "stores" : 1,
                "totalCompactingKVs" : 0,
                "totalStaticBloomSizeKB" : 0,
-               "totalStaticIndexSizeKB" : 1,
-               "writeRequestsCount" : 360
-            },
-            ...
+               "totalStaticIndexSizeKB" : 0,
+               "writeRequestsCount" : 2
+            }
          ],
-         "heapSizeMB" : 351,
-         "maxHeapSizeMB" : 11978,
-         "name" : "simple-hbase-regionserver-default-0.simple-hbase-regionserver-default.default.svc.cluster.local:16020",
-         "requests" : 395,
-         "startCode" : 1661156787704
+         "heapSizeMB" : 108,
+         "maxHeapSizeMB" : 2458,
+         "name" : "simple-hbase-regionserver-default-0-listener.default.svc.cluster.local:16020",
+         "requests" : 16,
+         "startCode" : 1752494125463
       }
    ],
-   "averageLoad" : 43,
-   "regions" : 43,
-   "requests" : 1716
+   "averageLoad" : 2,
+   "regions" : 2,
+   "requests" : 17
 }
 
 You can now create a table like this:
