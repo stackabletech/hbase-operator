@@ -21,12 +21,12 @@ case "$1" in
 "helm")
 echo "Installing Operators with Helm"
 # tag::helm-install-operators[]
-helm install --wait zookeeper-operator oci://oci.stackable.tech/sdp-charts/zookeeper-operator --version 0.0.0-dev &
-helm install --wait hdfs-operator oci://oci.stackable.tech/sdp-charts/hdfs-operator --version 0.0.0-dev &
-helm install --wait commons-operator oci://oci.stackable.tech/sdp-charts/commons-operator --version 0.0.0-dev &
-helm install --wait secret-operator oci://oci.stackable.tech/sdp-charts/secret-operator --version 0.0.0-dev &
-helm install --wait listener-operator oci://oci.stackable.tech/sdp-charts/listener-operator --version 0.0.0-dev &
-helm install --wait hbase-operator oci://oci.stackable.tech/sdp-charts/hbase-operator --version 0.0.0-dev &
+helm install --wait zookeeper-operator oci://oci.stackable.tech/sdp-charts/zookeeper-operator --version 25.7.0-rc1 &
+helm install --wait hdfs-operator oci://oci.stackable.tech/sdp-charts/hdfs-operator --version 25.7.0-rc1 &
+helm install --wait commons-operator oci://oci.stackable.tech/sdp-charts/commons-operator --version 25.7.0-rc1 &
+helm install --wait secret-operator oci://oci.stackable.tech/sdp-charts/secret-operator --version 25.7.0-rc1 &
+helm install --wait listener-operator oci://oci.stackable.tech/sdp-charts/listener-operator --version 25.7.0-rc1 &
+helm install --wait hbase-operator oci://oci.stackable.tech/sdp-charts/hbase-operator --version 25.7.0-rc1 &
 wait
 # end::helm-install-operators[]
 ;;
@@ -34,12 +34,12 @@ wait
 echo "installing Operators with stackablectl"
 # tag::stackablectl-install-operators[]
 stackablectl operator install \
-  commons=0.0.0-dev \
-  secret=0.0.0-dev \
-  listener=0.0.0-dev \
-  zookeeper=0.0.0-dev \
-  hdfs=0.0.0-dev \
-  hbase=0.0.0-dev
+  commons=25.7.0-rc1 \
+  secret=25.7.0-rc1 \
+  listener=25.7.0-rc1 \
+  zookeeper=25.7.0-rc1 \
+  hdfs=25.7.0-rc1 \
+  hbase=25.7.0-rc1
 # end::stackablectl-install-operators[]
 ;;
 *)
