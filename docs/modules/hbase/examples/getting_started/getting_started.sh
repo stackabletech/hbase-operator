@@ -128,7 +128,6 @@ version() {
 
 echo "Check cluster version..."
 cluster_version=$(version | jq -r '.Version')
-echo "$version"
 
 if [ "$cluster_version" == "2.6.2-stackable25.7.0" ]; then
   echo "Cluster version: $cluster_version"
