@@ -11,7 +11,7 @@ use stackable_operator::{
         },
     },
     kube::{ResourceExt, runtime::reflector::ObjectRef},
-    time::Duration,
+    shared::time::Duration,
     utils::cluster_info::KubernetesClusterInfo,
 };
 

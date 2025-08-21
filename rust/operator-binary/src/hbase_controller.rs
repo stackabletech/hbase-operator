@@ -26,7 +26,10 @@ use stackable_operator::{
         },
     },
     cluster_resources::{ClusterResourceApplyStrategy, ClusterResources},
-    commons::{product_image_selection::ResolvedProductImage, rbac::build_rbac_resources},
+    commons::{
+        product_image_selection::{self, ResolvedProductImage},
+        rbac::build_rbac_resources,
+    },
     k8s_openapi::{
         api::{
             apps::v1::{StatefulSet, StatefulSetSpec},
@@ -55,11 +58,11 @@ use stackable_operator::{
         },
     },
     role_utils::{GenericRoleConfig, RoleGroupRef},
+    shared::time::Duration,
     status::condition::{
         compute_conditions, operations::ClusterOperationsConditionBuilder,
         statefulset::StatefulSetConditionBuilder,
     },
-    time::Duration,
     utils::cluster_info::KubernetesClusterInfo,
 };
 use strum::{EnumDiscriminants, IntoStaticStr, ParseError};
@@ -321,6 +324,11 @@ pub enum Error {
 
     #[snafu(display("failed to build listener persistent volume claim"))]
     ListenerPersistentVolumeClaim { source: crate::crd::Error },
+
+    #[snafu(display("failed to resolve product image"))]
+    ResolveProductImage {
+        source: product_image_selection::Error,
+    },
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -348,7 +356,8 @@ pub async fn reconcile_hbase(
     let resolved_product_image = hbase
         .spec
         .image
-        .resolve(DOCKER_IMAGE_BASE_NAME, crate::built_info::PKG_VERSION);
+        .resolve(DOCKER_IMAGE_BASE_NAME, crate::built_info::PKG_VERSION)
+        .context(ResolveProductImageSnafu)?;
     let zookeeper_connection_information = ZookeeperConnectionInformation::retrieve(hbase, client)
         .await
         .context(RetrieveZookeeperConnectionInformationSnafu)?;
@@ -356,7 +365,7 @@ pub async fn reconcile_hbase(
     let roles = hbase.build_role_properties().context(RolePropertiesSnafu)?;
 
     let validated_config = validate_all_roles_and_groups_config(
-        &resolved_product_image.app_version_label,
+        &resolved_product_image.app_version_label_value,
         &transform_all_roles_to_config(hbase, roles).context(GenerateProductConfigSnafu)?,
         &ctx.product_config,
         false,
@@ -676,7 +685,7 @@ fn build_rolegroup_config_map(
         .context(ObjectMissingMetadataForOwnerRefSnafu)?
         .with_recommended_labels(build_recommended_labels(
             hbase,
-            &resolved_product_image.app_version_label,
+            &resolved_product_image.app_version_label_value,
             &rolegroup.role,
             &rolegroup.role_group,
         ))
@@ -740,7 +749,7 @@ fn build_rolegroup_service(
         .context(ObjectMissingMetadataForOwnerRefSnafu)?
         .with_recommended_labels(build_recommended_labels(
             hbase,
-            &resolved_product_image.app_version_label,
+            &resolved_product_image.app_version_label_value,
             &rolegroup.role,
             &rolegroup.role_group,
         ))
@@ -782,7 +791,7 @@ fn build_rolegroup_statefulset(
     resolved_product_image: &ResolvedProductImage,
     service_account: &ServiceAccount,
 ) -> Result<StatefulSet> {
-    let hbase_version = &resolved_product_image.app_version_label;
+    let hbase_version = &resolved_product_image.app_version_label_value;
 
     let ports = hbase
         .ports(hbase_role)
@@ -1244,7 +1253,9 @@ mod test {
 
         let resolved_image = ResolvedProductImage {
             image: format!("oci.stackable.tech/sdp/hbase:{hbase_version}-stackable0.0.0-dev"),
-            app_version_label: hbase_version.to_string(),
+            app_version_label_value: hbase_version
+                .parse()
+                .expect("test: hbase version is always valid"),
             product_version: hbase_version.to_string(),
             image_pull_policy: "Never".to_string(),
             pull_secrets: None,
