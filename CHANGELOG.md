@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Added
+
+- Helm: Allow Pod `priorityClassName` to be configured ([#691]).
+
+[#691]: https://github.com/stackabletech/hbase-operator/pull/691
+
 ## [25.7.0] - 2025-07-23
 
 ## [25.7.0-rc1] - 2025-07-18
