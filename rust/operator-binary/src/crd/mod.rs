@@ -1311,7 +1311,7 @@ metadata:
   name: test-hbase
 spec:
   image:
-    productVersion: 2.6.2
+    productVersion: 2.6.3
   clusterConfig:
     hdfsConfigMapName: test-hdfs
     zookeeperConfigMapName: test-znode
@@ -1359,7 +1359,7 @@ spec:
         )]);
 
         let validated_config = validate_all_roles_and_groups_config(
-            "2.6.2",
+            "2.6.3",
             &transform_all_roles_to_config(&hbase, roles).unwrap(),
             &ProductConfigManager::from_yaml_file("../../deploy/config-spec/properties.yaml")
                 .unwrap(),
@@ -1412,7 +1412,7 @@ metadata:
   name: test-hbase
 spec:
   image:
-    productVersion: 2.6.2
+    productVersion: 2.6.3
   clusterConfig:
     hdfsConfigMapName: test-hdfs
     zookeeperConfigMapName: test-znode
