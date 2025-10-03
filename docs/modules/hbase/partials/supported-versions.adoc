@@ -2,5 +2,5 @@
 // This is a separate file, since it is used by both the direct HBase-Operator documentation, and the overarching
 // Stackable Platform documentation.
 
-- 2.6.2 (LTS)
-- 2.6.1 (Deprecated)
+- 2.6.3 (LTS)
+- 2.6.2 (Deprecated)

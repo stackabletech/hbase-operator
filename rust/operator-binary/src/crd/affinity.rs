@@ -105,7 +105,7 @@ mod tests {
           name: simple-hbase
         spec:
           image:
-            productVersion: 2.6.2
+            productVersion: 2.6.3
           clusterConfig:
             hdfsConfigMapName: simple-hdfs
             zookeeperConfigMapName: simple-znode
