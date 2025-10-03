@@ -1,4 +1,25 @@
 ---
+global:
+  security:
+    allowInsecureImages: true # needed starting with Chart version 14.9.0 if modifying images
+
+image:
+  repository: bitnamilegacy/minio
+clientImage:
+  repository: bitnamilegacy/minio-client
+defaultInitContainers:
+  volumePermissions:  # volumePermissions moved under defaultInitContainers starting with Chart version 17.0.0
+    image:
+      repository: bitnamilegacy/os-shell
+console:
+  image:
+    repository: bitnamilegacy/minio-object-browser
+
+# volumePermissions can be removed starting with Chart version 17.0.0, moved under defaultInitContainers
+volumePermissions:
+  image:
+    repository: bitnamilegacy/os-shell
+
 persistence:
   enabled: false # "false" means, that an emptyDir is used instead of a persistentVolumeClaim
   size: 64Mi
