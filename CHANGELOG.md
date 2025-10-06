@@ -6,8 +6,13 @@
 
 - Helm: Allow Pod `priorityClassName` to be configured ([#691]).
 - Added support for HBase 2.6.3 ([#695]).
+- Add end-of-support checker ([#697]).
+  - `EOS_CHECK_MODE` (`--eos-check-mode`) to set the EoS check mode. Currently, only "offline" is supported.
+  - `EOS_INTERVAL` (`--eos-interval`) to set the interval in which the operator checks if it is EoS.
+  - `EOS_DISABLED` (`--eos-disabled`) to disable the EoS checker completely.
 
 [#691]: https://github.com/stackabletech/hbase-operator/pull/691
+[#697]: https://github.com/stackabletech/hbase-operator/pull/697
 
 ## [25.7.0] - 2025-07-23
 
