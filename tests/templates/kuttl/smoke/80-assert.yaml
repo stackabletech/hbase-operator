@@ -1,0 +1,11 @@
+---
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+metadata:
+  name: assert-hbck
+commands:
+  # Run the hbck2 command and tests that the return code is zero (0)
+  # This proves that the script is successfully starting the operation
+  # not that the Hbase operation is successful.
+  - script: kubectl exec --namespace=$NAMESPACE -c hbase test-hbase-restserver-default-0 -- hbck2 recoverUnknown
+timeout: 480
