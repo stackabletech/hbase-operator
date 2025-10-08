@@ -289,7 +289,7 @@ fn principal_host_part(
     })?;
     let cluster_domain = &cluster_info.cluster_domain;
     Ok(format!(
-        "{hbase_name}.{hbase_namespace}.svc.{cluster_domain}@${{env.KERBEROS_REALM}}"
+        "{hbase_name}.{hbase_namespace}.svc.{cluster_domain}@${{env:KERBEROS_REALM}}"
     ))
 }
 

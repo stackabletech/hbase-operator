@@ -41,6 +41,6 @@ Contains the needed information to connect to Zookeeper and use that to establis
 === Kerberos
 In case Kerberos is enabled according to the xref:usage-guide/security.adoc[security documentation], the discovery ConfigMap also includes the information that clients must authenticate themselves using Kerberos.
 
-If you want to use the discovery ConfigMap outside Stackable services, you need to substitute `${env.KERBEROS_REALM}` with your actual realm (e.g. by using `sed -i -e 's/${{env.KERBEROS_REALM}}/'"$KERBEROS_REALM/g" hbase-site.xml`).
+If you want to use the discovery ConfigMap outside Stackable services, you need to substitute `${env:KERBEROS_REALM}` with your actual realm (e.g. by using `sed -i -e 's/${{env:KERBEROS_REALM}}/'"$KERBEROS_REALM/g" hbase-site.xml`).
 
-One example would be the property `hbase.master.kerberos.principal` being set to `hbase/hbase.default.svc.cluster.local@${env.KERBEROS_REALM}`.
+One example would be the property `hbase.master.kerberos.principal` being set to `hbase/hbase.default.svc.cluster.local@${env:KERBEROS_REALM}`.
