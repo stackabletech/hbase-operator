@@ -11,8 +11,13 @@
   - `EOS_INTERVAL` (`--eos-interval`) to set the interval in which the operator checks if it is EoS.
   - `EOS_DISABLED` (`--eos-disabled`) to disable the EoS checker completely.
 
+### Changed
+
+- Changed env-vars to be consistent with config-utils in the entrypoint script ([#700]).
+
 [#691]: https://github.com/stackabletech/hbase-operator/pull/691
 [#697]: https://github.com/stackabletech/hbase-operator/pull/697
+[#700]: https://github.com/stackabletech/hbase-operator/pull/700
 
 ## [25.7.0] - 2025-07-23
 
