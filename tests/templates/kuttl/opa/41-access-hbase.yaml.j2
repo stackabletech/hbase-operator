@@ -87,9 +87,12 @@ data:
     klist -k /stackable/kerberos/keytab
 
     export KERBEROS_REALM=$(grep -oP 'default_realm = \K.*' /stackable/kerberos/krb5.conf)
-    cat /stackable/conf/hbase_mount/hbase-site.xml | sed -e 's/${env.KERBEROS_REALM}/'"$KERBEROS_REALM/g" > /stackable/conf/hbase/hbase-site.xml
+    # the hdfs discovery files are not written by the hbase operator and use
+    # the dot notation, so they cannot use config-utils
     cat /stackable/conf/hdfs_mount/core-site.xml | sed -e 's/${env.KERBEROS_REALM}/'"$KERBEROS_REALM/g" > /stackable/conf/hbase/core-site.xml
     cat /stackable/conf/hdfs_mount/hdfs-site.xml | sed -e 's/${env.KERBEROS_REALM}/'"$KERBEROS_REALM/g" > /stackable/conf/hbase/hdfs-site.xml
+    cp /stackable/conf/hbase_mount/hbase-site.xml /stackable/conf/hbase/hbase-site.xml
+    config-utils template /stackable/conf/hbase/hbase-site.xml
 
     kdestroy; kinit -kt /stackable/kerberos/keytab admin/access-hbase.$NAMESPACE.svc.cluster.local; klist
 

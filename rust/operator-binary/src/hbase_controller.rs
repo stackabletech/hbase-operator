@@ -567,15 +567,15 @@ fn build_rolegroup_config_map(
                         );
                         hbase_site_config.insert(
                             "hbase.master.hostname".to_string(),
-                            "${HBASE_SERVICE_HOST}".to_string(),
+                            "${env:HBASE_SERVICE_HOST}".to_string(),
                         );
                         hbase_site_config.insert(
                             "hbase.master.port".to_string(),
-                            "${HBASE_SERVICE_PORT}".to_string(),
+                            "${env:HBASE_SERVICE_PORT}".to_string(),
                         );
                         hbase_site_config.insert(
                             "hbase.master.info.port".to_string(),
-                            "${HBASE_INFO_PORT}".to_string(),
+                            "${env:HBASE_INFO_PORT}".to_string(),
                         );
                         hbase_site_config.insert(
                             "hbase.master.bound.info.port".to_string(),
@@ -593,15 +593,15 @@ fn build_rolegroup_config_map(
                         );
                         hbase_site_config.insert(
                             "hbase.unsafe.regionserver.hostname".to_string(),
-                            "${HBASE_SERVICE_HOST}".to_string(),
+                            "${env:HBASE_SERVICE_HOST}".to_string(),
                         );
                         hbase_site_config.insert(
                             "hbase.regionserver.port".to_string(),
-                            "${HBASE_SERVICE_PORT}".to_string(),
+                            "${env:HBASE_SERVICE_PORT}".to_string(),
                         );
                         hbase_site_config.insert(
                             "hbase.regionserver.info.port".to_string(),
-                            "${HBASE_INFO_PORT}".to_string(),
+                            "${env:HBASE_INFO_PORT}".to_string(),
                         );
                         hbase_site_config.insert(
                             "hbase.regionserver.bound.info.port".to_string(),
