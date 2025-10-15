@@ -45,7 +45,7 @@ use stackable_operator::{
         core::{DeserializeGuard, error_boundary},
         runtime::controller::Action,
     },
-    kvp::{Label, LabelError, Labels, ObjectLabels},
+    kvp::{Annotations, Label, LabelError, Labels, ObjectLabels},
     logging::controller::ReconcilerError,
     memory::{BinaryMultiple, MemoryQuantity},
     product_config_utils::{transform_all_roles_to_config, validate_all_roles_and_groups_config},
@@ -427,6 +427,14 @@ pub async fn reconcile_hbase(
 
             let rg_service =
                 build_rolegroup_service(hbase, &hbase_role, &rolegroup, &resolved_product_image)?;
+
+            let rg_metrics_service = build_rolegroup_metrics_service(
+                hbase,
+                &hbase_role,
+                &rolegroup,
+                &resolved_product_image,
+            )?;
+
             let rg_configmap = build_rolegroup_config_map(
                 hbase,
                 &client.kubernetes_cluster_info,
@@ -448,6 +456,12 @@ pub async fn reconcile_hbase(
             )?;
             cluster_resources
                 .add(client, rg_service)
+                .await
+                .with_context(|_| ApplyRoleGroupServiceSnafu {
+                    rolegroup: rolegroup.clone(),
+                })?;
+            cluster_resources
+                .add(client, rg_metrics_service)
                 .await
                 .with_context(|_| ApplyRoleGroupServiceSnafu {
                     rolegroup: rolegroup.clone(),
@@ -739,12 +753,9 @@ fn build_rolegroup_service(
         })
         .collect();
 
-    let prometheus_label =
-        Label::try_from(("prometheus.io/scrape", "true")).context(BuildLabelSnafu)?;
-
     let metadata = ObjectMetaBuilder::new()
         .name_and_namespace(hbase)
-        .name(headless_service_name(&rolegroup.object_name()))
+        .name(rolegroup.rolegroup_headless_service_name())
         .ownerreference_from_resource(hbase, None, Some(true))
         .context(ObjectMissingMetadataForOwnerRefSnafu)?
         .with_recommended_labels(build_recommended_labels(
@@ -754,7 +765,6 @@ fn build_rolegroup_service(
             &rolegroup.role_group,
         ))
         .context(ObjectMetaSnafu)?
-        .with_label(prometheus_label)
         .build();
 
     let service_selector =
@@ -776,6 +786,82 @@ fn build_rolegroup_service(
         spec: Some(service_spec),
         status: None,
     })
+}
+
+/// The rolegroup metrics [`Service`] is a service that exposes metrics and a prometheus scraping label.
+pub fn build_rolegroup_metrics_service(
+    hbase: &v1alpha1::HbaseCluster,
+    hbase_role: &HbaseRole,
+    rolegroup: &RoleGroupRef<v1alpha1::HbaseCluster>,
+    resolved_product_image: &ResolvedProductImage,
+) -> Result<Service, Error> {
+    let ports = hbase
+        .metrics_ports(hbase_role)
+        .into_iter()
+        .map(|(name, value)| ServicePort {
+            name: Some(name),
+            port: i32::from(value),
+            protocol: Some("TCP".to_string()),
+            ..ServicePort::default()
+        })
+        .collect();
+
+    let service_selector =
+        Labels::role_group_selector(hbase, APP_NAME, &rolegroup.role, &rolegroup.role_group)
+            .context(BuildLabelSnafu)?;
+
+    Ok(Service {
+        metadata: ObjectMetaBuilder::new()
+            .name_and_namespace(hbase)
+            .name(rolegroup.rolegroup_metrics_service_name())
+            .ownerreference_from_resource(hbase, None, Some(true))
+            .context(ObjectMissingMetadataForOwnerRefSnafu)?
+            .with_recommended_labels(build_recommended_labels(
+                hbase,
+                &resolved_product_image.app_version_label_value,
+                &rolegroup.role,
+                &rolegroup.role_group,
+            ))
+            .context(ObjectMetaSnafu)?
+            .with_label(Label::try_from(("prometheus.io/scrape", "true")).context(LabelBuildSnafu)?)
+            .with_annotations(prometheus_annotations(hbase, hbase_role))
+            .build(),
+        spec: Some(ServiceSpec {
+            // Internal communication does not need to be exposed
+            type_: Some("ClusterIP".to_string()),
+            cluster_ip: Some("None".to_string()),
+            ports: Some(ports),
+            selector: Some(service_selector.into()),
+            publish_not_ready_addresses: Some(true),
+            ..ServiceSpec::default()
+        }),
+        status: None,
+    })
+}
+
+/// Common annotations for Prometheus
+///
+/// These annotations can be used in a ServiceMonitor.
+///
+/// see also <https://github.com/prometheus-community/helm-charts/blob/prometheus-27.32.0/charts/prometheus/values.yaml#L983-L1036>
+fn prometheus_annotations(hbase: &v1alpha1::HbaseCluster, hbase_role: &HbaseRole) -> Annotations {
+    Annotations::try_from([
+        ("prometheus.io/path".to_owned(), "/prometheus".to_owned()),
+        (
+            "prometheus.io/port".to_owned(),
+            hbase.metrics_port(hbase_role).to_string(),
+        ),
+        (
+            "prometheus.io/scheme".to_owned(),
+            if hbase.has_https_enabled() {
+                "https".to_owned()
+            } else {
+                "http".to_owned()
+            },
+        ),
+        ("prometheus.io/scrape".to_owned(), "true".to_owned()),
+    ])
+    .expect("should be valid annotations")
 }
 
 /// The rolegroup [`StatefulSet`] runs the rolegroup, as configured by the administrator.
@@ -1088,7 +1174,7 @@ fn build_rolegroup_statefulset(
             match_labels: Some(statefulset_match_labels.into()),
             ..LabelSelector::default()
         },
-        service_name: Some(headless_service_name(&rolegroup_ref.object_name())),
+        service_name: Some(rolegroup_ref.rolegroup_headless_service_name()),
         template: pod_template,
         volume_claim_templates: listener_pvc,
         ..StatefulSetSpec::default()
@@ -1196,10 +1282,6 @@ fn build_hbase_env_sh(
     }
 
     Ok(result)
-}
-
-fn headless_service_name(role_group_name: &str) -> String {
-    format!("{name}-headless", name = role_group_name)
 }
 
 #[cfg(test)]
