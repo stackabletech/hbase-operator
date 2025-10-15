@@ -69,16 +69,20 @@ pub const HBASE_UI_PORT_NAME_HTTP: &str = "ui-http";
 pub const HBASE_UI_PORT_NAME_HTTPS: &str = "ui-https";
 pub const HBASE_REST_PORT_NAME_HTTP: &str = "rest-http";
 pub const HBASE_REST_PORT_NAME_HTTPS: &str = "rest-https";
+pub const HBASE_METRICS_PORT_NAME: &str = "metrics";
 
 pub const HBASE_MASTER_PORT: u16 = 16000;
 // HBase always uses 16010, regardless of http or https. On 2024-01-17 we decided in Arch-meeting that we want to stick
 // the port numbers to what the product is doing, so we get the least surprise for users - even when this means we have
 // inconsistency between Stackable products.
 pub const HBASE_MASTER_UI_PORT: u16 = 16010;
+pub const HBASE_MASTER_METRICS_PORT: u16 = 16010;
 pub const HBASE_REGIONSERVER_PORT: u16 = 16020;
 pub const HBASE_REGIONSERVER_UI_PORT: u16 = 16030;
+pub const HBASE_REGIONSERVER_METRICS_PORT: u16 = 16030;
 pub const HBASE_REST_PORT: u16 = 8080;
 pub const HBASE_REST_UI_PORT: u16 = 8085;
+pub const HBASE_REST_METRICS_PORT: u16 = 8085;
 pub const LISTENER_VOLUME_NAME: &str = "listener";
 pub const LISTENER_VOLUME_DIR: &str = "/stackable/listener";
 
@@ -542,11 +546,37 @@ impl v1alpha1::HbaseCluster {
         }
     }
 
+    /// Returns required metrics port name and metrics port number tuples depending on the role.
+    /// The metrics are available over the UI port.
+    pub fn metrics_ports(&self, role: &HbaseRole) -> Vec<(String, u16)> {
+        match role {
+            HbaseRole::Master => vec![(
+                HBASE_METRICS_PORT_NAME.to_string(),
+                HBASE_MASTER_METRICS_PORT,
+            )],
+            HbaseRole::RegionServer => vec![(
+                HBASE_METRICS_PORT_NAME.to_string(),
+                HBASE_REGIONSERVER_METRICS_PORT,
+            )],
+            HbaseRole::RestServer => {
+                vec![(HBASE_METRICS_PORT_NAME.to_string(), HBASE_REST_METRICS_PORT)]
+            }
+        }
+    }
+
     pub fn service_port(&self, role: &HbaseRole) -> u16 {
         match role {
             HbaseRole::Master => HBASE_MASTER_PORT,
             HbaseRole::RegionServer => HBASE_REGIONSERVER_PORT,
             HbaseRole::RestServer => HBASE_REST_PORT,
+        }
+    }
+
+    pub fn metrics_port(&self, role: &HbaseRole) -> u16 {
+        match role {
+            HbaseRole::Master => HBASE_MASTER_METRICS_PORT,
+            HbaseRole::RegionServer => HBASE_REGIONSERVER_METRICS_PORT,
+            HbaseRole::RestServer => HBASE_REST_METRICS_PORT,
         }
     }
 
