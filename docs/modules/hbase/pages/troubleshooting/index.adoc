@@ -1,0 +1,18 @@
+= Troubleshooting
+
+== Hbase access with kerberos authentication
+
+Currently, xref:zookeeper-operator:index.adoc[Zookeeper] is not secured with authentication. This means, if an application tries to connect to Hbase, it would ask the zookeeper quorum to figure the correct nodes to talk to. In a Java world, you would define a `Client` which would carry the kerberos requirements.
+
+However, those requirements might be passed through and thus your client ( e.g. xref:spark-k8s-operator:usage-guide:operations:applications.adoc[SparkApplications] ) would try to authenticate with kerberos at the corresponding Zookeeper endpoint. This will result in a kerberos ( authentication ) error.
+
+To prevent this, you can set a jvm argument like ( again e.g. SparkApplications )
+
+[source,yaml]
+----
+jvmArgumentOverrides:
+    add:
+        - "-Dzookeeper.sasl.client=false"
+----
+
+in all pods which would like to talk to Hbase.
