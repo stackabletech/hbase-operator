@@ -1092,6 +1092,7 @@ fn build_rolegroup_statefulset(
     if hbase.has_kerberos_enabled() {
         add_kerberos_pod_config(
             hbase,
+            rolegroup_ref,
             &mut hbase_container,
             &mut pod_builder,
             merged_config
