@@ -801,7 +801,7 @@ pub fn build_rolegroup_metrics_service(
         .map(|(name, value)| ServicePort {
             name: Some(name),
             port: i32::from(value),
-            protocol: Some("TCP".to_string()),
+            protocol: Some("TCP".to_owned()),
             ..ServicePort::default()
         })
         .collect();
