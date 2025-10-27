@@ -551,15 +551,15 @@ impl v1alpha1::HbaseCluster {
     pub fn metrics_ports(&self, role: &HbaseRole) -> Vec<(String, u16)> {
         match role {
             HbaseRole::Master => vec![(
-                HBASE_METRICS_PORT_NAME.to_string(),
+                HBASE_METRICS_PORT_NAME.to_owned(),
                 HBASE_MASTER_METRICS_PORT,
             )],
             HbaseRole::RegionServer => vec![(
-                HBASE_METRICS_PORT_NAME.to_string(),
+                HBASE_METRICS_PORT_NAME.to_owned(),
                 HBASE_REGIONSERVER_METRICS_PORT,
             )],
             HbaseRole::RestServer => {
-                vec![(HBASE_METRICS_PORT_NAME.to_string(), HBASE_REST_METRICS_PORT)]
+                vec![(HBASE_METRICS_PORT_NAME.to_owned(), HBASE_REST_METRICS_PORT)]
             }
         }
     }
