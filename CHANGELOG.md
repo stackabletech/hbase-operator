@@ -14,6 +14,7 @@
 
 ### Changed
 
+- Bump stackable-operator to `0.100.1` ([#705]).
 - Changed env-vars to be consistent with config-utils in the entrypoint script ([#700]).
 - BREAKING: The `prometheus.io/scrape` label moved from the `headless` Service to the `metrics` Service, which
   uses `metrics` as the port name instead of the previous `ui-http`/`ui-https` port name ([#701]).
@@ -22,6 +23,7 @@
 [#697]: https://github.com/stackabletech/hbase-operator/pull/697
 [#700]: https://github.com/stackabletech/hbase-operator/pull/700
 [#701]: https://github.com/stackabletech/hbase-operator/pull/701
+[#705]: https://github.com/stackabletech/hbase-operator/pull/705
 
 ## [25.7.0] - 2025-07-23
 
