@@ -774,10 +774,8 @@ impl HbaseRole {
         }
     }
 
-    pub fn metrics_port_name(&self) -> &str {
-        match self {
-            _ => HBASE_METRICS_PORT_NAME,
-        }
+    pub fn metrics_port_name() -> &'static str {
+        HBASE_METRICS_PORT_NAME
     }
 }
 

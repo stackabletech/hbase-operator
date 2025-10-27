@@ -765,7 +765,7 @@ pub fn build_rolegroup_metrics_service(
     resolved_product_image: &ResolvedProductImage,
 ) -> Result<Service, Error> {
     let ports = vec![ServicePort {
-        name: Some(hbase_role.metrics_port_name().to_owned()),
+        name: Some(HbaseRole::metrics_port_name().to_owned()),
         port: i32::from(hbase_role.metrics_port()),
         protocol: Some("TCP".to_owned()),
         ..ServicePort::default()
