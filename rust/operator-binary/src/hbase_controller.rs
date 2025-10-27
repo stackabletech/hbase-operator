@@ -828,8 +828,8 @@ pub fn build_rolegroup_metrics_service(
             .build(),
         spec: Some(ServiceSpec {
             // Internal communication does not need to be exposed
-            type_: Some("ClusterIP".to_string()),
-            cluster_ip: Some("None".to_string()),
+            type_: Some("ClusterIP".to_owned()),
+            cluster_ip: Some("None".to_owned()),
             ports: Some(ports),
             selector: Some(service_selector.into()),
             publish_not_ready_addresses: Some(true),
