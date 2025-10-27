@@ -75,10 +75,9 @@ use crate::{
     },
     crd::{
         APP_NAME, AnyServiceConfig, Container, HBASE_ENV_SH, HBASE_MASTER_PORT,
-        HBASE_MASTER_UI_PORT, HBASE_REGIONSERVER_PORT, HBASE_REGIONSERVER_UI_PORT,
-        HBASE_REST_PORT_NAME_HTTP, HBASE_REST_PORT_NAME_HTTPS, HBASE_SITE_XML, HbaseClusterStatus,
-        HbaseRole, JVM_SECURITY_PROPERTIES_FILE, LISTENER_VOLUME_DIR, LISTENER_VOLUME_NAME,
-        SSL_CLIENT_XML, SSL_SERVER_XML, merged_env, v1alpha1,
+        HBASE_MASTER_UI_PORT, HBASE_REGIONSERVER_PORT, HBASE_REGIONSERVER_UI_PORT, HBASE_SITE_XML,
+        HbaseClusterStatus, HbaseRole, JVM_SECURITY_PROPERTIES_FILE, LISTENER_VOLUME_DIR,
+        LISTENER_VOLUME_NAME, SSL_CLIENT_XML, SSL_SERVER_XML, merged_env, v1alpha1,
     },
     discovery::build_discovery_configmap,
     kerberos::{
@@ -108,9 +107,6 @@ const HBASE_LOG_CONFIG_TMP_DIR: &str = "/stackable/tmp/log_config";
 
 const DOCKER_IMAGE_BASE_NAME: &str = "hbase";
 
-const HBASE_MASTER_PORT_NAME: &str = "master";
-const HBASE_REGIONSERVER_PORT_NAME: &str = "regionserver";
-
 pub struct Ctx {
     pub client: stackable_operator::client::Client,
     pub product_config: ProductConfigManager,
@@ -124,21 +120,6 @@ pub enum Error {
 
     #[snafu(display("missing secret lifetime"))]
     MissingSecretLifetime,
-
-    #[snafu(display("object defines no version"))]
-    ObjectHasNoVersion,
-
-    #[snafu(display("object defines no namespace"))]
-    ObjectHasNoNamespace,
-
-    #[snafu(display("object defines no master role"))]
-    NoMasterRole,
-
-    #[snafu(display("the HBase role [{role}] is missing from spec"))]
-    MissingHbaseRole { role: String },
-
-    #[snafu(display("object defines no regionserver role"))]
-    NoRegionServerRole,
 
     #[snafu(display("failed to create cluster resources"))]
     CreateClusterResources {
@@ -206,12 +187,6 @@ pub enum Error {
         cm_name: String,
     },
 
-    #[snafu(display("failed to retrieve the entry {entry} for config map {cm_name}"))]
-    MissingConfigMapEntry {
-        entry: &'static str,
-        cm_name: String,
-    },
-
     #[snafu(display("failed to patch service account"))]
     ApplyServiceAccount {
         source: stackable_operator::cluster_resources::Error,
@@ -227,9 +202,6 @@ pub enum Error {
         source: strum::ParseError,
         role: String,
     },
-
-    #[snafu(display("failed to retrieve Hbase role group: {source}"))]
-    UnidentifiedHbaseRoleGroup { source: crate::crd::Error },
 
     #[snafu(display("failed to resolve and merge config for role and role group"))]
     FailedToResolveConfig { source: crate::crd::Error },
@@ -288,9 +260,6 @@ pub enum Error {
 
     #[snafu(display("unknown role [{role}]"))]
     UnknownHbaseRole { source: ParseError, role: String },
-
-    #[snafu(display("authorization is only supported from HBase 2.6 onwards"))]
-    AuthorizationNotSupported,
 
     #[snafu(display("failed to configure logging"))]
     ConfigureLogging { source: LoggingError },
@@ -742,8 +711,8 @@ fn build_rolegroup_service(
     rolegroup: &RoleGroupRef<v1alpha1::HbaseCluster>,
     resolved_product_image: &ResolvedProductImage,
 ) -> Result<Service> {
-    let ports = hbase
-        .ports(hbase_role)
+    let ports = hbase_role
+        .ports(hbase)
         .into_iter()
         .map(|(name, value)| ServicePort {
             name: Some(name),
@@ -795,16 +764,12 @@ pub fn build_rolegroup_metrics_service(
     rolegroup: &RoleGroupRef<v1alpha1::HbaseCluster>,
     resolved_product_image: &ResolvedProductImage,
 ) -> Result<Service, Error> {
-    let ports = hbase
-        .metrics_ports(hbase_role)
-        .into_iter()
-        .map(|(name, value)| ServicePort {
-            name: Some(name),
-            port: i32::from(value),
-            protocol: Some("TCP".to_owned()),
-            ..ServicePort::default()
-        })
-        .collect();
+    let ports = vec![ServicePort {
+        name: Some(hbase_role.metrics_port_name().to_owned()),
+        port: i32::from(hbase_role.metrics_port()),
+        protocol: Some("TCP".to_owned()),
+        ..ServicePort::default()
+    }];
 
     let service_selector =
         Labels::role_group_selector(hbase, APP_NAME, &rolegroup.role, &rolegroup.role_group)
@@ -849,7 +814,7 @@ fn prometheus_annotations(hbase: &v1alpha1::HbaseCluster, hbase_role: &HbaseRole
         ("prometheus.io/path".to_owned(), "/prometheus".to_owned()),
         (
             "prometheus.io/port".to_owned(),
-            hbase.metrics_port(hbase_role).to_string(),
+            hbase_role.metrics_port().to_string(),
         ),
         (
             "prometheus.io/scheme".to_owned(),
@@ -879,8 +844,8 @@ fn build_rolegroup_statefulset(
 ) -> Result<StatefulSet> {
     let hbase_version = &resolved_product_image.app_version_label_value;
 
-    let ports = hbase
-        .ports(hbase_role)
+    let ports = hbase_role
+        .ports(hbase)
         .into_iter()
         .map(|(name, value)| ContainerPort {
             name: Some(name),
@@ -890,38 +855,12 @@ fn build_rolegroup_statefulset(
         })
         .collect();
 
-    let probe_template = match hbase_role {
-        HbaseRole::Master => Probe {
-            tcp_socket: Some(TCPSocketAction {
-                port: IntOrString::String(HBASE_MASTER_PORT_NAME.to_string()),
-                ..TCPSocketAction::default()
-            }),
-            ..Probe::default()
-        },
-        HbaseRole::RegionServer => Probe {
-            tcp_socket: Some(TCPSocketAction {
-                port: IntOrString::String(HBASE_REGIONSERVER_PORT_NAME.to_string()),
-                ..TCPSocketAction::default()
-            }),
-            ..Probe::default()
-        },
-        HbaseRole::RestServer => Probe {
-            // We cant use HTTPGetAction, as it returns a 401 in case kerberos is enabled, and there is currently no way
-            // to tell Kubernetes an 401 is healthy. As an alternative we run curl ourselves and check the http status
-            // code there.
-            tcp_socket: Some(TCPSocketAction {
-                port: IntOrString::String(
-                    if hbase.has_https_enabled() {
-                        HBASE_REST_PORT_NAME_HTTPS
-                    } else {
-                        HBASE_REST_PORT_NAME_HTTP
-                    }
-                    .to_string(),
-                ),
-                ..TCPSocketAction::default()
-            }),
-            ..Probe::default()
-        },
+    let probe_template = Probe {
+        tcp_socket: Some(TCPSocketAction {
+            port: IntOrString::String(hbase_role.data_port_name(hbase)),
+            ..TCPSocketAction::default()
+        }),
+        ..Probe::default()
     };
 
     let startup_probe = Probe {
@@ -967,12 +906,6 @@ fn build_rolegroup_statefulset(
     let role_name = hbase_role.cli_role_name();
     let mut hbase_container = ContainerBuilder::new("hbase").expect("ContainerBuilder not created");
 
-    let rest_http_port_name = if hbase.has_https_enabled() {
-        HBASE_REST_PORT_NAME_HTTPS
-    } else {
-        HBASE_REST_PORT_NAME_HTTP
-    };
-
     hbase_container
         .image_from_product_image(resolved_product_image)
         .command(command())
@@ -980,13 +913,9 @@ fn build_rolegroup_statefulset(
             {entrypoint} {role} {port} {port_name} {ui_port_name}",
             entrypoint = "/stackable/hbase/bin/hbase-entrypoint.sh".to_string(),
             role = role_name,
-            port = hbase.service_port(hbase_role).to_string(),
-            port_name = match hbase_role {
-                HbaseRole::Master => HBASE_MASTER_PORT_NAME,
-                HbaseRole::RegionServer => HBASE_REGIONSERVER_PORT_NAME,
-                HbaseRole::RestServer => rest_http_port_name,
-            },
-            ui_port_name = hbase.ui_port_name(),
+            port = hbase_role.data_port(),
+            port_name = hbase_role.data_port_name(hbase),
+            ui_port_name = HbaseRole::ui_port_name(hbase),
         }])
         .add_env_vars(merged_env)
         // Needed for the `containerdebug` process to log it's tracing information to.
