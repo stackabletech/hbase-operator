@@ -16,7 +16,7 @@ and the clients scraping the metrics endpoint need to authenticate against it. T
 between Kubernetes Pods with the xref:home:secret-operator:index.adoc[Secret Operator].
 
 When using Prometheus `ServiceMonitor` for scraping, the `address` label needs relabeling to use the `headless` Service instead of the
-`metrics` Service. This is because per default Prometheus targets the Pod IPs as endpoints, but since the Pod IPs are not
+`metrics` Service. This is because by default Prometheus targets the Pod IPs as endpoints, but since the Pod IPs are not
 part of the certificate, the authentication will fail. Instead, the FQDN of the Pods, which can be added to the certificate, is used, but
 this FQDN is only available through the `headless` Service.
 

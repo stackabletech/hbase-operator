@@ -719,7 +719,8 @@ impl HbaseRole {
     }
 
     /// Returns required port name and port number tuples depending on the role.
-    /// Hbase versions 2.6.* will have two ports for each role. The metrics are available over the
+    ///
+    /// Hbase versions 2.6.* will have two ports for each role. The metrics are available on the
     /// UI port.
     pub fn ports(&self, hbase: &v1alpha1::HbaseCluster) -> Vec<(String, u16)> {
         vec![
