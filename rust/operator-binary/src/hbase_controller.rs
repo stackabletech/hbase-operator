@@ -915,7 +915,7 @@ fn build_rolegroup_statefulset(
             role = role_name,
             port = hbase_role.data_port(),
             port_name = hbase_role.data_port_name(hbase),
-            ui_port_name = HbaseRole::ui_port_name(hbase),
+            ui_port_name = HbaseRole::ui_port_name(hbase.has_https_enabled()),
         }])
         .add_env_vars(merged_env)
         // Needed for the `containerdebug` process to log it's tracing information to.

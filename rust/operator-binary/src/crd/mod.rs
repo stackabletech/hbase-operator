@@ -725,7 +725,10 @@ impl HbaseRole {
     pub fn ports(&self, hbase: &v1alpha1::HbaseCluster) -> Vec<(String, u16)> {
         vec![
             (self.data_port_name(hbase), self.data_port()),
-            (Self::ui_port_name(hbase).to_string(), self.ui_port()),
+            (
+                Self::ui_port_name(hbase.has_https_enabled()).to_string(),
+                self.ui_port(),
+            ),
         ]
     }
 
@@ -759,8 +762,8 @@ impl HbaseRole {
     }
 
     /// Name of the port used by the Web UI, which depends on HTTPS usage
-    pub fn ui_port_name(hbase: &v1alpha1::HbaseCluster) -> &str {
-        if hbase.has_https_enabled() {
+    pub fn ui_port_name(has_https_enabled: bool) -> &'static str {
+        if has_https_enabled {
             HBASE_UI_PORT_NAME_HTTPS
         } else {
             HBASE_UI_PORT_NAME_HTTP
