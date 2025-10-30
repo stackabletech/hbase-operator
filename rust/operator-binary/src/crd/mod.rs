@@ -65,20 +65,24 @@ pub const SSL_CLIENT_XML: &str = "ssl-client.xml";
 pub const HBASE_CLUSTER_DISTRIBUTED: &str = "hbase.cluster.distributed";
 pub const HBASE_ROOTDIR: &str = "hbase.rootdir";
 
-pub const HBASE_UI_PORT_NAME_HTTP: &str = "ui-http";
-pub const HBASE_UI_PORT_NAME_HTTPS: &str = "ui-https";
-pub const HBASE_REST_PORT_NAME_HTTP: &str = "rest-http";
-pub const HBASE_REST_PORT_NAME_HTTPS: &str = "rest-https";
+const HBASE_UI_PORT_NAME_HTTP: &str = "ui-http";
+const HBASE_UI_PORT_NAME_HTTPS: &str = "ui-https";
+const HBASE_REST_PORT_NAME_HTTP: &str = "rest-http";
+const HBASE_REST_PORT_NAME_HTTPS: &str = "rest-https";
+const HBASE_METRICS_PORT_NAME: &str = "metrics";
 
 pub const HBASE_MASTER_PORT: u16 = 16000;
 // HBase always uses 16010, regardless of http or https. On 2024-01-17 we decided in Arch-meeting that we want to stick
 // the port numbers to what the product is doing, so we get the least surprise for users - even when this means we have
 // inconsistency between Stackable products.
 pub const HBASE_MASTER_UI_PORT: u16 = 16010;
+pub const HBASE_MASTER_METRICS_PORT: u16 = 16010;
 pub const HBASE_REGIONSERVER_PORT: u16 = 16020;
 pub const HBASE_REGIONSERVER_UI_PORT: u16 = 16030;
+pub const HBASE_REGIONSERVER_METRICS_PORT: u16 = 16030;
 pub const HBASE_REST_PORT: u16 = 8080;
 pub const HBASE_REST_UI_PORT: u16 = 8085;
+pub const HBASE_REST_METRICS_PORT: u16 = 8085;
 pub const LISTENER_VOLUME_NAME: &str = "listener";
 pub const LISTENER_VOLUME_DIR: &str = "/stackable/listener";
 
@@ -513,52 +517,6 @@ impl v1alpha1::HbaseCluster {
             .as_ref()
             .map(|a| a.tls_secret_class.clone())
     }
-
-    /// Returns required port name and port number tuples depending on the role.
-    /// Hbase versions 2.6.* will have two ports for each role. The metrics are available over the
-    /// UI port.
-    pub fn ports(&self, role: &HbaseRole) -> Vec<(String, u16)> {
-        match role {
-            HbaseRole::Master => vec![
-                ("master".to_string(), HBASE_MASTER_PORT),
-                (self.ui_port_name(), HBASE_MASTER_UI_PORT),
-            ],
-            HbaseRole::RegionServer => vec![
-                ("regionserver".to_string(), HBASE_REGIONSERVER_PORT),
-                (self.ui_port_name(), HBASE_REGIONSERVER_UI_PORT),
-            ],
-            HbaseRole::RestServer => vec![
-                (
-                    if self.has_https_enabled() {
-                        HBASE_REST_PORT_NAME_HTTPS
-                    } else {
-                        HBASE_REST_PORT_NAME_HTTP
-                    }
-                    .to_string(),
-                    HBASE_REST_PORT,
-                ),
-                (self.ui_port_name(), HBASE_REST_UI_PORT),
-            ],
-        }
-    }
-
-    pub fn service_port(&self, role: &HbaseRole) -> u16 {
-        match role {
-            HbaseRole::Master => HBASE_MASTER_PORT,
-            HbaseRole::RegionServer => HBASE_REGIONSERVER_PORT,
-            HbaseRole::RestServer => HBASE_REST_PORT,
-        }
-    }
-
-    /// Name of the port used by the Web UI, which depends on HTTPS usage
-    pub fn ui_port_name(&self) -> String {
-        if self.has_https_enabled() {
-            HBASE_UI_PORT_NAME_HTTPS
-        } else {
-            HBASE_UI_PORT_NAME_HTTP
-        }
-        .to_string()
-    }
 }
 
 pub fn merged_env(rolegroup_config: Option<&BTreeMap<String, String>>) -> Vec<EnvVar> {
@@ -758,6 +716,70 @@ impl HbaseRole {
             ]),
         };
         Ok(pvc)
+    }
+
+    /// Returns required port name and port number tuples depending on the role.
+    ///
+    /// Hbase versions 2.6.* will have two ports for each role. The metrics are available on the
+    /// UI port.
+    pub fn ports(&self, hbase: &v1alpha1::HbaseCluster) -> Vec<(String, u16)> {
+        vec![
+            (self.data_port_name(hbase), self.data_port()),
+            (
+                Self::ui_port_name(hbase.has_https_enabled()).to_string(),
+                self.ui_port(),
+            ),
+        ]
+    }
+
+    pub fn data_port(&self) -> u16 {
+        match self {
+            HbaseRole::Master => HBASE_MASTER_PORT,
+            HbaseRole::RegionServer => HBASE_REGIONSERVER_PORT,
+            HbaseRole::RestServer => HBASE_REST_PORT,
+        }
+    }
+
+    pub fn data_port_name(&self, hbase: &v1alpha1::HbaseCluster) -> String {
+        match self {
+            HbaseRole::Master | HbaseRole::RegionServer => self.to_string(),
+            HbaseRole::RestServer => {
+                if hbase.has_https_enabled() {
+                    HBASE_REST_PORT_NAME_HTTPS.to_owned()
+                } else {
+                    HBASE_REST_PORT_NAME_HTTP.to_owned()
+                }
+            }
+        }
+    }
+
+    pub fn ui_port(&self) -> u16 {
+        match self {
+            HbaseRole::Master => HBASE_MASTER_UI_PORT,
+            HbaseRole::RegionServer => HBASE_REGIONSERVER_UI_PORT,
+            HbaseRole::RestServer => HBASE_REST_UI_PORT,
+        }
+    }
+
+    /// Name of the port used by the Web UI, which depends on HTTPS usage
+    pub fn ui_port_name(has_https_enabled: bool) -> &'static str {
+        if has_https_enabled {
+            HBASE_UI_PORT_NAME_HTTPS
+        } else {
+            HBASE_UI_PORT_NAME_HTTP
+        }
+    }
+
+    pub fn metrics_port(&self) -> u16 {
+        match self {
+            HbaseRole::Master => HBASE_MASTER_METRICS_PORT,
+            HbaseRole::RegionServer => HBASE_REGIONSERVER_METRICS_PORT,
+            HbaseRole::RestServer => HBASE_REST_METRICS_PORT,
+        }
+    }
+
+    pub fn metrics_port_name() -> &'static str {
+        HBASE_METRICS_PORT_NAME
     }
 }
 
