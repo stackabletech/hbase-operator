@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [25.11.0-rc1] - 2025-11-06
+
 ### Added
 
 - Helm: Allow Pod `priorityClassName` to be configured ([#691]).
