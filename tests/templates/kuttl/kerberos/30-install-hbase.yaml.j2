@@ -65,4 +65,17 @@ commands:
           roleGroups:
             default:
               replicas: 1
+          configOverrides:
+            hbase-site.xml:
+              # Allow Kerberos authentication at the hbase-restserver-default-headless service
+              hbase.rest.authentication.kerberos.principal: HTTP/hbase-restserver-default-headless.$NAMESPACE.svc.cluster.local@\${env:KERBEROS_REALM}
+          podOverrides:
+            spec:
+              volumes:
+                - name: kerberos
+                  ephemeral:
+                    volumeClaimTemplate:
+                      metadata:
+                        annotations:
+                          secrets.stackable.tech/scope: service=hbase,service=hbase-restserver-default-headless
       EOF
