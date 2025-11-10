@@ -4,6 +4,16 @@
 
 ### Added
 
+- Add `hbase.rest.hostname`, `hbase.rest.port`, and `hbase.rest.info.port` properties to the restserver `hbase-site.xml` ([#708]).
+
+[#708]: https://github.com/stackabletech/hbase-operator/pull/708
+
+## [25.11.0] - 2025-11-07
+
+## [25.11.0-rc1] - 2025-11-06
+
+### Added
+
 - Helm: Allow Pod `priorityClassName` to be configured ([#691]).
 - Added support for HBase 2.6.3 ([#695]).
 - Add end-of-support checker ([#697]).
