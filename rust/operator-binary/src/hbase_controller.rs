@@ -591,7 +591,20 @@ fn build_rolegroup_config_map(
                             HBASE_REGIONSERVER_UI_PORT.to_string(),
                         );
                     }
-                    HbaseRole::RestServer => {}
+                    HbaseRole::RestServer => {
+                        hbase_site_config.insert(
+                            "hbase.rest.hostname".to_string(),
+                            "${env:HBASE_SERVICE_HOST}".to_string(),
+                        );
+                        hbase_site_config.insert(
+                            "hbase.rest.port".to_string(),
+                            "${env:HBASE_SERVICE_PORT}".to_string(),
+                        );
+                        hbase_site_config.insert(
+                            "hbase.rest.info.port".to_string(),
+                            "${env:HBASE_INFO_PORT}".to_string(),
+                        );
+                    }
                 };
 
                 // configOverride come last
