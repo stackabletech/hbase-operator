@@ -1,0 +1,69 @@
+---
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  - script: |
+      kubectl apply -n $NAMESPACE -f - <<EOF
+      ---
+      apiVersion: batch/v1
+      kind: Job
+      metadata:
+        name: test-rest-server
+      spec:
+        template:
+          spec:
+            serviceAccountName: test-sa
+            containers:
+              - name: test-rest-server
+                image: oci.stackable.tech/sdp/testing-tools:0.2.0-stackable0.0.0-dev
+                command:
+                  - /bin/bash
+                  - -c
+                  - |
+                    status_code=\$(curl --write-out '%{http_code}' --silent --insecure --output /dev/null "https://hbase-restserver-default-headless:8080")
+
+                    if [[ "\$status_code" -eq 401 ]] ; then
+                      echo "[PASS] Successfully got 401 as we did not authenticate"
+                    else
+                      echo "[FAIL] Expected the restserver to return a 401 as we did not authenticate"
+                      exit 1
+                    fi
+
+                    kinit -kt /stackable/kerberos/keytab testuser/test-rest-server.$NAMESPACE.svc.cluster.local@{{ test_scenario['values']['kerberos-realm'] }}
+
+                    status_code=\$(curl --write-out '%{http_code}' --silent --insecure --output /dev/null --negotiate --user : "https://hbase-restserver-default-headless:8080")
+
+                    if [[ "\$status_code" -eq 200 ]] ; then
+                      echo "[PASS] Successfully got 200 as we did authenticate"
+                    else
+                      echo "[FAIL] Expected the restserver to return a 200 as we did authenticate"
+                      exit 1
+                    fi
+                env:
+                  - name: KRB5_CONFIG
+                    value: /stackable/kerberos/krb5.conf
+                volumeMounts:
+                  - name: kerberos
+                    mountPath: /stackable/kerberos
+            volumes:
+              - name: kerberos
+                ephemeral:
+                  volumeClaimTemplate:
+                    metadata:
+                      annotations:
+                        secrets.stackable.tech/class: kerberos-$NAMESPACE
+                        secrets.stackable.tech/scope: service=test-rest-server
+                        secrets.stackable.tech/kerberos.service.names: testuser
+                    spec:
+                      storageClassName: secrets.stackable.tech
+                      accessModes:
+                        - ReadWriteOnce
+                      resources:
+                        requests:
+                          storage: "1"
+            securityContext:
+              fsGroup: 1000
+              runAsGroup: 1000
+              runAsUser: 1000
+            restartPolicy: OnFailure
+      EOF
