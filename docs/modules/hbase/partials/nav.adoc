@@ -25,3 +25,4 @@
 ** xref:hbase:reference/discovery.adoc[]
 ** xref:hbase:reference/commandline-parameters.adoc[]
 ** xref:hbase:reference/environment-variables.adoc[]
+* xref:hbase:troubleshooting/index.adoc[]
