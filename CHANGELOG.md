@@ -4,9 +4,10 @@
 
 ### Added
 
-- Add `hbase.rest.hostname`, `hbase.rest.port`, and `hbase.rest.info.port` properties to the restserver `hbase-site.xml` ([#708]).
+- Add `hbase.rest.endpoint` property to the restserver `hbase-site.xml` ([#708], [#716]).
 
 [#708]: https://github.com/stackabletech/hbase-operator/pull/708
+[#716]: https://github.com/stackabletech/hbase-operator/pull/716
 
 ## [25.11.0] - 2025-11-07
 
