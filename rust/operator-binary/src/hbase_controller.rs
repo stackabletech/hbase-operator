@@ -593,6 +593,8 @@ fn build_rolegroup_config_map(
                     }
                     HbaseRole::RestServer => {
                         hbase_site_config.insert(
+                            // N.B. a custom tag, so as not to interfere with HBase internals.
+                            // The other roles use a patch to correctly resolve host/port.
                             "hbase.rest.endpoint".to_string(),
                             "${env:HBASE_SERVICE_HOST}:${env:HBASE_SERVICE_PORT}".to_string(),
                         );
