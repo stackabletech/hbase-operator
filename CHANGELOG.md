@@ -4,7 +4,9 @@
 
 ### Added
 
-- Add `hbase.rest.endpoint` property to the restserver `hbase-site.xml` ([#708], [#716]).
+- Add custom `hbase.rest.endpoint` property to the restserver `hbase-site.xml` ([#708], [#716]).
+  - The custom `hbase.rest.hostname` and native `hbase.rest.port` properties cannot be used for
+    discovery advertisement, as that would interfere with the internals of HBase restserver startup.
 
 [#708]: https://github.com/stackabletech/hbase-operator/pull/708
 [#716]: https://github.com/stackabletech/hbase-operator/pull/716
