@@ -6,7 +6,7 @@
 
 - Add custom `hbase.rest.endpoint` property to the restserver `hbase-site.xml` ([#708], [#716]).
   - The custom `hbase.rest.hostname` and native `hbase.rest.port` properties cannot be used for
-    discovery advertisement, as that would interfere with the internals of HBase restserver startup.
+    discovery advertisement, as these should remain stable regardless of listener class used to expose the REST service.
 
 [#708]: https://github.com/stackabletech/hbase-operator/pull/708
 [#716]: https://github.com/stackabletech/hbase-operator/pull/716
