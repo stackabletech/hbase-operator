@@ -6,7 +6,7 @@ Currently, xref:zookeeper:index.adoc[Zookeeper] stacklets can only be secured us
 This means, if an application tries to connect to HBase, it would contact Zookeeper to figure the correct HBase nodes to talk to.
 In a Java world, you would define a `Client` which would carry the Kerberos requirements.
 
-However, those requirements might be passed through and thus your client (e.g. xref:spark-k8s:usage-guide:operations:applications.adoc[SparkApplications]) would try to authenticate with Kerberos at the corresponding Zookeeper endpoint.
+However, those requirements might be passed through and thus your client (e.g. xref:spark-k8s:usage-guide:operations/applications.adoc[SparkApplications]) would try to authenticate with Kerberos at the corresponding Zookeeper endpoint.
 This will result in a Kerberos ( authentication ) error.
 
 To prevent this, you can set a xref:concepts:overrides.adoc#jvm-argument-overrides[JVM argument] like this (again e.g. SparkApplications) in all Pods which would like to talk to HBase:
