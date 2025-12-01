@@ -4,20 +4,39 @@
 
 ### Added
 
+- Add custom `hbase.rest.endpoint` property to the restserver `hbase-site.xml` ([#708], [#716]).
+  - The custom `hbase.rest.hostname` and native `hbase.rest.port` properties cannot be used for
+    discovery advertisement, as these should remain stable regardless of listener class used to expose the REST service.
+
+[#708]: https://github.com/stackabletech/hbase-operator/pull/708
+[#716]: https://github.com/stackabletech/hbase-operator/pull/716
+
+## [25.11.0] - 2025-11-07
+
+## [25.11.0-rc1] - 2025-11-06
+
+### Added
+
 - Helm: Allow Pod `priorityClassName` to be configured ([#691]).
 - Added support for HBase 2.6.3 ([#695]).
 - Add end-of-support checker ([#697]).
   - `EOS_CHECK_MODE` (`--eos-check-mode`) to set the EoS check mode. Currently, only "offline" is supported.
   - `EOS_INTERVAL` (`--eos-interval`) to set the interval in which the operator checks if it is EoS.
   - `EOS_DISABLED` (`--eos-disabled`) to disable the EoS checker completely.
+- Add `metrics` Services ([#701]).
 
 ### Changed
 
+- Bump stackable-operator to `0.100.1` ([#705]).
 - Changed env-vars to be consistent with config-utils in the entrypoint script ([#700]).
+- BREAKING: The `prometheus.io/scrape` label moved from the `headless` Service to the `metrics` Service, which
+  uses `metrics` as the port name instead of the previous `ui-http`/`ui-https` port name ([#701]).
 
 [#691]: https://github.com/stackabletech/hbase-operator/pull/691
 [#697]: https://github.com/stackabletech/hbase-operator/pull/697
 [#700]: https://github.com/stackabletech/hbase-operator/pull/700
+[#701]: https://github.com/stackabletech/hbase-operator/pull/701
+[#705]: https://github.com/stackabletech/hbase-operator/pull/705
 
 ## [25.7.0] - 2025-07-23
 

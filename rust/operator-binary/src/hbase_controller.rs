@@ -45,7 +45,7 @@ use stackable_operator::{
         core::{DeserializeGuard, error_boundary},
         runtime::controller::Action,
     },
-    kvp::{Label, LabelError, Labels, ObjectLabels},
+    kvp::{Annotations, Label, LabelError, Labels, ObjectLabels},
     logging::controller::ReconcilerError,
     memory::{BinaryMultiple, MemoryQuantity},
     product_config_utils::{transform_all_roles_to_config, validate_all_roles_and_groups_config},
@@ -75,10 +75,9 @@ use crate::{
     },
     crd::{
         APP_NAME, AnyServiceConfig, Container, HBASE_ENV_SH, HBASE_MASTER_PORT,
-        HBASE_MASTER_UI_PORT, HBASE_REGIONSERVER_PORT, HBASE_REGIONSERVER_UI_PORT,
-        HBASE_REST_PORT_NAME_HTTP, HBASE_REST_PORT_NAME_HTTPS, HBASE_SITE_XML, HbaseClusterStatus,
-        HbaseRole, JVM_SECURITY_PROPERTIES_FILE, LISTENER_VOLUME_DIR, LISTENER_VOLUME_NAME,
-        SSL_CLIENT_XML, SSL_SERVER_XML, merged_env, v1alpha1,
+        HBASE_MASTER_UI_PORT, HBASE_REGIONSERVER_PORT, HBASE_REGIONSERVER_UI_PORT, HBASE_SITE_XML,
+        HbaseClusterStatus, HbaseRole, JVM_SECURITY_PROPERTIES_FILE, LISTENER_VOLUME_DIR,
+        LISTENER_VOLUME_NAME, SSL_CLIENT_XML, SSL_SERVER_XML, merged_env, v1alpha1,
     },
     discovery::build_discovery_configmap,
     kerberos::{
@@ -108,9 +107,6 @@ const HBASE_LOG_CONFIG_TMP_DIR: &str = "/stackable/tmp/log_config";
 
 const DOCKER_IMAGE_BASE_NAME: &str = "hbase";
 
-const HBASE_MASTER_PORT_NAME: &str = "master";
-const HBASE_REGIONSERVER_PORT_NAME: &str = "regionserver";
-
 pub struct Ctx {
     pub client: stackable_operator::client::Client,
     pub product_config: ProductConfigManager,
@@ -124,21 +120,6 @@ pub enum Error {
 
     #[snafu(display("missing secret lifetime"))]
     MissingSecretLifetime,
-
-    #[snafu(display("object defines no version"))]
-    ObjectHasNoVersion,
-
-    #[snafu(display("object defines no namespace"))]
-    ObjectHasNoNamespace,
-
-    #[snafu(display("object defines no master role"))]
-    NoMasterRole,
-
-    #[snafu(display("the HBase role [{role}] is missing from spec"))]
-    MissingHbaseRole { role: String },
-
-    #[snafu(display("object defines no regionserver role"))]
-    NoRegionServerRole,
 
     #[snafu(display("failed to create cluster resources"))]
     CreateClusterResources {
@@ -206,12 +187,6 @@ pub enum Error {
         cm_name: String,
     },
 
-    #[snafu(display("failed to retrieve the entry {entry} for config map {cm_name}"))]
-    MissingConfigMapEntry {
-        entry: &'static str,
-        cm_name: String,
-    },
-
     #[snafu(display("failed to patch service account"))]
     ApplyServiceAccount {
         source: stackable_operator::cluster_resources::Error,
@@ -227,9 +202,6 @@ pub enum Error {
         source: strum::ParseError,
         role: String,
     },
-
-    #[snafu(display("failed to retrieve Hbase role group: {source}"))]
-    UnidentifiedHbaseRoleGroup { source: crate::crd::Error },
 
     #[snafu(display("failed to resolve and merge config for role and role group"))]
     FailedToResolveConfig { source: crate::crd::Error },
@@ -288,9 +260,6 @@ pub enum Error {
 
     #[snafu(display("unknown role [{role}]"))]
     UnknownHbaseRole { source: ParseError, role: String },
-
-    #[snafu(display("authorization is only supported from HBase 2.6 onwards"))]
-    AuthorizationNotSupported,
 
     #[snafu(display("failed to configure logging"))]
     ConfigureLogging { source: LoggingError },
@@ -427,6 +396,14 @@ pub async fn reconcile_hbase(
 
             let rg_service =
                 build_rolegroup_service(hbase, &hbase_role, &rolegroup, &resolved_product_image)?;
+
+            let rg_metrics_service = build_rolegroup_metrics_service(
+                hbase,
+                &hbase_role,
+                &rolegroup,
+                &resolved_product_image,
+            )?;
+
             let rg_configmap = build_rolegroup_config_map(
                 hbase,
                 &client.kubernetes_cluster_info,
@@ -448,6 +425,12 @@ pub async fn reconcile_hbase(
             )?;
             cluster_resources
                 .add(client, rg_service)
+                .await
+                .with_context(|_| ApplyRoleGroupServiceSnafu {
+                    rolegroup: rolegroup.clone(),
+                })?;
+            cluster_resources
+                .add(client, rg_metrics_service)
                 .await
                 .with_context(|_| ApplyRoleGroupServiceSnafu {
                     rolegroup: rolegroup.clone(),
@@ -608,7 +591,14 @@ fn build_rolegroup_config_map(
                             HBASE_REGIONSERVER_UI_PORT.to_string(),
                         );
                     }
-                    HbaseRole::RestServer => {}
+                    HbaseRole::RestServer => {
+                        hbase_site_config.insert(
+                            // N.B. a custom tag, so as not to interfere with HBase internals.
+                            // The other roles use a patch to correctly resolve host/port.
+                            "hbase.rest.endpoint".to_string(),
+                            "${env:HBASE_SERVICE_HOST}:${env:HBASE_SERVICE_PORT}".to_string(),
+                        );
+                    }
                 };
 
                 // configOverride come last
@@ -728,8 +718,8 @@ fn build_rolegroup_service(
     rolegroup: &RoleGroupRef<v1alpha1::HbaseCluster>,
     resolved_product_image: &ResolvedProductImage,
 ) -> Result<Service> {
-    let ports = hbase
-        .ports(hbase_role)
+    let ports = hbase_role
+        .ports(hbase)
         .into_iter()
         .map(|(name, value)| ServicePort {
             name: Some(name),
@@ -739,12 +729,9 @@ fn build_rolegroup_service(
         })
         .collect();
 
-    let prometheus_label =
-        Label::try_from(("prometheus.io/scrape", "true")).context(BuildLabelSnafu)?;
-
     let metadata = ObjectMetaBuilder::new()
         .name_and_namespace(hbase)
-        .name(headless_service_name(&rolegroup.object_name()))
+        .name(rolegroup.rolegroup_headless_service_name())
         .ownerreference_from_resource(hbase, None, Some(true))
         .context(ObjectMissingMetadataForOwnerRefSnafu)?
         .with_recommended_labels(build_recommended_labels(
@@ -754,7 +741,6 @@ fn build_rolegroup_service(
             &rolegroup.role_group,
         ))
         .context(ObjectMetaSnafu)?
-        .with_label(prometheus_label)
         .build();
 
     let service_selector =
@@ -778,6 +764,78 @@ fn build_rolegroup_service(
     })
 }
 
+/// The rolegroup metrics [`Service`] is a service that exposes metrics and a prometheus scraping label.
+pub fn build_rolegroup_metrics_service(
+    hbase: &v1alpha1::HbaseCluster,
+    hbase_role: &HbaseRole,
+    rolegroup: &RoleGroupRef<v1alpha1::HbaseCluster>,
+    resolved_product_image: &ResolvedProductImage,
+) -> Result<Service, Error> {
+    let ports = vec![ServicePort {
+        name: Some(HbaseRole::metrics_port_name().to_owned()),
+        port: i32::from(hbase_role.metrics_port()),
+        protocol: Some("TCP".to_owned()),
+        ..ServicePort::default()
+    }];
+
+    let service_selector =
+        Labels::role_group_selector(hbase, APP_NAME, &rolegroup.role, &rolegroup.role_group)
+            .context(BuildLabelSnafu)?;
+
+    Ok(Service {
+        metadata: ObjectMetaBuilder::new()
+            .name_and_namespace(hbase)
+            .name(rolegroup.rolegroup_metrics_service_name())
+            .ownerreference_from_resource(hbase, None, Some(true))
+            .context(ObjectMissingMetadataForOwnerRefSnafu)?
+            .with_recommended_labels(build_recommended_labels(
+                hbase,
+                &resolved_product_image.app_version_label_value,
+                &rolegroup.role,
+                &rolegroup.role_group,
+            ))
+            .context(ObjectMetaSnafu)?
+            .with_label(Label::try_from(("prometheus.io/scrape", "true")).context(LabelBuildSnafu)?)
+            .with_annotations(prometheus_annotations(hbase, hbase_role))
+            .build(),
+        spec: Some(ServiceSpec {
+            // Internal communication does not need to be exposed
+            type_: Some("ClusterIP".to_owned()),
+            cluster_ip: Some("None".to_owned()),
+            ports: Some(ports),
+            selector: Some(service_selector.into()),
+            publish_not_ready_addresses: Some(true),
+            ..ServiceSpec::default()
+        }),
+        status: None,
+    })
+}
+
+/// Common annotations for Prometheus
+///
+/// These annotations can be used in a ServiceMonitor.
+///
+/// see also <https://github.com/prometheus-community/helm-charts/blob/prometheus-27.32.0/charts/prometheus/values.yaml#L983-L1036>
+fn prometheus_annotations(hbase: &v1alpha1::HbaseCluster, hbase_role: &HbaseRole) -> Annotations {
+    Annotations::try_from([
+        ("prometheus.io/path".to_owned(), "/prometheus".to_owned()),
+        (
+            "prometheus.io/port".to_owned(),
+            hbase_role.metrics_port().to_string(),
+        ),
+        (
+            "prometheus.io/scheme".to_owned(),
+            if hbase.has_https_enabled() {
+                "https".to_owned()
+            } else {
+                "http".to_owned()
+            },
+        ),
+        ("prometheus.io/scrape".to_owned(), "true".to_owned()),
+    ])
+    .expect("should be valid annotations")
+}
+
 /// The rolegroup [`StatefulSet`] runs the rolegroup, as configured by the administrator.
 ///
 /// The [`Pod`](`stackable_operator::k8s_openapi::api::core::v1::Pod`)s are accessible through the corresponding [`Service`] (from [`build_rolegroup_service`]).
@@ -793,8 +851,8 @@ fn build_rolegroup_statefulset(
 ) -> Result<StatefulSet> {
     let hbase_version = &resolved_product_image.app_version_label_value;
 
-    let ports = hbase
-        .ports(hbase_role)
+    let ports = hbase_role
+        .ports(hbase)
         .into_iter()
         .map(|(name, value)| ContainerPort {
             name: Some(name),
@@ -804,38 +862,12 @@ fn build_rolegroup_statefulset(
         })
         .collect();
 
-    let probe_template = match hbase_role {
-        HbaseRole::Master => Probe {
-            tcp_socket: Some(TCPSocketAction {
-                port: IntOrString::String(HBASE_MASTER_PORT_NAME.to_string()),
-                ..TCPSocketAction::default()
-            }),
-            ..Probe::default()
-        },
-        HbaseRole::RegionServer => Probe {
-            tcp_socket: Some(TCPSocketAction {
-                port: IntOrString::String(HBASE_REGIONSERVER_PORT_NAME.to_string()),
-                ..TCPSocketAction::default()
-            }),
-            ..Probe::default()
-        },
-        HbaseRole::RestServer => Probe {
-            // We cant use HTTPGetAction, as it returns a 401 in case kerberos is enabled, and there is currently no way
-            // to tell Kubernetes an 401 is healthy. As an alternative we run curl ourselves and check the http status
-            // code there.
-            tcp_socket: Some(TCPSocketAction {
-                port: IntOrString::String(
-                    if hbase.has_https_enabled() {
-                        HBASE_REST_PORT_NAME_HTTPS
-                    } else {
-                        HBASE_REST_PORT_NAME_HTTP
-                    }
-                    .to_string(),
-                ),
-                ..TCPSocketAction::default()
-            }),
-            ..Probe::default()
-        },
+    let probe_template = Probe {
+        tcp_socket: Some(TCPSocketAction {
+            port: IntOrString::String(hbase_role.data_port_name(hbase)),
+            ..TCPSocketAction::default()
+        }),
+        ..Probe::default()
     };
 
     let startup_probe = Probe {
@@ -881,12 +913,6 @@ fn build_rolegroup_statefulset(
     let role_name = hbase_role.cli_role_name();
     let mut hbase_container = ContainerBuilder::new("hbase").expect("ContainerBuilder not created");
 
-    let rest_http_port_name = if hbase.has_https_enabled() {
-        HBASE_REST_PORT_NAME_HTTPS
-    } else {
-        HBASE_REST_PORT_NAME_HTTP
-    };
-
     hbase_container
         .image_from_product_image(resolved_product_image)
         .command(command())
@@ -894,13 +920,9 @@ fn build_rolegroup_statefulset(
             {entrypoint} {role} {port} {port_name} {ui_port_name}",
             entrypoint = "/stackable/hbase/bin/hbase-entrypoint.sh".to_string(),
             role = role_name,
-            port = hbase.service_port(hbase_role).to_string(),
-            port_name = match hbase_role {
-                HbaseRole::Master => HBASE_MASTER_PORT_NAME,
-                HbaseRole::RegionServer => HBASE_REGIONSERVER_PORT_NAME,
-                HbaseRole::RestServer => rest_http_port_name,
-            },
-            ui_port_name = hbase.ui_port_name(),
+            port = hbase_role.data_port(),
+            port_name = hbase_role.data_port_name(hbase),
+            ui_port_name = HbaseRole::ui_port_name(hbase.has_https_enabled()),
         }])
         .add_env_vars(merged_env)
         // Needed for the `containerdebug` process to log it's tracing information to.
@@ -1006,6 +1028,7 @@ fn build_rolegroup_statefulset(
     if hbase.has_kerberos_enabled() {
         add_kerberos_pod_config(
             hbase,
+            rolegroup_ref,
             &mut hbase_container,
             &mut pod_builder,
             merged_config
@@ -1088,7 +1111,7 @@ fn build_rolegroup_statefulset(
             match_labels: Some(statefulset_match_labels.into()),
             ..LabelSelector::default()
         },
-        service_name: Some(headless_service_name(&rolegroup_ref.object_name())),
+        service_name: Some(rolegroup_ref.rolegroup_headless_service_name()),
         template: pod_template,
         volume_claim_templates: listener_pvc,
         ..StatefulSetSpec::default()
@@ -1196,10 +1219,6 @@ fn build_hbase_env_sh(
     }
 
     Ok(result)
-}
-
-fn headless_service_name(role_group_name: &str) -> String {
-    format!("{name}-headless", name = role_group_name)
 }
 
 #[cfg(test)]
