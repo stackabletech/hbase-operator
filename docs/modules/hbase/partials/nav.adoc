@@ -13,7 +13,6 @@
 ** xref:hbase:usage-guide/hbck2.adoc[]
 ** xref:hbase:usage-guide/snapshot-export.adoc[]
 ** xref:hbase:usage-guide/adls.adoc[]
-** xref:hbase:usage-guide/troubleshooting.adoc[]
 ** xref:hbase:usage-guide/operations/index.adoc[]
 *** xref:hbase:usage-guide/operations/cluster-operations.adoc[]
 *** xref:hbase:usage-guide/operations/pod-placement.adoc[]
@@ -25,3 +24,4 @@
 ** xref:hbase:reference/discovery.adoc[]
 ** xref:hbase:reference/commandline-parameters.adoc[]
 ** xref:hbase:reference/environment-variables.adoc[]
+* xref:hbase:troubleshooting/index.adoc[]
