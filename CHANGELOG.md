@@ -8,8 +8,13 @@
   - The custom `hbase.rest.hostname` and native `hbase.rest.port` properties cannot be used for
     discovery advertisement, as these should remain stable regardless of listener class used to expose the REST service.
 
+### Changed
+
+- Bump testing-tools to `0.3.0-stackable0.0.0-dev` ([#724]).
+
 [#708]: https://github.com/stackabletech/hbase-operator/pull/708
 [#716]: https://github.com/stackabletech/hbase-operator/pull/716
+[#724]: https://github.com/stackabletech/hbase-operator/pull/724
 
 ## [25.11.0] - 2025-11-07
 
