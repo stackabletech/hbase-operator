@@ -23,6 +23,7 @@ use stackable_operator::{
         fragment::{self, Fragment, ValidationError},
         merge::{Atomic, Merge},
     },
+    deep_merger::ObjectOverrides,
     k8s_openapi::{
         DeepMerge,
         api::core::v1::{EnvVar, PersistentVolumeClaim, PodTemplateSpec, Volume},
@@ -173,6 +174,10 @@ pub mod versioned {
         // no doc string - See ClusterOperation struct
         #[serde(default)]
         pub cluster_operation: ClusterOperation,
+
+        // no doc string - See ObjectOverrides struct
+        #[serde(default)]
+        pub object_overrides: ObjectOverrides,
 
         /// The HBase master process is responsible for assigning regions to region servers and
         /// manages the cluster.
