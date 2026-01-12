@@ -7,6 +7,8 @@
 - Add custom `hbase.rest.endpoint` property to the restserver `hbase-site.xml` ([#708], [#716]).
   - The custom `hbase.rest.hostname` and native `hbase.rest.port` properties cannot be used for
     discovery advertisement, as these should remain stable regardless of listener class used to expose the REST service.
+- Support objectOverrides using `.spec.objectOverrides`.
+  See [objectOverrides concepts page](https://docs.stackable.tech/home/nightly/concepts/overrides/#object-overrides) for details ([#725]).
 
 ### Changed
 
@@ -15,6 +17,7 @@
 [#708]: https://github.com/stackabletech/hbase-operator/pull/708
 [#716]: https://github.com/stackabletech/hbase-operator/pull/716
 [#724]: https://github.com/stackabletech/hbase-operator/pull/724
+[#725]: https://github.com/stackabletech/hbase-operator/pull/725
 
 ## [25.11.0] - 2025-11-07
 

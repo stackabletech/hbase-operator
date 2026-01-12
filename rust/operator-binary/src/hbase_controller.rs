@@ -357,6 +357,7 @@ pub async fn reconcile_hbase(
         HBASE_CONTROLLER_NAME,
         &hbase.object_ref(&()),
         ClusterResourceApplyStrategy::from(&hbase.spec.cluster_operation),
+        &hbase.spec.object_overrides,
     )
     .context(CreateClusterResourcesSnafu)?;
 
