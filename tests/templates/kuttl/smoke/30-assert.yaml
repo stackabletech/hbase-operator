@@ -9,6 +9,9 @@ apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: test-hbase-master-default
+  generation: 1 # There should be no unneeded Pod restarts
+  labels:
+    restarter.stackable.tech/enabled: "true"
 spec:
   template:
     spec:
@@ -21,6 +24,9 @@ apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: test-hbase-regionserver-default
+  generation: 1 # There should be no unneeded Pod restarts
+  labels:
+    restarter.stackable.tech/enabled: "true"
 spec:
   template:
     spec:
@@ -33,6 +39,9 @@ apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: test-hbase-restserver-default
+  generation: 1 # There should be no unneeded Pod restarts
+  labels:
+    restarter.stackable.tech/enabled: "true"
 spec:
   template:
     spec:
