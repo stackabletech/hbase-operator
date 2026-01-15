@@ -33,7 +33,7 @@ dimensions:
       - 1.21.1
   - name: opa
     values:
-      - 1.8.0
+      - 1.12.2
   # Used for zookeeper, hdfs and hbase
   - name: listener-class
     values:
