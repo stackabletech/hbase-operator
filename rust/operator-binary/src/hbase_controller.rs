@@ -30,6 +30,7 @@ use stackable_operator::{
         product_image_selection::{self, ResolvedProductImage},
         rbac::build_rbac_resources,
     },
+    constants::RESTART_CONTROLLER_ENABLED_LABEL,
     k8s_openapi::{
         api::{
             apps::v1::{StatefulSet, StatefulSetSpec},
@@ -442,6 +443,10 @@ pub async fn reconcile_hbase(
                 .with_context(|_| ApplyRoleGroupConfigSnafu {
                     rolegroup: rolegroup.clone(),
                 })?;
+
+            // Note: The StatefulSet needs to be applied after all ConfigMaps and Secrets it mounts
+            // to prevent unnecessary Pod restarts.
+            // See https://github.com/stackabletech/commons-operator/issues/111 for details.
             ss_cond_builder.add(
                 cluster_resources
                     .add(client, rg_statefulset)
@@ -1095,6 +1100,7 @@ fn build_rolegroup_statefulset(
             &rolegroup_ref.role_group,
         ))
         .context(ObjectMetaSnafu)?
+        .with_label(RESTART_CONTROLLER_ENABLED_LABEL.to_owned())
         .build();
 
     let statefulset_match_labels = Labels::role_group_selector(

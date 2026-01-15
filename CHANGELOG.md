@@ -9,6 +9,7 @@
     discovery advertisement, as these should remain stable regardless of listener class used to expose the REST service.
 - Support objectOverrides using `.spec.objectOverrides`.
   See [objectOverrides concepts page](https://docs.stackable.tech/home/nightly/concepts/overrides/#object-overrides) for details ([#725]).
+- Enable the [restart-controller](https://docs.stackable.tech/home/nightly/commons-operator/restarter/), so that the Pods are automatically restarted on config changes ([#XXX]).
 
 ### Changed
 
@@ -18,6 +19,7 @@
 [#716]: https://github.com/stackabletech/hbase-operator/pull/716
 [#724]: https://github.com/stackabletech/hbase-operator/pull/724
 [#725]: https://github.com/stackabletech/hbase-operator/pull/725
+[#XXX]: https://github.com/stackabletech/hbase-operator/pull/XXX
 
 ## [25.11.0] - 2025-11-07
 
