@@ -2,19 +2,19 @@
 dimensions:
   - name: hbase
     values:
-      - 2.6.2
       - 2.6.3
+      - 2.6.4
       # To use a custom image, add a comma and the full name after the product version
-      # - 2.6.3,oci.stackable.tech/sandbox/hbase:2.6.3-stackable0.0.0-dev
+      # - x.x.x,oci.stackable.tech/sandbox/hbase:x.x.x-stackable0.0.0-dev
   - name: hbase-opa
     values:
-      - 2.6.3
+      - 2.6.4
       # To use a custom image, add a comma and the full name after the product version
-      # - 2.6.3,oci.stackable.tech/sandbox/hbase:2.6.3-stackable0.0.0-dev
+      # - x.x.x,oci.stackable.tech/sandbox/hbase:x.x.x-stackable0.0.0-dev
   - name: hbase-latest
     values:
-      - 2.6.3
-      # - 2.6.3,oci.stackable.tech/sandbox/hbase:2.6.3-stackable0.0.0-dev
+      - 2.6.4
+      # - x.x.x,oci.stackable.tech/sandbox/hbase:x.x.x-stackable0.0.0-dev
   - name: hdfs
     values:
       - 3.4.2
