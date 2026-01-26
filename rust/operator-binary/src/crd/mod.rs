@@ -1338,7 +1338,7 @@ metadata:
   name: test-hbase
 spec:
   image:
-    productVersion: 4
+    productVersion: 2.6.4
   clusterConfig:
     hdfsConfigMapName: test-hdfs
     zookeeperConfigMapName: test-znode
