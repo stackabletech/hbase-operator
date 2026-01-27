@@ -10,16 +10,22 @@
 - Support objectOverrides using `.spec.objectOverrides`.
   See [objectOverrides concepts page](https://docs.stackable.tech/home/nightly/concepts/overrides/#object-overrides) for details ([#725]).
 - Enable the [restart-controller](https://docs.stackable.tech/home/nightly/commons-operator/restarter/), so that the Pods are automatically restarted on config changes ([#727]).
+- Add support for Hbase 2.6.4 (as LTS) ([#729]).
 
 ### Changed
 
 - Bump testing-tools to `0.3.0-stackable0.0.0-dev` ([#724]).
+
+### Removed
+
+- Remove support for Hbase 2.6.2 ([#729]).
 
 [#708]: https://github.com/stackabletech/hbase-operator/pull/708
 [#716]: https://github.com/stackabletech/hbase-operator/pull/716
 [#724]: https://github.com/stackabletech/hbase-operator/pull/724
 [#725]: https://github.com/stackabletech/hbase-operator/pull/725
 [#727]: https://github.com/stackabletech/hbase-operator/pull/727
+[#729]: https://github.com/stackabletech/hbase-operator/pull/729
 
 ## [25.11.0] - 2025-11-07
 
