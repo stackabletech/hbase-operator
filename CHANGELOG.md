@@ -14,6 +14,7 @@
 
 ### Changed
 
+- Gracefully shutdown all concurrent tasks by forwarding the SIGTERM signal ([#730]).
 - Bump testing-tools to `0.3.0-stackable0.0.0-dev` ([#724]).
 
 ### Removed
@@ -26,6 +27,7 @@
 [#725]: https://github.com/stackabletech/hbase-operator/pull/725
 [#727]: https://github.com/stackabletech/hbase-operator/pull/727
 [#729]: https://github.com/stackabletech/hbase-operator/pull/729
+[#730]: https://github.com/stackabletech/hbase-operator/pull/730
 
 ## [25.11.0] - 2025-11-07
 
