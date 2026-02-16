@@ -4,6 +4,7 @@
 
 ### Added
 
+- Add conversion webhook ([#733]).
 - Add custom `hbase.rest.endpoint` property to the restserver `hbase-site.xml` ([#708], [#716]).
   - The custom `hbase.rest.hostname` and native `hbase.rest.port` properties cannot be used for
     discovery advertisement, as these should remain stable regardless of listener class used to expose the REST service.
@@ -28,6 +29,7 @@
 [#727]: https://github.com/stackabletech/hbase-operator/pull/727
 [#729]: https://github.com/stackabletech/hbase-operator/pull/729
 [#730]: https://github.com/stackabletech/hbase-operator/pull/730
+[#733]: https://github.com/stackabletech/hbase-operator/pull/733
 
 ## [25.11.0] - 2025-11-07
 

@@ -47,6 +47,7 @@ pub mod affinity;
 pub mod security;
 
 pub const APP_NAME: &str = "hbase";
+pub const FIELD_MANAGER: &str = "hbase-operator";
 
 // This constant is hard coded in hbase-entrypoint.sh
 // You need to change it there too.
