@@ -128,6 +128,102 @@ data:
     exit;
     EOF4
 
+    # Tests get, delete, and append within the developer's own namespace.
+    cat > /tmp/dev-extra-script << 'EOF5'
+    get 'developers:test', 'row1';
+    delete 'developers:test', 'row1', 'cf1';
+    append 'developers:test', 'row2', 'cf1', 'extra';
+    exit;
+    EOF5
+
+    # Admin creates/disables/drops a table; takes a snapshot, clones it, restores it, then cleans up.
+    # Covers: preCreateTable, preDisableTable, preDeleteTable, preSnapshot, preCloneSnapshot,
+    #         preListSnapshot, preRestoreSnapshot, preEnableTable, preDeleteSnapshot.
+    cat > /tmp/admin-ddl-script << 'EOF6'
+    create 'developers:admin_table', 'cf1';
+    disable 'developers:admin_table';
+    drop 'developers:admin_table';
+    snapshot 'developers:test', 'test_snap';
+    clone_snapshot 'test_snap', 'developers:cloned_table';
+    disable 'developers:cloned_table';
+    drop 'developers:cloned_table';
+    list_snapshots;
+    disable 'developers:test';
+    restore_snapshot 'test_snap';
+    enable 'developers:test';
+    delete_snapshot 'test_snap';
+    exit;
+    EOF6
+
+    # Developer attempts to write to a namespace they do not own — must be denied.
+    cat > /tmp/denial-dev-script << 'EOF7'
+    put 'public:test', 'rowX', 'cf1', 'unauthorized';
+    exit;
+    EOF7
+
+    # Read-only user attempts a write — must be denied.
+    cat > /tmp/denial-readonly-script << 'EOF8'
+    put 'developers:test', 'row4', 'cf1', 'unauthorized';
+    exit;
+    EOF8
+
+    # Developer checks existence, increments a counter, and describes own table and namespace.
+    # Covers: preExists, preIncrement, preGetTableDescriptors/postGetTableDescriptors,
+    #         preGetNamespaceDescriptor.
+    cat > /tmp/dev-describe-script << 'EOF9'
+    exists 'developers:test', 'row2';
+    incr 'developers:test', 'counter_row', 'cf1:counter', 5;
+    describe 'developers:test';
+    describe_namespace 'developers';
+    exit;
+    EOF9
+
+    # Developer lists all tables — only own namespace should appear in the results.
+    # Covers: postGetTableNames (filtered per-user).
+    cat > /tmp/dev-list-script << 'EOF10'
+    list;
+    exit;
+    EOF10
+
+    # Admin manages namespaces and tables, and exercises global admin commands.
+    # Covers: preModifyNamespace, preDeleteNamespace, preTableFlush, preModifyTable,
+    #         preTruncateTable, preBalance, preBalanceSwitch, preGetProcedures, preGetLocks.
+    cat > /tmp/admin-extended-script << 'EOF11'
+    create_namespace 'temp_ns';
+    alter_namespace 'temp_ns', {NAME => 'temp_ns'};
+    drop_namespace 'temp_ns';
+    create 'developers:mgmt_table', 'cf1';
+    flush 'developers:mgmt_table';
+    alter 'developers:mgmt_table', {NAME => 'cf1', COMPRESSION => 'NONE'};
+    create 'developers:truncate_me', 'cf1';
+    truncate 'developers:truncate_me';
+    disable 'developers:truncate_me';
+    drop 'developers:truncate_me';
+    disable 'developers:mgmt_table';
+    drop 'developers:mgmt_table';
+    balancer;
+    balance_switch false;
+    balance_switch true;
+    list_procedures;
+    list_locks;
+    exit;
+    EOF11
+
+    # Readonlyuser exercises read operations — exercises the matches_families Rego branch
+    # (ACL restricts readonlyuser to cf1; an empty families map on get/exists always passes).
+    cat > /tmp/readonly-extended-script << 'EOF12'
+    get 'developers:test', 'row2';
+    exists 'developers:test', 'row2';
+    exit;
+    EOF12
+
+    # Developer attempts to describe a namespace they do not own — must be denied.
+    # Covers: preGetNamespaceDescriptor (denial path).
+    cat > /tmp/denial-dev-describe-public-script << 'EOF13'
+    describe_namespace 'public';
+    exit;
+    EOF13
+
     #------------------------------------------
     # Admin should be able to create namespaces
     #------------------------------------------
@@ -187,6 +283,131 @@ data:
 
     expected=$(bin/hbase shell /tmp/readonly-hbase-script | grep '=> 3' | wc -l)
     if [ $expected == 2 ]; then
+      echo "Test passed"
+    else
+      echo "Test failed"
+      exit 1
+    fi
+
+    #--------------------------------------------------------
+    # Developer should be able to get, delete and append in own namespace
+    # (covers preGetOp, preDelete, preAppend)
+    #--------------------------------------------------------
+    kdestroy; kinit -kt /stackable/kerberos/keytab developer/access-hbase.$NAMESPACE.svc.cluster.local; klist
+
+    expected=$(bin/hbase shell /tmp/dev-extra-script 2>&1 | grep 'Took ' | wc -l)
+    if [ $expected == 3 ]; then
+      echo "Test passed"
+    else
+      echo "Test failed"
+      exit 1
+    fi
+
+    #--------------------------------------------------------
+    # Developer can check existence, increment a counter, and describe own table and namespace
+    # (covers preExists, preIncrement, preGetTableDescriptors, preGetNamespaceDescriptor)
+    #--------------------------------------------------------
+    kdestroy; kinit -kt /stackable/kerberos/keytab developer/access-hbase.$NAMESPACE.svc.cluster.local; klist
+
+    expected=$(bin/hbase shell /tmp/dev-describe-script 2>&1 | grep 'Took ' | wc -l)
+    if [ $expected == 4 ]; then
+      echo "Test passed"
+    else
+      echo "Test failed"
+      exit 1
+    fi
+
+    #--------------------------------------------------------
+    # Developer list is filtered to own namespace (covers postGetTableNames)
+    #--------------------------------------------------------
+    list_output=$(bin/hbase shell /tmp/dev-list-script 2>&1)
+    in_list=$(echo "$list_output" | grep 'developers:test' | wc -l)
+    not_in_list=$(echo "$list_output" | grep 'public:test' | wc -l)
+    if [ $in_list -gt 0 ] && [ $not_in_list -eq 0 ]; then
+      echo "Test passed"
+    else
+      echo "Test failed"
+      exit 1
+    fi
+
+    #--------------------------------------------------------
+    # Admin should be able to perform table DDL and snapshot operations
+    # (covers preCreateTable, preDisableTable, preDeleteTable,
+    #  preSnapshot, preCloneSnapshot, preListSnapshot,
+    #  preRestoreSnapshot, preEnableTable, preDeleteSnapshot)
+    #--------------------------------------------------------
+    kdestroy; kinit -kt /stackable/kerberos/keytab admin/access-hbase.$NAMESPACE.svc.cluster.local; klist
+
+    expected=$(bin/hbase shell /tmp/admin-ddl-script 2>&1 | grep 'Took ' | wc -l)
+    if [ $expected == 12 ]; then
+      echo "Test passed"
+    else
+      echo "Test failed"
+      exit 1
+    fi
+
+    #--------------------------------------------------------
+    # Admin can manage namespaces/tables and run global admin commands
+    # (covers preModifyNamespace, preDeleteNamespace, preTableFlush, preModifyTable,
+    #  preTruncateTable, preBalance, preBalanceSwitch, preGetProcedures, preGetLocks)
+    #--------------------------------------------------------
+    expected=$(bin/hbase shell /tmp/admin-extended-script 2>&1 | grep 'Took ' | wc -l)
+    if [ $expected == 17 ]; then
+      echo "Test passed"
+    else
+      echo "Test failed"
+      exit 1
+    fi
+
+    #--------------------------------------------------------
+    # Readonlyuser can read rows (exercises matches_families non-null branch in Rego)
+    #--------------------------------------------------------
+    kdestroy; kinit -kt /stackable/kerberos/keytab readonlyuser/access-hbase.$NAMESPACE.svc.cluster.local; klist
+
+    expected=$(bin/hbase shell /tmp/readonly-extended-script 2>&1 | grep 'Took ' | wc -l)
+    if [ $expected == 2 ]; then
+      echo "Test passed"
+    else
+      echo "Test failed"
+      exit 1
+    fi
+
+    #--------------------------------------------------------
+    # Developer should NOT be able to write to another namespace
+    # (denial: prePut on public:test)
+    #--------------------------------------------------------
+    kdestroy; kinit -kt /stackable/kerberos/keytab developer/access-hbase.$NAMESPACE.svc.cluster.local; klist
+
+    expected=$(bin/hbase shell /tmp/denial-dev-script 2>&1 | grep 'OPA denied the request' | wc -l)
+    if [ $expected -gt 0 ]; then
+      echo "Test passed"
+    else
+      echo "Test failed"
+      exit 1
+    fi
+
+    #--------------------------------------------------------
+    # Readonlyuser should NOT be able to write
+    # (denial: prePut on developers:test)
+    #--------------------------------------------------------
+    kdestroy; kinit -kt /stackable/kerberos/keytab readonlyuser/access-hbase.$NAMESPACE.svc.cluster.local; klist
+
+    expected=$(bin/hbase shell /tmp/denial-readonly-script 2>&1 | grep 'OPA denied the request' | wc -l)
+    if [ $expected -gt 0 ]; then
+      echo "Test passed"
+    else
+      echo "Test failed"
+      exit 1
+    fi
+
+    #--------------------------------------------------------
+    # Developer cannot describe a namespace they do not own
+    # (denial: preGetNamespaceDescriptor on public namespace)
+    #--------------------------------------------------------
+    kdestroy; kinit -kt /stackable/kerberos/keytab developer/access-hbase.$NAMESPACE.svc.cluster.local; klist
+
+    expected=$(bin/hbase shell /tmp/denial-dev-describe-public-script 2>&1 | grep 'OPA denied the request' | wc -l)
+    if [ $expected -gt 0 ]; then
       echo "Test passed"
     else
       echo "Test failed"
