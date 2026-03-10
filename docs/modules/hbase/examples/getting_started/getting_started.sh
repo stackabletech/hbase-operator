@@ -15,6 +15,9 @@ then
   exit 1
 fi
 
+echo "Waiting for node(s) to be ready..."
+kubectl wait node --all --for=condition=Ready --timeout=120s
+
 cd "$(dirname "$0")"
 
 case "$1" in
@@ -47,6 +50,10 @@ echo "Need to give 'helm' or 'stackablectl' as an argument for which installatio
 exit 1
 ;;
 esac
+
+# As of SDP 26.3 CRDs are managed by the operator not helm, so there should be an initial delay
+# to allow the CRDs to be detected
+sleep 10
 
 echo "Creating ZooKeeper cluster"
 # tag::install-zk[]
@@ -90,9 +97,9 @@ done
 
 echo "Awaiting HDFS rollout finish"
 # tag::watch-hdfs-rollout[]
-kubectl rollout status --watch statefulset/simple-hdfs-datanode-default --timeout=300s
-kubectl rollout status --watch statefulset/simple-hdfs-namenode-default --timeout=300s
-kubectl rollout status --watch statefulset/simple-hdfs-journalnode-default --timeout=300s
+kubectl rollout status --watch statefulset/simple-hdfs-datanode-default --timeout=600s
+kubectl rollout status --watch statefulset/simple-hdfs-namenode-default --timeout=600s
+kubectl rollout status --watch statefulset/simple-hdfs-journalnode-default --timeout=600s
 # end::watch-hdfs-rollout[]
 
 sleep 5
@@ -114,9 +121,9 @@ done
 
 echo "Awaiting HBase rollout finish"
 # tag::watch-hbase-rollout[]
-kubectl rollout status --watch statefulset/simple-hbase-master-default --timeout=300s
-kubectl rollout status --watch statefulset/simple-hbase-regionserver-default --timeout=300s
-kubectl rollout status --watch statefulset/simple-hbase-restserver-default --timeout=300s
+kubectl rollout status --watch statefulset/simple-hbase-master-default --timeout=600s
+kubectl rollout status --watch statefulset/simple-hbase-regionserver-default --timeout=600s
+kubectl rollout status --watch statefulset/simple-hbase-restserver-default --timeout=600s
 # end::watch-hbase-rollout[]
 
 version() {
@@ -191,6 +198,8 @@ tables_count=$(get_all | jq -r '.table' | jq '. | length')
 # here, and error out if they don't match
 expected_tables=$(echo "
 SYSTEM.CATALOG
+SYSTEM.CDC_STREAM
+SYSTEM.CDC_STREAM_STATUS
 SYSTEM.CHILD_LINK
 SYSTEM.FUNCTION
 SYSTEM.LOG
