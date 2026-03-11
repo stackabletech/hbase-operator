@@ -51,9 +51,8 @@ exit 1
 ;;
 esac
 
-# As of SDP 26.3 CRDs are managed by the operator (previously it was helm),
-# so we need to wait untill the CRDs are installed before creating the CRs.
-until kubectl get crd hbaseclusters.hbase.stackable.tech >/dev/null 2>&1; do sleep 1; done 
+# TODO: Remove once https://github.com/stackabletech/issues/issues/828 has been implemented (see that issue for details).
+until kubectl get crd hbaseclusters.hbase.stackable.tech >/dev/null 2>&1; do echo "Waiting for CRDs to be installed" && sleep 1; done
 
 echo "Creating ZooKeeper cluster"
 # tag::install-zk[]
