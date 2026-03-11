@@ -15,9 +15,13 @@
 
 ### Changed
 
-- Bump stackable-operator to 0.106.2, and strum to 0.28 ([#737]).
+- Bump stackable-operator to 0.108.0, and strum to 0.28 ([#737], [#740]).
 - Gracefully shutdown all concurrent tasks by forwarding the SIGTERM signal ([#730]).
 - Bump testing-tools to `0.3.0-stackable0.0.0-dev` ([#724]).
+
+### Fixed
+
+- Fix "404 page not found" error for the initial object list ([#740]).
 
 ### Removed
 
@@ -32,6 +36,7 @@
 [#730]: https://github.com/stackabletech/hbase-operator/pull/730
 [#733]: https://github.com/stackabletech/hbase-operator/pull/733
 [#737]: https://github.com/stackabletech/hbase-operator/pull/737
+[#740]: https://github.com/stackabletech/hbase-operator/pull/740
 
 ## [25.11.0] - 2025-11-07
 
