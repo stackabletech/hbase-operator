@@ -541,31 +541,6 @@ pub fn merged_env(rolegroup_config: Option<&BTreeMap<String, String>>) -> Vec<En
     merged_env
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, Hash, JsonSchema, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct KerberosConfig {
-    /// Name of the SecretClass providing the keytab for the HDFS services.
-    #[serde(default = "default_kerberos_kerberos_secret_class")]
-    kerberos_secret_class: String,
-    /// Name of the SecretClass providing the tls certificates for the WebUIs.
-    #[serde(default = "default_kerberos_tls_secret_class")]
-    tls_secret_class: String,
-    /// Wether a principal including the Kubernetes node name should be requested.
-    /// The principal could e.g. be `HTTP/my-k8s-worker-0.mycorp.lan`.
-    /// This feature is disabled by default, as the resulting principals can already by existent
-    /// e.g. in Active Directory which can cause problems.
-    #[serde(default)]
-    request_node_principals: bool,
-}
-
-fn default_kerberos_tls_secret_class() -> String {
-    "tls".to_string()
-}
-
-fn default_kerberos_kerberos_secret_class() -> String {
-    "kerberos".to_string()
-}
-
 #[derive(
     Clone,
     Debug,
