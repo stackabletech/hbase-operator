@@ -1,0 +1,29 @@
+---
+# Product ClusterRole: bound (via per HbaseCluster RoleBinding) to the ServiceAccount that HBase
+# workload pods (masters, regionServers, restServers) run as.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "operator.name" . }}-clusterrole
+  labels:
+  {{- include "operator.labels" . | nindent 4 }}
+rules:
+  # Allows HBase pods to emit Kubernetes events (e.g. for lifecycle notifications).
+  - apiGroups:
+      - events.k8s.io
+    resources:
+      - events
+    verbs:
+      - create
+      - patch
+{{ if .Capabilities.APIVersions.Has "security.openshift.io/v1" }}
+  # Required on OpenShift to allow the HBase pods to run as a non-root user.
+  - apiGroups:
+      - security.openshift.io
+    resources:
+      - securitycontextconstraints
+    resourceNames:
+      - nonroot-v2
+    verbs:
+      - use
+{{ end }}
