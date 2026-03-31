@@ -22,6 +22,8 @@ data:
         matches_identity(acl.identity)
         matches_resource(input.namespace, checked_table_name, acl.resource)
         action_sufficient_for_operation(acl.action, input.action)
+        matches_operation(acl, input.operation)
+        matches_families(acl, input.families)
     }
 
     # Identity mentions the (long) userName explicitly
@@ -84,6 +86,30 @@ data:
         "CREATE": "full",
         "WRITE": "rw",
         "READ": "ro",
+        "EXEC":  "full",
+    }
+
+    # If the ACL does not restrict operations, all operation types are permitted.
+    matches_operation(acl, _) if {
+        not acl.operations
+    }
+
+    # If the ACL restricts operations, the requested OpType must be in the permitted set.
+    matches_operation(acl, operation) if {
+        acl.operations
+        operation in acl.operations
+    }
+
+    # If the ACL does not restrict families, all column families are permitted.
+    matches_families(acl, _) if {
+        not acl.families
+    }
+
+    # If the ACL restricts families, every family present in the request must be allowed.
+    # An empty families map (namespace-scoped or unfiltered scan) always passes.
+    matches_families(acl, families) if {
+        acl.families
+        count({f | f := object.keys(families)[_]; not f in acl.families}) == 0
     }
 
     groups_for_user := {
@@ -114,5 +140,9 @@ data:
             "identity": "user:readonlyuser/access-hbase.$NAMESPACE.svc.cluster.local@CLUSTER.LOCAL",
             "action": "ro",
             "resource": "hbase:namespace:",
+            # Restrict to read-only operation types; exercises matches_operation non-null branch.
+            "operations": ["EXISTS", "GET", "SCAN", "NONE"],
+            # Restrict to known column families; exercises matches_families non-null branch.
+            "families": ["cf1"],
         },
     ]
