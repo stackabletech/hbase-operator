@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Document Helm deployed RBAC permissions and remove unnecessary permissions ([#745]).
+
+[#745]: https://github.com/stackabletech/hbase-operator/pull/745
+
 ## [26.3.0] - 2026-03-16
 
 ## [26.3.0-rc1] - 2026-03-16
