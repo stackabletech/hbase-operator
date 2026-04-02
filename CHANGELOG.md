@@ -4,7 +4,7 @@
 
 ### Changed
 
-- Helm deployed RBAC permissions documented, with unnecessary permissions removed ([#745]).
+- Document Helm deployed RBAC permissions and remove unnecessary permissions ([#745]).
 
 [#745]: https://github.com/stackabletech/hbase-operator/pull/745
 
