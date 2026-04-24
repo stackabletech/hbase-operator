@@ -332,16 +332,17 @@ pub async fn reconcile_hbase(
         .await
         .context(RetrieveZookeeperConnectionInformationSnafu)?;
 
-    let roles = hbase.build_role_properties().context(RolePropertiesSnafu)?;
-
-    let validated_config = validate_all_roles_and_groups_config(
-        &resolved_product_image.app_version_label_value,
-        &transform_all_roles_to_config(hbase, roles).context(GenerateProductConfigSnafu)?,
-        &ctx.product_config,
-        false,
-        false,
-    )
-    .context(InvalidProductConfigSnafu)?;
+    let validated_config = {
+        let roles = hbase.build_role_properties().context(RolePropertiesSnafu)?;
+        validate_all_roles_and_groups_config(
+            &resolved_product_image.app_version_label_value,
+            &transform_all_roles_to_config(hbase, &roles).context(GenerateProductConfigSnafu)?,
+            &ctx.product_config,
+            false,
+            false,
+        )
+        .context(InvalidProductConfigSnafu)?
+    };
 
     let hbase_opa_config = match &hbase.spec.cluster_config.authorization {
         Some(opa_config) => Some(
@@ -679,7 +680,7 @@ fn build_rolegroup_config_map(
         .name(rolegroup.object_name())
         .ownerreference_from_resource(hbase, None, Some(true))
         .context(ObjectMissingMetadataForOwnerRefSnafu)?
-        .with_recommended_labels(build_recommended_labels(
+        .with_recommended_labels(&build_recommended_labels(
             hbase,
             &resolved_product_image.app_version_label_value,
             &rolegroup.role,
@@ -740,7 +741,7 @@ fn build_rolegroup_service(
         .name(rolegroup.rolegroup_headless_service_name())
         .ownerreference_from_resource(hbase, None, Some(true))
         .context(ObjectMissingMetadataForOwnerRefSnafu)?
-        .with_recommended_labels(build_recommended_labels(
+        .with_recommended_labels(&build_recommended_labels(
             hbase,
             &resolved_product_image.app_version_label_value,
             &rolegroup.role,
@@ -794,7 +795,7 @@ pub fn build_rolegroup_metrics_service(
             .name(rolegroup.rolegroup_metrics_service_name())
             .ownerreference_from_resource(hbase, None, Some(true))
             .context(ObjectMissingMetadataForOwnerRefSnafu)?
-            .with_recommended_labels(build_recommended_labels(
+            .with_recommended_labels(&build_recommended_labels(
                 hbase,
                 &resolved_product_image.app_version_label_value,
                 &rolegroup.role,
@@ -961,10 +962,10 @@ fn build_rolegroup_statefulset(
         &rolegroup_ref.role_group,
     );
     let recommended_labels =
-        Labels::recommended(recommended_object_labels.clone()).context(LabelBuildSnafu)?;
+        Labels::recommended(&recommended_object_labels).context(LabelBuildSnafu)?;
 
     let pb_metadata = ObjectMetaBuilder::new()
-        .with_recommended_labels(recommended_object_labels)
+        .with_recommended_labels(&recommended_object_labels)
         .context(ObjectMetaSnafu)?
         .build();
 
@@ -1093,7 +1094,7 @@ fn build_rolegroup_statefulset(
         .name(rolegroup_ref.object_name())
         .ownerreference_from_resource(hbase, None, Some(true))
         .context(ObjectMissingMetadataForOwnerRefSnafu)?
-        .with_recommended_labels(build_recommended_labels(
+        .with_recommended_labels(&build_recommended_labels(
             hbase,
             hbase_version,
             &rolegroup_ref.role,

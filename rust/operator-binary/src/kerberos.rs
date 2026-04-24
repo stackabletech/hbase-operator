@@ -10,6 +10,7 @@ use stackable_operator::{
             volume::{SecretFormat, SecretOperatorVolumeSourceBuilder, VolumeBuilder},
         },
     },
+    commons::secret_class::SecretClassVolumeProvisionParts,
     kube::{ResourceExt, runtime::reflector::ObjectRef},
     role_utils::RoleGroupRef,
     shared::time::Duration,
@@ -238,13 +239,15 @@ pub fn add_kerberos_pod_config(
 ) -> Result<(), Error> {
     if let Some(kerberos_secret_class) = hbase.kerberos_secret_class() {
         // Mount keytab
-        let kerberos_secret_operator_volume =
-            SecretOperatorVolumeSourceBuilder::new(kerberos_secret_class)
-                .with_service_scope(hbase.name_any())
-                .with_kerberos_service_name(kerberos_service_name())
-                .with_kerberos_service_name("HTTP")
-                .build()
-                .context(AddKerberosSecretVolumeSnafu)?;
+        let kerberos_secret_operator_volume = SecretOperatorVolumeSourceBuilder::new(
+            kerberos_secret_class,
+            SecretClassVolumeProvisionParts::PublicPrivate,
+        )
+        .with_service_scope(hbase.name_any())
+        .with_kerberos_service_name(kerberos_service_name())
+        .with_kerberos_service_name("HTTP")
+        .build()
+        .context(AddKerberosSecretVolumeSnafu)?;
         pb.add_volume(
             VolumeBuilder::new("kerberos")
                 .ephemeral(kerberos_secret_operator_volume)
@@ -263,16 +266,19 @@ pub fn add_kerberos_pod_config(
         pb.add_volume(
             VolumeBuilder::new(TLS_STORE_VOLUME_NAME)
                 .ephemeral(
-                    SecretOperatorVolumeSourceBuilder::new(https_secret_class)
-                        .with_pod_scope()
-                        .with_node_scope()
-                        // We need to add the metrics service for scraping
-                        .with_service_scope(rolegroup_ref.rolegroup_metrics_service_name())
-                        .with_format(SecretFormat::TlsPkcs12)
-                        .with_tls_pkcs12_password(TLS_STORE_PASSWORD)
-                        .with_auto_tls_cert_lifetime(requested_secret_lifetime)
-                        .build()
-                        .context(AddTlsSecretVolumeSnafu)?,
+                    SecretOperatorVolumeSourceBuilder::new(
+                        https_secret_class,
+                        SecretClassVolumeProvisionParts::PublicPrivate,
+                    )
+                    .with_pod_scope()
+                    .with_node_scope()
+                    // We need to add the metrics service for scraping
+                    .with_service_scope(rolegroup_ref.rolegroup_metrics_service_name())
+                    .with_format(SecretFormat::TlsPkcs12)
+                    .with_tls_pkcs12_password(TLS_STORE_PASSWORD)
+                    .with_auto_tls_cert_lifetime(requested_secret_lifetime)
+                    .build()
+                    .context(AddTlsSecretVolumeSnafu)?,
                 )
                 .build(),
         )
