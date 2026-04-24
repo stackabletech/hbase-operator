@@ -142,34 +142,17 @@ pub struct HbaseConfigOverrides {
 
 impl KeyValueOverridesProvider for HbaseConfigOverrides {
     fn get_key_value_overrides(&self, file: &str) -> BTreeMap<String, Option<String>> {
-        match file {
-            HBASE_SITE_XML => self
-                .hbase_site_xml
-                .as_ref()
-                .map(KeyValueConfigOverrides::as_product_config_overrides)
-                .unwrap_or_default(),
-            HBASE_ENV_SH => self
-                .hbase_env_sh
-                .as_ref()
-                .map(KeyValueConfigOverrides::as_product_config_overrides)
-                .unwrap_or_default(),
-            SSL_SERVER_XML => self
-                .ssl_server_xml
-                .as_ref()
-                .map(KeyValueConfigOverrides::as_product_config_overrides)
-                .unwrap_or_default(),
-            SSL_CLIENT_XML => self
-                .ssl_client_xml
-                .as_ref()
-                .map(KeyValueConfigOverrides::as_product_config_overrides)
-                .unwrap_or_default(),
-            JVM_SECURITY_PROPERTIES_FILE => self
-                .security_properties
-                .as_ref()
-                .map(KeyValueConfigOverrides::as_product_config_overrides)
-                .unwrap_or_default(),
-            _ => BTreeMap::new(),
-        }
+        let field = match file {
+            HBASE_SITE_XML => self.hbase_site_xml.as_ref(),
+            HBASE_ENV_SH => self.hbase_env_sh.as_ref(),
+            SSL_SERVER_XML => self.ssl_server_xml.as_ref(),
+            SSL_CLIENT_XML => self.ssl_client_xml.as_ref(),
+            JVM_SECURITY_PROPERTIES_FILE => self.security_properties.as_ref(),
+            _ => None,
+        };
+        field
+            .map(KeyValueConfigOverrides::as_product_config_overrides)
+            .unwrap_or_default()
     }
 }
 
