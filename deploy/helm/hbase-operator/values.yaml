@@ -1,7 +1,6 @@
 # Default values for hbase-operator.
 ---
 image:
-  repository: oci.stackable.tech/sdp/hbase-operator
   pullPolicy: IfNotPresent
   pullSecrets: []
 
