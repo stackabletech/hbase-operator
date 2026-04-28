@@ -12,6 +12,8 @@ For a role or role group, at the same level of `config`, you can specify: `confi
 
 * `hbase-site.xml`
 * `hbase-env.sh`
+* `ssl-server.xml`
+* `ssl-client.xml`
 * `security.properties`
 
 NOTE: `hdfs-site.xml` is not listed here, the file is always taken from the referenced HDFS cluster.

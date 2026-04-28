@@ -241,6 +241,7 @@ pub fn add_kerberos_pod_config(
         // Mount keytab
         let kerberos_secret_operator_volume = SecretOperatorVolumeSourceBuilder::new(
             kerberos_secret_class,
+            // We need both public (krb5.conf) and private (keytab) parts.
             SecretClassVolumeProvisionParts::PublicPrivate,
         )
         .with_service_scope(hbase.name_any())
@@ -268,6 +269,8 @@ pub fn add_kerberos_pod_config(
                 .ephemeral(
                     SecretOperatorVolumeSourceBuilder::new(
                         https_secret_class,
+                        // HBase serves its own TLS endpoints, so the Pod needs both the public
+                        // certificate and the private key.
                         SecretClassVolumeProvisionParts::PublicPrivate,
                     )
                     .with_pod_scope()
