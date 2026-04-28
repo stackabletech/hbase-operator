@@ -1,11 +1,11 @@
 = Using Apache Phoenix
 :description: Apache Phoenix lets you use SQL with HBase via JDBC. Use bundled psql.py or sqlline.py for table creation and querying, no separate installation needed.
-:phoenix-installation: https://phoenix.apache.org/installation.html
+:phoenix-installation: https://phoenix.apache.org/docs/installation
 :sqlline-github: https://github.com/julianhyde/sqlline
 
 Apache Phoenix allows you to interact with HBase using a familiar SQL-syntax via a JDBC driver.
 The Phoenix dependencies are bundled with the Stackable HBase image and do not need to be installed separately (client components need to ensure that they have the correct client-side libraries available).
-Information about client-side installation can be found {phoenix-installation}[here].
+Information about client-side installation can be found {phoenix-installation}[here{external-link-icon}^].
 
 Apache Phoenix comes bundled with a few simple scripts to verify a correct server-side installation.
 For example, assuming that Phoenix dependencies have been installed to their default location of `/stackable/phoenix/bin`, we can issue the following using the supplied `psql.py` script:
@@ -19,7 +19,7 @@ $ /stackable/phoenix/bin/psql.py  && \
 ----
 
 This script creates, populates and queries a Phoenix table called `WEB_STAT`.
-Alternatively, one can use the `sqlline.py` script (which wraps the {sqlline-github}[sqlline] utility):
+Alternatively, one can use the `sqlline.py` script (which wraps the {sqlline-github}[sqlline{external-link-icon}^] utility):
 
 [source,shell]
 ----
