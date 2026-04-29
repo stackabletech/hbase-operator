@@ -1371,8 +1371,11 @@ mod tests {
     use indoc::indoc;
     use product_config::{ProductConfigManager, types::PropertyNameKind};
     use rstest::rstest;
-    use stackable_operator::product_config_utils::{
-        transform_all_roles_to_config, validate_all_roles_and_groups_config,
+    use stackable_operator::{
+        product_config_utils::{
+            transform_all_roles_to_config, validate_all_roles_and_groups_config,
+        },
+        versioned::test_utils::RoundtripTestData,
     };
 
     use super::*;
@@ -1542,5 +1545,11 @@ spec:
         } else {
             panic!("this shouldn't happen");
         };
+    }
+
+    impl RoundtripTestData for v1alpha1::HbaseClusterSpec {
+        fn roundtrip_test_data() -> Vec<Self> {
+            vec![]
+        }
     }
 }
