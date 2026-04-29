@@ -1371,8 +1371,11 @@ mod tests {
     use indoc::indoc;
     use product_config::{ProductConfigManager, types::PropertyNameKind};
     use rstest::rstest;
-    use stackable_operator::product_config_utils::{
-        transform_all_roles_to_config, validate_all_roles_and_groups_config,
+    use stackable_operator::{
+        product_config_utils::{
+            transform_all_roles_to_config, validate_all_roles_and_groups_config,
+        },
+        versioned::test_utils::RoundtripTestData,
     };
 
     use super::*;
@@ -1542,5 +1545,92 @@ spec:
         } else {
             panic!("this shouldn't happen");
         };
+    }
+
+    impl RoundtripTestData for v1alpha1::HbaseClusterSpec {
+        fn roundtrip_test_data() -> Vec<Self> {
+            stackable_operator::utils::yaml_from_str_singleton_map(indoc::indoc! {r#"
+              - image:
+                  productVersion: 2.6.4
+                  pullPolicy: IfNotPresent
+                clusterOperation:
+                  reconciliationPaused: false
+                  stopped: true
+                clusterConfig:
+                  hdfsConfigMapName: test-hdfs
+                  zookeeperConfigMapName: test-znode
+                  vectorAggregatorConfigMapName: vector-aggregator-discovery
+                  authentication:
+                    tlsSecretClass: my-tls
+                    kerberos:
+                      secretClass: my-kerberos
+                  authorization:
+                    opa:
+                      configMapName: opa
+                      package: hbase
+                masters:
+                  envOverrides:
+                    COMMON_VAR: role-value
+                    ROLE_VAR: role-value
+                  config:
+                    gracefulShutdownTimeout: 1m
+                    resources:
+                      cpu:
+                        min: 250m
+                        max: "1"
+                      memory:
+                        limit: 1Gi
+                    logging:
+                      enableVectorAgent: true
+                    listenerClass: cluster-internal
+                  configOverrides:
+                    hbase-site.xml:
+                      hbase.master.info.port: "16010"
+                  roleGroups:
+                    default:
+                      replicas: 2
+                      configOverrides:
+                        hbase-site.xml:
+                          hbase.master.info.port: "16011"
+                      envOverrides:
+                        COMMON_VAR: group-value
+                        GROUP_VAR: group-value
+                regionServers:
+                  config:
+                    gracefulShutdownTimeout: 2m
+                    resources:
+                      cpu:
+                        min: 250m
+                        max: "2"
+                      memory:
+                        limit: 2Gi
+                    logging:
+                      enableVectorAgent: true
+                    regionMover:
+                      runBeforeShutdown: true
+                      ack: true
+                      maxThreads: 1
+                    listenerClass: cluster-internal
+                  roleGroups:
+                    default:
+                      replicas: 3
+                restServers:
+                  config:
+                    gracefulShutdownTimeout: 1m
+                    resources:
+                      cpu:
+                        min: 100m
+                        max: "1"
+                      memory:
+                        limit: 1Gi
+                    logging:
+                      enableVectorAgent: true
+                    listenerClass: cluster-internal
+                  roleGroups:
+                    default:
+                      replicas: 1
+        "#})
+            .expect("Failed to parse HbaseClusterSpec YAML")
+        }
     }
 }

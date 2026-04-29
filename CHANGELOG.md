@@ -2,16 +2,21 @@
 
 ## [Unreleased]
 
+### Added
+
+- BREAKING: Add required CLI argument and env var to set the image repository used to construct final product image names: `IMAGE_REPOSITORY` (`--image-repository`), eg. `oci.example.org/my/namespace` ([#752]).
+
 ### Changed
 
 - Document Helm deployed RBAC permissions and remove unnecessary permissions ([#745]).
 - BREAKING: `configOverrides` now only accepts the known config files (`hbase-site.xml`,
   `hbase-env.sh`, `ssl-server.xml`, `ssl-client.xml` and `security.properties`).
   Previously, arbitrary file names were silently accepted and ignored ([#751]).
-- Bump `stackable-operator` to 0.110.1 and snafu to 0.9 ([#751]).
+- Bump `stackable-operator` to 0.111.1 and snafu to 0.9 ([#751], [#752]).
 
 [#745]: https://github.com/stackabletech/hbase-operator/pull/745
 [#751]: https://github.com/stackabletech/hbase-operator/pull/751
+[#752]: https://github.com/stackabletech/hbase-operator/pull/752
 
 ## [26.3.0] - 2026-03-16
 

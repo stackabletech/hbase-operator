@@ -25,6 +25,7 @@ use stackable_operator::{
             security::PodSecurityContextBuilder,
         },
     },
+    cli::OperatorEnvironmentOptions,
     cluster_resources::{ClusterResourceApplyStrategy, ClusterResources},
     commons::{
         product_image_selection::{self, ResolvedProductImage},
@@ -106,11 +107,12 @@ const HDFS_DISCOVERY_TMP_DIR: &str = "/stackable/tmp/hdfs";
 const HBASE_CONFIG_TMP_DIR: &str = "/stackable/tmp/hbase";
 const HBASE_LOG_CONFIG_TMP_DIR: &str = "/stackable/tmp/log_config";
 
-const DOCKER_IMAGE_BASE_NAME: &str = "hbase";
+const CONTAINER_IMAGE_BASE_NAME: &str = "hbase";
 
 pub struct Ctx {
     pub client: stackable_operator::client::Client,
     pub product_config: ProductConfigManager,
+    pub operator_environment: OperatorEnvironmentOptions,
 }
 
 #[derive(Snafu, Debug, EnumDiscriminants)]
@@ -326,7 +328,11 @@ pub async fn reconcile_hbase(
     let resolved_product_image = hbase
         .spec
         .image
-        .resolve(DOCKER_IMAGE_BASE_NAME, crate::built_info::PKG_VERSION)
+        .resolve(
+            CONTAINER_IMAGE_BASE_NAME,
+            &ctx.operator_environment.image_repository,
+            crate::built_info::PKG_VERSION,
+        )
         .context(ResolveProductImageSnafu)?;
     let zookeeper_connection_information = ZookeeperConnectionInformation::retrieve(hbase, client)
         .await
