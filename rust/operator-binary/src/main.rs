@@ -163,6 +163,7 @@ async fn main() -> anyhow::Result<()> {
                     hbase_controller::error_policy,
                     Arc::new(hbase_controller::Ctx {
                         client: client.clone(),
+                        operator_environment,
                         product_config,
                     }),
                 )
