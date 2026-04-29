@@ -23,6 +23,7 @@ use stackable_operator::{
         fragment::{self, Fragment, ValidationError},
         merge::{Atomic, Merge},
     },
+    config_overrides::{KeyValueConfigOverrides, KeyValueOverridesProvider},
     deep_merger::ObjectOverrides,
     k8s_openapi::{
         DeepMerge,
@@ -92,6 +93,19 @@ const DEFAULT_REGION_MOVER_TIMEOUT: Duration = Duration::from_minutes_unchecked(
 const DEFAULT_REGION_MOVER_DELTA_TO_SHUTDOWN: Duration = Duration::from_minutes_unchecked(1);
 
 const DEFAULT_LISTENER_CLASS: &str = "cluster-internal";
+
+pub type MasterRoleType =
+    Role<HbaseConfigFragment, v1alpha1::HbaseConfigOverrides, GenericRoleConfig, JavaCommonConfig>;
+
+pub type RegionServerRoleType = Role<
+    RegionServerConfigFragment,
+    v1alpha1::HbaseConfigOverrides,
+    GenericRoleConfig,
+    JavaCommonConfig,
+>;
+
+pub type RestServerRoleType =
+    Role<HbaseConfigFragment, v1alpha1::HbaseConfigOverrides, GenericRoleConfig, JavaCommonConfig>;
 
 #[derive(Snafu, Debug)]
 pub enum Error {
@@ -183,16 +197,15 @@ pub mod versioned {
         /// The HBase master process is responsible for assigning regions to region servers and
         /// manages the cluster.
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        pub masters: Option<Role<HbaseConfigFragment, GenericRoleConfig, JavaCommonConfig>>,
+        pub masters: Option<MasterRoleType>,
 
         /// Region servers hold the data and handle requests from clients for their region.
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        pub region_servers:
-            Option<Role<RegionServerConfigFragment, GenericRoleConfig, JavaCommonConfig>>,
+        pub region_servers: Option<RegionServerRoleType>,
 
         /// Rest servers provide a REST API to interact with.
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        pub rest_servers: Option<Role<HbaseConfigFragment, GenericRoleConfig, JavaCommonConfig>>,
+        pub rest_servers: Option<RestServerRoleType>,
     }
 
     #[derive(Clone, Debug, Default, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
@@ -218,6 +231,45 @@ pub mod versioned {
 
         #[serde(default, skip_serializing_if = "Option::is_none")]
         pub authorization: Option<AuthorizationConfig>,
+    }
+
+    #[derive(Clone, Debug, Default, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
+    #[serde(rename_all = "camelCase")]
+    pub struct HbaseConfigOverrides {
+        #[serde(
+            default,
+            rename = "hbase-site.xml",
+            skip_serializing_if = "Option::is_none"
+        )]
+        pub hbase_site_xml: Option<KeyValueConfigOverrides>,
+
+        #[serde(
+            default,
+            rename = "hbase-env.sh",
+            skip_serializing_if = "Option::is_none"
+        )]
+        pub hbase_env_sh: Option<KeyValueConfigOverrides>,
+
+        #[serde(
+            default,
+            rename = "ssl-server.xml",
+            skip_serializing_if = "Option::is_none"
+        )]
+        pub ssl_server_xml: Option<KeyValueConfigOverrides>,
+
+        #[serde(
+            default,
+            rename = "ssl-client.xml",
+            skip_serializing_if = "Option::is_none"
+        )]
+        pub ssl_client_xml: Option<KeyValueConfigOverrides>,
+
+        #[serde(
+            default,
+            rename = "security.properties",
+            skip_serializing_if = "Option::is_none"
+        )]
+        pub security_properties: Option<KeyValueConfigOverrides>,
     }
 }
 
@@ -346,7 +398,12 @@ impl v1alpha1::HbaseCluster {
             String,
             (
                 Vec<PropertyNameKind>,
-                Role<impl Configuration<Configurable = Self>, GenericRoleConfig, JavaCommonConfig>,
+                Role<
+                    impl Configuration<Configurable = Self>,
+                    v1alpha1::HbaseConfigOverrides,
+                    GenericRoleConfig,
+                    JavaCommonConfig,
+                >,
             ),
         >,
         Error,
@@ -522,6 +579,22 @@ impl v1alpha1::HbaseCluster {
             .authentication
             .as_ref()
             .map(|a| a.tls_secret_class.clone())
+    }
+}
+
+impl KeyValueOverridesProvider for v1alpha1::HbaseConfigOverrides {
+    fn get_key_value_overrides(&self, file: &str) -> BTreeMap<String, Option<String>> {
+        let field = match file {
+            HBASE_SITE_XML => self.hbase_site_xml.as_ref(),
+            HBASE_ENV_SH => self.hbase_env_sh.as_ref(),
+            SSL_SERVER_XML => self.ssl_server_xml.as_ref(),
+            SSL_CLIENT_XML => self.ssl_client_xml.as_ref(),
+            JVM_SECURITY_PROPERTIES_FILE => self.security_properties.as_ref(),
+            _ => None,
+        };
+        field
+            .map(KeyValueConfigOverrides::as_product_config_overrides)
+            .unwrap_or_default()
     }
 }
 
@@ -1363,7 +1436,7 @@ spec:
 
         let validated_config = validate_all_roles_and_groups_config(
             "2.6.4",
-            &transform_all_roles_to_config(&hbase, roles).unwrap(),
+            &transform_all_roles_to_config(&hbase, &roles).unwrap(),
             &ProductConfigManager::from_yaml_file("../../deploy/config-spec/properties.yaml")
                 .unwrap(),
             false,

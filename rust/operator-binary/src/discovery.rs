@@ -62,7 +62,7 @@ pub fn build_discovery_configmap(
                 .with_context(|_| ObjectMissingMetadataForOwnerRefSnafu {
                     hbase: ObjectRef::from_obj(hbase),
                 })?
-                .with_recommended_labels(build_recommended_labels(
+                .with_recommended_labels(&build_recommended_labels(
                     hbase,
                     &resolved_product_image.app_version_label_value,
                     &HbaseRole::RegionServer.to_string(),
