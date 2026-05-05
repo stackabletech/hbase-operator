@@ -3,7 +3,7 @@
 == Requirements
 
 A distributed Apache HBase installation depends on a running Apache ZooKeeper and HDFS cluster. See
-the documentation for the https://docs.stackable.tech/hdfs/usage.html[Stackable Operator for Apache HDFS]
+the documentation for the xref:hdfs:getting_started/first_steps.adoc[Stackable Operator for Apache HDFS]
 how to set up these clusters.
 
 == Deployment of an Apache HBase cluster
