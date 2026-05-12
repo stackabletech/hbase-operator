@@ -1,0 +1,124 @@
+use std::{
+    collections::{BTreeMap, HashMap},
+    str::FromStr,
+};
+
+use product_config::{ProductConfigManager, types::PropertyNameKind};
+use snafu::{ResultExt, Snafu};
+use stackable_operator::{
+    commons::product_image_selection::ResolvedProductImage,
+    product_config_utils::{transform_all_roles_to_config, validate_all_roles_and_groups_config},
+    role_utils::GenericRoleConfig,
+};
+
+use super::dereference::DereferencedObjects;
+use crate::crd::{AnyServiceConfig, HbaseRole, v1alpha1};
+
+#[derive(Snafu, Debug)]
+pub enum Error {
+    #[snafu(display("invalid role properties"))]
+    RoleProperties { source: crate::crd::Error },
+
+    #[snafu(display("failed to generate product config"))]
+    GenerateProductConfig {
+        source: stackable_operator::product_config_utils::Error,
+    },
+
+    #[snafu(display("invalid product config"))]
+    InvalidProductConfig {
+        source: stackable_operator::product_config_utils::Error,
+    },
+
+    #[snafu(display("could not parse Hbase role [{role}]"))]
+    UnidentifiedHbaseRole {
+        source: strum::ParseError,
+        role: String,
+    },
+
+    #[snafu(display("failed to resolve and merge config for role and role group"))]
+    FailedToResolveConfig { source: crate::crd::Error },
+}
+
+/// Per-role configuration extracted during validation.
+#[derive(Clone, Debug)]
+pub struct ValidatedRoleConfig {
+    pub pdb: stackable_operator::commons::pdb::PdbConfig,
+}
+
+/// Per-rolegroup configuration: the merged CRD config plus the product-config properties.
+#[derive(Clone, Debug)]
+pub struct ValidatedRoleGroupConfig {
+    pub merged_config: AnyServiceConfig,
+    pub product_config_properties: HashMap<PropertyNameKind, BTreeMap<String, String>>,
+}
+
+/// The validated cluster: proves that product-config validation and config merging
+/// succeeded for every role and role group before any resources are created.
+#[derive(Clone, Debug)]
+pub struct ValidatedHbaseCluster {
+    pub image: ResolvedProductImage,
+    pub role_groups: BTreeMap<HbaseRole, BTreeMap<String, ValidatedRoleGroupConfig>>,
+    pub role_configs: BTreeMap<HbaseRole, ValidatedRoleConfig>,
+}
+
+pub fn validate_cluster(
+    hbase: &v1alpha1::HbaseCluster,
+    dereferenced: &DereferencedObjects,
+    product_config_manager: &ProductConfigManager,
+) -> Result<ValidatedHbaseCluster, Error> {
+    let roles = hbase.build_role_properties().context(RolePropertiesSnafu)?;
+
+    let validated_config = validate_all_roles_and_groups_config(
+        &dereferenced.resolved_product_image.app_version_label_value,
+        &transform_all_roles_to_config(hbase, &roles).context(GenerateProductConfigSnafu)?,
+        product_config_manager,
+        false,
+        false,
+    )
+    .context(InvalidProductConfigSnafu)?;
+
+    let mut role_groups = BTreeMap::new();
+    let mut role_configs = BTreeMap::new();
+
+    for (role_name, group_config) in validated_config.iter() {
+        let hbase_role = HbaseRole::from_str(role_name).context(UnidentifiedHbaseRoleSnafu {
+            role: role_name.to_string(),
+        })?;
+
+        if let Some(GenericRoleConfig {
+            pod_disruption_budget: pdb,
+        }) = hbase.role_config(&hbase_role)
+        {
+            role_configs.insert(hbase_role.clone(), ValidatedRoleConfig { pdb: pdb.clone() });
+        }
+
+        let mut group_configs = BTreeMap::new();
+        for (rolegroup_name, rolegroup_config) in group_config.iter() {
+            let rolegroup = hbase.server_rolegroup_ref(role_name, rolegroup_name);
+
+            let merged_config = hbase
+                .merged_config(
+                    &hbase_role,
+                    &rolegroup.role_group,
+                    &hbase.spec.cluster_config.hdfs_config_map_name,
+                )
+                .context(FailedToResolveConfigSnafu)?;
+
+            group_configs.insert(
+                rolegroup_name.clone(),
+                ValidatedRoleGroupConfig {
+                    merged_config,
+                    product_config_properties: rolegroup_config.clone(),
+                },
+            );
+        }
+
+        role_groups.insert(hbase_role, group_configs);
+    }
+
+    Ok(ValidatedHbaseCluster {
+        image: dereferenced.resolved_product_image.clone(),
+        role_groups,
+        role_configs,
+    })
+}
