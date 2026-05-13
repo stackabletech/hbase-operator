@@ -69,7 +69,7 @@ pub fn validate_cluster(
     let roles = hbase.build_role_properties().context(RolePropertiesSnafu)?;
 
     let validated_config = validate_all_roles_and_groups_config(
-        &dereferenced.resolved_product_image.app_version_label_value,
+        &dereferenced.resolved_product_image.product_version,
         &transform_all_roles_to_config(hbase, &roles).context(GenerateProductConfigSnafu)?,
         product_config_manager,
         false,
