@@ -6,16 +6,20 @@ use std::{
 use product_config::{ProductConfigManager, types::PropertyNameKind};
 use snafu::{ResultExt, Snafu};
 use stackable_operator::{
-    commons::product_image_selection::ResolvedProductImage,
+    commons::product_image_selection::{self, ResolvedProductImage},
     product_config_utils::{transform_all_roles_to_config, validate_all_roles_and_groups_config},
     role_utils::GenericRoleConfig,
 };
 
-use super::dereference::DereferencedObjects;
 use crate::crd::{AnyServiceConfig, HbaseRole, v1alpha1};
 
 #[derive(Snafu, Debug)]
 pub enum Error {
+    #[snafu(display("failed to resolve product image"))]
+    ResolveProductImage {
+        source: product_image_selection::Error,
+    },
+
     #[snafu(display("invalid role properties"))]
     RoleProperties { source: crate::crd::Error },
 
@@ -63,13 +67,21 @@ pub struct ValidatedHbaseCluster {
 
 pub fn validate_cluster(
     hbase: &v1alpha1::HbaseCluster,
-    dereferenced: &DereferencedObjects,
+    image_base_name: &str,
+    image_repository: &str,
+    pkg_version: &str,
     product_config_manager: &ProductConfigManager,
 ) -> Result<ValidatedHbaseCluster, Error> {
+    let resolved_product_image = hbase
+        .spec
+        .image
+        .resolve(image_base_name, image_repository, pkg_version)
+        .context(ResolveProductImageSnafu)?;
+
     let roles = hbase.build_role_properties().context(RolePropertiesSnafu)?;
 
     let validated_config = validate_all_roles_and_groups_config(
-        &dereferenced.resolved_product_image.product_version,
+        &resolved_product_image.product_version,
         &transform_all_roles_to_config(hbase, &roles).context(GenerateProductConfigSnafu)?,
         product_config_manager,
         false,
@@ -117,7 +129,7 @@ pub fn validate_cluster(
     }
 
     Ok(ValidatedHbaseCluster {
-        image: dereferenced.resolved_product_image.clone(),
+        image: resolved_product_image,
         role_groups,
         role_configs,
     })

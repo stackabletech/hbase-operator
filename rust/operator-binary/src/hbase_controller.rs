@@ -298,19 +298,18 @@ pub async fn reconcile_hbase(
 
     let client = &ctx.client;
 
-    let dereferenced = crate::controller::dereference::dereference(
-        client,
+    let dereferenced = crate::controller::dereference::dereference(client, hbase)
+        .await
+        .context(DereferenceSnafu)?;
+
+    let validated = crate::controller::validate::validate_cluster(
         hbase,
         CONTAINER_IMAGE_BASE_NAME,
         &ctx.operator_environment.image_repository,
         crate::built_info::PKG_VERSION,
+        &ctx.product_config,
     )
-    .await
-    .context(DereferenceSnafu)?;
-
-    let validated =
-        crate::controller::validate::validate_cluster(hbase, &dereferenced, &ctx.product_config)
-            .context(ValidateSnafu)?;
+    .context(ValidateSnafu)?;
 
     let mut cluster_resources = ClusterResources::new(
         APP_NAME,
