@@ -1,0 +1,892 @@
+---
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+metadata:
+  name: install-hbase
+timeout: 600
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app.kubernetes.io/component: master
+    app.kubernetes.io/instance: test-hbase
+    app.kubernetes.io/managed-by: hbase.stackable.com_hbasecluster
+    app.kubernetes.io/name: hbase
+    app.kubernetes.io/role-group: default
+    stackable.tech/vendor: Stackable
+  name: test-hbase-master-default-headless
+spec:
+  clusterIP: None
+  ports:
+  - name: master
+    port: 16000
+    protocol: TCP
+    targetPort: 16000
+  - name: ui-http
+    port: 16010
+    protocol: TCP
+    targetPort: 16010
+  publishNotReadyAddresses: true
+  selector:
+    app.kubernetes.io/component: master
+    app.kubernetes.io/instance: test-hbase
+    app.kubernetes.io/name: hbase
+    app.kubernetes.io/role-group: default
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    prometheus.io/path: /prometheus
+    prometheus.io/port: "16010"
+    prometheus.io/scheme: http
+    prometheus.io/scrape: "true"
+  labels:
+    app.kubernetes.io/component: master
+    app.kubernetes.io/instance: test-hbase
+    app.kubernetes.io/managed-by: hbase.stackable.com_hbasecluster
+    app.kubernetes.io/name: hbase
+    app.kubernetes.io/role-group: default
+    prometheus.io/scrape: "true"
+    stackable.tech/vendor: Stackable
+  name: test-hbase-master-default-metrics
+spec:
+  clusterIP: None
+  ports:
+  - name: metrics
+    port: 16010
+    protocol: TCP
+    targetPort: 16010
+  publishNotReadyAddresses: true
+  selector:
+    app.kubernetes.io/component: master
+    app.kubernetes.io/instance: test-hbase
+    app.kubernetes.io/name: hbase
+    app.kubernetes.io/role-group: default
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app.kubernetes.io/component: regionserver
+    app.kubernetes.io/instance: test-hbase
+    app.kubernetes.io/managed-by: hbase.stackable.com_hbasecluster
+    app.kubernetes.io/name: hbase
+    app.kubernetes.io/role-group: default
+    stackable.tech/vendor: Stackable
+  name: test-hbase-regionserver-default-headless
+spec:
+  clusterIP: None
+  ports:
+  - name: regionserver
+    port: 16020
+    protocol: TCP
+    targetPort: 16020
+  - name: ui-http
+    port: 16030
+    protocol: TCP
+    targetPort: 16030
+  publishNotReadyAddresses: true
+  selector:
+    app.kubernetes.io/component: regionserver
+    app.kubernetes.io/instance: test-hbase
+    app.kubernetes.io/name: hbase
+    app.kubernetes.io/role-group: default
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    prometheus.io/path: /prometheus
+    prometheus.io/port: "16030"
+    prometheus.io/scheme: http
+    prometheus.io/scrape: "true"
+  labels:
+    app.kubernetes.io/component: regionserver
+    app.kubernetes.io/instance: test-hbase
+    app.kubernetes.io/managed-by: hbase.stackable.com_hbasecluster
+    app.kubernetes.io/name: hbase
+    app.kubernetes.io/role-group: default
+    prometheus.io/scrape: "true"
+    stackable.tech/vendor: Stackable
+  name: test-hbase-regionserver-default-metrics
+spec:
+  clusterIP: None
+  ports:
+  - name: metrics
+    port: 16030
+    protocol: TCP
+    targetPort: 16030
+  publishNotReadyAddresses: true
+  selector:
+    app.kubernetes.io/component: regionserver
+    app.kubernetes.io/instance: test-hbase
+    app.kubernetes.io/name: hbase
+    app.kubernetes.io/role-group: default
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app.kubernetes.io/component: restserver
+    app.kubernetes.io/instance: test-hbase
+    app.kubernetes.io/managed-by: hbase.stackable.com_hbasecluster
+    app.kubernetes.io/name: hbase
+    app.kubernetes.io/role-group: default
+    stackable.tech/vendor: Stackable
+  name: test-hbase-restserver-default-headless
+spec:
+  clusterIP: None
+  ports:
+  - name: rest-http
+    port: 8080
+    protocol: TCP
+    targetPort: 8080
+  - name: ui-http
+    port: 8085
+    protocol: TCP
+    targetPort: 8085
+  publishNotReadyAddresses: true
+  selector:
+    app.kubernetes.io/component: restserver
+    app.kubernetes.io/instance: test-hbase
+    app.kubernetes.io/name: hbase
+    app.kubernetes.io/role-group: default
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    prometheus.io/path: /prometheus
+    prometheus.io/port: "8085"
+    prometheus.io/scheme: http
+    prometheus.io/scrape: "true"
+  labels:
+    app.kubernetes.io/component: restserver
+    app.kubernetes.io/instance: test-hbase
+    app.kubernetes.io/managed-by: hbase.stackable.com_hbasecluster
+    app.kubernetes.io/name: hbase
+    app.kubernetes.io/role-group: default
+    prometheus.io/scrape: "true"
+    stackable.tech/vendor: Stackable
+  name: test-hbase-restserver-default-metrics
+spec:
+  clusterIP: None
+  ports:
+  - name: metrics
+    port: 8085
+    protocol: TCP
+    targetPort: 8085
+  publishNotReadyAddresses: true
+  selector:
+    app.kubernetes.io/component: restserver
+    app.kubernetes.io/instance: test-hbase
+    app.kubernetes.io/name: hbase
+    app.kubernetes.io/role-group: default
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: test-hbase-master-default
+  generation: 1 # There should be no unneeded Pod restarts
+  labels:
+    app.kubernetes.io/component: master
+    app.kubernetes.io/instance: test-hbase
+    app.kubernetes.io/managed-by: hbase.stackable.com_hbasecluster
+    app.kubernetes.io/name: hbase
+    app.kubernetes.io/role-group: default
+    restarter.stackable.tech/enabled: "true"
+    stackable.tech/vendor: Stackable
+spec:
+  podManagementPolicy: Parallel
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: master
+      app.kubernetes.io/instance: test-hbase
+      app.kubernetes.io/name: hbase
+      app.kubernetes.io/role-group: default
+  serviceName: test-hbase-master-default-headless
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: master
+        app.kubernetes.io/instance: test-hbase
+        app.kubernetes.io/managed-by: hbase.stackable.com_hbasecluster
+        app.kubernetes.io/name: hbase
+        app.kubernetes.io/role-group: default
+        stackable.tech/vendor: Stackable
+    spec:
+      affinity:
+        podAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  app.kubernetes.io/instance: test-hbase
+                  app.kubernetes.io/name: hbase
+              topologyKey: kubernetes.io/hostname
+            weight: 20
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  app.kubernetes.io/component: master
+                  app.kubernetes.io/instance: test-hbase
+                  app.kubernetes.io/name: hbase
+              topologyKey: kubernetes.io/hostname
+            weight: 70
+      containers:
+      - args:
+        - /stackable/hbase/bin/hbase-entrypoint.sh master 16000 master ui-http
+        command:
+        - /bin/bash
+        - -x
+        - -euo
+        - pipefail
+        - -c
+        env:
+        - name: HADOOP_CONF_DIR
+          value: /stackable/conf
+        - name: HBASE_CONF_DIR
+          value: /stackable/conf
+        - name: REGION_MOVER_OPTS
+        - name: RUN_REGION_MOVER
+          value: "false"
+        - name: STACKABLE_LOG_DIR
+          value: /stackable/log
+        - name: CONTAINERDEBUG_LOG_DIRECTORY
+          value: /stackable/log/containerdebug
+        imagePullPolicy: IfNotPresent
+        livenessProbe:
+          failureThreshold: 3
+          periodSeconds: 10
+          successThreshold: 1
+          tcpSocket:
+            port: master
+          timeoutSeconds: 3
+        name: hbase
+        ports:
+        - containerPort: 16000
+          name: master
+          protocol: TCP
+        - containerPort: 16010
+          name: ui-http
+          protocol: TCP
+        readinessProbe:
+          failureThreshold: 1
+          periodSeconds: 10
+          successThreshold: 1
+          tcpSocket:
+            port: master
+          timeoutSeconds: 2
+        resources:
+          limits:
+            cpu: "1"
+            memory: 1Gi
+          requests:
+            cpu: 250m
+            memory: 1Gi
+        startupProbe:
+          failureThreshold: 120
+          initialDelaySeconds: 4
+          periodSeconds: 5
+          successThreshold: 1
+          tcpSocket:
+            port: master
+          timeoutSeconds: 3
+        volumeMounts:
+        - mountPath: /stackable/tmp/hbase
+          name: hbase-config
+        - mountPath: /stackable/tmp/hdfs
+          name: hdfs-discovery
+        - mountPath: /stackable/tmp/log_config
+          name: log-config
+        - mountPath: /stackable/log
+          name: log
+        - mountPath: /stackable/listener
+          name: listener
+      enableServiceLinks: false
+      serviceAccountName: test-hbase-serviceaccount
+      terminationGracePeriodSeconds: 1200
+      volumes:
+      - configMap:
+          name: test-hbase-master-default
+        name: hbase-config
+      - configMap:
+          name: test-hdfs
+        name: hdfs-discovery
+      - emptyDir:
+          sizeLimit: 30Mi
+        name: log
+      - configMap:
+          name: test-hbase-master-default
+        name: log-config
+      - ephemeral:
+          volumeClaimTemplate:
+            metadata:
+              annotations:
+                listeners.stackable.tech/listener-class: {{ test_scenario['values']['listener-class'] }}
+            spec:
+              accessModes:
+              - ReadWriteMany
+              resources:
+                requests:
+                  storage: "1"
+              storageClassName: listeners.stackable.tech
+        name: listener
+status:
+  readyReplicas: 2
+  replicas: 2
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: test-hbase-regionserver-default
+  generation: 1 # There should be no unneeded Pod restarts
+  labels:
+    app.kubernetes.io/component: regionserver
+    app.kubernetes.io/instance: test-hbase
+    app.kubernetes.io/managed-by: hbase.stackable.com_hbasecluster
+    app.kubernetes.io/name: hbase
+    app.kubernetes.io/role-group: default
+    restarter.stackable.tech/enabled: "true"
+    stackable.tech/vendor: Stackable
+spec:
+  podManagementPolicy: Parallel
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: regionserver
+      app.kubernetes.io/instance: test-hbase
+      app.kubernetes.io/name: hbase
+      app.kubernetes.io/role-group: default
+  serviceName: test-hbase-regionserver-default-headless
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: regionserver
+        app.kubernetes.io/instance: test-hbase
+        app.kubernetes.io/managed-by: hbase.stackable.com_hbasecluster
+        app.kubernetes.io/name: hbase
+        app.kubernetes.io/role-group: default
+        stackable.tech/vendor: Stackable
+    spec:
+      affinity:
+        podAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  app.kubernetes.io/instance: test-hbase
+                  app.kubernetes.io/name: hbase
+              topologyKey: kubernetes.io/hostname
+            weight: 20
+          - podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  app.kubernetes.io/component: datanode
+                  app.kubernetes.io/instance: test-hdfs
+                  app.kubernetes.io/name: hdfs
+              topologyKey: kubernetes.io/hostname
+            weight: 50
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  app.kubernetes.io/component: regionserver
+                  app.kubernetes.io/instance: test-hbase
+                  app.kubernetes.io/name: hbase
+              topologyKey: kubernetes.io/hostname
+            weight: 70
+      containers:
+      - args:
+        - /stackable/hbase/bin/hbase-entrypoint.sh regionserver 16020 regionserver
+          ui-http
+        command:
+        - /bin/bash
+        - -x
+        - -euo
+        - pipefail
+        - -c
+        env:
+        - name: HADOOP_CONF_DIR
+          value: /stackable/conf
+        - name: HBASE_CONF_DIR
+          value: /stackable/conf
+        - name: REGION_MOVER_OPTS
+        - name: RUN_REGION_MOVER
+          value: "false"
+        - name: STACKABLE_LOG_DIR
+          value: /stackable/log
+        - name: CONTAINERDEBUG_LOG_DIRECTORY
+          value: /stackable/log/containerdebug
+        imagePullPolicy: IfNotPresent
+        livenessProbe:
+          failureThreshold: 3
+          periodSeconds: 10
+          successThreshold: 1
+          tcpSocket:
+            port: regionserver
+          timeoutSeconds: 3
+        name: hbase
+        ports:
+        - containerPort: 16020
+          name: regionserver
+          protocol: TCP
+        - containerPort: 16030
+          name: ui-http
+          protocol: TCP
+        readinessProbe:
+          failureThreshold: 1
+          periodSeconds: 10
+          successThreshold: 1
+          tcpSocket:
+            port: regionserver
+          timeoutSeconds: 2
+        resources:
+          limits:
+            cpu: "1"
+            memory: 1Gi
+          requests:
+            cpu: 250m
+            memory: 1Gi
+        startupProbe:
+          failureThreshold: 120
+          initialDelaySeconds: 4
+          periodSeconds: 5
+          successThreshold: 1
+          tcpSocket:
+            port: regionserver
+          timeoutSeconds: 3
+        volumeMounts:
+        - mountPath: /stackable/tmp/hbase
+          name: hbase-config
+        - mountPath: /stackable/tmp/hdfs
+          name: hdfs-discovery
+        - mountPath: /stackable/tmp/log_config
+          name: log-config
+        - mountPath: /stackable/log
+          name: log
+        - mountPath: /stackable/listener
+          name: listener
+      enableServiceLinks: false
+      serviceAccountName: test-hbase-serviceaccount
+      terminationGracePeriodSeconds: 3600
+      volumes:
+      - configMap:
+          name: test-hbase-regionserver-default
+        name: hbase-config
+      - configMap:
+          name: test-hdfs
+        name: hdfs-discovery
+      - emptyDir:
+          sizeLimit: 30Mi
+        name: log
+      - configMap:
+          name: test-hbase-regionserver-default
+        name: log-config
+      - ephemeral:
+          volumeClaimTemplate:
+            metadata:
+              annotations:
+                listeners.stackable.tech/listener-class: {{ test_scenario['values']['listener-class'] }}
+            spec:
+              accessModes:
+              - ReadWriteMany
+              resources:
+                requests:
+                  storage: "1"
+              storageClassName: listeners.stackable.tech
+        name: listener
+status:
+  readyReplicas: 2
+  replicas: 2
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: test-hbase-restserver-default
+  generation: 1 # There should be no unneeded Pod restarts
+  labels:
+    app.kubernetes.io/component: restserver
+    app.kubernetes.io/instance: test-hbase
+    app.kubernetes.io/managed-by: hbase.stackable.com_hbasecluster
+    app.kubernetes.io/name: hbase
+    app.kubernetes.io/role-group: default
+    restarter.stackable.tech/enabled: "true"
+    stackable.tech/vendor: Stackable
+spec:
+  podManagementPolicy: Parallel
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: restserver
+      app.kubernetes.io/instance: test-hbase
+      app.kubernetes.io/name: hbase
+      app.kubernetes.io/role-group: default
+  serviceName: test-hbase-restserver-default-headless
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: restserver
+        app.kubernetes.io/instance: test-hbase
+        app.kubernetes.io/managed-by: hbase.stackable.com_hbasecluster
+        app.kubernetes.io/name: hbase
+        app.kubernetes.io/role-group: default
+        stackable.tech/vendor: Stackable
+    spec:
+      affinity:
+        podAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  app.kubernetes.io/instance: test-hbase
+                  app.kubernetes.io/name: hbase
+              topologyKey: kubernetes.io/hostname
+            weight: 20
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  app.kubernetes.io/component: restserver
+                  app.kubernetes.io/instance: test-hbase
+                  app.kubernetes.io/name: hbase
+              topologyKey: kubernetes.io/hostname
+            weight: 70
+      containers:
+      - args:
+        - /stackable/hbase/bin/hbase-entrypoint.sh rest 8080 rest-http ui-http
+        command:
+        - /bin/bash
+        - -x
+        - -euo
+        - pipefail
+        - -c
+        env:
+        - name: HADOOP_CONF_DIR
+          value: /stackable/conf
+        - name: HBASE_CONF_DIR
+          value: /stackable/conf
+        - name: REGION_MOVER_OPTS
+        - name: RUN_REGION_MOVER
+          value: "false"
+        - name: STACKABLE_LOG_DIR
+          value: /stackable/log
+        - name: CONTAINERDEBUG_LOG_DIRECTORY
+          value: /stackable/log/containerdebug
+        imagePullPolicy: IfNotPresent
+        livenessProbe:
+          failureThreshold: 3
+          periodSeconds: 10
+          successThreshold: 1
+          tcpSocket:
+            port: rest-http
+          timeoutSeconds: 3
+        name: hbase
+        ports:
+        - containerPort: 8080
+          name: rest-http
+          protocol: TCP
+        - containerPort: 8085
+          name: ui-http
+          protocol: TCP
+        readinessProbe:
+          failureThreshold: 1
+          periodSeconds: 10
+          successThreshold: 1
+          tcpSocket:
+            port: rest-http
+          timeoutSeconds: 2
+        resources:
+          limits:
+            cpu: 400m
+            memory: 1Gi
+          requests:
+            cpu: 100m
+            memory: 1Gi
+        startupProbe:
+          failureThreshold: 120
+          initialDelaySeconds: 4
+          periodSeconds: 5
+          successThreshold: 1
+          tcpSocket:
+            port: rest-http
+          timeoutSeconds: 3
+        volumeMounts:
+        - mountPath: /stackable/tmp/hbase
+          name: hbase-config
+        - mountPath: /stackable/tmp/hdfs
+          name: hdfs-discovery
+        - mountPath: /stackable/tmp/log_config
+          name: log-config
+        - mountPath: /stackable/log
+          name: log
+        - mountPath: /stackable/listener
+          name: listener
+      enableServiceLinks: false
+      serviceAccountName: test-hbase-serviceaccount
+      terminationGracePeriodSeconds: 300
+      volumes:
+      - configMap:
+          name: test-hbase-restserver-default
+        name: hbase-config
+      - configMap:
+          name: test-hdfs
+        name: hdfs-discovery
+      - emptyDir:
+          sizeLimit: 30Mi
+        name: log
+      - configMap:
+          name: test-hbase-restserver-default
+        name: log-config
+  volumeClaimTemplates:
+  - metadata:
+      annotations:
+        listeners.stackable.tech/listener-class: {{ test_scenario['values']['listener-class'] }}
+      labels:
+        app.kubernetes.io/component: restserver
+        app.kubernetes.io/instance: test-hbase
+        app.kubernetes.io/managed-by: hbase.stackable.com_hbasecluster
+        app.kubernetes.io/name: hbase
+        app.kubernetes.io/role-group: default
+        stackable.tech/vendor: Stackable
+      name: listener
+    spec:
+      accessModes:
+      - ReadWriteMany
+      resources:
+        requests:
+          storage: "1"
+      storageClassName: listeners.stackable.tech
+status:
+  readyReplicas: 2
+  replicas: 2
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  labels:
+    app.kubernetes.io/component: regionserver
+    app.kubernetes.io/instance: test-hbase
+    app.kubernetes.io/managed-by: hbase.stackable.com_hbasecluster
+    app.kubernetes.io/name: hbase
+    app.kubernetes.io/role-group: discovery
+    stackable.tech/vendor: Stackable
+  name: test-hbase
+  ownerReferences:
+  - apiVersion: hbase.stackable.tech/v1alpha1
+    controller: true
+    kind: HbaseCluster
+    name: test-hbase
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  labels:
+    app.kubernetes.io/component: master
+    app.kubernetes.io/instance: test-hbase
+    app.kubernetes.io/managed-by: hbase.stackable.com_hbasecluster
+    app.kubernetes.io/name: hbase
+    app.kubernetes.io/role-group: default
+    stackable.tech/vendor: Stackable
+  name: test-hbase-master-default
+  ownerReferences:
+  - apiVersion: hbase.stackable.tech/v1alpha1
+    controller: true
+    kind: HbaseCluster
+    name: test-hbase
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  labels:
+    app.kubernetes.io/component: regionserver
+    app.kubernetes.io/instance: test-hbase
+    app.kubernetes.io/managed-by: hbase.stackable.com_hbasecluster
+    app.kubernetes.io/name: hbase
+    app.kubernetes.io/role-group: default
+    stackable.tech/vendor: Stackable
+  name: test-hbase-regionserver-default
+  ownerReferences:
+  - apiVersion: hbase.stackable.tech/v1alpha1
+    controller: true
+    kind: HbaseCluster
+    name: test-hbase
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  labels:
+    app.kubernetes.io/component: restserver
+    app.kubernetes.io/instance: test-hbase
+    app.kubernetes.io/managed-by: hbase.stackable.com_hbasecluster
+    app.kubernetes.io/name: hbase
+    app.kubernetes.io/role-group: default
+    stackable.tech/vendor: Stackable
+  name: test-hbase-restserver-default
+  ownerReferences:
+  - apiVersion: hbase.stackable.tech/v1alpha1
+    controller: true
+    kind: HbaseCluster
+    name: test-hbase
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  labels:
+    app.kubernetes.io/instance: test-hbase
+    app.kubernetes.io/managed-by: hbase.stackable.com_hbasecluster
+    app.kubernetes.io/name: hbase
+  name: test-hbase-serviceaccount
+  ownerReferences:
+  - apiVersion: hbase.stackable.tech/v1alpha1
+    controller: true
+    kind: HbaseCluster
+    name: test-hbase
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  labels:
+    app.kubernetes.io/instance: test-hbase
+    app.kubernetes.io/managed-by: hbase.stackable.com_hbasecluster
+    app.kubernetes.io/name: hbase
+  name: test-hbase-rolebinding
+  ownerReferences:
+  - apiVersion: hbase.stackable.tech/v1alpha1
+    controller: true
+    kind: HbaseCluster
+    name: test-hbase
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: hbase-clusterrole
+subjects:
+- kind: ServiceAccount
+  name: test-hbase-serviceaccount
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: test-hbase-master
+status:
+  expectedPods: 2
+  currentHealthy: 2
+  disruptionsAllowed: 1
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: test-hbase-regionserver
+status:
+  expectedPods: 2
+  currentHealthy: 2
+  disruptionsAllowed: 1
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: test-hbase-restserver
+status:
+  expectedPods: 2
+  currentHealthy: 2
+  disruptionsAllowed: 1
+---
+apiVersion: listeners.stackable.tech/v1alpha1
+kind: Listener
+metadata:
+  labels:
+    app.kubernetes.io/component: master
+    app.kubernetes.io/instance: test-hbase
+    app.kubernetes.io/managed-by: hbase.stackable.com_hbasecluster
+    app.kubernetes.io/name: hbase
+    app.kubernetes.io/role-group: default
+    stackable.tech/vendor: Stackable
+  name: test-hbase-master-default-0-listener
+spec:
+  className: {{ test_scenario['values']['listener-class'] }}
+  ports:
+  - name: master
+    port: 16000
+    protocol: TCP
+  - name: ui-http
+    port: 16010
+    protocol: TCP
+  publishNotReadyAddresses: true
+status:
+  ingressAddresses:
+  - addressType: Hostname
+    ports:
+      master: 16000
+      ui-http: 16010
+  serviceName: test-hbase-master-default-0-listener
+---
+apiVersion: listeners.stackable.tech/v1alpha1
+kind: Listener
+metadata:
+  labels:
+    app.kubernetes.io/component: regionserver
+    app.kubernetes.io/instance: test-hbase
+    app.kubernetes.io/managed-by: hbase.stackable.com_hbasecluster
+    app.kubernetes.io/name: hbase
+    app.kubernetes.io/role-group: default
+    stackable.tech/vendor: Stackable
+  name: test-hbase-regionserver-default-0-listener
+spec:
+  className: {{ test_scenario['values']['listener-class'] }}
+  ports:
+  - name: regionserver
+    port: 16020
+    protocol: TCP
+  - name: ui-http
+    port: 16030
+    protocol: TCP
+  publishNotReadyAddresses: true
+status:
+  ingressAddresses:
+  - addressType: Hostname
+    ports:
+      regionserver: 16020
+      ui-http: 16030
+  serviceName: test-hbase-regionserver-default-0-listener
+---
+apiVersion: listeners.stackable.tech/v1alpha1
+kind: Listener
+metadata:
+  labels:
+    app.kubernetes.io/component: restserver
+    app.kubernetes.io/instance: test-hbase
+    app.kubernetes.io/managed-by: hbase.stackable.com_hbasecluster
+    app.kubernetes.io/name: hbase
+    app.kubernetes.io/role-group: default
+    stackable.tech/vendor: Stackable
+  name: listener-test-hbase-restserver-default-0
+spec:
+  className: {{ test_scenario['values']['listener-class'] }}
+  ports:
+  - name: rest-http
+    port: 8080
+    protocol: TCP
+  - name: ui-http
+    port: 8085
+    protocol: TCP
+  publishNotReadyAddresses: true
+status:
+  ingressAddresses:
+  - addressType: Hostname
+    ports:
+      rest-http: 8080
+      ui-http: 8085
+  serviceName: listener-test-hbase-restserver-default-0
