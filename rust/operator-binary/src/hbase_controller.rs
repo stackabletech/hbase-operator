@@ -3,7 +3,6 @@
 use std::{
     collections::{BTreeMap, HashMap},
     fmt::Write,
-    str::FromStr,
     sync::Arc,
 };
 
@@ -366,6 +365,7 @@ pub async fn reconcile_hbase(
 
             let rg_configmap = build_rolegroup_config_map(
                 hbase,
+                hbase_role,
                 &client.kubernetes_cluster_info,
                 &rolegroup,
                 &validated_rg_config.product_config_properties,
@@ -465,6 +465,7 @@ pub async fn reconcile_hbase(
 #[allow(clippy::too_many_arguments)]
 fn build_rolegroup_config_map(
     hbase: &v1alpha1::HbaseCluster,
+    hbase_role: &HbaseRole,
     cluster_info: &KubernetesClusterInfo,
     rolegroup: &RoleGroupRef<v1alpha1::HbaseCluster>,
     rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
@@ -477,11 +478,6 @@ fn build_rolegroup_config_map(
     let mut hbase_env_sh = String::new();
     let mut ssl_server_xml = String::new();
     let mut ssl_client_xml = String::new();
-
-    let hbase_role =
-        HbaseRole::from_str(rolegroup.role.as_ref()).with_context(|_| UnknownHbaseRoleSnafu {
-            role: rolegroup.role.clone(),
-        })?;
 
     for (property_name_kind, config) in rolegroup_config {
         match property_name_kind {
@@ -579,7 +575,7 @@ fn build_rolegroup_config_map(
             }
             PropertyNameKind::File(file_name) if file_name == HBASE_ENV_SH => {
                 let mut hbase_env_config =
-                    build_hbase_env_sh(hbase, merged_config, &hbase_role, &rolegroup.role_group)?;
+                    build_hbase_env_sh(hbase, merged_config, hbase_role, &rolegroup.role_group)?;
 
                 // configOverride come last
                 hbase_env_config.extend(config.clone());
