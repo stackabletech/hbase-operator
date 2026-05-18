@@ -827,10 +827,14 @@ spec:
   publishNotReadyAddresses: true
 status:
   ingressAddresses:
+{% if test_scenario['values']['listener-class'] == 'cluster-internal' %}
   - addressType: Hostname
     ports:
       master: 16000
       ui-http: 16010
+{% else %}
+  - addressType: IP
+{% endif %}
   serviceName: test-hbase-master-default-0-listener
 ---
 apiVersion: listeners.stackable.tech/v1alpha1
@@ -856,10 +860,14 @@ spec:
   publishNotReadyAddresses: true
 status:
   ingressAddresses:
+{% if test_scenario['values']['listener-class'] == 'cluster-internal' %}
   - addressType: Hostname
     ports:
       regionserver: 16020
       ui-http: 16030
+{% else %}
+  - addressType: IP
+{% endif %}
   serviceName: test-hbase-regionserver-default-0-listener
 ---
 apiVersion: listeners.stackable.tech/v1alpha1
@@ -885,8 +893,12 @@ spec:
   publishNotReadyAddresses: true
 status:
   ingressAddresses:
+{% if test_scenario['values']['listener-class'] == 'cluster-internal' %}
   - addressType: Hostname
     ports:
       rest-http: 8080
       ui-http: 8085
+{% else %}
+  - addressType: IP
+{% endif %}
   serviceName: listener-test-hbase-restserver-default-0
