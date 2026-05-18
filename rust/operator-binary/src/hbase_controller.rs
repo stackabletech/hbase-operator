@@ -103,7 +103,7 @@ const HDFS_DISCOVERY_TMP_DIR: &str = "/stackable/tmp/hdfs";
 const HBASE_CONFIG_TMP_DIR: &str = "/stackable/tmp/hbase";
 const HBASE_LOG_CONFIG_TMP_DIR: &str = "/stackable/tmp/log_config";
 
-const CONTAINER_IMAGE_BASE_NAME: &str = "hbase";
+pub const CONTAINER_IMAGE_BASE_NAME: &str = "hbase";
 
 pub struct Ctx {
     pub client: stackable_operator::client::Client,
@@ -304,7 +304,6 @@ pub async fn reconcile_hbase(
 
     let validated = crate::controller::validate::validate_cluster(
         hbase,
-        CONTAINER_IMAGE_BASE_NAME,
         &ctx.operator_environment.image_repository,
         crate::built_info::PKG_VERSION,
         &ctx.product_config,

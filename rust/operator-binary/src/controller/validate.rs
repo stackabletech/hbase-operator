@@ -11,7 +11,7 @@ use stackable_operator::{
     role_utils::GenericRoleConfig,
 };
 
-use crate::crd::{AnyServiceConfig, HbaseRole, v1alpha1};
+use crate::{crd::{AnyServiceConfig, HbaseRole, v1alpha1}, hbase_controller::CONTAINER_IMAGE_BASE_NAME};
 
 #[derive(Snafu, Debug)]
 pub enum Error {
@@ -67,7 +67,6 @@ pub struct ValidatedHbaseCluster {
 
 pub fn validate_cluster(
     hbase: &v1alpha1::HbaseCluster,
-    image_base_name: &str,
     image_repository: &str,
     pkg_version: &str,
     product_config_manager: &ProductConfigManager,
@@ -75,7 +74,7 @@ pub fn validate_cluster(
     let resolved_product_image = hbase
         .spec
         .image
-        .resolve(image_base_name, image_repository, pkg_version)
+        .resolve(CONTAINER_IMAGE_BASE_NAME, image_repository, pkg_version)
         .context(ResolveProductImageSnafu)?;
 
     let roles = hbase.build_role_properties().context(RolePropertiesSnafu)?;
