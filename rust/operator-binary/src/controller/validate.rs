@@ -64,7 +64,6 @@ pub struct ValidatedRoleGroupConfig {
 pub fn validate_cluster(
     hbase: &v1alpha1::HbaseCluster,
     image_repository: &str,
-    pkg_version: &str,
     product_config_manager: &ProductConfigManager,
     zookeeper_connection_information: ZookeeperConnectionInformation,
     hbase_opa_config: Option<HbaseOpaConfig>,
@@ -72,7 +71,11 @@ pub fn validate_cluster(
     let resolved_product_image = hbase
         .spec
         .image
-        .resolve(CONTAINER_IMAGE_BASE_NAME, image_repository, pkg_version)
+        .resolve(
+            CONTAINER_IMAGE_BASE_NAME,
+            image_repository,
+            crate::built_info::PKG_VERSION,
+        )
         .context(ResolveProductImageSnafu)?;
 
     let roles = hbase.build_role_properties().context(RolePropertiesSnafu)?;

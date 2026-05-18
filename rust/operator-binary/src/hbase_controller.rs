@@ -319,7 +319,6 @@ pub async fn reconcile_hbase(
     let validated = crate::controller::validate::validate_cluster(
         hbase,
         &ctx.operator_environment.image_repository,
-        crate::built_info::PKG_VERSION,
         &ctx.product_config,
         dereferenced.zookeeper_connection_information,
         dereferenced.hbase_opa_config,
