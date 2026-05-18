@@ -11,7 +11,10 @@ use stackable_operator::{
     role_utils::GenericRoleConfig,
 };
 
-use crate::{crd::{AnyServiceConfig, HbaseRole, v1alpha1}, hbase_controller::CONTAINER_IMAGE_BASE_NAME};
+use crate::{
+    crd::{AnyServiceConfig, HbaseRole, v1alpha1},
+    hbase_controller::CONTAINER_IMAGE_BASE_NAME,
+};
 
 #[derive(Snafu, Debug)]
 pub enum Error {
