@@ -6,14 +6,16 @@ use std::{
 use product_config::{ProductConfigManager, types::PropertyNameKind};
 use snafu::{ResultExt, Snafu};
 use stackable_operator::{
-    commons::product_image_selection::{self, ResolvedProductImage},
+    commons::product_image_selection::{self},
     product_config_utils::{transform_all_roles_to_config, validate_all_roles_and_groups_config},
     role_utils::GenericRoleConfig,
 };
 
 use crate::{
     crd::{AnyServiceConfig, HbaseRole, v1alpha1},
-    hbase_controller::CONTAINER_IMAGE_BASE_NAME,
+    hbase_controller::{CONTAINER_IMAGE_BASE_NAME, ValidatedCluster},
+    security::opa::HbaseOpaConfig,
+    zookeeper::ZookeeperConnectionInformation,
 };
 
 #[derive(Snafu, Debug)]
@@ -59,21 +61,14 @@ pub struct ValidatedRoleGroupConfig {
     pub product_config_properties: HashMap<PropertyNameKind, BTreeMap<String, String>>,
 }
 
-/// The validated cluster: proves that product-config validation and config merging
-/// succeeded for every role and role group before any resources are created.
-#[derive(Clone, Debug)]
-pub struct ValidatedHbaseCluster {
-    pub image: ResolvedProductImage,
-    pub role_groups: BTreeMap<HbaseRole, BTreeMap<String, ValidatedRoleGroupConfig>>,
-    pub role_configs: BTreeMap<HbaseRole, ValidatedRoleConfig>,
-}
-
 pub fn validate_cluster(
     hbase: &v1alpha1::HbaseCluster,
     image_repository: &str,
     pkg_version: &str,
     product_config_manager: &ProductConfigManager,
-) -> Result<ValidatedHbaseCluster, Error> {
+    zookeeper_connection_information: ZookeeperConnectionInformation,
+    hbase_opa_config: Option<HbaseOpaConfig>,
+) -> Result<ValidatedCluster, Error> {
     let resolved_product_image = hbase
         .spec
         .image
@@ -130,9 +125,11 @@ pub fn validate_cluster(
         role_groups.insert(hbase_role, group_configs);
     }
 
-    Ok(ValidatedHbaseCluster {
+    Ok(ValidatedCluster {
         image: resolved_product_image,
         role_groups,
         role_configs,
+        zookeeper_connection_information,
+        hbase_opa_config,
     })
 }

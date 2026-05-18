@@ -71,6 +71,7 @@ use crate::{
         construct_global_jvm_args, construct_hbase_heapsize_env,
         construct_role_specific_non_heap_jvm_args,
     },
+    controller::validate::{ValidatedRoleConfig, ValidatedRoleGroupConfig},
     crd::{
         APP_NAME, AnyServiceConfig, Container, HBASE_ENV_SH, HBASE_MASTER_PORT,
         HBASE_MASTER_UI_PORT, HBASE_REGIONSERVER_PORT, HBASE_REGIONSERVER_UI_PORT, HBASE_SITE_XML,
@@ -109,6 +110,19 @@ pub struct Ctx {
     pub client: stackable_operator::client::Client,
     pub product_config: ProductConfigManager,
     pub operator_environment: OperatorEnvironmentOptions,
+}
+
+/// The validated cluster: proves that product-config validation and config merging
+/// succeeded for every role and role group before any resources are created.
+/// Placed in the controller so that subsequent steps that reference this struct
+/// only depend on the controller.
+#[derive(Clone, Debug)]
+pub struct ValidatedCluster {
+    pub image: ResolvedProductImage,
+    pub role_groups: BTreeMap<HbaseRole, BTreeMap<String, ValidatedRoleGroupConfig>>,
+    pub role_configs: BTreeMap<HbaseRole, ValidatedRoleConfig>,
+    pub zookeeper_connection_information: ZookeeperConnectionInformation,
+    pub hbase_opa_config: Option<HbaseOpaConfig>,
 }
 
 #[derive(Snafu, Debug, EnumDiscriminants)]
@@ -307,6 +321,8 @@ pub async fn reconcile_hbase(
         &ctx.operator_environment.image_repository,
         crate::built_info::PKG_VERSION,
         &ctx.product_config,
+        dereferenced.zookeeper_connection_information,
+        dereferenced.hbase_opa_config,
     )
     .context(ValidateSnafu)?;
 
@@ -354,10 +370,10 @@ pub async fn reconcile_hbase(
                 &client.kubernetes_cluster_info,
                 &rolegroup,
                 &validated_rg_config.product_config_properties,
-                &dereferenced.zookeeper_connection_information,
+                &validated.zookeeper_connection_information,
                 &validated_rg_config.merged_config,
                 &validated.image,
-                dereferenced.hbase_opa_config.as_ref(),
+                validated.hbase_opa_config.as_ref(),
             )?;
             let rg_statefulset = build_rolegroup_statefulset(
                 hbase,
@@ -418,7 +434,7 @@ pub async fn reconcile_hbase(
     let discovery_cm = build_discovery_configmap(
         hbase,
         &client.kubernetes_cluster_info,
-        &dereferenced.zookeeper_connection_information,
+        &validated.zookeeper_connection_information,
         &validated.image,
     )
     .context(BuildDiscoveryConfigMapSnafu)?;
