@@ -311,7 +311,7 @@ pub async fn reconcile_hbase(
 
     let client = &ctx.client;
 
-    let dereferenced = crate::controller::dereference::dereference(client, hbase)
+    let dereferenced_objects = crate::controller::dereference::dereference(client, hbase)
         .await
         .context(DereferenceSnafu)?;
 
@@ -319,8 +319,7 @@ pub async fn reconcile_hbase(
         hbase,
         &ctx.operator_environment.image_repository,
         &ctx.product_config,
-        dereferenced.zookeeper_connection_information,
-        dereferenced.hbase_opa_config,
+        dereferenced_objects,
     )
     .context(ValidateSnafu)?;
 

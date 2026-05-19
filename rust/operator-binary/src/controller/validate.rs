@@ -12,10 +12,9 @@ use stackable_operator::{
 };
 
 use crate::{
+    controller::dereference::DereferencedObjects,
     crd::{AnyServiceConfig, HbaseRole, v1alpha1},
     hbase_controller::{CONTAINER_IMAGE_BASE_NAME, ValidatedCluster},
-    security::opa::HbaseOpaConfig,
-    zookeeper::ZookeeperConnectionInformation,
 };
 
 #[derive(Snafu, Debug)]
@@ -65,8 +64,7 @@ pub fn validate_cluster(
     hbase: &v1alpha1::HbaseCluster,
     image_repository: &str,
     product_config_manager: &ProductConfigManager,
-    zookeeper_connection_information: ZookeeperConnectionInformation,
-    hbase_opa_config: Option<HbaseOpaConfig>,
+    dereferenced_objects: DereferencedObjects,
 ) -> Result<ValidatedCluster, Error> {
     let resolved_product_image = hbase
         .spec
@@ -132,7 +130,7 @@ pub fn validate_cluster(
         image: resolved_product_image,
         role_groups,
         role_configs,
-        zookeeper_connection_information,
-        hbase_opa_config,
+        zookeeper_connection_information: dereferenced_objects.zookeeper_connection_information,
+        hbase_opa_config: dereferenced_objects.hbase_opa_config,
     })
 }
