@@ -1,0 +1,122 @@
+use std::{collections::BTreeMap, str::FromStr};
+
+use product_config::ProductConfigManager;
+use snafu::{ResultExt, Snafu};
+use stackable_operator::{
+    commons::product_image_selection::{self},
+    product_config_utils::{transform_all_roles_to_config, validate_all_roles_and_groups_config},
+    role_utils::GenericRoleConfig,
+};
+
+use crate::{
+    controller::dereference::DereferencedObjects,
+    crd::{HbaseRole, v1alpha1},
+    hbase_controller::{
+        CONTAINER_IMAGE_BASE_NAME, ValidatedCluster, ValidatedRoleConfig, ValidatedRoleGroupConfig,
+    },
+};
+
+#[derive(Snafu, Debug)]
+pub enum Error {
+    #[snafu(display("failed to resolve product image"))]
+    ResolveProductImage {
+        source: product_image_selection::Error,
+    },
+
+    #[snafu(display("invalid role properties"))]
+    RoleProperties { source: crate::crd::Error },
+
+    #[snafu(display("failed to generate product config"))]
+    GenerateProductConfig {
+        source: stackable_operator::product_config_utils::Error,
+    },
+
+    #[snafu(display("invalid product config"))]
+    InvalidProductConfig {
+        source: stackable_operator::product_config_utils::Error,
+    },
+
+    #[snafu(display("could not parse Hbase role [{role}]"))]
+    UnidentifiedHbaseRole {
+        source: strum::ParseError,
+        role: String,
+    },
+
+    #[snafu(display("failed to resolve and merge config for role and role group"))]
+    FailedToResolveConfig { source: crate::crd::Error },
+}
+
+pub fn validate_cluster(
+    hbase: &v1alpha1::HbaseCluster,
+    image_repository: &str,
+    product_config_manager: &ProductConfigManager,
+    dereferenced_objects: DereferencedObjects,
+) -> Result<ValidatedCluster, Error> {
+    let resolved_product_image = hbase
+        .spec
+        .image
+        .resolve(
+            CONTAINER_IMAGE_BASE_NAME,
+            image_repository,
+            crate::built_info::PKG_VERSION,
+        )
+        .context(ResolveProductImageSnafu)?;
+
+    let roles = hbase.build_role_properties().context(RolePropertiesSnafu)?;
+
+    let validated_config = validate_all_roles_and_groups_config(
+        &resolved_product_image.product_version,
+        &transform_all_roles_to_config(hbase, &roles).context(GenerateProductConfigSnafu)?,
+        product_config_manager,
+        false,
+        false,
+    )
+    .context(InvalidProductConfigSnafu)?;
+
+    let mut role_groups = BTreeMap::new();
+    let mut role_configs = BTreeMap::new();
+
+    for (role_name, group_config) in validated_config.iter() {
+        let hbase_role = HbaseRole::from_str(role_name).context(UnidentifiedHbaseRoleSnafu {
+            role: role_name.to_string(),
+        })?;
+
+        if let Some(GenericRoleConfig {
+            pod_disruption_budget: pdb,
+        }) = hbase.role_config(&hbase_role)
+        {
+            role_configs.insert(hbase_role.clone(), ValidatedRoleConfig { pdb: pdb.clone() });
+        }
+
+        let mut group_configs = BTreeMap::new();
+        for (rolegroup_name, rolegroup_config) in group_config.iter() {
+            let rolegroup = hbase.server_rolegroup_ref(role_name, rolegroup_name);
+
+            let merged_config = hbase
+                .merged_config(
+                    &hbase_role,
+                    &rolegroup.role_group,
+                    &hbase.spec.cluster_config.hdfs_config_map_name,
+                )
+                .context(FailedToResolveConfigSnafu)?;
+
+            group_configs.insert(
+                rolegroup_name.clone(),
+                ValidatedRoleGroupConfig {
+                    merged_config,
+                    product_config_properties: rolegroup_config.clone(),
+                },
+            );
+        }
+
+        role_groups.insert(hbase_role, group_configs);
+    }
+
+    Ok(ValidatedCluster {
+        image: resolved_product_image,
+        role_groups,
+        role_configs,
+        zookeeper_connection_information: dereferenced_objects.zookeeper_connection_information,
+        hbase_opa_config: dereferenced_objects.hbase_opa_config,
+    })
+}

@@ -3,7 +3,6 @@
 use std::{
     collections::{BTreeMap, HashMap},
     fmt::Write,
-    str::FromStr,
     sync::Arc,
 };
 
@@ -27,10 +26,7 @@ use stackable_operator::{
     },
     cli::OperatorEnvironmentOptions,
     cluster_resources::{ClusterResourceApplyStrategy, ClusterResources},
-    commons::{
-        product_image_selection::{self, ResolvedProductImage},
-        rbac::build_rbac_resources,
-    },
+    commons::{product_image_selection::ResolvedProductImage, rbac::build_rbac_resources},
     constants::RESTART_CONTROLLER_ENABLED_LABEL,
     k8s_openapi::{
         api::{
@@ -50,7 +46,6 @@ use stackable_operator::{
     kvp::{Annotations, Label, LabelError, Labels, ObjectLabels},
     logging::controller::ReconcilerError,
     memory::{BinaryMultiple, MemoryQuantity},
-    product_config_utils::{transform_all_roles_to_config, validate_all_roles_and_groups_config},
     product_logging::{
         self,
         framework::LoggingError,
@@ -59,7 +54,7 @@ use stackable_operator::{
             CustomContainerLogConfig,
         },
     },
-    role_utils::{GenericRoleConfig, RoleGroupRef},
+    role_utils::RoleGroupRef,
     shared::time::Duration,
     status::condition::{
         compute_conditions, operations::ClusterOperationsConditionBuilder,
@@ -90,8 +85,8 @@ use crate::{
     product_logging::{
         CONTAINERDEBUG_LOG_DIRECTORY, STACKABLE_LOG_DIR, extend_role_group_config_map,
     },
-    security::{self, opa::HbaseOpaConfig},
-    zookeeper::{self, ZookeeperConnectionInformation},
+    security::opa::HbaseOpaConfig,
+    zookeeper::ZookeeperConnectionInformation,
 };
 
 pub const HBASE_CONTROLLER_NAME: &str = "hbasecluster";
@@ -107,7 +102,7 @@ const HDFS_DISCOVERY_TMP_DIR: &str = "/stackable/tmp/hdfs";
 const HBASE_CONFIG_TMP_DIR: &str = "/stackable/tmp/hbase";
 const HBASE_LOG_CONFIG_TMP_DIR: &str = "/stackable/tmp/log_config";
 
-const CONTAINER_IMAGE_BASE_NAME: &str = "hbase";
+pub const CONTAINER_IMAGE_BASE_NAME: &str = "hbase";
 
 pub struct Ctx {
     pub client: stackable_operator::client::Client,
@@ -115,12 +110,35 @@ pub struct Ctx {
     pub operator_environment: OperatorEnvironmentOptions,
 }
 
+/// The validated cluster: proves that product-config validation and config merging
+/// succeeded for every role and role group before any resources are created.
+/// Placed in the controller so that subsequent steps that reference this struct
+/// only depend on the controller.
+#[derive(Clone, Debug)]
+pub struct ValidatedCluster {
+    pub image: ResolvedProductImage,
+    pub role_groups: BTreeMap<HbaseRole, BTreeMap<String, ValidatedRoleGroupConfig>>,
+    pub role_configs: BTreeMap<HbaseRole, ValidatedRoleConfig>,
+    pub zookeeper_connection_information: ZookeeperConnectionInformation,
+    pub hbase_opa_config: Option<HbaseOpaConfig>,
+}
+
+/// Per-role configuration extracted during validation.
+#[derive(Clone, Debug)]
+pub struct ValidatedRoleConfig {
+    pub pdb: stackable_operator::commons::pdb::PdbConfig,
+}
+
+/// Per-rolegroup configuration: the merged CRD config plus the product-config properties.
+#[derive(Clone, Debug)]
+pub struct ValidatedRoleGroupConfig {
+    pub merged_config: AnyServiceConfig,
+    pub product_config_properties: HashMap<PropertyNameKind, BTreeMap<String, String>>,
+}
+
 #[derive(Snafu, Debug, EnumDiscriminants)]
 #[strum_discriminants(derive(IntoStaticStr))]
 pub enum Error {
-    #[snafu(display("invalid role properties"))]
-    RoleProperties { source: crate::crd::Error },
-
     #[snafu(display("missing secret lifetime"))]
     MissingSecretLifetime,
 
@@ -166,19 +184,6 @@ pub enum Error {
         rolegroup: RoleGroupRef<v1alpha1::HbaseCluster>,
     },
 
-    #[snafu(display("failed to generate product config"))]
-    GenerateProductConfig {
-        source: stackable_operator::product_config_utils::Error,
-    },
-
-    #[snafu(display("invalid product config"))]
-    InvalidProductConfig {
-        source: stackable_operator::product_config_utils::Error,
-    },
-
-    #[snafu(display("failed to retrieve zookeeper connection information"))]
-    RetrieveZookeeperConnectionInformation { source: zookeeper::Error },
-
     #[snafu(display("object is missing metadata to build owner reference"))]
     ObjectMissingMetadataForOwnerRef {
         source: stackable_operator::builder::meta::Error,
@@ -199,15 +204,6 @@ pub enum Error {
     ApplyRoleBinding {
         source: stackable_operator::cluster_resources::Error,
     },
-
-    #[snafu(display("could not parse Hbase role [{role}]"))]
-    UnidentifiedHbaseRole {
-        source: strum::ParseError,
-        role: String,
-    },
-
-    #[snafu(display("failed to resolve and merge config for role and role group"))]
-    FailedToResolveConfig { source: crate::crd::Error },
 
     #[snafu(display("vector agent is enabled but vector aggregator ConfigMap is missing"))]
     VectorAggregatorConfigMapMissing,
@@ -258,9 +254,6 @@ pub enum Error {
         source: stackable_operator::builder::meta::Error,
     },
 
-    #[snafu(display("invalid OPA configuration"))]
-    InvalidOpaConfig { source: security::opa::Error },
-
     #[snafu(display("unknown role [{role}]"))]
     UnknownHbaseRole { source: ParseError, role: String },
 
@@ -297,9 +290,14 @@ pub enum Error {
     #[snafu(display("failed to build listener persistent volume claim"))]
     ListenerPersistentVolumeClaim { source: crate::crd::Error },
 
-    #[snafu(display("failed to resolve product image"))]
-    ResolveProductImage {
-        source: product_image_selection::Error,
+    #[snafu(display("failed to dereference cluster resources"))]
+    Dereference {
+        source: crate::controller::dereference::Error,
+    },
+
+    #[snafu(display("failed to validate cluster configuration"))]
+    Validate {
+        source: crate::controller::validate::Error,
     },
 }
 
@@ -325,39 +323,17 @@ pub async fn reconcile_hbase(
 
     let client = &ctx.client;
 
-    let resolved_product_image = hbase
-        .spec
-        .image
-        .resolve(
-            CONTAINER_IMAGE_BASE_NAME,
-            &ctx.operator_environment.image_repository,
-            crate::built_info::PKG_VERSION,
-        )
-        .context(ResolveProductImageSnafu)?;
-    let zookeeper_connection_information = ZookeeperConnectionInformation::retrieve(hbase, client)
+    let dereferenced_objects = crate::controller::dereference::dereference(client, hbase)
         .await
-        .context(RetrieveZookeeperConnectionInformationSnafu)?;
+        .context(DereferenceSnafu)?;
 
-    let validated_config = {
-        let roles = hbase.build_role_properties().context(RolePropertiesSnafu)?;
-        validate_all_roles_and_groups_config(
-            &resolved_product_image.app_version_label_value,
-            &transform_all_roles_to_config(hbase, &roles).context(GenerateProductConfigSnafu)?,
-            &ctx.product_config,
-            false,
-            false,
-        )
-        .context(InvalidProductConfigSnafu)?
-    };
-
-    let hbase_opa_config = match &hbase.spec.cluster_config.authorization {
-        Some(opa_config) => Some(
-            HbaseOpaConfig::from_opa_config(client, hbase, opa_config)
-                .await
-                .context(InvalidOpaConfigSnafu)?,
-        ),
-        None => None,
-    };
+    let validated = crate::controller::validate::validate_cluster(
+        hbase,
+        &ctx.operator_environment.image_repository,
+        &ctx.product_config,
+        dereferenced_objects,
+    )
+    .context(ValidateSnafu)?;
 
     let mut cluster_resources = ClusterResources::new(
         APP_NAME,
@@ -388,48 +364,34 @@ pub async fn reconcile_hbase(
 
     let mut ss_cond_builder = StatefulSetConditionBuilder::default();
 
-    for (role_name, group_config) in validated_config.iter() {
-        let hbase_role = HbaseRole::from_str(role_name).context(UnidentifiedHbaseRoleSnafu {
-            role: role_name.to_string(),
-        })?;
-        for (rolegroup_name, rolegroup_config) in group_config.iter() {
-            let rolegroup = hbase.server_rolegroup_ref(role_name, rolegroup_name);
-
-            let merged_config = hbase
-                .merged_config(
-                    &hbase_role,
-                    &rolegroup.role_group,
-                    &hbase.spec.cluster_config.hdfs_config_map_name,
-                )
-                .context(FailedToResolveConfigSnafu)?;
+    for (hbase_role, role_group_configs) in &validated.role_groups {
+        for (rolegroup_name, validated_rg_config) in role_group_configs {
+            let rolegroup = hbase.server_rolegroup_ref(hbase_role.to_string(), rolegroup_name);
 
             let rg_service =
-                build_rolegroup_service(hbase, &hbase_role, &rolegroup, &resolved_product_image)?;
+                build_rolegroup_service(hbase, hbase_role, &rolegroup, &validated.image)?;
 
-            let rg_metrics_service = build_rolegroup_metrics_service(
-                hbase,
-                &hbase_role,
-                &rolegroup,
-                &resolved_product_image,
-            )?;
+            let rg_metrics_service =
+                build_rolegroup_metrics_service(hbase, hbase_role, &rolegroup, &validated.image)?;
 
             let rg_configmap = build_rolegroup_config_map(
                 hbase,
+                hbase_role,
                 &client.kubernetes_cluster_info,
                 &rolegroup,
-                rolegroup_config,
-                &zookeeper_connection_information,
-                &merged_config,
-                &resolved_product_image,
-                hbase_opa_config.as_ref(),
+                &validated_rg_config.product_config_properties,
+                &validated.zookeeper_connection_information,
+                &validated_rg_config.merged_config,
+                &validated.image,
+                validated.hbase_opa_config.as_ref(),
             )?;
             let rg_statefulset = build_rolegroup_statefulset(
                 hbase,
-                &hbase_role,
+                hbase_role,
                 &rolegroup,
-                rolegroup_config,
-                &merged_config,
-                &resolved_product_image,
+                &validated_rg_config.product_config_properties,
+                &validated_rg_config.merged_config,
+                &validated.image,
                 &rbac_sa,
             )?;
             cluster_resources
@@ -464,14 +426,16 @@ pub async fn reconcile_hbase(
             );
         }
 
-        let role_config = hbase.role_config(&hbase_role);
-        if let Some(GenericRoleConfig {
-            pod_disruption_budget: pdb,
-        }) = role_config
-        {
-            add_pdbs(pdb, hbase, &hbase_role, client, &mut cluster_resources)
-                .await
-                .context(FailedToCreatePdbSnafu)?;
+        if let Some(role_config) = validated.role_configs.get(hbase_role) {
+            add_pdbs(
+                &role_config.pdb,
+                hbase,
+                hbase_role,
+                client,
+                &mut cluster_resources,
+            )
+            .await
+            .context(FailedToCreatePdbSnafu)?;
         }
     }
 
@@ -480,8 +444,8 @@ pub async fn reconcile_hbase(
     let discovery_cm = build_discovery_configmap(
         hbase,
         &client.kubernetes_cluster_info,
-        &zookeeper_connection_information,
-        &resolved_product_image,
+        &validated.zookeeper_connection_information,
+        &validated.image,
     )
     .context(BuildDiscoveryConfigMapSnafu)?;
     cluster_resources
@@ -512,6 +476,7 @@ pub async fn reconcile_hbase(
 #[allow(clippy::too_many_arguments)]
 fn build_rolegroup_config_map(
     hbase: &v1alpha1::HbaseCluster,
+    hbase_role: &HbaseRole,
     cluster_info: &KubernetesClusterInfo,
     rolegroup: &RoleGroupRef<v1alpha1::HbaseCluster>,
     rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
@@ -524,11 +489,6 @@ fn build_rolegroup_config_map(
     let mut hbase_env_sh = String::new();
     let mut ssl_server_xml = String::new();
     let mut ssl_client_xml = String::new();
-
-    let hbase_role =
-        HbaseRole::from_str(rolegroup.role.as_ref()).with_context(|_| UnknownHbaseRoleSnafu {
-            role: rolegroup.role.clone(),
-        })?;
 
     for (property_name_kind, config) in rolegroup_config {
         match property_name_kind {
@@ -626,7 +586,7 @@ fn build_rolegroup_config_map(
             }
             PropertyNameKind::File(file_name) if file_name == HBASE_ENV_SH => {
                 let mut hbase_env_config =
-                    build_hbase_env_sh(hbase, merged_config, &hbase_role, &rolegroup.role_group)?;
+                    build_hbase_env_sh(hbase, merged_config, hbase_role, &rolegroup.role_group)?;
 
                 // configOverride come last
                 hbase_env_config.extend(config.clone());

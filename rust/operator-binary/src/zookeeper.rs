@@ -43,6 +43,7 @@ pub enum Error {
 type Result<T, E = Error> = std::result::Result<T, E>;
 
 /// Contains the information as exposed by the Zookeeper/Znode discovery CM (should work with both)
+#[derive(Clone, Debug)]
 pub struct ZookeeperConnectionInformation {
     /// E.g. `simple-zk-server-default-0.simple-zk-server-default.default.svc.cluster.local:2282,simple-zk-server-default-1.simple-zk-server-default.default.svc.cluster.local:2282,simple-zk-server-default-2.simple-zk-server-default.default.svc.cluster.local:2282`
     hosts: String,

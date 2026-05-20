@@ -623,7 +623,9 @@ pub fn merged_env(rolegroup_config: Option<&BTreeMap<String, String>>) -> Vec<En
     Eq,
     Hash,
     JsonSchema,
+    Ord,
     PartialEq,
+    PartialOrd,
     Serialize,
     EnumString,
 )]
@@ -1253,6 +1255,7 @@ pub struct HbaseClusterStatus {
     pub conditions: Vec<ClusterCondition>,
 }
 
+#[derive(Clone, Debug)]
 pub enum AnyServiceConfig {
     Master(HbaseConfig),
     RegionServer(RegionServerConfig),

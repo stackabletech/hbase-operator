@@ -13,10 +13,12 @@
   `hbase-env.sh`, `ssl-server.xml`, `ssl-client.xml` and `security.properties`).
   Previously, arbitrary file names were silently accepted and ignored ([#751]).
 - Bump `stackable-operator` to 0.111.1 and snafu to 0.9 ([#751], [#752]).
+- Internal operator refactoring: introduce dereference() and validate() steps in the reconciler ([#757]).
 
 [#745]: https://github.com/stackabletech/hbase-operator/pull/745
 [#751]: https://github.com/stackabletech/hbase-operator/pull/751
 [#752]: https://github.com/stackabletech/hbase-operator/pull/752
+[#757]: https://github.com/stackabletech/hbase-operator/pull/757
 
 ## [26.3.0] - 2026-03-16
 
