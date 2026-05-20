@@ -70,7 +70,6 @@ use crate::{
         construct_global_jvm_args, construct_hbase_heapsize_env,
         construct_role_specific_non_heap_jvm_args,
     },
-    controller::validate::{ValidatedRoleConfig, ValidatedRoleGroupConfig},
     crd::{
         APP_NAME, AnyServiceConfig, Container, HBASE_ENV_SH, HBASE_MASTER_PORT,
         HBASE_MASTER_UI_PORT, HBASE_REGIONSERVER_PORT, HBASE_REGIONSERVER_UI_PORT, HBASE_SITE_XML,
@@ -122,6 +121,19 @@ pub struct ValidatedCluster {
     pub role_configs: BTreeMap<HbaseRole, ValidatedRoleConfig>,
     pub zookeeper_connection_information: ZookeeperConnectionInformation,
     pub hbase_opa_config: Option<HbaseOpaConfig>,
+}
+
+/// Per-role configuration extracted during validation.
+#[derive(Clone, Debug)]
+pub struct ValidatedRoleConfig {
+    pub pdb: stackable_operator::commons::pdb::PdbConfig,
+}
+
+/// Per-rolegroup configuration: the merged CRD config plus the product-config properties.
+#[derive(Clone, Debug)]
+pub struct ValidatedRoleGroupConfig {
+    pub merged_config: AnyServiceConfig,
+    pub product_config_properties: HashMap<PropertyNameKind, BTreeMap<String, String>>,
 }
 
 #[derive(Snafu, Debug, EnumDiscriminants)]
