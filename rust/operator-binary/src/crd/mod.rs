@@ -399,7 +399,7 @@ impl v1alpha1::HbaseCluster {
             (
                 Vec<PropertyNameKind>,
                 Role<
-                    impl Configuration<Configurable = Self>,
+                    impl Configuration<Configurable = Self> + use<>,
                     v1alpha1::HbaseConfigOverrides,
                     GenericRoleConfig,
                     JavaCommonConfig,
