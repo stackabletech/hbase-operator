@@ -8,11 +8,7 @@ use std::{
 
 use const_format::concatcp;
 use indoc::formatdoc;
-use product_config::{
-    ProductConfigManager,
-    types::PropertyNameKind,
-    writer::{PropertiesWriterError, to_hadoop_xml, to_java_properties_string},
-};
+use product_config::{ProductConfigManager, types::PropertyNameKind};
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
     builder::{
@@ -66,9 +62,12 @@ use strum::{EnumDiscriminants, IntoStaticStr, ParseError};
 
 use crate::{
     OPERATOR_NAME,
-    config::jvm::{
-        construct_global_jvm_args, construct_hbase_heapsize_env,
-        construct_role_specific_non_heap_jvm_args,
+    config::{
+        jvm::{
+            construct_global_jvm_args, construct_hbase_heapsize_env,
+            construct_role_specific_non_heap_jvm_args,
+        },
+        writer::{PropertiesWriterError, to_hadoop_xml, to_java_properties_string},
     },
     crd::{
         APP_NAME, AnyServiceConfig, Container, HBASE_ENV_SH, HBASE_MASTER_PORT,

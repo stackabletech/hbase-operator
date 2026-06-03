@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use product_config::writer::to_hadoop_xml;
+use crate::config::writer::to_hadoop_xml;
 use snafu::{ResultExt, Snafu};
 use stackable_operator::{
     builder::{configmap::ConfigMapBuilder, meta::ObjectMetaBuilder},
