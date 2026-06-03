@@ -1,6 +1,5 @@
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
 
-use product_config::types::PropertyNameKind;
 use security::AuthenticationConfig;
 use serde::{Deserialize, Serialize};
 use shell_escape::escape;
@@ -23,7 +22,6 @@ use stackable_operator::{
         fragment::{self, Fragment, ValidationError},
         merge::{Atomic, Merge},
     },
-    config_overrides::KeyValueOverridesProvider,
     deep_merger::ObjectOverrides,
     k8s_openapi::{
         DeepMerge,
@@ -32,7 +30,6 @@ use stackable_operator::{
     },
     kube::{CustomResource, ResourceExt, runtime::reflector::ObjectRef},
     kvp::Labels,
-    product_config_utils::Configuration,
     product_logging::{self, spec::Logging},
     role_utils::{GenericRoleConfig, JavaCommonConfig, Role, RoleGroupRef},
     schemars::{self, JsonSchema},
@@ -61,10 +58,7 @@ pub const TLS_STORE_PASSWORD: &str = "changeit";
 
 pub const JVM_SECURITY_PROPERTIES_FILE: &str = "security.properties";
 
-pub const HBASE_ENV_SH: &str = "hbase-env.sh";
 pub const HBASE_SITE_XML: &str = "hbase-site.xml";
-pub const SSL_SERVER_XML: &str = "ssl-server.xml";
-pub const SSL_CLIENT_XML: &str = "ssl-client.xml";
 
 pub const HBASE_CLUSTER_DISTRIBUTED: &str = "hbase.cluster.distributed";
 pub const HBASE_ROOTDIR: &str = "hbase.rootdir";
@@ -121,12 +115,6 @@ pub enum Error {
 
     #[snafu(display("fragment validation failure"))]
     FragmentValidationFailure { source: ValidationError },
-
-    #[snafu(display("object defines no master role"))]
-    NoMasterRole,
-
-    #[snafu(display("object defines no regionserver role"))]
-    NoRegionServerRole,
 
     #[snafu(display("incompatible merge types"))]
     IncompatibleMergeTypes,
@@ -370,67 +358,6 @@ impl v1alpha1::HbaseCluster {
         })
     }
 
-    // The result type is only defined once, there is no value in extracting it into a type definition.
-    #[allow(clippy::type_complexity)]
-    pub fn build_role_properties(
-        &self,
-    ) -> Result<
-        HashMap<
-            String,
-            (
-                Vec<PropertyNameKind>,
-                Role<
-                    impl Configuration<Configurable = Self>,
-                    v1alpha1::HbaseConfigOverrides,
-                    GenericRoleConfig,
-                    JavaCommonConfig,
-                >,
-            ),
-        >,
-        Error,
-    > {
-        let config_types = vec![
-            PropertyNameKind::Env,
-            PropertyNameKind::File(HBASE_ENV_SH.to_string()),
-            PropertyNameKind::File(HBASE_SITE_XML.to_string()),
-            PropertyNameKind::File(SSL_SERVER_XML.to_string()),
-            PropertyNameKind::File(SSL_CLIENT_XML.to_string()),
-            PropertyNameKind::File(JVM_SECURITY_PROPERTIES_FILE.to_string()),
-        ];
-
-        let mut roles = HashMap::from([(
-            HbaseRole::Master.to_string(),
-            (
-                config_types.to_owned(),
-                self.spec
-                    .masters
-                    .clone()
-                    .context(NoMasterRoleSnafu)?
-                    .erase(),
-            ),
-        )]);
-        roles.insert(
-            HbaseRole::RegionServer.to_string(),
-            (
-                config_types.to_owned(),
-                self.spec
-                    .region_servers
-                    .clone()
-                    .context(NoRegionServerRoleSnafu)?
-                    .erase(),
-            ),
-        );
-
-        if let Some(rest_servers) = self.spec.rest_servers.as_ref() {
-            roles.insert(
-                HbaseRole::RestServer.to_string(),
-                (config_types, rest_servers.to_owned().erase()),
-            );
-        }
-
-        Ok(roles)
-    }
-
     pub fn merge_pod_overrides(
         &self,
         pod_template: &mut PodTemplateSpec,
@@ -560,19 +487,6 @@ impl v1alpha1::HbaseCluster {
             .authentication
             .as_ref()
             .map(|a| a.tls_secret_class.clone())
-    }
-}
-
-impl KeyValueOverridesProvider for v1alpha1::HbaseConfigOverrides {
-    fn get_key_value_overrides(&self, file: &str) -> BTreeMap<String, Option<String>> {
-        match file {
-            HBASE_SITE_XML => self.hbase_site_xml.overrides.clone(),
-            HBASE_ENV_SH => self.hbase_env_sh.overrides.clone(),
-            SSL_SERVER_XML => self.ssl_server_xml.overrides.clone(),
-            SSL_CLIENT_XML => self.ssl_client_xml.overrides.clone(),
-            JVM_SECURITY_PROPERTIES_FILE => self.security_properties.overrides.clone(),
-            _ => BTreeMap::new(),
-        }
     }
 }
 
@@ -1004,73 +918,6 @@ pub struct HbaseConfig {
     pub listener_class: String,
 }
 
-impl Configuration for HbaseConfigFragment {
-    type Configurable = v1alpha1::HbaseCluster;
-
-    fn compute_env(
-        &self,
-        _resource: &Self::Configurable,
-        _role_name: &str,
-    ) -> Result<BTreeMap<String, Option<String>>, stackable_operator::product_config_utils::Error>
-    {
-        // Maps env var name to env var object. This allows env_overrides to work
-        // as expected (i.e. users can override the env var value).
-        let mut vars: BTreeMap<String, Option<String>> = BTreeMap::new();
-
-        vars.insert(
-            "HBASE_CONF_DIR".to_string(),
-            Some(CONFIG_DIR_NAME.to_string()),
-        );
-        // required by phoenix (for cases where Kerberos is enabled): see https://issues.apache.org/jira/browse/PHOENIX-2369
-        vars.insert(
-            "HADOOP_CONF_DIR".to_string(),
-            Some(CONFIG_DIR_NAME.to_string()),
-        );
-        Ok(vars)
-    }
-
-    fn compute_cli(
-        &self,
-        _resource: &Self::Configurable,
-        _role_name: &str,
-    ) -> Result<BTreeMap<String, Option<String>>, stackable_operator::product_config_utils::Error>
-    {
-        Ok(BTreeMap::new())
-    }
-
-    fn compute_files(
-        &self,
-        _resource: &Self::Configurable,
-        _role_name: &str,
-        file: &str,
-    ) -> Result<BTreeMap<String, Option<String>>, stackable_operator::product_config_utils::Error>
-    {
-        let mut result = BTreeMap::new();
-
-        match file {
-            HBASE_ENV_SH => {
-                // The contents of this file cannot be built entirely here because we don't have
-                // access to the clusterConfig or product version.
-                // These are needed to set up Kerberos.
-                // To avoid fragmentation of the code needed to build this file, we moved the
-                // implementation to the hbase_controller::build_hbase_env_sh() function.
-            }
-            HBASE_SITE_XML => {
-                result.insert(
-                    HBASE_CLUSTER_DISTRIBUTED.to_string(),
-                    Some("true".to_string()),
-                );
-                result.insert(HBASE_ROOTDIR.to_string(), self.hbase_rootdir.clone());
-            }
-            _ => {}
-        }
-
-        result.retain(|_, maybe_value| maybe_value.is_some());
-
-        Ok(result)
-    }
-}
-
 #[derive(Fragment, Clone, Debug, JsonSchema, PartialEq, Serialize, Deserialize)]
 #[fragment_attrs(
     derive(
@@ -1154,71 +1001,6 @@ pub struct RegionServerConfig {
 
     /// This field controls which [ListenerClass](DOCS_BASE_URL_PLACEHOLDER/listener-operator/listenerclass.html) is used to expose this rolegroup.
     pub listener_class: String,
-}
-
-impl Configuration for RegionServerConfigFragment {
-    type Configurable = v1alpha1::HbaseCluster;
-
-    fn compute_env(
-        &self,
-        _resource: &Self::Configurable,
-        _role_name: &str,
-    ) -> Result<BTreeMap<String, Option<String>>, stackable_operator::product_config_utils::Error>
-    {
-        let mut vars: BTreeMap<String, Option<String>> = BTreeMap::new();
-
-        vars.insert(
-            "HBASE_CONF_DIR".to_string(),
-            Some(CONFIG_DIR_NAME.to_string()),
-        );
-        // required by phoenix (for cases where Kerberos is enabled): see https://issues.apache.org/jira/browse/PHOENIX-2369
-        vars.insert(
-            "HADOOP_CONF_DIR".to_string(),
-            Some(CONFIG_DIR_NAME.to_string()),
-        );
-        Ok(vars)
-    }
-
-    fn compute_cli(
-        &self,
-        _resource: &Self::Configurable,
-        _role_name: &str,
-    ) -> Result<BTreeMap<String, Option<String>>, stackable_operator::product_config_utils::Error>
-    {
-        Ok(BTreeMap::new())
-    }
-
-    fn compute_files(
-        &self,
-        _resource: &Self::Configurable,
-        _role_name: &str,
-        file: &str,
-    ) -> Result<BTreeMap<String, Option<String>>, stackable_operator::product_config_utils::Error>
-    {
-        let mut result = BTreeMap::new();
-
-        match file {
-            HBASE_ENV_SH => {
-                // The contents of this file cannot be built entirely here because we don't have
-                // access to the clusterConfig or product version.
-                // These are needed to set up Kerberos.
-                // To avoid fragmentation of the code needed to build this file, we moved the
-                // implementation to the hbase_controller::build_hbase_env_sh() function.
-            }
-            HBASE_SITE_XML => {
-                result.insert(
-                    HBASE_CLUSTER_DISTRIBUTED.to_string(),
-                    Some("true".to_string()),
-                );
-                result.insert(HBASE_ROOTDIR.to_string(), self.hbase_rootdir.clone());
-            }
-            _ => {}
-        }
-
-        result.retain(|_, maybe_value| maybe_value.is_some());
-
-        Ok(result)
-    }
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
@@ -1352,115 +1134,11 @@ impl AnyServiceConfig {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::{BTreeMap, HashMap};
-
     use indoc::indoc;
-    use product_config::{ProductConfigManager, types::PropertyNameKind};
     use rstest::rstest;
-    use stackable_operator::{
-        product_config_utils::{
-            transform_all_roles_to_config, validate_all_roles_and_groups_config,
-        },
-        versioned::test_utils::RoundtripTestData,
-    };
+    use stackable_operator::versioned::test_utils::RoundtripTestData;
 
     use super::*;
-
-    #[test]
-    pub fn test_env_overrides() {
-        let input = indoc! {r#"
----
-apiVersion: hbase.stackable.tech/v1alpha1
-kind: HbaseCluster
-metadata:
-  name: test-hbase
-spec:
-  image:
-    productVersion: 2.6.4
-  clusterConfig:
-    hdfsConfigMapName: test-hdfs
-    zookeeperConfigMapName: test-znode
-  masters:
-    envOverrides:
-      TEST_VAR_FROM_MASTER: MASTER
-      TEST_VAR: MASTER
-    config:
-      logging:
-        enableVectorAgent: False
-    roleGroups:
-      default:
-        replicas: 1
-        envOverrides:
-          TEST_VAR_FROM_MRG: MASTER
-          TEST_VAR: MASTER_RG
-  regionServers:
-    config:
-      logging:
-        enableVectorAgent: False
-      regionMover:
-        runBeforeShutdown: false
-    roleGroups:
-      default:
-        replicas: 1
-  restServers:
-    config:
-      logging:
-        enableVectorAgent: False
-    roleGroups:
-      default:
-        replicas: 1
-        "#};
-
-        let deserializer = serde_yaml::Deserializer::from_str(input);
-        let hbase: v1alpha1::HbaseCluster =
-            serde_yaml::with::singleton_map_recursive::deserialize(deserializer).unwrap();
-
-        let roles = HashMap::from([(
-            HbaseRole::Master.to_string(),
-            (
-                vec![PropertyNameKind::Env],
-                hbase.spec.masters.clone().unwrap(),
-            ),
-        )]);
-
-        let validated_config = validate_all_roles_and_groups_config(
-            "2.6.4",
-            &transform_all_roles_to_config(&hbase, &roles).unwrap(),
-            &ProductConfigManager::from_yaml_file("../../deploy/config-spec/properties.yaml")
-                .unwrap(),
-            false,
-            false,
-        )
-        .unwrap();
-
-        let rolegroup_config = validated_config
-            .get(&HbaseRole::Master.to_string())
-            .unwrap()
-            .get("default")
-            .unwrap()
-            .get(&PropertyNameKind::Env)
-            .cloned()
-            .unwrap_or_default();
-        let merged_env = merged_env(&rolegroup_config);
-
-        let env_map: BTreeMap<&str, Option<String>> = merged_env
-            .iter()
-            .map(|env_var| (env_var.name.as_str(), env_var.value.clone()))
-            .collect();
-
-        assert_eq!(
-            Some(&Some("MASTER_RG".to_string())),
-            env_map.get("TEST_VAR")
-        );
-        assert_eq!(
-            Some(&Some("MASTER".to_string())),
-            env_map.get("TEST_VAR_FROM_MASTER")
-        );
-        assert_eq!(
-            Some(&Some("MASTER".to_string())),
-            env_map.get("TEST_VAR_FROM_MRG")
-        );
-    }
 
     #[rstest]
     #[case("default", false, 1, vec![])]

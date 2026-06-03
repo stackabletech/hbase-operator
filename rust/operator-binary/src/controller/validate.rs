@@ -1,15 +1,14 @@
 use std::{collections::BTreeMap, str::FromStr};
 
-use product_config::ProductConfigManager;
 use snafu::{ResultExt, Snafu};
 use stackable_operator::{
     commons::product_image_selection::{self},
     config::merge::Merge,
     kube::ResourceExt,
-    product_config_utils::{transform_all_roles_to_config, validate_all_roles_and_groups_config},
     role_utils::GenericRoleConfig,
     v2::types::operator::ClusterName,
 };
+use strum::IntoEnumIterator;
 
 use crate::{
     controller::dereference::DereferencedObjects,
@@ -32,24 +31,8 @@ pub enum Error {
         source: stackable_operator::v2::macros::attributed_string_type::Error,
     },
 
-    #[snafu(display("invalid role properties"))]
-    RoleProperties { source: crate::crd::Error },
-
-    #[snafu(display("failed to generate product config"))]
-    GenerateProductConfig {
-        source: stackable_operator::product_config_utils::Error,
-    },
-
-    #[snafu(display("invalid product config"))]
-    InvalidProductConfig {
-        source: stackable_operator::product_config_utils::Error,
-    },
-
-    #[snafu(display("could not parse Hbase role [{role}]"))]
-    UnidentifiedHbaseRole {
-        source: strum::ParseError,
-        role: String,
-    },
+    #[snafu(display("the HbaseCluster has no {role} role defined"))]
+    MissingRequiredRole { role: String },
 
     #[snafu(display("failed to resolve and merge config for role and role group"))]
     FailedToResolveConfig { source: crate::crd::Error },
@@ -58,7 +41,6 @@ pub enum Error {
 pub fn validate_cluster(
     hbase: &v1alpha1::HbaseCluster,
     image_repository: &str,
-    product_config_manager: &ProductConfigManager,
     dereferenced_objects: DereferencedObjects,
 ) -> Result<ValidatedCluster, Error> {
     let resolved_product_image = hbase
@@ -71,24 +53,25 @@ pub fn validate_cluster(
         )
         .context(ResolveProductImageSnafu)?;
 
-    let roles = hbase.build_role_properties().context(RolePropertiesSnafu)?;
-
-    let validated_config = validate_all_roles_and_groups_config(
-        &resolved_product_image.product_version,
-        &transform_all_roles_to_config(hbase, &roles).context(GenerateProductConfigSnafu)?,
-        product_config_manager,
-        false,
-        false,
-    )
-    .context(InvalidProductConfigSnafu)?;
-
     let mut role_groups = BTreeMap::new();
     let mut role_configs = BTreeMap::new();
 
-    for (role_name, group_config) in validated_config.iter() {
-        let hbase_role = HbaseRole::from_str(role_name).context(UnidentifiedHbaseRoleSnafu {
-            role: role_name.to_string(),
-        })?;
+    for hbase_role in HbaseRole::iter() {
+        let role_group_names = role_group_names(hbase, &hbase_role);
+
+        // masters and region servers are required (preserves the old build_role_properties check);
+        // rest servers are optional.
+        if role_group_names.is_empty() {
+            match hbase_role {
+                HbaseRole::Master | HbaseRole::RegionServer => {
+                    return MissingRequiredRoleSnafu {
+                        role: hbase_role.to_string(),
+                    }
+                    .fail();
+                }
+                HbaseRole::RestServer => continue,
+            }
+        }
 
         if let Some(GenericRoleConfig {
             pod_disruption_budget: pdb,
@@ -98,13 +81,11 @@ pub fn validate_cluster(
         }
 
         let mut group_configs = BTreeMap::new();
-        for (rolegroup_name, rolegroup_config) in group_config.iter() {
-            let rolegroup = hbase.server_rolegroup_ref(role_name, rolegroup_name);
-
+        for rolegroup_name in role_group_names {
             let merged_config = hbase
                 .merged_config(
                     &hbase_role,
-                    &rolegroup.role_group,
+                    &rolegroup_name,
                     &hbase.spec.cluster_config.hdfs_config_map_name,
                 )
                 .context(FailedToResolveConfigSnafu)?;
@@ -113,9 +94,8 @@ pub fn validate_cluster(
                 rolegroup_name.clone(),
                 ValidatedRoleGroupConfig {
                     merged_config,
-                    config_overrides: merged_config_overrides(hbase, &hbase_role, rolegroup_name),
-                    env_overrides: merged_env_overrides(hbase, &hbase_role, rolegroup_name),
-                    product_config_properties: rolegroup_config.clone(),
+                    config_overrides: merged_config_overrides(hbase, &hbase_role, &rolegroup_name),
+                    env_overrides: merged_env_overrides(hbase, &hbase_role, &rolegroup_name),
                 },
             );
         }
@@ -134,6 +114,28 @@ pub fn validate_cluster(
         role_group_configs: role_groups,
         role_configs,
     })
+}
+
+/// The names of the role groups defined for `role` in the spec.
+fn role_group_names(hbase: &v1alpha1::HbaseCluster, role: &HbaseRole) -> Vec<String> {
+    match role {
+        HbaseRole::Master => hbase
+            .spec
+            .masters
+            .as_ref()
+            .map(|r| r.role_groups.keys().cloned().collect()),
+        HbaseRole::RegionServer => hbase
+            .spec
+            .region_servers
+            .as_ref()
+            .map(|r| r.role_groups.keys().cloned().collect()),
+        HbaseRole::RestServer => hbase
+            .spec
+            .rest_servers
+            .as_ref()
+            .map(|r| r.role_groups.keys().cloned().collect()),
+    }
+    .unwrap_or_default()
 }
 
 /// Merge role-level then role-group-level `configOverrides` (role group wins).
@@ -246,4 +248,73 @@ fn merged_env_overrides(
         env_overrides.extend(role_group_overrides);
     }
     env_overrides
+}
+
+#[cfg(test)]
+mod tests {
+    use indoc::indoc;
+
+    use super::*;
+
+    #[test]
+    fn test_env_overrides() {
+        let input = indoc! {r#"
+---
+apiVersion: hbase.stackable.tech/v1alpha1
+kind: HbaseCluster
+metadata:
+  name: test-hbase
+spec:
+  image:
+    productVersion: 2.6.4
+  clusterConfig:
+    hdfsConfigMapName: test-hdfs
+    zookeeperConfigMapName: test-znode
+  masters:
+    envOverrides:
+      TEST_VAR_FROM_MASTER: MASTER
+      TEST_VAR: MASTER
+    config:
+      logging:
+        enableVectorAgent: False
+    roleGroups:
+      default:
+        replicas: 1
+        envOverrides:
+          TEST_VAR_FROM_MRG: MASTER
+          TEST_VAR: MASTER_RG
+  regionServers:
+    config:
+      logging:
+        enableVectorAgent: False
+      regionMover:
+        runBeforeShutdown: false
+    roleGroups:
+      default:
+        replicas: 1
+  restServers:
+    config:
+      logging:
+        enableVectorAgent: False
+    roleGroups:
+      default:
+        replicas: 1
+        "#};
+
+        let deserializer = serde_yaml::Deserializer::from_str(input);
+        let hbase: v1alpha1::HbaseCluster =
+            serde_yaml::with::singleton_map_recursive::deserialize(deserializer).unwrap();
+
+        let env_overrides = merged_env_overrides(&hbase, &HbaseRole::Master, "default");
+
+        assert_eq!(env_overrides.get("TEST_VAR"), Some(&"MASTER_RG".to_string()));
+        assert_eq!(
+            env_overrides.get("TEST_VAR_FROM_MASTER"),
+            Some(&"MASTER".to_string())
+        );
+        assert_eq!(
+            env_overrides.get("TEST_VAR_FROM_MRG"),
+            Some(&"MASTER".to_string())
+        );
+    }
 }

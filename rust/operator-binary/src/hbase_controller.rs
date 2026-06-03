@@ -1,13 +1,9 @@
 //! Ensures that `Pod`s are configured and running for each [`v1alpha1::HbaseCluster`]
 
-use std::{
-    collections::{BTreeMap, HashMap},
-    sync::Arc,
-};
+use std::{collections::BTreeMap, sync::Arc};
 
 use const_format::concatcp;
 use indoc::formatdoc;
-use product_config::{ProductConfigManager, types::PropertyNameKind};
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
     builder::{
@@ -89,7 +85,6 @@ pub const CONTAINER_IMAGE_BASE_NAME: &str = "hbase";
 
 pub struct Ctx {
     pub client: stackable_operator::client::Client,
-    pub product_config: ProductConfigManager,
     pub operator_environment: OperatorEnvironmentOptions,
 }
 
@@ -122,17 +117,11 @@ pub struct ValidatedRoleConfig {
 
 /// Per-rolegroup configuration: the merged CRD config plus the merged
 /// (role <- role group) `configOverrides` and `envOverrides`.
-///
-/// `product_config_properties` is retained temporarily so the existing controller
-/// path keeps compiling; it is removed in a later commit.
 #[derive(Clone, Debug)]
 pub struct ValidatedRoleGroupConfig {
     pub merged_config: AnyServiceConfig,
     pub config_overrides: v1alpha1::HbaseConfigOverrides,
     pub env_overrides: BTreeMap<String, String>,
-    // Retained until the product-config path is fully removed in a later commit.
-    #[allow(dead_code)]
-    pub product_config_properties: HashMap<PropertyNameKind, BTreeMap<String, String>>,
 }
 
 #[derive(Snafu, Debug, EnumDiscriminants)]
@@ -307,7 +296,6 @@ pub async fn reconcile_hbase(
     let validated = crate::controller::validate::validate_cluster(
         hbase,
         &ctx.operator_environment.image_repository,
-        &ctx.product_config,
         dereferenced_objects,
     )
     .context(ValidateSnafu)?;
