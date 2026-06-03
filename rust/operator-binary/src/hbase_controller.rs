@@ -2,7 +2,6 @@
 
 use std::{
     collections::{BTreeMap, HashMap},
-    fmt::Write,
     sync::Arc,
 };
 
@@ -13,7 +12,6 @@ use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
     builder::{
         self,
-        configmap::ConfigMapBuilder,
         meta::ObjectMetaBuilder,
         pod::{
             PodBuilder, container::ContainerBuilder, resources::ResourceRequirementsBuilder,
@@ -28,8 +26,8 @@ use stackable_operator::{
         api::{
             apps::v1::{StatefulSet, StatefulSetSpec},
             core::v1::{
-                ConfigMap, ConfigMapVolumeSource, ContainerPort, EnvVar, Probe, Service,
-                ServiceAccount, ServicePort, ServiceSpec, TCPSocketAction, Volume,
+                ConfigMapVolumeSource, ContainerPort, EnvVar, Probe, Service, ServiceAccount,
+                ServicePort, ServiceSpec, TCPSocketAction, Volume,
             },
         },
         apimachinery::pkg::{apis::meta::v1::LabelSelector, util::intstr::IntOrString},
@@ -56,35 +54,20 @@ use stackable_operator::{
         compute_conditions, operations::ClusterOperationsConditionBuilder,
         statefulset::StatefulSetConditionBuilder,
     },
-    utils::cluster_info::KubernetesClusterInfo,
     v2::types::operator::ClusterName,
 };
 use strum::{EnumDiscriminants, IntoStaticStr, ParseError};
 
 use crate::{
     OPERATOR_NAME,
-    config::{
-        jvm::{
-            construct_global_jvm_args, construct_hbase_heapsize_env,
-            construct_role_specific_non_heap_jvm_args,
-        },
-        writer::{PropertiesWriterError, to_hadoop_xml, to_java_properties_string},
-    },
     crd::{
-        APP_NAME, AnyServiceConfig, Container, HBASE_ENV_SH, HBASE_MASTER_PORT,
-        HBASE_MASTER_UI_PORT, HBASE_REGIONSERVER_PORT, HBASE_REGIONSERVER_UI_PORT, HBASE_SITE_XML,
-        HbaseClusterStatus, HbaseRole, JVM_SECURITY_PROPERTIES_FILE, LISTENER_VOLUME_DIR,
-        LISTENER_VOLUME_NAME, SSL_CLIENT_XML, SSL_SERVER_XML, merged_env, v1alpha1,
+        APP_NAME, AnyServiceConfig, CONFIG_DIR_NAME, Container, HbaseClusterStatus, HbaseRole,
+        LISTENER_VOLUME_DIR, LISTENER_VOLUME_NAME, merged_env, v1alpha1,
     },
     discovery::build_discovery_configmap,
-    kerberos::{
-        self, add_kerberos_pod_config, kerberos_config_properties, kerberos_ssl_client_settings,
-        kerberos_ssl_server_settings,
-    },
+    kerberos::{self, add_kerberos_pod_config},
     operations::{graceful_shutdown::add_graceful_shutdown_config, pdb::add_pdbs},
-    product_logging::{
-        CONTAINERDEBUG_LOG_DIRECTORY, STACKABLE_LOG_DIR, extend_role_group_config_map,
-    },
+    product_logging::{CONTAINERDEBUG_LOG_DIRECTORY, STACKABLE_LOG_DIR},
     security::opa::HbaseOpaConfig,
     zookeeper::ZookeeperConnectionInformation,
 };
@@ -146,9 +129,9 @@ pub struct ValidatedRoleConfig {
 pub struct ValidatedRoleGroupConfig {
     pub merged_config: AnyServiceConfig,
     pub config_overrides: v1alpha1::HbaseConfigOverrides,
-    // Populated now; consumed by the new build path in a later commit.
-    #[allow(dead_code)]
     pub env_overrides: BTreeMap<String, String>,
+    // Retained until the product-config path is fully removed in a later commit.
+    #[allow(dead_code)]
     pub product_config_properties: HashMap<PropertyNameKind, BTreeMap<String, String>>,
 }
 
@@ -182,10 +165,9 @@ pub enum Error {
     #[snafu(display("failed to build discovery configmap"))]
     BuildDiscoveryConfigMap { source: super::discovery::Error },
 
-    #[snafu(display("failed to build ConfigMap for {}", rolegroup))]
-    BuildRoleGroupConfig {
-        source: stackable_operator::builder::configmap::Error,
-        rolegroup: RoleGroupRef<v1alpha1::HbaseCluster>,
+    #[snafu(display("failed to build rolegroup ConfigMap"))]
+    BuildRolegroupConfigMap {
+        source: crate::controller::build::config_map::Error,
     },
 
     #[snafu(display("failed to apply ConfigMap for {}", rolegroup))]
@@ -224,12 +206,6 @@ pub enum Error {
     #[snafu(display("vector agent is enabled but vector aggregator ConfigMap is missing"))]
     VectorAggregatorConfigMapMissing,
 
-    #[snafu(display("failed to add the logging configuration to the ConfigMap [{cm_name}]"))]
-    InvalidLoggingConfig {
-        source: crate::product_logging::Error,
-        cm_name: String,
-    },
-
     #[snafu(display("failed to add kerberos config"))]
     AddKerberosConfig { source: kerberos::Error },
 
@@ -241,15 +217,6 @@ pub enum Error {
     #[snafu(display("failed to build RBAC resources"))]
     BuildRbacResources {
         source: stackable_operator::commons::rbac::Error,
-    },
-
-    #[snafu(display(
-        "failed to serialize [{JVM_SECURITY_PROPERTIES_FILE}] for {}",
-        rolegroup
-    ))]
-    SerializeJvmSecurity {
-        source: PropertiesWriterError,
-        rolegroup: RoleGroupRef<v1alpha1::HbaseCluster>,
     },
 
     #[snafu(display("failed to create PodDisruptionBudget"))]
@@ -288,12 +255,6 @@ pub enum Error {
     InvalidHBaseCluster {
         source: error_boundary::InvalidObject,
     },
-
-    #[snafu(display("failed to construct HBASE_HEAPSIZE env variable"))]
-    ConstructHbaseHeapsizeEnv { source: crate::config::jvm::Error },
-
-    #[snafu(display("failed to construct JVM arguments"))]
-    ConstructJvmArgument { source: crate::config::jvm::Error },
 
     #[snafu(display("failed to build Labels"))]
     LabelBuild {
@@ -390,23 +351,19 @@ pub async fn reconcile_hbase(
             let rg_metrics_service =
                 build_rolegroup_metrics_service(hbase, hbase_role, &rolegroup, &validated.image)?;
 
-            let rg_configmap = build_rolegroup_config_map(
+            let rg_configmap = crate::controller::build::config_map::build_rolegroup_config_map(
                 hbase,
+                &validated,
                 hbase_role,
                 &client.kubernetes_cluster_info,
                 &rolegroup,
-                &validated_rg_config.product_config_properties,
-                &validated.cluster_config.zookeeper_connection_information,
-                &validated_rg_config.merged_config,
-                &validated.image,
-                validated.cluster_config.hbase_opa_config.as_ref(),
-            )?;
+            )
+            .context(BuildRolegroupConfigMapSnafu)?;
             let rg_statefulset = build_rolegroup_statefulset(
                 hbase,
                 hbase_role,
                 &rolegroup,
-                &validated_rg_config.product_config_properties,
-                &validated_rg_config.merged_config,
+                validated_rg_config,
                 &validated.image,
                 &rbac_sa,
             )?;
@@ -486,216 +443,6 @@ pub async fn reconcile_hbase(
         .context(ApplyStatusSnafu)?;
 
     Ok(Action::await_change())
-}
-
-/// The rolegroup [`ConfigMap`] configures the rolegroup based on the configuration given by the administrator
-#[allow(clippy::too_many_arguments)]
-fn build_rolegroup_config_map(
-    hbase: &v1alpha1::HbaseCluster,
-    hbase_role: &HbaseRole,
-    cluster_info: &KubernetesClusterInfo,
-    rolegroup: &RoleGroupRef<v1alpha1::HbaseCluster>,
-    rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
-    zookeeper_connection_information: &ZookeeperConnectionInformation,
-    merged_config: &AnyServiceConfig,
-    resolved_product_image: &ResolvedProductImage,
-    hbase_opa_config: Option<&HbaseOpaConfig>,
-) -> Result<ConfigMap, Error> {
-    let mut hbase_site_xml = String::new();
-    let mut hbase_env_sh = String::new();
-    let mut ssl_server_xml = String::new();
-    let mut ssl_client_xml = String::new();
-
-    for (property_name_kind, config) in rolegroup_config {
-        match property_name_kind {
-            PropertyNameKind::File(file_name) if file_name == HBASE_SITE_XML => {
-                let mut hbase_site_config = BTreeMap::new();
-                hbase_site_config.extend(zookeeper_connection_information.as_hbase_settings());
-                hbase_site_config.extend(
-                    kerberos_config_properties(hbase, cluster_info)
-                        .context(AddKerberosConfigSnafu)?,
-                );
-                hbase_site_config
-                    .extend(hbase_opa_config.map_or(vec![], |config| config.hbase_site_config()));
-
-                // Set flag to override default behaviour, which is that the
-                // RPC client should bind the client address (forcing outgoing
-                // RPC traffic to happen from the same network interface that
-                // the RPC server is bound on).
-                hbase_site_config.insert(
-                    "hbase.client.rpc.bind.address".to_string(),
-                    "false".to_string(),
-                );
-
-                match hbase_role {
-                    HbaseRole::Master => {
-                        hbase_site_config.insert(
-                            "hbase.master.ipc.address".to_string(),
-                            "0.0.0.0".to_string(),
-                        );
-                        hbase_site_config.insert(
-                            "hbase.master.ipc.port".to_string(),
-                            HBASE_MASTER_PORT.to_string(),
-                        );
-                        hbase_site_config.insert(
-                            "hbase.master.hostname".to_string(),
-                            "${env:HBASE_SERVICE_HOST}".to_string(),
-                        );
-                        hbase_site_config.insert(
-                            "hbase.master.port".to_string(),
-                            "${env:HBASE_SERVICE_PORT}".to_string(),
-                        );
-                        hbase_site_config.insert(
-                            "hbase.master.info.port".to_string(),
-                            "${env:HBASE_INFO_PORT}".to_string(),
-                        );
-                        hbase_site_config.insert(
-                            "hbase.master.bound.info.port".to_string(),
-                            HBASE_MASTER_UI_PORT.to_string(),
-                        );
-                    }
-                    HbaseRole::RegionServer => {
-                        hbase_site_config.insert(
-                            "hbase.regionserver.ipc.address".to_string(),
-                            "0.0.0.0".to_string(),
-                        );
-                        hbase_site_config.insert(
-                            "hbase.regionserver.ipc.port".to_string(),
-                            HBASE_REGIONSERVER_PORT.to_string(),
-                        );
-                        hbase_site_config.insert(
-                            "hbase.unsafe.regionserver.hostname".to_string(),
-                            "${env:HBASE_SERVICE_HOST}".to_string(),
-                        );
-                        hbase_site_config.insert(
-                            "hbase.regionserver.port".to_string(),
-                            "${env:HBASE_SERVICE_PORT}".to_string(),
-                        );
-                        hbase_site_config.insert(
-                            "hbase.regionserver.info.port".to_string(),
-                            "${env:HBASE_INFO_PORT}".to_string(),
-                        );
-                        hbase_site_config.insert(
-                            "hbase.regionserver.bound.info.port".to_string(),
-                            HBASE_REGIONSERVER_UI_PORT.to_string(),
-                        );
-                    }
-                    HbaseRole::RestServer => {
-                        hbase_site_config.insert(
-                            // N.B. a custom tag, so as not to interfere with HBase internals.
-                            // The other roles use a patch to correctly resolve host/port.
-                            "hbase.rest.endpoint".to_string(),
-                            "${env:HBASE_SERVICE_HOST}:${env:HBASE_SERVICE_PORT}".to_string(),
-                        );
-                    }
-                };
-
-                // configOverride come last
-                hbase_site_config.extend(config.clone());
-                hbase_site_xml = to_hadoop_xml(
-                    hbase_site_config
-                        .into_iter()
-                        .map(|(k, v)| (k, Some(v)))
-                        .collect::<BTreeMap<_, _>>()
-                        .iter(),
-                );
-            }
-            PropertyNameKind::File(file_name) if file_name == HBASE_ENV_SH => {
-                let mut hbase_env_config =
-                    build_hbase_env_sh(hbase, merged_config, hbase_role, &rolegroup.role_group)?;
-
-                // configOverride come last
-                hbase_env_config.extend(config.clone());
-                hbase_env_sh = write_hbase_env_sh(hbase_env_config.iter());
-            }
-            PropertyNameKind::File(file_name) if file_name == SSL_SERVER_XML => {
-                let mut config_opts = BTreeMap::new();
-                config_opts.extend(kerberos_ssl_server_settings(hbase));
-
-                // configOverride come last
-                config_opts.extend(config.clone());
-                ssl_server_xml = to_hadoop_xml(
-                    config_opts
-                        .into_iter()
-                        .map(|(k, v)| (k, Some(v)))
-                        .collect::<BTreeMap<_, _>>()
-                        .iter(),
-                );
-            }
-            PropertyNameKind::File(file_name) if file_name == SSL_CLIENT_XML => {
-                let mut config_opts = BTreeMap::new();
-                config_opts.extend(kerberos_ssl_client_settings(hbase));
-
-                // configOverride come last
-                config_opts.extend(config.clone());
-                ssl_client_xml = to_hadoop_xml(
-                    config_opts
-                        .into_iter()
-                        .map(|(k, v)| (k, Some(v)))
-                        .collect::<BTreeMap<_, _>>()
-                        .iter(),
-                );
-            }
-            _ => {}
-        }
-    }
-
-    let jvm_sec_props: BTreeMap<String, Option<String>> = rolegroup_config
-        .get(&PropertyNameKind::File(
-            JVM_SECURITY_PROPERTIES_FILE.to_string(),
-        ))
-        .cloned()
-        .unwrap_or_default()
-        .into_iter()
-        .map(|(k, v)| (k, Some(v)))
-        .collect();
-    let jvm_sec_props = to_java_properties_string(jvm_sec_props.iter()).with_context(|_| {
-        SerializeJvmSecuritySnafu {
-            rolegroup: rolegroup.clone(),
-        }
-    })?;
-
-    let mut builder = ConfigMapBuilder::new();
-
-    let cm_metadata = ObjectMetaBuilder::new()
-        .name_and_namespace(hbase)
-        .name(rolegroup.object_name())
-        .ownerreference_from_resource(hbase, None, Some(true))
-        .context(ObjectMissingMetadataForOwnerRefSnafu)?
-        .with_recommended_labels(&build_recommended_labels(
-            hbase,
-            &resolved_product_image.app_version_label_value,
-            &rolegroup.role,
-            &rolegroup.role_group,
-        ))
-        .context(ObjectMetaSnafu)?
-        .build();
-
-    builder
-        .metadata(cm_metadata)
-        .add_data(HBASE_SITE_XML, hbase_site_xml)
-        .add_data(HBASE_ENV_SH, hbase_env_sh)
-        .add_data(JVM_SECURITY_PROPERTIES_FILE, jvm_sec_props);
-
-    // HBase does not like empty config files:
-    // Caused by: com.ctc.wstx.exc.WstxEOFException: Unexpected EOF in prolog at [row,col,system-id]: [1,0,"file:/stackable/conf/ssl-server.xml"]
-    if !ssl_server_xml.is_empty() {
-        builder.add_data(SSL_SERVER_XML, ssl_server_xml);
-    }
-    if !ssl_client_xml.is_empty() {
-        builder.add_data(SSL_CLIENT_XML, ssl_client_xml);
-    }
-
-    extend_role_group_config_map(rolegroup, merged_config.logging(), &mut builder).context(
-        InvalidLoggingConfigSnafu {
-            cm_name: rolegroup.object_name(),
-        },
-    )?;
-
-    builder.build().map_err(|e| Error::BuildRoleGroupConfig {
-        source: e,
-        rolegroup: rolegroup.clone(),
-    })
 }
 
 /// The rolegroup [`Service`] is a headless service that allows direct access to the instances of a certain rolegroup
@@ -833,11 +580,11 @@ fn build_rolegroup_statefulset(
     hbase: &v1alpha1::HbaseCluster,
     hbase_role: &HbaseRole,
     rolegroup_ref: &RoleGroupRef<v1alpha1::HbaseCluster>,
-    rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
-    merged_config: &AnyServiceConfig,
+    validated_rg_config: &ValidatedRoleGroupConfig,
     resolved_product_image: &ResolvedProductImage,
     service_account: &ServiceAccount,
 ) -> Result<StatefulSet> {
+    let merged_config = &validated_rg_config.merged_config;
     let hbase_version = &resolved_product_image.app_version_label_value;
 
     let ports = hbase_role
@@ -879,7 +626,12 @@ fn build_rolegroup_statefulset(
         ..probe_template
     };
 
-    let mut merged_env = merged_env(rolegroup_config.get(&PropertyNameKind::Env));
+    let mut env_map: BTreeMap<String, String> = BTreeMap::from([
+        ("HBASE_CONF_DIR".to_string(), CONFIG_DIR_NAME.to_string()),
+        ("HADOOP_CONF_DIR".to_string(), CONFIG_DIR_NAME.to_string()),
+    ]);
+    env_map.extend(validated_rg_config.env_overrides.clone());
+    let mut merged_env = merged_env(&env_map);
     // This env var is set for all roles to avoid bash's "unbound variable" errors
     merged_env.extend([
         EnvVar {
@@ -1125,16 +877,6 @@ fn command() -> Vec<String> {
     ]
 }
 
-fn write_hbase_env_sh<'a, T>(properties: T) -> String
-where
-    T: Iterator<Item = (&'a String, &'a String)>,
-{
-    properties.fold(String::new(), |mut output, (variable, value)| {
-        let _ = writeln!(output, "export {variable}=\"{value}\"");
-        output
-    })
-}
-
 pub fn error_policy(
     _obj: Arc<DeserializeGuard<v1alpha1::HbaseCluster>>,
     error: &Error,
@@ -1162,53 +904,6 @@ pub fn build_recommended_labels<'a>(
         role,
         role_group,
     }
-}
-
-/// The content of the HBase `hbase-env.sh` file.
-fn build_hbase_env_sh(
-    hbase: &v1alpha1::HbaseCluster,
-    merged_config: &AnyServiceConfig,
-    hbase_role: &HbaseRole,
-    role_group: &str,
-) -> Result<BTreeMap<String, String>, Error> {
-    let mut result = BTreeMap::new();
-
-    result.insert("HBASE_MANAGES_ZK".to_string(), "false".to_string());
-
-    result.insert(
-        "HBASE_HEAPSIZE".to_owned(),
-        construct_hbase_heapsize_env(merged_config).context(ConstructHbaseHeapsizeEnvSnafu)?,
-    );
-    result.insert(
-        "HBASE_OPTS".to_owned(),
-        construct_global_jvm_args(hbase.has_kerberos_enabled()),
-    );
-    let role_specific_non_heap_jvm_args =
-        construct_role_specific_non_heap_jvm_args(hbase, hbase_role, role_group)
-            .context(ConstructJvmArgumentSnafu)?;
-
-    match hbase_role {
-        HbaseRole::Master => {
-            result.insert(
-                "HBASE_MASTER_OPTS".to_string(),
-                role_specific_non_heap_jvm_args,
-            );
-        }
-        HbaseRole::RegionServer => {
-            result.insert(
-                "HBASE_REGIONSERVER_OPTS".to_string(),
-                role_specific_non_heap_jvm_args,
-            );
-        }
-        HbaseRole::RestServer => {
-            result.insert(
-                "HBASE_REST_OPTS".to_string(),
-                role_specific_non_heap_jvm_args,
-            );
-        }
-    }
-
-    Ok(result)
 }
 
 #[cfg(test)]

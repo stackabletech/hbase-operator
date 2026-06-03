@@ -576,20 +576,15 @@ impl KeyValueOverridesProvider for v1alpha1::HbaseConfigOverrides {
     }
 }
 
-pub fn merged_env(rolegroup_config: Option<&BTreeMap<String, String>>) -> Vec<EnvVar> {
-    let merged_env: Vec<EnvVar> = if let Some(rolegroup_config) = rolegroup_config {
-        rolegroup_config
-            .iter()
-            .map(|(env_name, env_value)| EnvVar {
-                name: env_name.clone(),
-                value: Some(env_value.to_owned()),
-                value_from: None,
-            })
-            .collect()
-    } else {
-        vec![]
-    };
-    merged_env
+pub fn merged_env(rolegroup_config: &BTreeMap<String, String>) -> Vec<EnvVar> {
+    rolegroup_config
+        .iter()
+        .map(|(env_name, env_value)| EnvVar {
+            name: env_name.clone(),
+            value: Some(env_value.to_owned()),
+            value_from: None,
+        })
+        .collect()
 }
 
 #[derive(
@@ -1443,8 +1438,10 @@ spec:
             .unwrap()
             .get("default")
             .unwrap()
-            .get(&PropertyNameKind::Env);
-        let merged_env = merged_env(rolegroup_config);
+            .get(&PropertyNameKind::Env)
+            .cloned()
+            .unwrap_or_default();
+        let merged_env = merged_env(&rolegroup_config);
 
         let env_map: BTreeMap<&str, Option<String>> = merged_env
             .iter()

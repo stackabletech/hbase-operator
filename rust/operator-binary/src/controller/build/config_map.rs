@@ -61,7 +61,6 @@ pub enum Error {
 
 type Result<T, E = Error> = std::result::Result<T, E>;
 
-#[allow(dead_code)]
 pub fn build_rolegroup_config_map(
     hbase: &v1alpha1::HbaseCluster,
     cluster: &ValidatedCluster,
