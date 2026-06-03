@@ -14,6 +14,7 @@
   Previously, arbitrary file names were silently accepted and ignored ([#751]).
 - Bump `stackable-operator` to 0.111.1 and snafu to 0.9 ([#751], [#752]).
 - Internal operator refactoring: introduce dereference() and validate() steps in the reconciler ([#757]).
+- Removed the `product-config` dependency; configuration is now rendered from typed, validated inputs ([#757]).
 - test: Bump vector-aggregator to 0.55.0, replace /graphql call with gRPC call ([#762]).
 
 [#745]: https://github.com/stackabletech/hbase-operator/pull/745
