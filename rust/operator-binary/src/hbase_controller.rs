@@ -57,6 +57,7 @@ use stackable_operator::{
         statefulset::StatefulSetConditionBuilder,
     },
     utils::cluster_info::KubernetesClusterInfo,
+    v2::types::operator::ClusterName,
 };
 use strum::{EnumDiscriminants, IntoStaticStr, ParseError};
 
@@ -109,17 +110,28 @@ pub struct Ctx {
     pub operator_environment: OperatorEnvironmentOptions,
 }
 
-/// The validated cluster: proves that product-config validation and config merging
-/// succeeded for every role and role group before any resources are created.
-/// Placed in the controller so that subsequent steps that reference this struct
-/// only depend on the controller.
+/// The validated cluster: proves that config merging and validation succeeded for
+/// every role and role group before any resources are created.
 #[derive(Clone, Debug)]
 pub struct ValidatedCluster {
+    /// The logical (and Kubernetes object) name of the cluster.
+    // Populated now; consumed by the new build path in a later commit.
+    #[allow(dead_code)]
+    pub name: ClusterName,
     pub image: ResolvedProductImage,
-    pub role_groups: BTreeMap<HbaseRole, BTreeMap<String, ValidatedRoleGroupConfig>>,
+    pub cluster_config: ValidatedClusterConfig,
+    pub role_group_configs: BTreeMap<HbaseRole, BTreeMap<String, ValidatedRoleGroupConfig>>,
     pub role_configs: BTreeMap<HbaseRole, ValidatedRoleConfig>,
+}
+
+/// Cluster-wide settings resolved once during validation.
+#[derive(Clone, Debug)]
+pub struct ValidatedClusterConfig {
     pub zookeeper_connection_information: ZookeeperConnectionInformation,
     pub hbase_opa_config: Option<HbaseOpaConfig>,
+    // Populated now; consumed by the new build path in a later commit.
+    #[allow(dead_code)]
+    pub kerberos_enabled: bool,
 }
 
 /// Per-role configuration extracted during validation.
@@ -128,10 +140,20 @@ pub struct ValidatedRoleConfig {
     pub pdb: stackable_operator::commons::pdb::PdbConfig,
 }
 
-/// Per-rolegroup configuration: the merged CRD config plus the product-config properties.
+/// Per-rolegroup configuration: the merged CRD config plus the merged
+/// (role <- role group) `configOverrides` and `envOverrides`.
+///
+/// `product_config_properties` is retained temporarily so the existing controller
+/// path keeps compiling; it is removed in a later commit.
 #[derive(Clone, Debug)]
 pub struct ValidatedRoleGroupConfig {
     pub merged_config: AnyServiceConfig,
+    // Populated now; consumed by the new build path in a later commit.
+    #[allow(dead_code)]
+    pub config_overrides: v1alpha1::HbaseConfigOverrides,
+    // Populated now; consumed by the new build path in a later commit.
+    #[allow(dead_code)]
+    pub env_overrides: BTreeMap<String, String>,
     pub product_config_properties: HashMap<PropertyNameKind, BTreeMap<String, String>>,
 }
 
@@ -363,7 +385,7 @@ pub async fn reconcile_hbase(
 
     let mut ss_cond_builder = StatefulSetConditionBuilder::default();
 
-    for (hbase_role, role_group_configs) in &validated.role_groups {
+    for (hbase_role, role_group_configs) in &validated.role_group_configs {
         for (rolegroup_name, validated_rg_config) in role_group_configs {
             let rolegroup = hbase.server_rolegroup_ref(hbase_role.to_string(), rolegroup_name);
 
@@ -379,10 +401,10 @@ pub async fn reconcile_hbase(
                 &client.kubernetes_cluster_info,
                 &rolegroup,
                 &validated_rg_config.product_config_properties,
-                &validated.zookeeper_connection_information,
+                &validated.cluster_config.zookeeper_connection_information,
                 &validated_rg_config.merged_config,
                 &validated.image,
-                validated.hbase_opa_config.as_ref(),
+                validated.cluster_config.hbase_opa_config.as_ref(),
             )?;
             let rg_statefulset = build_rolegroup_statefulset(
                 hbase,
@@ -443,7 +465,7 @@ pub async fn reconcile_hbase(
     let discovery_cm = build_discovery_configmap(
         hbase,
         &client.kubernetes_cluster_info,
-        &validated.zookeeper_connection_information,
+        &validated.cluster_config.zookeeper_connection_information,
         &validated.image,
     )
     .context(BuildDiscoveryConfigMapSnafu)?;

@@ -4,15 +4,19 @@ use product_config::ProductConfigManager;
 use snafu::{ResultExt, Snafu};
 use stackable_operator::{
     commons::product_image_selection::{self},
+    config::merge::Merge,
+    kube::ResourceExt,
     product_config_utils::{transform_all_roles_to_config, validate_all_roles_and_groups_config},
     role_utils::GenericRoleConfig,
+    v2::types::operator::ClusterName,
 };
 
 use crate::{
     controller::dereference::DereferencedObjects,
     crd::{HbaseRole, v1alpha1},
     hbase_controller::{
-        CONTAINER_IMAGE_BASE_NAME, ValidatedCluster, ValidatedRoleConfig, ValidatedRoleGroupConfig,
+        CONTAINER_IMAGE_BASE_NAME, ValidatedCluster, ValidatedClusterConfig, ValidatedRoleConfig,
+        ValidatedRoleGroupConfig,
     },
 };
 
@@ -21,6 +25,11 @@ pub enum Error {
     #[snafu(display("failed to resolve product image"))]
     ResolveProductImage {
         source: product_image_selection::Error,
+    },
+
+    #[snafu(display("invalid cluster name"))]
+    InvalidClusterName {
+        source: stackable_operator::v2::macros::attributed_string_type::Error,
     },
 
     #[snafu(display("invalid role properties"))]
@@ -104,6 +113,8 @@ pub fn validate_cluster(
                 rolegroup_name.clone(),
                 ValidatedRoleGroupConfig {
                     merged_config,
+                    config_overrides: merged_config_overrides(hbase, &hbase_role, rolegroup_name),
+                    env_overrides: merged_env_overrides(hbase, &hbase_role, rolegroup_name),
                     product_config_properties: rolegroup_config.clone(),
                 },
             );
@@ -113,10 +124,127 @@ pub fn validate_cluster(
     }
 
     Ok(ValidatedCluster {
+        name: ClusterName::from_str(&hbase.name_any()).context(InvalidClusterNameSnafu)?,
         image: resolved_product_image,
-        role_groups,
+        cluster_config: ValidatedClusterConfig {
+            zookeeper_connection_information: dereferenced_objects
+                .zookeeper_connection_information,
+            hbase_opa_config: dereferenced_objects.hbase_opa_config,
+            kerberos_enabled: hbase.has_kerberos_enabled(),
+        },
+        role_group_configs: role_groups,
         role_configs,
-        zookeeper_connection_information: dereferenced_objects.zookeeper_connection_information,
-        hbase_opa_config: dereferenced_objects.hbase_opa_config,
     })
+}
+
+/// Merge role-level then role-group-level `configOverrides` (role group wins).
+fn merged_config_overrides(
+    hbase: &v1alpha1::HbaseCluster,
+    role: &HbaseRole,
+    role_group: &str,
+) -> v1alpha1::HbaseConfigOverrides {
+    let (role_overrides, role_group_overrides) = match role {
+        HbaseRole::Master => (
+            hbase
+                .spec
+                .masters
+                .as_ref()
+                .map(|r| r.config.config_overrides.clone()),
+            hbase
+                .spec
+                .masters
+                .as_ref()
+                .and_then(|r| r.role_groups.get(role_group))
+                .map(|rg| rg.config.config_overrides.clone()),
+        ),
+        HbaseRole::RegionServer => (
+            hbase
+                .spec
+                .region_servers
+                .as_ref()
+                .map(|r| r.config.config_overrides.clone()),
+            hbase
+                .spec
+                .region_servers
+                .as_ref()
+                .and_then(|r| r.role_groups.get(role_group))
+                .map(|rg| rg.config.config_overrides.clone()),
+        ),
+        HbaseRole::RestServer => (
+            hbase
+                .spec
+                .rest_servers
+                .as_ref()
+                .map(|r| r.config.config_overrides.clone()),
+            hbase
+                .spec
+                .rest_servers
+                .as_ref()
+                .and_then(|r| r.role_groups.get(role_group))
+                .map(|rg| rg.config.config_overrides.clone()),
+        ),
+    };
+
+    let role_overrides = role_overrides.unwrap_or_default();
+    let mut merged = role_group_overrides.unwrap_or_default();
+    merged.merge(&role_overrides);
+    merged
+}
+
+/// Merge role-level then role-group-level `envOverrides` (role group wins).
+fn merged_env_overrides(
+    hbase: &v1alpha1::HbaseCluster,
+    role: &HbaseRole,
+    role_group: &str,
+) -> BTreeMap<String, String> {
+    let (role_overrides, role_group_overrides) = match role {
+        HbaseRole::Master => (
+            hbase
+                .spec
+                .masters
+                .as_ref()
+                .map(|r| r.config.env_overrides.clone()),
+            hbase
+                .spec
+                .masters
+                .as_ref()
+                .and_then(|r| r.role_groups.get(role_group))
+                .map(|rg| rg.config.env_overrides.clone()),
+        ),
+        HbaseRole::RegionServer => (
+            hbase
+                .spec
+                .region_servers
+                .as_ref()
+                .map(|r| r.config.env_overrides.clone()),
+            hbase
+                .spec
+                .region_servers
+                .as_ref()
+                .and_then(|r| r.role_groups.get(role_group))
+                .map(|rg| rg.config.env_overrides.clone()),
+        ),
+        HbaseRole::RestServer => (
+            hbase
+                .spec
+                .rest_servers
+                .as_ref()
+                .map(|r| r.config.env_overrides.clone()),
+            hbase
+                .spec
+                .rest_servers
+                .as_ref()
+                .and_then(|r| r.role_groups.get(role_group))
+                .map(|rg| rg.config.env_overrides.clone()),
+        ),
+    };
+
+    let mut env_overrides = BTreeMap::new();
+    if let Some(role_overrides) = role_overrides {
+        env_overrides.extend(role_overrides);
+    }
+    if let Some(role_group_overrides) = role_group_overrides {
+        env_overrides.extend(role_group_overrides);
+    }
+    env_overrides
 }

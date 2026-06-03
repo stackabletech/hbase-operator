@@ -23,7 +23,7 @@ use stackable_operator::{
         fragment::{self, Fragment, ValidationError},
         merge::{Atomic, Merge},
     },
-    config_overrides::{KeyValueConfigOverrides, KeyValueOverridesProvider},
+    config_overrides::KeyValueOverridesProvider,
     deep_merger::ObjectOverrides,
     k8s_openapi::{
         DeepMerge,
@@ -38,6 +38,7 @@ use stackable_operator::{
     schemars::{self, JsonSchema},
     shared::time::Duration,
     status::condition::{ClusterCondition, HasStatusCondition},
+    v2::config_overrides::KeyValueConfigOverrides,
     versioned::versioned,
 };
 use strum::{Display, EnumIter, EnumString};
@@ -233,43 +234,23 @@ pub mod versioned {
         pub authorization: Option<AuthorizationConfig>,
     }
 
-    #[derive(Clone, Debug, Default, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
+    #[derive(Clone, Debug, Default, Deserialize, Eq, JsonSchema, Merge, PartialEq, Serialize)]
     #[serde(rename_all = "camelCase")]
     pub struct HbaseConfigOverrides {
-        #[serde(
-            default,
-            rename = "hbase-site.xml",
-            skip_serializing_if = "Option::is_none"
-        )]
-        pub hbase_site_xml: Option<KeyValueConfigOverrides>,
+        #[serde(default, rename = "hbase-site.xml")]
+        pub hbase_site_xml: KeyValueConfigOverrides,
 
-        #[serde(
-            default,
-            rename = "hbase-env.sh",
-            skip_serializing_if = "Option::is_none"
-        )]
-        pub hbase_env_sh: Option<KeyValueConfigOverrides>,
+        #[serde(default, rename = "hbase-env.sh")]
+        pub hbase_env_sh: KeyValueConfigOverrides,
 
-        #[serde(
-            default,
-            rename = "ssl-server.xml",
-            skip_serializing_if = "Option::is_none"
-        )]
-        pub ssl_server_xml: Option<KeyValueConfigOverrides>,
+        #[serde(default, rename = "ssl-server.xml")]
+        pub ssl_server_xml: KeyValueConfigOverrides,
 
-        #[serde(
-            default,
-            rename = "ssl-client.xml",
-            skip_serializing_if = "Option::is_none"
-        )]
-        pub ssl_client_xml: Option<KeyValueConfigOverrides>,
+        #[serde(default, rename = "ssl-client.xml")]
+        pub ssl_client_xml: KeyValueConfigOverrides,
 
-        #[serde(
-            default,
-            rename = "security.properties",
-            skip_serializing_if = "Option::is_none"
-        )]
-        pub security_properties: Option<KeyValueConfigOverrides>,
+        #[serde(default, rename = "security.properties")]
+        pub security_properties: KeyValueConfigOverrides,
     }
 }
 
@@ -584,17 +565,14 @@ impl v1alpha1::HbaseCluster {
 
 impl KeyValueOverridesProvider for v1alpha1::HbaseConfigOverrides {
     fn get_key_value_overrides(&self, file: &str) -> BTreeMap<String, Option<String>> {
-        let field = match file {
-            HBASE_SITE_XML => self.hbase_site_xml.as_ref(),
-            HBASE_ENV_SH => self.hbase_env_sh.as_ref(),
-            SSL_SERVER_XML => self.ssl_server_xml.as_ref(),
-            SSL_CLIENT_XML => self.ssl_client_xml.as_ref(),
-            JVM_SECURITY_PROPERTIES_FILE => self.security_properties.as_ref(),
-            _ => None,
-        };
-        field
-            .map(KeyValueConfigOverrides::as_product_config_overrides)
-            .unwrap_or_default()
+        match file {
+            HBASE_SITE_XML => self.hbase_site_xml.overrides.clone(),
+            HBASE_ENV_SH => self.hbase_env_sh.overrides.clone(),
+            SSL_SERVER_XML => self.ssl_server_xml.overrides.clone(),
+            SSL_CLIENT_XML => self.ssl_client_xml.overrides.clone(),
+            JVM_SECURITY_PROPERTIES_FILE => self.security_properties.overrides.clone(),
+            _ => BTreeMap::new(),
+        }
     }
 }
 
