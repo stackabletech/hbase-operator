@@ -6,29 +6,23 @@ use snafu::{ResultExt, Snafu};
 use stackable_operator::v2::config_overrides::KeyValueConfigOverrides;
 
 use crate::{
-    config::jvm::{
-        self, construct_global_jvm_args, construct_hbase_heapsize_env,
-        construct_role_specific_non_heap_jvm_args,
-    },
+    config::jvm::{self, construct_global_jvm_args, construct_hbase_heapsize_env},
     controller::build::properties::resolved_overrides,
-    crd::{AnyServiceConfig, HbaseRole, v1alpha1},
+    crd::{AnyServiceConfig, HbaseRole},
 };
 
 #[derive(Snafu, Debug)]
 pub enum Error {
     #[snafu(display("failed to construct the HBASE_HEAPSIZE env variable"))]
     ConstructHbaseHeapsizeEnv { source: jvm::Error },
-
-    #[snafu(display("failed to construct the JVM arguments"))]
-    ConstructJvmArgument { source: jvm::Error },
 }
 
 /// Renders `hbase-env.sh` as `export VAR="VALUE"` lines.
 pub fn build(
-    hbase: &v1alpha1::HbaseCluster,
     merged_config: &AnyServiceConfig,
     role: &HbaseRole,
-    role_group: &str,
+    kerberos_enabled: bool,
+    non_heap_jvm_args: String,
     overrides: KeyValueConfigOverrides,
 ) -> Result<String, Error> {
     let mut env: BTreeMap<String, String> = BTreeMap::new();
@@ -40,30 +34,18 @@ pub fn build(
     );
     env.insert(
         "HBASE_OPTS".to_string(),
-        construct_global_jvm_args(hbase.has_kerberos_enabled()),
+        construct_global_jvm_args(kerberos_enabled),
     );
 
-    let role_specific_non_heap_jvm_args =
-        construct_role_specific_non_heap_jvm_args(hbase, role, role_group)
-            .context(ConstructJvmArgumentSnafu)?;
     match role {
         HbaseRole::Master => {
-            env.insert(
-                "HBASE_MASTER_OPTS".to_string(),
-                role_specific_non_heap_jvm_args,
-            );
+            env.insert("HBASE_MASTER_OPTS".to_string(), non_heap_jvm_args);
         }
         HbaseRole::RegionServer => {
-            env.insert(
-                "HBASE_REGIONSERVER_OPTS".to_string(),
-                role_specific_non_heap_jvm_args,
-            );
+            env.insert("HBASE_REGIONSERVER_OPTS".to_string(), non_heap_jvm_args);
         }
         HbaseRole::RestServer => {
-            env.insert(
-                "HBASE_REST_OPTS".to_string(),
-                role_specific_non_heap_jvm_args,
-            );
+            env.insert("HBASE_REST_OPTS".to_string(), non_heap_jvm_args);
         }
     }
 
@@ -81,7 +63,10 @@ pub fn build(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::controller::build::properties::test_support::{config_overrides, minimal_hbase};
+    use crate::{
+        controller::build::properties::test_support::{config_overrides, minimal_hbase},
+        crd::v1alpha1,
+    };
 
     fn master_merged_config(hbase: &v1alpha1::HbaseCluster) -> AnyServiceConfig {
         hbase
@@ -100,10 +85,10 @@ mod tests {
         let hbase = minimal_hbase();
         let merged = master_merged_config(&hbase);
         let env = build(
-            &hbase,
             &merged,
             &HbaseRole::Master,
-            "default",
+            false,
+            "-Xtest".to_string(),
             config_overrides(&[]),
         )
         .unwrap();
@@ -116,10 +101,10 @@ mod tests {
         let hbase = minimal_hbase();
         let merged = region_server_merged_config(&hbase);
         let env = build(
-            &hbase,
             &merged,
             &HbaseRole::RegionServer,
-            "default",
+            false,
+            "-Xtest".to_string(),
             config_overrides(&[]),
         )
         .unwrap();
@@ -131,10 +116,10 @@ mod tests {
         let hbase = minimal_hbase();
         let merged = master_merged_config(&hbase);
         let env = build(
-            &hbase,
             &merged,
             &HbaseRole::Master,
-            "default",
+            false,
+            "-Xtest".to_string(),
             config_overrides(&[("CUSTOM_VAR", "custom_value")]),
         )
         .unwrap();

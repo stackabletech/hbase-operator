@@ -5,7 +5,6 @@ use stackable_operator::{
     builder::{configmap::ConfigMapBuilder, meta::ObjectMetaBuilder},
     k8s_openapi::api::core::v1::ConfigMap,
     role_utils::RoleGroupRef,
-    utils::cluster_info::KubernetesClusterInfo,
 };
 
 use crate::{
@@ -22,9 +21,6 @@ use crate::{
 pub enum Error {
     #[snafu(display("the validated cluster has no role group {role_group:?} for role {role:?}"))]
     MissingRoleGroup { role: String, role_group: String },
-
-    #[snafu(display("failed to build hbase-site.xml"))]
-    BuildHbaseSite { source: hbase_site::Error },
 
     #[snafu(display("failed to build hbase-env.sh"))]
     BuildHbaseEnv { source: hbase_env::Error },
@@ -62,10 +58,11 @@ pub enum Error {
 type Result<T, E = Error> = std::result::Result<T, E>;
 
 pub fn build_rolegroup_config_map(
+    // `hbase` is retained only for the ConfigMap ObjectMeta / owner reference; the rendered
+    // content comes entirely from `cluster`. To be decoupled in a follow-up.
     hbase: &v1alpha1::HbaseCluster,
     cluster: &ValidatedCluster,
     role: &HbaseRole,
-    cluster_info: &KubernetesClusterInfo,
     rolegroup_ref: &RoleGroupRef<v1alpha1::HbaseCluster>,
 ) -> Result<ConfigMap> {
     tracing::info!("Setting up ConfigMap for {:?}", rolegroup_ref);
@@ -83,29 +80,33 @@ pub fn build_rolegroup_config_map(
     let overrides = &rg.config_overrides;
 
     let hbase_site_xml = hbase_site::build(
-        hbase,
         role,
-        cluster_info,
         &rg.merged_config,
         cluster_config
             .zookeeper_connection_information
             .as_hbase_settings(),
+        cluster_config.hbase_site_kerberos_config.clone(),
         cluster_config.hbase_opa_config.as_ref(),
         overrides.hbase_site_xml.clone(),
-    )
-    .context(BuildHbaseSiteSnafu)?;
+    );
 
     let hbase_env_sh = hbase_env::build(
-        hbase,
         &rg.merged_config,
         role,
-        &rolegroup_ref.role_group,
+        cluster_config.kerberos_enabled,
+        rg.non_heap_jvm_args.clone(),
         overrides.hbase_env_sh.clone(),
     )
     .context(BuildHbaseEnvSnafu)?;
 
-    let ssl_server_xml = ssl_server::build(hbase, overrides.ssl_server_xml.clone());
-    let ssl_client_xml = ssl_client::build(hbase, overrides.ssl_client_xml.clone());
+    let ssl_server_xml = ssl_server::build(
+        cluster_config.ssl_server_settings.clone(),
+        overrides.ssl_server_xml.clone(),
+    );
+    let ssl_client_xml = ssl_client::build(
+        cluster_config.ssl_client_settings.clone(),
+        overrides.ssl_client_xml.clone(),
+    );
 
     let security_properties = security_properties::build(role, overrides.security_properties.clone())
         .with_context(|_| JvmSecurityPropertiesSnafu {

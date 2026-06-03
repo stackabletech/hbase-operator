@@ -52,7 +52,7 @@ use stackable_operator::{
     },
     v2::types::operator::ClusterName,
 };
-use strum::{EnumDiscriminants, IntoStaticStr, ParseError};
+use strum::{EnumDiscriminants, IntoStaticStr};
 
 use crate::{
     OPERATOR_NAME,
@@ -107,6 +107,13 @@ pub struct ValidatedCluster {
 pub struct ValidatedClusterConfig {
     pub zookeeper_connection_information: ZookeeperConnectionInformation,
     pub hbase_opa_config: Option<HbaseOpaConfig>,
+    pub kerberos_enabled: bool,
+    /// Pre-resolved kerberos properties for hbase-site.xml (empty when kerberos is disabled).
+    pub hbase_site_kerberos_config: BTreeMap<String, String>,
+    /// Pre-resolved ssl-server.xml settings (empty when HTTPS is disabled).
+    pub ssl_server_settings: BTreeMap<String, String>,
+    /// Pre-resolved ssl-client.xml settings (empty when HTTPS is disabled).
+    pub ssl_client_settings: BTreeMap<String, String>,
 }
 
 /// Per-role configuration extracted during validation.
@@ -122,6 +129,8 @@ pub struct ValidatedRoleGroupConfig {
     pub merged_config: AnyServiceConfig,
     pub config_overrides: v1alpha1::HbaseConfigOverrides,
     pub env_overrides: BTreeMap<String, String>,
+    /// Pre-resolved role-specific non-heap JVM args (operator-generated + role/role-group overrides).
+    pub non_heap_jvm_args: String,
 }
 
 #[derive(Snafu, Debug, EnumDiscriminants)]
@@ -176,12 +185,6 @@ pub enum Error {
         source: stackable_operator::builder::meta::Error,
     },
 
-    #[snafu(display("no configmap_name for {cm_name} discovery is configured"))]
-    MissingConfigMap {
-        source: stackable_operator::builder::meta::Error,
-        cm_name: String,
-    },
-
     #[snafu(display("failed to patch service account"))]
     ApplyServiceAccount {
         source: stackable_operator::cluster_resources::Error,
@@ -225,9 +228,6 @@ pub enum Error {
     ObjectMeta {
         source: stackable_operator::builder::meta::Error,
     },
-
-    #[snafu(display("unknown role [{role}]"))]
-    UnknownHbaseRole { source: ParseError, role: String },
 
     #[snafu(display("failed to configure logging"))]
     ConfigureLogging { source: LoggingError },
@@ -293,9 +293,10 @@ pub async fn reconcile_hbase(
         .await
         .context(DereferenceSnafu)?;
 
-    let validated = crate::controller::validate::validate_cluster(
+    let validated_cluster = crate::controller::validate::validate_cluster(
         hbase,
         &ctx.operator_environment.image_repository,
+        &client.kubernetes_cluster_info,
         dereferenced_objects,
     )
     .context(ValidateSnafu)?;
@@ -329,21 +330,24 @@ pub async fn reconcile_hbase(
 
     let mut ss_cond_builder = StatefulSetConditionBuilder::default();
 
-    for (hbase_role, role_group_configs) in &validated.role_group_configs {
+    for (hbase_role, role_group_configs) in &validated_cluster.role_group_configs {
         for (rolegroup_name, validated_rg_config) in role_group_configs {
             let rolegroup = hbase.server_rolegroup_ref(hbase_role.to_string(), rolegroup_name);
 
             let rg_service =
-                build_rolegroup_service(hbase, hbase_role, &rolegroup, &validated.image)?;
+                build_rolegroup_service(hbase, hbase_role, &rolegroup, &validated_cluster.image)?;
 
-            let rg_metrics_service =
-                build_rolegroup_metrics_service(hbase, hbase_role, &rolegroup, &validated.image)?;
+            let rg_metrics_service = build_rolegroup_metrics_service(
+                hbase,
+                hbase_role,
+                &rolegroup,
+                &validated_cluster.image,
+            )?;
 
             let rg_configmap = crate::controller::build::config_map::build_rolegroup_config_map(
                 hbase,
-                &validated,
+                &validated_cluster,
                 hbase_role,
-                &client.kubernetes_cluster_info,
                 &rolegroup,
             )
             .context(BuildRolegroupConfigMapSnafu)?;
@@ -352,7 +356,7 @@ pub async fn reconcile_hbase(
                 hbase_role,
                 &rolegroup,
                 validated_rg_config,
-                &validated.image,
+                &validated_cluster.image,
                 &rbac_sa,
             )?;
             cluster_resources
@@ -387,7 +391,7 @@ pub async fn reconcile_hbase(
             );
         }
 
-        if let Some(role_config) = validated.role_configs.get(hbase_role) {
+        if let Some(role_config) = validated_cluster.role_configs.get(hbase_role) {
             add_pdbs(
                 &role_config.pdb,
                 hbase,
@@ -405,8 +409,10 @@ pub async fn reconcile_hbase(
     let discovery_cm = build_discovery_configmap(
         hbase,
         &client.kubernetes_cluster_info,
-        &validated.cluster_config.zookeeper_connection_information,
-        &validated.image,
+        &validated_cluster
+            .cluster_config
+            .zookeeper_connection_information,
+        &validated_cluster.image,
     )
     .context(BuildDiscoveryConfigMapSnafu)?;
     cluster_resources

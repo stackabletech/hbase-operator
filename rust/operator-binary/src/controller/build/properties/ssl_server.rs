@@ -3,19 +3,12 @@ use std::collections::BTreeMap;
 
 use stackable_operator::v2::config_overrides::KeyValueConfigOverrides;
 
-use crate::{
-    config::writer::to_hadoop_xml, controller::build::properties::resolved_overrides,
-    crd::v1alpha1, kerberos::kerberos_ssl_server_settings,
-};
+use crate::{config::writer::to_hadoop_xml, controller::build::properties::resolved_overrides};
 
 /// Renders `ssl-server.xml`. Returns "" (HBase rejects empty XML files) when empty.
-pub fn build(hbase: &v1alpha1::HbaseCluster, overrides: KeyValueConfigOverrides) -> String {
+pub fn build(settings: BTreeMap<String, String>, overrides: KeyValueConfigOverrides) -> String {
     let mut config: BTreeMap<String, Option<String>> = BTreeMap::new();
-    config.extend(
-        kerberos_ssl_server_settings(hbase)
-            .into_iter()
-            .map(|(k, v)| (k, Some(v))),
-    );
+    config.extend(settings.into_iter().map(|(k, v)| (k, Some(v))));
     config.extend(resolved_overrides(overrides).map(|(k, v)| (k, Some(v))));
     if config.is_empty() {
         return String::new();
@@ -26,17 +19,32 @@ pub fn build(hbase: &v1alpha1::HbaseCluster, overrides: KeyValueConfigOverrides)
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::controller::build::properties::test_support::{config_overrides, minimal_hbase};
+    use crate::controller::build::properties::test_support::config_overrides;
 
     #[test]
-    fn non_kerberos_without_overrides_renders_empty_string() {
-        assert_eq!(build(&minimal_hbase(), config_overrides(&[])), "");
+    fn empty_settings_without_overrides_renders_empty_string() {
+        assert_eq!(build(BTreeMap::new(), config_overrides(&[])), "");
+    }
+
+    #[test]
+    fn settings_appear_in_xml() {
+        let xml = build(
+            BTreeMap::from([(
+                "ssl.server.keystore.type".to_string(),
+                "pkcs12".to_string(),
+            )]),
+            config_overrides(&[]),
+        );
+        assert!(
+            xml.contains("<name>ssl.server.keystore.type</name>\n    <value>pkcs12</value>"),
+            "{xml}"
+        );
     }
 
     #[test]
     fn user_override_appears_in_xml() {
         let xml = build(
-            &minimal_hbase(),
+            BTreeMap::new(),
             config_overrides(&[("ssl.server.keystore.type", "jks")]),
         );
         assert!(

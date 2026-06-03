@@ -61,10 +61,7 @@ mod tests {
 
 #[cfg(test)]
 pub(crate) mod test_support {
-    use stackable_operator::{
-        commons::networking::DomainName, utils::cluster_info::KubernetesClusterInfo,
-        v2::config_overrides::KeyValueConfigOverrides,
-    };
+    use stackable_operator::v2::config_overrides::KeyValueConfigOverrides;
 
     use crate::crd::v1alpha1;
 
@@ -108,11 +105,5 @@ spec:
 
     pub fn minimal_hbase() -> v1alpha1::HbaseCluster {
         serde_yaml::from_str(MINIMAL_HBASE_YAML).expect("invalid test HbaseCluster YAML")
-    }
-
-    pub fn cluster_info() -> KubernetesClusterInfo {
-        KubernetesClusterInfo {
-            cluster_domain: DomainName::try_from("cluster.local").unwrap(),
-        }
     }
 }

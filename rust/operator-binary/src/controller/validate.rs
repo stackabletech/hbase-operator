@@ -6,16 +6,21 @@ use stackable_operator::{
     config::merge::Merge,
     kube::ResourceExt,
     role_utils::GenericRoleConfig,
+    utils::cluster_info::KubernetesClusterInfo,
     v2::types::operator::ClusterName,
 };
 use strum::IntoEnumIterator;
 
 use crate::{
+    config::jvm::construct_role_specific_non_heap_jvm_args,
     controller::dereference::DereferencedObjects,
     crd::{HbaseRole, v1alpha1},
     hbase_controller::{
         CONTAINER_IMAGE_BASE_NAME, ValidatedCluster, ValidatedClusterConfig, ValidatedRoleConfig,
         ValidatedRoleGroupConfig,
+    },
+    kerberos::{
+        self, kerberos_config_properties, kerberos_ssl_client_settings, kerberos_ssl_server_settings,
     },
 };
 
@@ -36,11 +41,18 @@ pub enum Error {
 
     #[snafu(display("failed to resolve and merge config for role and role group"))]
     FailedToResolveConfig { source: crate::crd::Error },
+
+    #[snafu(display("failed to resolve kerberos config"))]
+    AddKerberosConfig { source: kerberos::Error },
+
+    #[snafu(display("failed to construct role-specific JVM arguments"))]
+    ConstructJvmArgument { source: crate::config::jvm::Error },
 }
 
 pub fn validate_cluster(
     hbase: &v1alpha1::HbaseCluster,
     image_repository: &str,
+    cluster_info: &KubernetesClusterInfo,
     dereferenced_objects: DereferencedObjects,
 ) -> Result<ValidatedCluster, Error> {
     let resolved_product_image = hbase
@@ -96,12 +108,23 @@ pub fn validate_cluster(
                     merged_config,
                     config_overrides: merged_config_overrides(hbase, &hbase_role, &rolegroup_name),
                     env_overrides: merged_env_overrides(hbase, &hbase_role, &rolegroup_name),
+                    non_heap_jvm_args: construct_role_specific_non_heap_jvm_args(
+                        hbase,
+                        &hbase_role,
+                        &rolegroup_name,
+                    )
+                    .context(ConstructJvmArgumentSnafu)?,
                 },
             );
         }
 
         role_groups.insert(hbase_role, group_configs);
     }
+
+    let hbase_site_kerberos_config =
+        kerberos_config_properties(hbase, cluster_info).context(AddKerberosConfigSnafu)?;
+    let ssl_server_settings = kerberos_ssl_server_settings(hbase);
+    let ssl_client_settings = kerberos_ssl_client_settings(hbase);
 
     Ok(ValidatedCluster {
         name: ClusterName::from_str(&hbase.name_any()).context(InvalidClusterNameSnafu)?,
@@ -110,6 +133,10 @@ pub fn validate_cluster(
             zookeeper_connection_information: dereferenced_objects
                 .zookeeper_connection_information,
             hbase_opa_config: dereferenced_objects.hbase_opa_config,
+            kerberos_enabled: hbase.has_kerberos_enabled(),
+            hbase_site_kerberos_config,
+            ssl_server_settings,
+            ssl_client_settings,
         },
         role_group_configs: role_groups,
         role_configs,

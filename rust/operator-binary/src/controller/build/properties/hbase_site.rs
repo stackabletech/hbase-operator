@@ -4,39 +4,28 @@
 
 use std::collections::BTreeMap;
 
-use snafu::{ResultExt, Snafu};
-use stackable_operator::{
-    utils::cluster_info::KubernetesClusterInfo, v2::config_overrides::KeyValueConfigOverrides,
-};
+use stackable_operator::v2::config_overrides::KeyValueConfigOverrides;
 
 use crate::{
     config::writer::to_hadoop_xml,
     controller::build::properties::resolved_overrides,
     crd::{
         AnyServiceConfig, HBASE_CLUSTER_DISTRIBUTED, HBASE_MASTER_PORT, HBASE_MASTER_UI_PORT,
-        HBASE_REGIONSERVER_PORT, HBASE_REGIONSERVER_UI_PORT, HBASE_ROOTDIR, HbaseRole, v1alpha1,
+        HBASE_REGIONSERVER_PORT, HBASE_REGIONSERVER_UI_PORT, HBASE_ROOTDIR, HbaseRole,
     },
-    kerberos::{self, kerberos_config_properties},
     security::opa::HbaseOpaConfig,
 };
-
-#[derive(Snafu, Debug)]
-pub enum Error {
-    #[snafu(display("failed to add the kerberos configuration"))]
-    AddKerberosConfig { source: kerberos::Error },
-}
 
 /// Renders `hbase-site.xml`.
 #[allow(clippy::too_many_arguments)]
 pub fn build(
-    hbase: &v1alpha1::HbaseCluster,
     role: &HbaseRole,
-    cluster_info: &KubernetesClusterInfo,
     merged_config: &AnyServiceConfig,
     zookeeper_config: BTreeMap<String, String>,
+    kerberos_config: BTreeMap<String, String>,
     opa_config: Option<&HbaseOpaConfig>,
     overrides: KeyValueConfigOverrides,
-) -> Result<String, Error> {
+) -> String {
     let mut config: BTreeMap<String, String> = BTreeMap::new();
 
     // Defaults previously injected by product-config's `compute_files`.
@@ -46,7 +35,7 @@ pub fn build(
     }
 
     config.extend(zookeeper_config);
-    config.extend(kerberos_config_properties(hbase, cluster_info).context(AddKerberosConfigSnafu)?);
+    config.extend(kerberos_config);
     config.extend(opa_config.map_or(vec![], |config| config.hbase_site_config()));
 
     // Set flag to override default behaviour, which is that the
@@ -124,20 +113,21 @@ pub fn build(
     // configOverride come last
     config.extend(resolved_overrides(overrides));
 
-    Ok(to_hadoop_xml(
+    to_hadoop_xml(
         config
             .into_iter()
             .map(|(k, v)| (k, Some(v)))
             .collect::<BTreeMap<_, _>>()
             .iter(),
-    ))
+    )
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::controller::build::properties::test_support::{
-        cluster_info, config_overrides, minimal_hbase,
+    use crate::{
+        controller::build::properties::test_support::{config_overrides, minimal_hbase},
+        crd::v1alpha1,
     };
 
     fn master_merged_config(hbase: &v1alpha1::HbaseCluster) -> AnyServiceConfig {
@@ -163,15 +153,13 @@ mod tests {
         let hbase = minimal_hbase();
         let merged = master_merged_config(&hbase);
         let xml = build(
-            &hbase,
             &HbaseRole::Master,
-            &cluster_info(),
             &merged,
+            BTreeMap::new(),
             BTreeMap::new(),
             None,
             config_overrides(&[]),
-        )
-        .unwrap();
+        );
         assert!(
             xml.contains("<name>hbase.cluster.distributed</name>\n    <value>true</value>"),
             "{xml}"
@@ -187,15 +175,13 @@ mod tests {
         let hbase = minimal_hbase();
         let merged = region_server_merged_config(&hbase);
         let xml = build(
-            &hbase,
             &HbaseRole::RegionServer,
-            &cluster_info(),
             &merged,
+            BTreeMap::new(),
             BTreeMap::new(),
             None,
             config_overrides(&[]),
-        )
-        .unwrap();
+        );
         assert!(
             xml.contains(
                 "<name>hbase.regionserver.ipc.address</name>\n    <value>0.0.0.0</value>"
@@ -215,15 +201,13 @@ mod tests {
         let hbase = minimal_hbase();
         let merged = rest_server_merged_config(&hbase);
         let xml = build(
-            &hbase,
             &HbaseRole::RestServer,
-            &cluster_info(),
             &merged,
+            BTreeMap::new(),
             BTreeMap::new(),
             None,
             config_overrides(&[]),
-        )
-        .unwrap();
+        );
         assert!(
             xml.contains(
                 "<name>hbase.rest.endpoint</name>\n    <value>${env:HBASE_SERVICE_HOST}:${env:HBASE_SERVICE_PORT}</value>"
@@ -237,15 +221,13 @@ mod tests {
         let hbase = minimal_hbase();
         let merged = master_merged_config(&hbase);
         let xml = build(
-            &hbase,
             &HbaseRole::Master,
-            &cluster_info(),
             &merged,
+            BTreeMap::new(),
             BTreeMap::new(),
             None,
             config_overrides(&[("hbase.cluster.distributed", "false")]),
-        )
-        .unwrap();
+        );
         assert!(
             xml.contains("<name>hbase.cluster.distributed</name>\n    <value>false</value>"),
             "{xml}"
