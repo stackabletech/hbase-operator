@@ -1289,6 +1289,16 @@ impl AnyServiceConfig {
         }
     }
 
+    /// The configured `hbase.rootdir`, if any. Previously injected into
+    /// `hbase-site.xml` via product-config's `compute_files`.
+    pub fn hbase_rootdir(&self) -> Option<String> {
+        match self {
+            AnyServiceConfig::Master(config) => config.hbase_rootdir.clone(),
+            AnyServiceConfig::RegionServer(config) => config.hbase_rootdir.clone(),
+            AnyServiceConfig::RestServer(config) => config.hbase_rootdir.clone(),
+        }
+    }
+
     /// Returns command line arguments to pass on to the region mover tool.
     /// The following arguments are excluded because they are already part of the
     /// hbase-entrypoint.sh script.

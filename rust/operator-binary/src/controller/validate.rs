@@ -130,7 +130,6 @@ pub fn validate_cluster(
             zookeeper_connection_information: dereferenced_objects
                 .zookeeper_connection_information,
             hbase_opa_config: dereferenced_objects.hbase_opa_config,
-            kerberos_enabled: hbase.has_kerberos_enabled(),
         },
         role_group_configs: role_groups,
         role_configs,

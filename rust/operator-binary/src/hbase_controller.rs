@@ -129,9 +129,6 @@ pub struct ValidatedCluster {
 pub struct ValidatedClusterConfig {
     pub zookeeper_connection_information: ZookeeperConnectionInformation,
     pub hbase_opa_config: Option<HbaseOpaConfig>,
-    // Populated now; consumed by the new build path in a later commit.
-    #[allow(dead_code)]
-    pub kerberos_enabled: bool,
 }
 
 /// Per-role configuration extracted during validation.
@@ -148,8 +145,6 @@ pub struct ValidatedRoleConfig {
 #[derive(Clone, Debug)]
 pub struct ValidatedRoleGroupConfig {
     pub merged_config: AnyServiceConfig,
-    // Populated now; consumed by the new build path in a later commit.
-    #[allow(dead_code)]
     pub config_overrides: v1alpha1::HbaseConfigOverrides,
     // Populated now; consumed by the new build path in a later commit.
     #[allow(dead_code)]
