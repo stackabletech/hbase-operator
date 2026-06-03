@@ -183,9 +183,7 @@ mod tests {
             config_overrides(&[]),
         );
         assert!(
-            xml.contains(
-                "<name>hbase.regionserver.ipc.address</name>\n    <value>0.0.0.0</value>"
-            ),
+            xml.contains("<name>hbase.regionserver.ipc.address</name>\n    <value>0.0.0.0</value>"),
             "{xml}"
         );
         assert!(

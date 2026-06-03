@@ -58,12 +58,12 @@ pub enum Error {
 type Result<T, E = Error> = std::result::Result<T, E>;
 
 pub fn build_rolegroup_config_map(
-    // `hbase` is retained only for the ConfigMap ObjectMeta / owner reference; the rendered
-    // content comes entirely from `cluster`. To be decoupled in a follow-up.
-    hbase: &v1alpha1::HbaseCluster,
     cluster: &ValidatedCluster,
     role: &HbaseRole,
     rolegroup_ref: &RoleGroupRef<v1alpha1::HbaseCluster>,
+    // `owner` is retained only for the ConfigMap ObjectMeta / owner reference; the rendered
+    // content comes entirely from `cluster`. To be decoupled in a follow-up.
+    owner_ref: &v1alpha1::HbaseCluster,
 ) -> Result<ConfigMap> {
     tracing::info!("Setting up ConfigMap for {:?}", rolegroup_ref);
 
@@ -108,18 +108,20 @@ pub fn build_rolegroup_config_map(
         overrides.ssl_client_xml.clone(),
     );
 
-    let security_properties = security_properties::build(role, overrides.security_properties.clone())
-        .with_context(|_| JvmSecurityPropertiesSnafu {
-            role_group: rolegroup_ref.role_group.clone(),
-        })?;
+    let security_properties =
+        security_properties::build(role, overrides.security_properties.clone()).with_context(
+            |_| JvmSecurityPropertiesSnafu {
+                role_group: rolegroup_ref.role_group.clone(),
+            },
+        )?;
 
     let cm_metadata = ObjectMetaBuilder::new()
-        .name_and_namespace(hbase)
+        .name_and_namespace(owner_ref)
         .name(rolegroup_ref.object_name())
-        .ownerreference_from_resource(hbase, None, Some(true))
+        .ownerreference_from_resource(owner_ref, None, Some(true))
         .context(ObjectMissingMetadataForOwnerRefSnafu)?
         .with_recommended_labels(&build_recommended_labels(
-            hbase,
+            owner_ref,
             &cluster.image.app_version_label_value,
             &rolegroup_ref.role,
             &rolegroup_ref.role_group,
@@ -143,10 +145,11 @@ pub fn build_rolegroup_config_map(
         builder.add_data(ConfigFileName::SslClient.to_string(), ssl_client_xml);
     }
 
-    extend_role_group_config_map(rolegroup_ref, rg.merged_config.logging(), &mut builder)
-        .context(InvalidLoggingConfigSnafu {
+    extend_role_group_config_map(rolegroup_ref, rg.merged_config.logging(), &mut builder).context(
+        InvalidLoggingConfigSnafu {
             cm_name: rolegroup_ref.object_name(),
-        })?;
+        },
+    )?;
 
     builder.build().with_context(|_| AssembleSnafu {
         role: rolegroup_ref.role.clone(),

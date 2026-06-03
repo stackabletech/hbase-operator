@@ -123,9 +123,6 @@ mod tests {
             config_overrides(&[("CUSTOM_VAR", "custom_value")]),
         )
         .unwrap();
-        assert!(
-            env.contains("export CUSTOM_VAR=\"custom_value\""),
-            "{env}"
-        );
+        assert!(env.contains("export CUSTOM_VAR=\"custom_value\""), "{env}");
     }
 }

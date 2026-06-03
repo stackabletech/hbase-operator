@@ -345,10 +345,10 @@ pub async fn reconcile_hbase(
             )?;
 
             let rg_configmap = crate::controller::build::config_map::build_rolegroup_config_map(
-                hbase,
                 &validated_cluster,
                 hbase_role,
                 &rolegroup,
+                hbase,
             )
             .context(BuildRolegroupConfigMapSnafu)?;
             let rg_statefulset = build_rolegroup_statefulset(

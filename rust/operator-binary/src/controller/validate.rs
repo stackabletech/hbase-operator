@@ -20,7 +20,8 @@ use crate::{
         ValidatedRoleGroupConfig,
     },
     kerberos::{
-        self, kerberos_config_properties, kerberos_ssl_client_settings, kerberos_ssl_server_settings,
+        self, kerberos_config_properties, kerberos_ssl_client_settings,
+        kerberos_ssl_server_settings,
     },
 };
 
@@ -130,8 +131,7 @@ pub fn validate_cluster(
         name: ClusterName::from_str(&hbase.name_any()).context(InvalidClusterNameSnafu)?,
         image: resolved_product_image,
         cluster_config: ValidatedClusterConfig {
-            zookeeper_connection_information: dereferenced_objects
-                .zookeeper_connection_information,
+            zookeeper_connection_information: dereferenced_objects.zookeeper_connection_information,
             hbase_opa_config: dereferenced_objects.hbase_opa_config,
             kerberos_enabled: hbase.has_kerberos_enabled(),
             hbase_site_kerberos_config,
@@ -334,7 +334,10 @@ spec:
 
         let env_overrides = merged_env_overrides(&hbase, &HbaseRole::Master, "default");
 
-        assert_eq!(env_overrides.get("TEST_VAR"), Some(&"MASTER_RG".to_string()));
+        assert_eq!(
+            env_overrides.get("TEST_VAR"),
+            Some(&"MASTER_RG".to_string())
+        );
         assert_eq!(
             env_overrides.get("TEST_VAR_FROM_MASTER"),
             Some(&"MASTER".to_string())

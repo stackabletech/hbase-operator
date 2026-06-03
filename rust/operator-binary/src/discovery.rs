@@ -1,6 +1,5 @@
 use std::collections::BTreeMap;
 
-use crate::config::writer::to_hadoop_xml;
 use snafu::{ResultExt, Snafu};
 use stackable_operator::{
     builder::{configmap::ConfigMapBuilder, meta::ObjectMetaBuilder},
@@ -11,6 +10,7 @@ use stackable_operator::{
 };
 
 use crate::{
+    config::writer::to_hadoop_xml,
     crd::{HBASE_SITE_XML, HbaseRole, v1alpha1},
     hbase_controller::build_recommended_labels,
     kerberos::{self, kerberos_discovery_config_properties},

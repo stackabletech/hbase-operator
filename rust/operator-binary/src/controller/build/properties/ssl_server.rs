@@ -29,10 +29,7 @@ mod tests {
     #[test]
     fn settings_appear_in_xml() {
         let xml = build(
-            BTreeMap::from([(
-                "ssl.server.keystore.type".to_string(),
-                "pkcs12".to_string(),
-            )]),
+            BTreeMap::from([("ssl.server.keystore.type".to_string(), "pkcs12".to_string())]),
             config_overrides(&[]),
         );
         assert!(
