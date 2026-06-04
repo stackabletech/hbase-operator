@@ -1,0 +1,40 @@
+---
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 60
+commands:
+  #
+  # ConfigMap data snapshot: test-hbase-master-default
+  #
+  - script: |
+      export ZNODE_PATH=$(kubectl -n $NAMESPACE get zookeeperznode test-znode -o jsonpath='{.status.znodePath}')
+      envsubst '$NAMESPACE $ZNODE_PATH' < 32_cm-test-hbase-master-default.yaml > /tmp/$NAMESPACE-expected.yaml
+      kubectl -n $NAMESPACE get cm test-hbase-master-default -o yaml | yq '.data' > /tmp/$NAMESPACE-actual.yaml
+      if ! diff /tmp/$NAMESPACE-expected.yaml /tmp/$NAMESPACE-actual.yaml; then
+        echo "ERROR: ConfigMap test-hbase-master-default data drifted from snapshot."
+        exit 1
+      fi
+
+  #
+  # ConfigMap data snapshot: test-hbase-regionserver-default
+  #
+  - script: |
+      export ZNODE_PATH=$(kubectl -n $NAMESPACE get zookeeperznode test-znode -o jsonpath='{.status.znodePath}')
+      envsubst '$NAMESPACE $ZNODE_PATH' < 32_cm-test-hbase-regionserver-default.yaml > /tmp/$NAMESPACE-expected.yaml
+      kubectl -n $NAMESPACE get cm test-hbase-regionserver-default -o yaml | yq '.data' > /tmp/$NAMESPACE-actual.yaml
+      if ! diff /tmp/$NAMESPACE-expected.yaml /tmp/$NAMESPACE-actual.yaml; then
+        echo "ERROR: ConfigMap test-hbase-regionserver-default data drifted from snapshot."
+        exit 1
+      fi
+
+  #
+  # ConfigMap data snapshot: test-hbase-restserver-default
+  #
+  - script: |
+      export ZNODE_PATH=$(kubectl -n $NAMESPACE get zookeeperznode test-znode -o jsonpath='{.status.znodePath}')
+      envsubst '$NAMESPACE $ZNODE_PATH' < 32_cm-test-hbase-restserver-default.yaml > /tmp/$NAMESPACE-expected.yaml
+      kubectl -n $NAMESPACE get cm test-hbase-restserver-default -o yaml | yq '.data' > /tmp/$NAMESPACE-actual.yaml
+      if ! diff /tmp/$NAMESPACE-expected.yaml /tmp/$NAMESPACE-actual.yaml; then
+        echo "ERROR: ConfigMap test-hbase-restserver-default data drifted from snapshot."
+        exit 1
+      fi

@@ -60,6 +60,7 @@ pub const JVM_SECURITY_PROPERTIES_FILE: &str = "security.properties";
 
 pub const HBASE_CLUSTER_DISTRIBUTED: &str = "hbase.cluster.distributed";
 pub const HBASE_ROOTDIR: &str = "hbase.rootdir";
+const DEFAULT_HBASE_ROOTDIR: &str = "/hbase";
 
 const HBASE_UI_PORT_NAME_HTTP: &str = "ui-http";
 const HBASE_UI_PORT_NAME_HTTPS: &str = "ui-https";
@@ -86,6 +87,10 @@ const DEFAULT_REGION_MOVER_TIMEOUT: Duration = Duration::from_minutes_unchecked(
 const DEFAULT_REGION_MOVER_DELTA_TO_SHUTDOWN: Duration = Duration::from_minutes_unchecked(1);
 
 const DEFAULT_LISTENER_CLASS: &str = "cluster-internal";
+
+fn default_hbase_rootdir() -> String {
+    DEFAULT_HBASE_ROOTDIR.to_string()
+}
 
 pub type MasterRoleType =
     Role<HbaseConfigFragment, v1alpha1::HbaseConfigOverrides, GenericRoleConfig, JavaCommonConfig>;
@@ -593,7 +598,7 @@ impl HbaseRole {
         };
 
         HbaseConfigFragment {
-            hbase_rootdir: None,
+            hbase_rootdir: Some(default_hbase_rootdir()),
             resources,
             logging: product_logging::spec::default_logging(),
             affinity: get_affinity(cluster_name, self, hdfs_discovery_cm_name),
@@ -796,7 +801,7 @@ impl AnyConfigFragment {
         match role {
             HbaseRole::RegionServer => {
                 AnyConfigFragment::RegionServer(RegionServerConfigFragment {
-                    hbase_rootdir: None,
+                    hbase_rootdir: Some(default_hbase_rootdir()),
                     resources: default_resources(role),
                     logging: product_logging::spec::default_logging(),
                     affinity: get_affinity(cluster_name, role, hdfs_discovery_cm_name),
@@ -814,7 +819,7 @@ impl AnyConfigFragment {
                 })
             }
             HbaseRole::RestServer => AnyConfigFragment::RestServer(HbaseConfigFragment {
-                hbase_rootdir: None,
+                hbase_rootdir: Some(default_hbase_rootdir()),
                 resources: default_resources(role),
                 logging: product_logging::spec::default_logging(),
                 affinity: get_affinity(cluster_name, role, hdfs_discovery_cm_name),
@@ -825,7 +830,7 @@ impl AnyConfigFragment {
                 listener_class: Some(DEFAULT_LISTENER_CLASS.to_string()),
             }),
             HbaseRole::Master => AnyConfigFragment::Master(HbaseConfigFragment {
-                hbase_rootdir: None,
+                hbase_rootdir: Some(default_hbase_rootdir()),
                 resources: default_resources(role),
                 logging: product_logging::spec::default_logging(),
                 affinity: get_affinity(cluster_name, role, hdfs_discovery_cm_name),
@@ -891,8 +896,9 @@ pub enum Container {
     serde(rename_all = "camelCase")
 )]
 pub struct HbaseConfig {
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub hbase_rootdir: Option<String>,
+    /// Root directory for Hbase on the filesystem (usually a path in HDFS). Default is `/hbase`.
+    #[serde(default = "default_hbase_rootdir")]
+    pub hbase_rootdir: String,
 
     #[fragment_attrs(serde(default))]
     pub resources: Resources<HbaseStorageConfig, NoRuntimeLimits>,
@@ -971,8 +977,8 @@ impl Atomic for RegionMoverExtraCliOpts {}
     serde(rename_all = "camelCase")
 )]
 pub struct RegionServerConfig {
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub hbase_rootdir: Option<String>,
+    #[serde(default = "default_hbase_rootdir")]
+    pub hbase_rootdir: String,
     #[fragment_attrs(serde(default))]
     pub resources: Resources<HbaseStorageConfig, NoRuntimeLimits>,
     #[fragment_attrs(serde(default))]
@@ -1064,9 +1070,9 @@ impl AnyServiceConfig {
         }
     }
 
-    /// The configured `hbase.rootdir`, if any. Previously injected into
+    /// The configured `hbase.rootdir`. Previously injected into
     /// `hbase-site.xml` via product-config's `compute_files`.
-    pub fn hbase_rootdir(&self) -> Option<String> {
+    pub fn hbase_rootdir(&self) -> String {
         match self {
             AnyServiceConfig::Master(config) => config.hbase_rootdir.clone(),
             AnyServiceConfig::RegionServer(config) => config.hbase_rootdir.clone(),

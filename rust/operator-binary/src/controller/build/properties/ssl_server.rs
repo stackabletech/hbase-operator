@@ -5,14 +5,11 @@ use stackable_operator::v2::config_overrides::KeyValueConfigOverrides;
 
 use crate::{config::writer::to_hadoop_xml, controller::build::properties::resolved_overrides};
 
-/// Renders `ssl-server.xml`. Returns "" (HBase rejects empty XML files) when empty.
+/// Renders `ssl-server.xml`.
 pub fn build(settings: BTreeMap<String, String>, overrides: KeyValueConfigOverrides) -> String {
     let mut config: BTreeMap<String, Option<String>> = BTreeMap::new();
     config.extend(settings.into_iter().map(|(k, v)| (k, Some(v))));
     config.extend(resolved_overrides(overrides).map(|(k, v)| (k, Some(v))));
-    if config.is_empty() {
-        return String::new();
-    }
     to_hadoop_xml(config.iter())
 }
 
@@ -20,11 +17,6 @@ pub fn build(settings: BTreeMap<String, String>, overrides: KeyValueConfigOverri
 mod tests {
     use super::*;
     use crate::controller::build::properties::test_support::config_overrides;
-
-    #[test]
-    fn empty_settings_without_overrides_renders_empty_string() {
-        assert_eq!(build(BTreeMap::new(), config_overrides(&[])), "");
-    }
 
     #[test]
     fn settings_appear_in_xml() {

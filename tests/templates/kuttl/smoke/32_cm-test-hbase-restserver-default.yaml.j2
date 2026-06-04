@@ -1,0 +1,85 @@
+hbase-env.sh: |
+  export HBASE_HEAPSIZE="819m"
+  export HBASE_MANAGES_ZK="false"
+  export HBASE_OPTS=""
+  export HBASE_REST_OPTS="-Djava.security.properties=/stackable/conf/security.properties"
+hbase-site.xml: |-
+  <?xml version="1.0"?>
+  <configuration>
+    <property>
+      <name>hbase.client.rpc.bind.address</name>
+      <value>false</value>
+    </property>
+    <property>
+      <name>hbase.cluster.distributed</name>
+      <value>true</value>
+    </property>
+    <property>
+      <name>hbase.regionserver.wal.codec</name>
+      <value>org.apache.hadoop.hbase.regionserver.wal.IndexedWALEditCodec</value>
+    </property>
+    <property>
+      <name>hbase.rest.endpoint</name>
+      <value>${env:HBASE_SERVICE_HOST}:${env:HBASE_SERVICE_PORT}</value>
+    </property>
+    <property>
+      <name>hbase.rootdir</name>
+      <value>/hbase</value>
+    </property>
+    <property>
+      <name>hbase.zookeeper.property.clientPort</name>
+      <value>2282</value>
+    </property>
+    <property>
+      <name>hbase.zookeeper.quorum</name>
+      <value>test-zk-server.$NAMESPACE.svc.cluster.local:2282</value>
+    </property>
+    <property>
+      <name>phoenix.log.saltBuckets</name>
+      <value>2</value>
+    </property>
+    <property>
+      <name>zookeeper.znode.parent</name>
+      <value>$ZNODE_PATH/hbase</value>
+    </property>
+  </configuration>
+log4j2.properties: |-
+  appenders = FILE, CONSOLE
+
+  appender.CONSOLE.type = Console
+  appender.CONSOLE.name = CONSOLE
+  appender.CONSOLE.target = SYSTEM_ERR
+  appender.CONSOLE.layout.type = PatternLayout
+  appender.CONSOLE.layout.pattern = %d{ISO8601} %-5p [%t] %c{2}: %.1000m%n
+  appender.CONSOLE.filter.threshold.type = ThresholdFilter
+  appender.CONSOLE.filter.threshold.level = INFO
+
+  appender.FILE.type = RollingFile
+  appender.FILE.name = FILE
+  appender.FILE.fileName = /stackable/log/hbase/hbase.log4j2.xml
+  appender.FILE.filePattern = /stackable/log/hbase/hbase.log4j2.xml.%i
+  appender.FILE.layout.type = XMLLayout
+  appender.FILE.policies.type = Policies
+  appender.FILE.policies.size.type = SizeBasedTriggeringPolicy
+  appender.FILE.policies.size.size = 5MB
+  appender.FILE.strategy.type = DefaultRolloverStrategy
+  appender.FILE.strategy.max = 1
+  appender.FILE.filter.threshold.type = ThresholdFilter
+  appender.FILE.filter.threshold.level = INFO
+
+
+  rootLogger.level=INFO
+  rootLogger.appenderRefs = CONSOLE, FILE
+  rootLogger.appenderRef.CONSOLE.ref = CONSOLE
+  rootLogger.appenderRef.FILE.ref = FILE
+security.properties: |
+  networkaddress.cache.negative.ttl=0
+  networkaddress.cache.ttl=30
+ssl-client.xml: |-
+  <?xml version="1.0"?>
+  <configuration>
+  </configuration>
+ssl-server.xml: |-
+  <?xml version="1.0"?>
+  <configuration>
+  </configuration>

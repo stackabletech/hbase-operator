@@ -242,6 +242,7 @@ spec:
                         nullable: true
                         type: string
                       hbaseRootdir:
+                        description: Root directory for Hbase on the filesystem (usually a path in HDFS). Default is `/hbase`.
                         nullable: true
                         type: string
                       listenerClass:
@@ -687,6 +688,7 @@ spec:
                               nullable: true
                               type: string
                             hbaseRootdir:
+                              description: Root directory for Hbase on the filesystem (usually a path in HDFS). Default is `/hbase`.
                               nullable: true
                               type: string
                             listenerClass:
@@ -2054,6 +2056,7 @@ spec:
                         nullable: true
                         type: string
                       hbaseRootdir:
+                        description: Root directory for Hbase on the filesystem (usually a path in HDFS). Default is `/hbase`.
                         nullable: true
                         type: string
                       listenerClass:
@@ -2499,6 +2502,7 @@ spec:
                               nullable: true
                               type: string
                             hbaseRootdir:
+                              description: Root directory for Hbase on the filesystem (usually a path in HDFS). Default is `/hbase`.
                               nullable: true
                               type: string
                             listenerClass:

@@ -30,9 +30,7 @@ pub fn build(
 
     // Defaults previously injected by product-config's `compute_files`.
     config.insert(HBASE_CLUSTER_DISTRIBUTED.to_string(), "true".to_string());
-    if let Some(rootdir) = merged_config.hbase_rootdir() {
-        config.insert(HBASE_ROOTDIR.to_string(), rootdir);
-    }
+    config.insert(HBASE_ROOTDIR.to_string(), merged_config.hbase_rootdir());
 
     config.extend(zookeeper_config);
     config.extend(kerberos_config);
