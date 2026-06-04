@@ -43,7 +43,6 @@ mod crd;
 mod hbase_controller;
 mod kerberos;
 mod operations;
-mod product_logging;
 mod security;
 mod webhooks;
 mod zookeeper;

@@ -9,6 +9,7 @@ use stackable_operator::v2::config_overrides::KeyValueConfigOverrides;
 
 pub mod hbase_env;
 pub mod hbase_site;
+pub mod logging;
 pub mod security_properties;
 pub mod ssl_client;
 pub mod ssl_server;
@@ -43,6 +44,8 @@ pub enum ConfigFileName {
     SslClient,
     #[strum(serialize = "security.properties")]
     Security,
+    #[strum(serialize = "log4j2.properties")]
+    Log4j2,
 }
 
 #[cfg(test)]
@@ -56,6 +59,7 @@ mod tests {
         assert_eq!(ConfigFileName::SslServer.to_string(), "ssl-server.xml");
         assert_eq!(ConfigFileName::SslClient.to_string(), "ssl-client.xml");
         assert_eq!(ConfigFileName::Security.to_string(), "security.properties");
+        assert_eq!(ConfigFileName::Log4j2.to_string(), "log4j2.properties");
     }
 }
 

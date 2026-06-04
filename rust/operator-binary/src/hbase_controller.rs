@@ -63,7 +63,6 @@ use crate::{
     },
     kerberos::{self, add_kerberos_pod_config},
     operations::{graceful_shutdown::add_graceful_shutdown_config, pdb::add_pdbs},
-    product_logging::{CONTAINERDEBUG_LOG_DIRECTORY, STACKABLE_LOG_DIR},
     security::opa::HbaseOpaConfig,
     zookeeper::ZookeeperConnectionInformation,
 };
@@ -74,6 +73,10 @@ pub const MAX_HBASE_LOG_FILES_SIZE: MemoryQuantity = MemoryQuantity {
     value: 10.0,
     unit: BinaryMultiple::Mebi,
 };
+
+pub const STACKABLE_LOG_DIR: &str = "/stackable/log";
+pub static CONTAINERDEBUG_LOG_DIRECTORY: std::sync::LazyLock<String> =
+    std::sync::LazyLock::new(|| format!("{STACKABLE_LOG_DIR}/containerdebug"));
 
 // These constants are hard coded in hbase-entrypoint.sh
 // You need to change them there too.

@@ -10,11 +10,11 @@ use stackable_operator::{
 use crate::{
     config::writer::PropertiesWriterError,
     controller::build::properties::{
-        ConfigFileName, hbase_env, hbase_site, security_properties, ssl_client, ssl_server,
+        ConfigFileName, hbase_env, hbase_site, logging::extend_role_group_config_map,
+        security_properties, ssl_client, ssl_server,
     },
     crd::{HbaseRole, v1alpha1},
     hbase_controller::{ValidatedCluster, build_recommended_labels},
-    product_logging::extend_role_group_config_map,
 };
 
 #[derive(Snafu, Debug)]

@@ -11,16 +11,13 @@ use stackable_operator::{
 };
 
 use crate::{
+    controller::build::properties::ConfigFileName,
     crd::{Container, v1alpha1},
-    hbase_controller::MAX_HBASE_LOG_FILES_SIZE,
+    hbase_controller::{MAX_HBASE_LOG_FILES_SIZE, STACKABLE_LOG_DIR},
 };
 
 const CONSOLE_CONVERSION_PATTERN: &str = "%d{ISO8601} %-5p [%t] %c{2}: %.1000m%n";
 const HBASE_LOG4J2_FILE: &str = "hbase.log4j2.xml";
-pub const LOG4J2_CONFIG_FILE: &str = "log4j2.properties";
-pub const STACKABLE_LOG_DIR: &str = "/stackable/log";
-pub static CONTAINERDEBUG_LOG_DIRECTORY: std::sync::LazyLock<String> =
-    std::sync::LazyLock::new(|| format!("{STACKABLE_LOG_DIR}/containerdebug"));
 
 /// Extend the role group ConfigMap with logging and Vector configurations
 pub fn extend_role_group_config_map(
@@ -32,7 +29,7 @@ pub fn extend_role_group_config_map(
         choice: Some(ContainerLogConfigChoice::Automatic(log_config)),
     }) = logging.containers.get(&Container::Hbase)
     {
-        cm_builder.add_data(LOG4J2_CONFIG_FILE, log4j_config(log_config));
+        cm_builder.add_data(ConfigFileName::Log4j2.to_string(), log4j_config(log_config));
     }
 
     let vector_log_config = if let Some(ContainerLogConfig {
