@@ -56,11 +56,11 @@ use strum::{EnumDiscriminants, IntoStaticStr};
 
 use crate::{
     OPERATOR_NAME,
+    controller::build::discovery::build_discovery_config_map,
     crd::{
         APP_NAME, AnyServiceConfig, CONFIG_DIR_NAME, Container, HbaseClusterStatus, HbaseRole,
         LISTENER_VOLUME_DIR, LISTENER_VOLUME_NAME, merged_env, v1alpha1,
     },
-    discovery::build_discovery_configmap,
     kerberos::{self, add_kerberos_pod_config},
     operations::{graceful_shutdown::add_graceful_shutdown_config, pdb::add_pdbs},
     product_logging::{CONTAINERDEBUG_LOG_DIRECTORY, STACKABLE_LOG_DIR},
@@ -110,6 +110,9 @@ pub struct ValidatedClusterConfig {
     pub kerberos_enabled: bool,
     /// Pre-resolved kerberos properties for hbase-site.xml (empty when kerberos is disabled).
     pub hbase_site_kerberos_config: BTreeMap<String, String>,
+    /// Pre-resolved kerberos properties for the discovery `hbase-site.xml` exposed to clients
+    /// (empty when kerberos is disabled).
+    pub discovery_kerberos_config: BTreeMap<String, String>,
     /// Pre-resolved ssl-server.xml settings (empty when HTTPS is disabled).
     pub ssl_server_settings: BTreeMap<String, String>,
     /// Pre-resolved ssl-client.xml settings (empty when HTTPS is disabled).
@@ -161,7 +164,9 @@ pub enum Error {
     },
 
     #[snafu(display("failed to build discovery configmap"))]
-    BuildDiscoveryConfigMap { source: super::discovery::Error },
+    BuildDiscoveryConfigMap {
+        source: crate::controller::build::discovery::Error,
+    },
 
     #[snafu(display("failed to build rolegroup ConfigMap"))]
     BuildRolegroupConfigMap {
@@ -406,15 +411,8 @@ pub async fn reconcile_hbase(
 
     // Discovery CM will fail to build until the rest of the cluster has been deployed, so do it last
     // so that failure won't inhibit the rest of the cluster from booting up.
-    let discovery_cm = build_discovery_configmap(
-        hbase,
-        &client.kubernetes_cluster_info,
-        &validated_cluster
-            .cluster_config
-            .zookeeper_connection_information,
-        &validated_cluster.image,
-    )
-    .context(BuildDiscoveryConfigMapSnafu)?;
+    let discovery_cm = build_discovery_config_map(&validated_cluster, hbase)
+        .context(BuildDiscoveryConfigMapSnafu)?;
     cluster_resources
         .add(client, discovery_cm)
         .await

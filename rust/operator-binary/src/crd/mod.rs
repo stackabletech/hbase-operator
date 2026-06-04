@@ -58,8 +58,6 @@ pub const TLS_STORE_PASSWORD: &str = "changeit";
 
 pub const JVM_SECURITY_PROPERTIES_FILE: &str = "security.properties";
 
-pub const HBASE_SITE_XML: &str = "hbase-site.xml";
-
 pub const HBASE_CLUSTER_DISTRIBUTED: &str = "hbase.cluster.distributed";
 pub const HBASE_ROOTDIR: &str = "hbase.rootdir";
 

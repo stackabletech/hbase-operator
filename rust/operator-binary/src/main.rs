@@ -40,7 +40,6 @@ use crate::{
 mod config;
 mod controller;
 mod crd;
-mod discovery;
 mod hbase_controller;
 mod kerberos;
 mod operations;

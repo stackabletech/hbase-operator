@@ -1,20 +1,19 @@
+//! Build the discovery `ConfigMap` for the HbaseCluster.
+
 use std::collections::BTreeMap;
 
 use snafu::{ResultExt, Snafu};
 use stackable_operator::{
     builder::{configmap::ConfigMapBuilder, meta::ObjectMetaBuilder},
-    commons::product_image_selection::ResolvedProductImage,
     k8s_openapi::api::core::v1::ConfigMap,
     kube::runtime::reflector::ObjectRef,
-    utils::cluster_info::KubernetesClusterInfo,
 };
 
 use crate::{
     config::writer::to_hadoop_xml,
-    crd::{HBASE_SITE_XML, HbaseRole, v1alpha1},
-    hbase_controller::build_recommended_labels,
-    kerberos::{self, kerberos_discovery_config_properties},
-    zookeeper::ZookeeperConnectionInformation,
+    controller::build::properties::ConfigFileName,
+    crd::{HbaseRole, v1alpha1},
+    hbase_controller::{ValidatedCluster, build_recommended_labels},
 };
 
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -36,35 +35,34 @@ pub enum Error {
     ObjectMeta {
         source: stackable_operator::builder::meta::Error,
     },
-
-    #[snafu(display("failed to add Kerberos discovery"))]
-    AddKerberosDiscovery { source: kerberos::Error },
 }
 
 /// Creates a discovery config map containing the `hbase-site.xml` for clients.
-pub fn build_discovery_configmap(
-    hbase: &v1alpha1::HbaseCluster,
-    cluster_info: &KubernetesClusterInfo,
-    zookeeper_connection_information: &ZookeeperConnectionInformation,
-    resolved_product_image: &ResolvedProductImage,
+///
+/// The rendered content comes entirely from `cluster`; `owner_ref` is retained only for the
+/// ConfigMap ObjectMeta / owner reference.
+pub fn build_discovery_config_map(
+    cluster: &ValidatedCluster,
+    owner_ref: &v1alpha1::HbaseCluster,
 ) -> Result<ConfigMap> {
-    let mut hbase_site = zookeeper_connection_information.as_hbase_settings();
-    hbase_site.extend(
-        kerberos_discovery_config_properties(hbase, cluster_info)
-            .context(AddKerberosDiscoverySnafu)?,
-    );
+    let cluster_config = &cluster.cluster_config;
+
+    let mut hbase_site = cluster_config
+        .zookeeper_connection_information
+        .as_hbase_settings();
+    hbase_site.extend(cluster_config.discovery_kerberos_config.clone());
 
     ConfigMapBuilder::new()
         .metadata(
             ObjectMetaBuilder::new()
-                .name_and_namespace(hbase)
-                .ownerreference_from_resource(hbase, None, Some(true))
+                .name_and_namespace(owner_ref)
+                .ownerreference_from_resource(owner_ref, None, Some(true))
                 .with_context(|_| ObjectMissingMetadataForOwnerRefSnafu {
-                    hbase: ObjectRef::from_obj(hbase),
+                    hbase: ObjectRef::from_obj(owner_ref),
                 })?
                 .with_recommended_labels(&build_recommended_labels(
-                    hbase,
-                    &resolved_product_image.app_version_label_value,
+                    owner_ref,
+                    &cluster.image.app_version_label_value,
                     &HbaseRole::RegionServer.to_string(),
                     "discovery",
                 ))
@@ -72,7 +70,7 @@ pub fn build_discovery_configmap(
                 .build(),
         )
         .add_data(
-            HBASE_SITE_XML,
+            ConfigFileName::HbaseSite.to_string(),
             to_hadoop_xml(
                 hbase_site
                     .into_iter()

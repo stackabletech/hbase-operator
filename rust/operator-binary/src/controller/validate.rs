@@ -20,8 +20,8 @@ use crate::{
         ValidatedRoleGroupConfig,
     },
     kerberos::{
-        self, kerberos_config_properties, kerberos_ssl_client_settings,
-        kerberos_ssl_server_settings,
+        self, kerberos_config_properties, kerberos_discovery_config_properties,
+        kerberos_ssl_client_settings, kerberos_ssl_server_settings,
     },
 };
 
@@ -124,6 +124,8 @@ pub fn validate_cluster(
 
     let hbase_site_kerberos_config =
         kerberos_config_properties(hbase, cluster_info).context(AddKerberosConfigSnafu)?;
+    let discovery_kerberos_config = kerberos_discovery_config_properties(hbase, cluster_info)
+        .context(AddKerberosConfigSnafu)?;
     let ssl_server_settings = kerberos_ssl_server_settings(hbase);
     let ssl_client_settings = kerberos_ssl_client_settings(hbase);
 
@@ -135,6 +137,7 @@ pub fn validate_cluster(
             hbase_opa_config: dereferenced_objects.hbase_opa_config,
             kerberos_enabled: hbase.has_kerberos_enabled(),
             hbase_site_kerberos_config,
+            discovery_kerberos_config,
             ssl_server_settings,
             ssl_client_settings,
         },
