@@ -41,12 +41,6 @@ pub enum Error {
         source: stackable_operator::builder::meta::Error,
     },
 
-    #[snafu(display("failed to add the logging configuration to the ConfigMap {cm_name:?}"))]
-    InvalidLoggingConfig {
-        source: crate::product_logging::Error,
-        cm_name: String,
-    },
-
     #[snafu(display("cannot build config map for role {role:?} and role group {role_group:?}"))]
     Assemble {
         source: stackable_operator::builder::configmap::Error,
@@ -145,11 +139,7 @@ pub fn build_rolegroup_config_map(
         builder.add_data(ConfigFileName::SslClient.to_string(), ssl_client_xml);
     }
 
-    extend_role_group_config_map(rolegroup_ref, rg.merged_config.logging(), &mut builder).context(
-        InvalidLoggingConfigSnafu {
-            cm_name: rolegroup_ref.object_name(),
-        },
-    )?;
+    extend_role_group_config_map(rolegroup_ref, rg.merged_config.logging(), &mut builder);
 
     builder.build().with_context(|_| AssembleSnafu {
         role: rolegroup_ref.role.clone(),

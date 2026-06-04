@@ -1,4 +1,3 @@
-use snafu::Snafu;
 use stackable_operator::{
     builder::configmap::ConfigMapBuilder,
     memory::BinaryMultiple,
@@ -16,32 +15,6 @@ use crate::{
     hbase_controller::MAX_HBASE_LOG_FILES_SIZE,
 };
 
-#[derive(Snafu, Debug)]
-pub enum Error {
-    #[snafu(display("object has no namespace"))]
-    ObjectHasNoNamespace,
-
-    #[snafu(display("failed to retrieve the ConfigMap [{cm_name}]"))]
-    ConfigMapNotFound {
-        source: stackable_operator::client::Error,
-        cm_name: String,
-    },
-
-    #[snafu(display("failed to retrieve the entry [{entry}] for ConfigMap [{cm_name}]"))]
-    MissingConfigMapEntry {
-        entry: &'static str,
-        cm_name: String,
-    },
-
-    #[snafu(display("crd validation failure"))]
-    CrdValidationFailure { source: crate::crd::Error },
-
-    #[snafu(display("vectorAggregatorConfigMapName must be set"))]
-    MissingVectorAggregatorAddress,
-}
-
-type Result<T, E = Error> = std::result::Result<T, E>;
-
 const CONSOLE_CONVERSION_PATTERN: &str = "%d{ISO8601} %-5p [%t] %c{2}: %.1000m%n";
 const HBASE_LOG4J2_FILE: &str = "hbase.log4j2.xml";
 pub const LOG4J2_CONFIG_FILE: &str = "log4j2.properties";
@@ -54,7 +27,7 @@ pub fn extend_role_group_config_map(
     rolegroup: &RoleGroupRef<v1alpha1::HbaseCluster>,
     logging: &Logging<Container>,
     cm_builder: &mut ConfigMapBuilder,
-) -> Result<()> {
+) {
     if let Some(ContainerLogConfig {
         choice: Some(ContainerLogConfigChoice::Automatic(log_config)),
     }) = logging.containers.get(&Container::Hbase)
@@ -77,8 +50,6 @@ pub fn extend_role_group_config_map(
             product_logging::framework::create_vector_config(rolegroup, vector_log_config),
         );
     }
-
-    Ok(())
 }
 
 fn log4j_config(log_config: &AutomaticContainerLogConfig) -> String {
