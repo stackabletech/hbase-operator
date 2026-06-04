@@ -16,14 +16,15 @@ use crate::{
     controller::dereference::DereferencedObjects,
     crd::{HbaseRole, v1alpha1},
     hbase_controller::{
-        CONTAINER_IMAGE_BASE_NAME, ValidatedCluster, ValidatedClusterConfig, ValidatedRoleConfig,
-        ValidatedRoleGroupConfig,
+        ValidatedCluster, ValidatedClusterConfig, ValidatedRoleConfig, ValidatedRoleGroupConfig,
     },
     kerberos::{
         self, kerberos_config_properties, kerberos_discovery_config_properties,
         kerberos_ssl_client_settings, kerberos_ssl_server_settings,
     },
 };
+
+const CONTAINER_IMAGE_BASE_NAME: &str = "hbase";
 
 #[derive(Snafu, Debug)]
 pub enum Error {

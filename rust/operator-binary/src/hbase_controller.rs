@@ -35,7 +35,6 @@ use stackable_operator::{
     },
     kvp::{Annotations, Label, LabelError, Labels, ObjectLabels},
     logging::controller::ReconcilerError,
-    memory::{BinaryMultiple, MemoryQuantity},
     product_logging::{
         self,
         framework::LoggingError,
@@ -56,7 +55,10 @@ use strum::{EnumDiscriminants, IntoStaticStr};
 
 use crate::{
     OPERATOR_NAME,
-    controller::build::discovery::build_discovery_config_map,
+    controller::build::{
+        discovery::build_discovery_config_map,
+        properties::logging::{MAX_HBASE_LOG_FILES_SIZE, STACKABLE_LOG_DIR},
+    },
     crd::{
         APP_NAME, AnyServiceConfig, CONFIG_DIR_NAME, Container, HbaseClusterStatus, HbaseRole,
         LISTENER_VOLUME_DIR, LISTENER_VOLUME_NAME, merged_env, v1alpha1,
@@ -69,12 +71,7 @@ use crate::{
 
 pub const HBASE_CONTROLLER_NAME: &str = "hbasecluster";
 pub const FULL_HBASE_CONTROLLER_NAME: &str = concatcp!(HBASE_CONTROLLER_NAME, '.', OPERATOR_NAME);
-pub const MAX_HBASE_LOG_FILES_SIZE: MemoryQuantity = MemoryQuantity {
-    value: 10.0,
-    unit: BinaryMultiple::Mebi,
-};
 
-pub const STACKABLE_LOG_DIR: &str = "/stackable/log";
 pub static CONTAINERDEBUG_LOG_DIRECTORY: std::sync::LazyLock<String> =
     std::sync::LazyLock::new(|| format!("{STACKABLE_LOG_DIR}/containerdebug"));
 
@@ -83,8 +80,6 @@ pub static CONTAINERDEBUG_LOG_DIRECTORY: std::sync::LazyLock<String> =
 const HDFS_DISCOVERY_TMP_DIR: &str = "/stackable/tmp/hdfs";
 const HBASE_CONFIG_TMP_DIR: &str = "/stackable/tmp/hbase";
 const HBASE_LOG_CONFIG_TMP_DIR: &str = "/stackable/tmp/log_config";
-
-pub const CONTAINER_IMAGE_BASE_NAME: &str = "hbase";
 
 pub struct Ctx {
     pub client: stackable_operator::client::Client,
@@ -108,18 +103,20 @@ pub struct ValidatedCluster {
 /// Cluster-wide settings resolved once during validation.
 #[derive(Clone, Debug)]
 pub struct ValidatedClusterConfig {
-    pub zookeeper_connection_information: ZookeeperConnectionInformation,
+    // Pre-resolved OPA connection configuration.
     pub hbase_opa_config: Option<HbaseOpaConfig>,
     pub kerberos_enabled: bool,
-    /// Pre-resolved kerberos properties for hbase-site.xml (empty when kerberos is disabled).
+    // Pre-resolved kerberos properties for hbase-site.xml (empty when kerberos is disabled).
     pub hbase_site_kerberos_config: BTreeMap<String, String>,
-    /// Pre-resolved kerberos properties for the discovery `hbase-site.xml` exposed to clients
-    /// (empty when kerberos is disabled).
+    // Pre-resolved kerberos properties for the discovery `hbase-site.xml` exposed to clients
+    // (empty when kerberos is disabled).
     pub discovery_kerberos_config: BTreeMap<String, String>,
-    /// Pre-resolved ssl-server.xml settings (empty when HTTPS is disabled).
+    // Pre-resolved ssl-server.xml settings (empty when HTTPS is disabled).
     pub ssl_server_settings: BTreeMap<String, String>,
-    /// Pre-resolved ssl-client.xml settings (empty when HTTPS is disabled).
+    // Pre-resolved ssl-client.xml settings (empty when HTTPS is disabled).
     pub ssl_client_settings: BTreeMap<String, String>,
+    // Pre-resolved zookeeper connection settings.
+    pub zookeeper_connection_information: ZookeeperConnectionInformation,
 }
 
 /// Per-role configuration extracted during validation.

@@ -1,6 +1,6 @@
 use stackable_operator::{
     builder::configmap::ConfigMapBuilder,
-    memory::BinaryMultiple,
+    memory::{BinaryMultiple, MemoryQuantity},
     product_logging::{
         self,
         spec::{
@@ -13,7 +13,12 @@ use stackable_operator::{
 use crate::{
     controller::build::properties::ConfigFileName,
     crd::{Container, v1alpha1},
-    hbase_controller::{MAX_HBASE_LOG_FILES_SIZE, STACKABLE_LOG_DIR},
+};
+
+pub const STACKABLE_LOG_DIR: &str = "/stackable/log";
+pub const MAX_HBASE_LOG_FILES_SIZE: MemoryQuantity = MemoryQuantity {
+    value: 10.0,
+    unit: BinaryMultiple::Mebi,
 };
 
 const CONSOLE_CONVERSION_PATTERN: &str = "%d{ISO8601} %-5p [%t] %c{2}: %.1000m%n";
