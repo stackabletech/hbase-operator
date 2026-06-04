@@ -4,14 +4,14 @@ use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
     builder::{configmap::ConfigMapBuilder, meta::ObjectMetaBuilder},
     k8s_openapi::api::core::v1::ConfigMap,
+    product_logging::framework::VECTOR_CONFIG_FILE,
     role_utils::RoleGroupRef,
 };
 
 use crate::{
     config::writer::PropertiesWriterError,
     controller::build::properties::{
-        ConfigFileName, hbase_env, hbase_site, logging::extend_role_group_config_map,
-        security_properties, ssl_client, ssl_server,
+        ConfigFileName, hbase_env, hbase_site, logging, security_properties, ssl_client, ssl_server,
     },
     crd::{HbaseRole, v1alpha1},
     hbase_controller::{ValidatedCluster, build_recommended_labels},
@@ -139,7 +139,14 @@ pub fn build_rolegroup_config_map(
         builder.add_data(ConfigFileName::SslClient.to_string(), ssl_client_xml);
     }
 
-    extend_role_group_config_map(rolegroup_ref, rg.merged_config.logging(), &mut builder);
+    if let Some(log4j2_properties) = logging::build_log4j2(rg.merged_config.logging()) {
+        builder.add_data(ConfigFileName::Log4j2.to_string(), log4j2_properties);
+    }
+    if let Some(vector_config) =
+        logging::build_vector_config(rolegroup_ref, rg.merged_config.logging())
+    {
+        builder.add_data(VECTOR_CONFIG_FILE, vector_config);
+    }
 
     builder.build().with_context(|_| AssembleSnafu {
         role: rolegroup_ref.role.clone(),

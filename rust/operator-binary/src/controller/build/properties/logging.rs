@@ -1,5 +1,4 @@
 use stackable_operator::{
-    builder::configmap::ConfigMapBuilder,
     memory::{BinaryMultiple, MemoryQuantity},
     product_logging::{
         self,
@@ -10,10 +9,7 @@ use stackable_operator::{
     role_utils::RoleGroupRef,
 };
 
-use crate::{
-    controller::build::properties::ConfigFileName,
-    crd::{Container, v1alpha1},
-};
+use crate::crd::{Container, v1alpha1};
 
 pub const STACKABLE_LOG_DIR: &str = "/stackable/log";
 pub const MAX_HBASE_LOG_FILES_SIZE: MemoryQuantity = MemoryQuantity {
@@ -24,34 +20,42 @@ pub const MAX_HBASE_LOG_FILES_SIZE: MemoryQuantity = MemoryQuantity {
 const CONSOLE_CONVERSION_PATTERN: &str = "%d{ISO8601} %-5p [%t] %c{2}: %.1000m%n";
 const HBASE_LOG4J2_FILE: &str = "hbase.log4j2.xml";
 
-/// Extend the role group ConfigMap with logging and Vector configurations
-pub fn extend_role_group_config_map(
+/// Renders `log4j2.properties` for the HBase container.
+///
+/// Returns `None` when the HBase container does not use the operator's automatic logging
+/// configuration (e.g. a custom log ConfigMap is referenced instead), in which case no
+/// `log4j2.properties` should be added to the rolegroup `ConfigMap`.
+pub fn build_log4j2(logging: &Logging<Container>) -> Option<String> {
+    match logging.containers.get(&Container::Hbase) {
+        Some(ContainerLogConfig {
+            choice: Some(ContainerLogConfigChoice::Automatic(log_config)),
+        }) => Some(log4j_config(log_config)),
+        _ => None,
+    }
+}
+
+/// Renders the Vector agent config (`vector.yaml`).
+///
+/// Returns `None` when the Vector agent is disabled for this role group.
+pub fn build_vector_config(
     rolegroup: &RoleGroupRef<v1alpha1::HbaseCluster>,
     logging: &Logging<Container>,
-    cm_builder: &mut ConfigMapBuilder,
-) {
-    if let Some(ContainerLogConfig {
-        choice: Some(ContainerLogConfigChoice::Automatic(log_config)),
-    }) = logging.containers.get(&Container::Hbase)
-    {
-        cm_builder.add_data(ConfigFileName::Log4j2.to_string(), log4j_config(log_config));
+) -> Option<String> {
+    if !logging.enable_vector_agent {
+        return None;
     }
 
-    let vector_log_config = if let Some(ContainerLogConfig {
-        choice: Some(ContainerLogConfigChoice::Automatic(log_config)),
-    }) = logging.containers.get(&Container::Vector)
-    {
-        Some(log_config)
-    } else {
-        None
+    let vector_log_config = match logging.containers.get(&Container::Vector) {
+        Some(ContainerLogConfig {
+            choice: Some(ContainerLogConfigChoice::Automatic(log_config)),
+        }) => Some(log_config),
+        _ => None,
     };
 
-    if logging.enable_vector_agent {
-        cm_builder.add_data(
-            product_logging::framework::VECTOR_CONFIG_FILE,
-            product_logging::framework::create_vector_config(rolegroup, vector_log_config),
-        );
-    }
+    Some(product_logging::framework::create_vector_config(
+        rolegroup,
+        vector_log_config,
+    ))
 }
 
 fn log4j_config(log_config: &AutomaticContainerLogConfig) -> String {
