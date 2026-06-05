@@ -6,10 +6,10 @@ use stackable_operator::{
     k8s_openapi::api::core::v1::ConfigMap,
     product_logging::framework::VECTOR_CONFIG_FILE,
     role_utils::RoleGroupRef,
+    v2::config_file_writer::PropertiesWriterError,
 };
 
 use crate::{
-    config::writer::PropertiesWriterError,
     controller::build::properties::{
         ConfigFileName, hbase_env, hbase_site, logging, security_properties, ssl_client, ssl_server,
     },

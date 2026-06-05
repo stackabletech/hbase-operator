@@ -1,9 +1,11 @@
 //! Builds the `ssl-server.xml` config file: kerberos/TLS server settings + overrides.
 use std::collections::BTreeMap;
 
-use stackable_operator::v2::config_overrides::KeyValueConfigOverrides;
+use stackable_operator::v2::{
+    config_file_writer::to_hadoop_xml, config_overrides::KeyValueConfigOverrides,
+};
 
-use crate::{config::writer::to_hadoop_xml, controller::build::properties::resolved_overrides};
+use crate::controller::build::properties::resolved_overrides;
 
 /// Renders `ssl-server.xml`.
 pub fn build(settings: BTreeMap<String, String>, overrides: KeyValueConfigOverrides) -> String {

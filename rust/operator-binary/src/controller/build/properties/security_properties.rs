@@ -6,13 +6,12 @@
 
 use std::collections::BTreeMap;
 
-use stackable_operator::v2::config_overrides::KeyValueConfigOverrides;
-
-use crate::{
-    config::writer::{PropertiesWriterError, to_java_properties_string},
-    controller::build::properties::resolved_overrides,
-    crd::HbaseRole,
+use stackable_operator::v2::{
+    config_file_writer::{PropertiesWriterError, to_java_properties_string},
+    config_overrides::KeyValueConfigOverrides,
 };
+
+use crate::{controller::build::properties::resolved_overrides, crd::HbaseRole};
 
 /// Renders `security.properties`: role-specific DNS cache TTLs plus user overrides.
 pub fn build(

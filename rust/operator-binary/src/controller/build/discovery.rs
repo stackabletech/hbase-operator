@@ -7,10 +7,10 @@ use stackable_operator::{
     builder::{configmap::ConfigMapBuilder, meta::ObjectMetaBuilder},
     k8s_openapi::api::core::v1::ConfigMap,
     kube::runtime::reflector::ObjectRef,
+    v2::config_file_writer::to_hadoop_xml,
 };
 
 use crate::{
-    config::writer::to_hadoop_xml,
     controller::build::properties::ConfigFileName,
     crd::{HbaseRole, v1alpha1},
     hbase_controller::{ValidatedCluster, build_recommended_labels},
