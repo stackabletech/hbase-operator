@@ -26,7 +26,10 @@ use stackable_operator::{
                 ServicePort, ServiceSpec, TCPSocketAction, Volume,
             },
         },
-        apimachinery::pkg::{apis::meta::v1::LabelSelector, util::intstr::IntOrString},
+        apimachinery::pkg::{
+            apis::meta::v1::{LabelSelector, ObjectMeta},
+            util::intstr::IntOrString,
+        },
     },
     kube::{
         Resource, ResourceExt,
@@ -49,7 +52,13 @@ use stackable_operator::{
         compute_conditions, operations::ClusterOperationsConditionBuilder,
         statefulset::StatefulSetConditionBuilder,
     },
-    v2::types::operator::ClusterName,
+    v2::{
+        HasName, HasUid, NameIsValidLabelValue,
+        types::{
+            kubernetes::{NamespaceName, Uid},
+            operator::ClusterName,
+        },
+    },
 };
 use strum::{EnumDiscriminants, IntoStaticStr};
 
@@ -90,14 +99,98 @@ pub struct Ctx {
 /// every role and role group before any resources are created.
 #[derive(Clone, Debug)]
 pub struct ValidatedCluster {
+    /// Backs the [`Resource`] implementation (provides `meta()`/`name_any()`) so the build
+    /// functions can derive `ObjectMeta`, owner references and labels without the full
+    /// `HbaseCluster` object. Holds only name, namespace and uid.
+    metadata: ObjectMeta,
     /// The logical (and Kubernetes object) name of the cluster.
-    // Populated now; consumed by the new build path in a later commit.
-    #[allow(dead_code)]
     pub name: ClusterName,
+    /// The namespace the cluster lives in. Part of the cluster identity; currently consumed via
+    /// the [`Resource`] metadata (`name_and_namespace`) rather than read directly.
+    #[allow(dead_code)]
+    pub namespace: NamespaceName,
+    /// The UID of the `HbaseCluster` object, used to build owner references.
+    pub uid: Uid,
     pub image: ResolvedProductImage,
     pub cluster_config: ValidatedClusterConfig,
     pub role_group_configs: BTreeMap<HbaseRole, BTreeMap<String, ValidatedRoleGroupConfig>>,
     pub role_configs: BTreeMap<HbaseRole, ValidatedRoleConfig>,
+}
+
+impl ValidatedCluster {
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        name: ClusterName,
+        namespace: NamespaceName,
+        uid: Uid,
+        image: ResolvedProductImage,
+        cluster_config: ValidatedClusterConfig,
+        role_group_configs: BTreeMap<HbaseRole, BTreeMap<String, ValidatedRoleGroupConfig>>,
+        role_configs: BTreeMap<HbaseRole, ValidatedRoleConfig>,
+    ) -> Self {
+        Self {
+            metadata: ObjectMeta {
+                name: Some(name.to_string()),
+                namespace: Some(namespace.to_string()),
+                uid: Some(uid.to_string()),
+                ..ObjectMeta::default()
+            },
+            name,
+            namespace,
+            uid,
+            image,
+            cluster_config,
+            role_group_configs,
+            role_configs,
+        }
+    }
+}
+
+impl Resource for ValidatedCluster {
+    type DynamicType = <v1alpha1::HbaseCluster as Resource>::DynamicType;
+    type Scope = <v1alpha1::HbaseCluster as Resource>::Scope;
+
+    fn group(dt: &Self::DynamicType) -> std::borrow::Cow<'_, str> {
+        v1alpha1::HbaseCluster::group(dt)
+    }
+
+    fn version(dt: &Self::DynamicType) -> std::borrow::Cow<'_, str> {
+        v1alpha1::HbaseCluster::version(dt)
+    }
+
+    fn kind(dt: &Self::DynamicType) -> std::borrow::Cow<'_, str> {
+        v1alpha1::HbaseCluster::kind(dt)
+    }
+
+    fn plural(dt: &Self::DynamicType) -> std::borrow::Cow<'_, str> {
+        v1alpha1::HbaseCluster::plural(dt)
+    }
+
+    fn meta(&self) -> &ObjectMeta {
+        &self.metadata
+    }
+
+    fn meta_mut(&mut self) -> &mut ObjectMeta {
+        &mut self.metadata
+    }
+}
+
+impl HasName for ValidatedCluster {
+    fn to_name(&self) -> String {
+        self.name.to_string()
+    }
+}
+
+impl HasUid for ValidatedCluster {
+    fn to_uid(&self) -> Uid {
+        self.uid.clone()
+    }
+}
+
+impl NameIsValidLabelValue for ValidatedCluster {
+    fn to_label_value(&self) -> String {
+        self.name.to_label_value()
+    }
 }
 
 /// Cluster-wide settings resolved once during validation.
@@ -353,7 +446,6 @@ pub async fn reconcile_hbase(
                 &validated_cluster,
                 hbase_role,
                 &rolegroup,
-                hbase,
             )
             .context(BuildRolegroupConfigMapSnafu)?;
             let rg_statefulset = build_rolegroup_statefulset(
@@ -411,8 +503,8 @@ pub async fn reconcile_hbase(
 
     // Discovery CM will fail to build until the rest of the cluster has been deployed, so do it last
     // so that failure won't inhibit the rest of the cluster from booting up.
-    let discovery_cm = build_discovery_config_map(&validated_cluster, hbase)
-        .context(BuildDiscoveryConfigMapSnafu)?;
+    let discovery_cm =
+        build_discovery_config_map(&validated_cluster).context(BuildDiscoveryConfigMapSnafu)?;
     cluster_resources
         .add(client, discovery_cm)
         .await
@@ -881,12 +973,12 @@ pub fn error_policy(
     }
 }
 
-pub fn build_recommended_labels<'a>(
-    owner: &'a v1alpha1::HbaseCluster,
+pub fn build_recommended_labels<'a, R>(
+    owner: &'a R,
     app_version: &'a str,
     role: &'a str,
     role_group: &'a str,
-) -> ObjectLabels<'a, v1alpha1::HbaseCluster> {
+) -> ObjectLabels<'a, R> {
     ObjectLabels {
         owner,
         app_name: APP_NAME,

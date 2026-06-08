@@ -1,13 +1,12 @@
-use std::{collections::BTreeMap, str::FromStr};
+use std::collections::BTreeMap;
 
 use snafu::{ResultExt, Snafu};
 use stackable_operator::{
     commons::product_image_selection::{self},
     config::merge::Merge,
-    kube::ResourceExt,
     role_utils::GenericRoleConfig,
     utils::cluster_info::KubernetesClusterInfo,
-    v2::types::operator::ClusterName,
+    v2::controller_utils::{get_cluster_name, get_namespace, get_uid},
 };
 use strum::IntoEnumIterator;
 
@@ -33,9 +32,9 @@ pub enum Error {
         source: product_image_selection::Error,
     },
 
-    #[snafu(display("invalid cluster name"))]
-    InvalidClusterName {
-        source: stackable_operator::v2::macros::attributed_string_type::Error,
+    #[snafu(display("failed to determine the cluster identity (name, namespace and uid)"))]
+    GetClusterIdentity {
+        source: stackable_operator::v2::controller_utils::Error,
     },
 
     #[snafu(display("the HbaseCluster has no {role} role defined"))]
@@ -130,10 +129,16 @@ pub fn validate_cluster(
     let ssl_server_settings = kerberos_ssl_server_settings(hbase);
     let ssl_client_settings = kerberos_ssl_client_settings(hbase);
 
-    Ok(ValidatedCluster {
-        name: ClusterName::from_str(&hbase.name_any()).context(InvalidClusterNameSnafu)?,
-        image: resolved_product_image,
-        cluster_config: ValidatedClusterConfig {
+    let name = get_cluster_name(hbase).context(GetClusterIdentitySnafu)?;
+    let namespace = get_namespace(hbase).context(GetClusterIdentitySnafu)?;
+    let uid = get_uid(hbase).context(GetClusterIdentitySnafu)?;
+
+    Ok(ValidatedCluster::new(
+        name,
+        namespace,
+        uid,
+        resolved_product_image,
+        ValidatedClusterConfig {
             zookeeper_connection_information: dereferenced_objects.zookeeper_connection_information,
             hbase_opa_config: dereferenced_objects.hbase_opa_config,
             kerberos_enabled: hbase.has_kerberos_enabled(),
@@ -142,9 +147,9 @@ pub fn validate_cluster(
             ssl_server_settings,
             ssl_client_settings,
         },
-        role_group_configs: role_groups,
+        role_groups,
         role_configs,
-    })
+    ))
 }
 
 /// The names of the role groups defined for `role` in the spec.

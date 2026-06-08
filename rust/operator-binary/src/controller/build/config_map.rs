@@ -6,7 +6,7 @@ use stackable_operator::{
     k8s_openapi::api::core::v1::ConfigMap,
     product_logging::framework::VECTOR_CONFIG_FILE,
     role_utils::RoleGroupRef,
-    v2::config_file_writer::PropertiesWriterError,
+    v2::{builder::meta::ownerreference_from_resource, config_file_writer::PropertiesWriterError},
 };
 
 use crate::{
@@ -31,11 +31,6 @@ pub enum Error {
         role_group: String,
     },
 
-    #[snafu(display("object is missing metadata to build owner reference"))]
-    ObjectMissingMetadataForOwnerRef {
-        source: stackable_operator::builder::meta::Error,
-    },
-
     #[snafu(display("failed to build object meta data"))]
     ObjectMeta {
         source: stackable_operator::builder::meta::Error,
@@ -55,9 +50,6 @@ pub fn build_rolegroup_config_map(
     cluster: &ValidatedCluster,
     role: &HbaseRole,
     rolegroup_ref: &RoleGroupRef<v1alpha1::HbaseCluster>,
-    // `owner` is retained only for the ConfigMap ObjectMeta / owner reference; the rendered
-    // content comes entirely from `cluster`. To be decoupled in a follow-up.
-    owner_ref: &v1alpha1::HbaseCluster,
 ) -> Result<ConfigMap> {
     tracing::info!("Setting up ConfigMap for {:?}", rolegroup_ref);
 
@@ -110,12 +102,11 @@ pub fn build_rolegroup_config_map(
         )?;
 
     let cm_metadata = ObjectMetaBuilder::new()
-        .name_and_namespace(owner_ref)
+        .name_and_namespace(cluster)
         .name(rolegroup_ref.object_name())
-        .ownerreference_from_resource(owner_ref, None, Some(true))
-        .context(ObjectMissingMetadataForOwnerRefSnafu)?
+        .ownerreference(ownerreference_from_resource(cluster, None, Some(true)))
         .with_recommended_labels(&build_recommended_labels(
-            owner_ref,
+            cluster,
             &cluster.image.app_version_label_value,
             &rolegroup_ref.role,
             &rolegroup_ref.role_group,
