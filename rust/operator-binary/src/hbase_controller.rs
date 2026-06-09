@@ -63,14 +63,13 @@ use stackable_operator::{
 use strum::{EnumDiscriminants, IntoStaticStr};
 
 use crate::{
-    OPERATOR_NAME,
     controller::build::{
         discovery::build_discovery_config_map,
         properties::logging::{MAX_HBASE_LOG_FILES_SIZE, STACKABLE_LOG_DIR},
     },
     crd::{
         APP_NAME, AnyServiceConfig, CONFIG_DIR_NAME, Container, HbaseClusterStatus, HbaseRole,
-        LISTENER_VOLUME_DIR, LISTENER_VOLUME_NAME, merged_env, v1alpha1,
+        LISTENER_VOLUME_DIR, LISTENER_VOLUME_NAME, OPERATOR_NAME, merged_env, v1alpha1,
     },
     kerberos::{self, add_kerberos_pod_config},
     operations::{graceful_shutdown::add_graceful_shutdown_config, pdb::add_pdbs},
@@ -585,7 +584,7 @@ fn build_rolegroup_service(
 }
 
 /// The rolegroup metrics [`Service`] is a service that exposes metrics and a prometheus scraping label.
-pub fn build_rolegroup_metrics_service(
+fn build_rolegroup_metrics_service(
     hbase: &v1alpha1::HbaseCluster,
     hbase_role: &HbaseRole,
     rolegroup: &RoleGroupRef<v1alpha1::HbaseCluster>,

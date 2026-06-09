@@ -55,7 +55,7 @@ pub fn kerberos_config_properties(
 
     let principal_host_part = principal_host_part(hbase, cluster_info)?;
 
-    Ok(BTreeMap::from([
+    let mut config = BTreeMap::from([
         // Kerberos settings
         (
             "hbase.security.authentication".to_string(),
@@ -73,27 +73,6 @@ pub fn kerberos_config_properties(
         (
             "hbase.rpc.engine".to_string(),
             "org.apache.hadoop.hbase.ipc.SecureRpcEngine".to_string(),
-        ),
-        (
-            "hbase.master.kerberos.principal".to_string(),
-            format!(
-                "{service_name}/{principal_host_part}",
-                service_name = kerberos_service_name()
-            ),
-        ),
-        (
-            "hbase.regionserver.kerberos.principal".to_string(),
-            format!(
-                "{service_name}/{principal_host_part}",
-                service_name = kerberos_service_name()
-            ),
-        ),
-        (
-            "hbase.rest.kerberos.principal".to_string(),
-            format!(
-                "{service_name}/{principal_host_part}",
-                service_name = kerberos_service_name()
-            ),
         ),
         (
             "hbase.master.keytab.file".to_string(),
@@ -128,14 +107,16 @@ pub fn kerberos_config_properties(
         ("hbase.http.policy".to_string(), "HTTPS_ONLY".to_string()),
         // Recommended by the docs https://hbase.apache.org/book.html#hbase.ui.cache
         ("hbase.http.filter.no-store.enable".to_string(), "true".to_string()),
-        // Ḱey- and truststore come from ssl-server.xml and ssl-client.xml
+        // Key- and truststore come from ssl-server.xml and ssl-client.xml
 
         // Https for rest server
         ("hbase.rest.ssl.enabled".to_string(), "true".to_string()),
         ("hbase.rest.ssl.keystore.store".to_string(), format!("{TLS_STORE_DIR}/keystore.p12")),
         ("hbase.rest.ssl.keystore.password".to_string(), TLS_STORE_PASSWORD.to_string()),
         ("hbase.rest.ssl.keystore.type".to_string(), "pkcs12".to_string()),
-    ]))
+    ]);
+    config.extend(kerberos_principals(&principal_host_part));
+    Ok(config)
 }
 
 pub fn kerberos_discovery_config_properties(
@@ -148,35 +129,16 @@ pub fn kerberos_discovery_config_properties(
 
     let principal_host_part = principal_host_part(hbase, cluster_info)?;
 
-    Ok(BTreeMap::from([
+    let mut config = BTreeMap::from([
         (
             "hbase.security.authentication".to_string(),
             "kerberos".to_string(),
         ),
         ("hbase.rpc.protection".to_string(), "privacy".to_string()),
         ("hbase.ssl.enabled".to_string(), "true".to_string()),
-        (
-            "hbase.master.kerberos.principal".to_string(),
-            format!(
-                "{service_name}/{principal_host_part}",
-                service_name = kerberos_service_name()
-            ),
-        ),
-        (
-            "hbase.regionserver.kerberos.principal".to_string(),
-            format!(
-                "{service_name}/{principal_host_part}",
-                service_name = kerberos_service_name()
-            ),
-        ),
-        (
-            "hbase.rest.kerberos.principal".to_string(),
-            format!(
-                "{service_name}/{principal_host_part}",
-                service_name = kerberos_service_name()
-            ),
-        ),
-    ]))
+    ]);
+    config.extend(kerberos_principals(&principal_host_part));
+    Ok(config)
 }
 
 pub fn kerberos_ssl_server_settings(hbase: &v1alpha1::HbaseCluster) -> BTreeMap<String, String> {
@@ -184,19 +146,8 @@ pub fn kerberos_ssl_server_settings(hbase: &v1alpha1::HbaseCluster) -> BTreeMap<
         return BTreeMap::new();
     }
 
-    BTreeMap::from([
-        (
-            "ssl.server.truststore.location".to_string(),
-            format!("{TLS_STORE_DIR}/truststore.p12"),
-        ),
-        (
-            "ssl.server.truststore.type".to_string(),
-            "pkcs12".to_string(),
-        ),
-        (
-            "ssl.server.truststore.password".to_string(),
-            TLS_STORE_PASSWORD.to_string(),
-        ),
+    let mut settings = truststore_settings("server");
+    settings.extend([
         (
             "ssl.server.keystore.location".to_string(),
             format!("{TLS_STORE_DIR}/keystore.p12"),
@@ -206,7 +157,8 @@ pub fn kerberos_ssl_server_settings(hbase: &v1alpha1::HbaseCluster) -> BTreeMap<
             "ssl.server.keystore.password".to_string(),
             TLS_STORE_PASSWORD.to_string(),
         ),
-    ])
+    ]);
+    settings
 }
 
 pub fn kerberos_ssl_client_settings(hbase: &v1alpha1::HbaseCluster) -> BTreeMap<String, String> {
@@ -214,20 +166,7 @@ pub fn kerberos_ssl_client_settings(hbase: &v1alpha1::HbaseCluster) -> BTreeMap<
         return BTreeMap::new();
     }
 
-    BTreeMap::from([
-        (
-            "ssl.client.truststore.location".to_string(),
-            format!("{TLS_STORE_DIR}/truststore.p12"),
-        ),
-        (
-            "ssl.client.truststore.type".to_string(),
-            "pkcs12".to_string(),
-        ),
-        (
-            "ssl.client.truststore.password".to_string(),
-            TLS_STORE_PASSWORD.to_string(),
-        ),
-    ])
+    truststore_settings("client")
 }
 
 pub fn add_kerberos_pod_config(
@@ -290,6 +229,43 @@ pub fn add_kerberos_pod_config(
             .context(AddVolumeMountSnafu)?;
     }
     Ok(())
+}
+
+/// The `hbase.{master,regionserver,rest}.kerberos.principal` entries shared by the main
+/// and discovery config. All roles use the same `hbase` service principal (see
+/// [`kerberos_service_name`]).
+fn kerberos_principals(principal_host_part: &str) -> [(String, String); 3] {
+    let principal = format!(
+        "{service_name}/{principal_host_part}",
+        service_name = kerberos_service_name()
+    );
+    [
+        (
+            "hbase.master.kerberos.principal".to_string(),
+            principal.clone(),
+        ),
+        (
+            "hbase.regionserver.kerberos.principal".to_string(),
+            principal.clone(),
+        ),
+        ("hbase.rest.kerberos.principal".to_string(), principal),
+    ]
+}
+
+/// The `ssl.{role}.truststore.*` entries (location/type/password) shared by the server and
+/// client TLS settings. `role` is either `"server"` or `"client"`.
+fn truststore_settings(role: &str) -> BTreeMap<String, String> {
+    BTreeMap::from([
+        (
+            format!("ssl.{role}.truststore.location"),
+            format!("{TLS_STORE_DIR}/truststore.p12"),
+        ),
+        (format!("ssl.{role}.truststore.type"), "pkcs12".to_string()),
+        (
+            format!("ssl.{role}.truststore.password"),
+            TLS_STORE_PASSWORD.to_string(),
+        ),
+    ])
 }
 
 fn principal_host_part(

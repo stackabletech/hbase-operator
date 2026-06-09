@@ -5,8 +5,7 @@ use stackable_operator::{
 };
 
 use crate::{
-    OPERATOR_NAME,
-    crd::{APP_NAME, HbaseRole, v1alpha1},
+    crd::{APP_NAME, HbaseRole, OPERATOR_NAME, v1alpha1},
     hbase_controller::HBASE_CONTROLLER_NAME,
 };
 

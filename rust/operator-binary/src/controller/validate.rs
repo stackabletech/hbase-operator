@@ -72,8 +72,7 @@ pub fn validate_cluster(
     for hbase_role in HbaseRole::iter() {
         let role_group_names = role_group_names(hbase, &hbase_role);
 
-        // masters and region servers are required (preserves the old build_role_properties check);
-        // rest servers are optional.
+        // masters and region servers are required; rest servers are optional.
         if role_group_names.is_empty() {
             match hbase_role {
                 HbaseRole::Master | HbaseRole::RegionServer => {

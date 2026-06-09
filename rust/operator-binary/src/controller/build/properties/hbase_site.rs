@@ -4,12 +4,10 @@
 
 use std::collections::BTreeMap;
 
-use stackable_operator::v2::{
-    config_file_writer::to_hadoop_xml, config_overrides::KeyValueConfigOverrides,
-};
+use stackable_operator::v2::config_overrides::KeyValueConfigOverrides;
 
 use crate::{
-    controller::build::properties::resolved_overrides,
+    controller::build::properties::build_xml_config,
     crd::{
         AnyServiceConfig, HBASE_CLUSTER_DISTRIBUTED, HBASE_MASTER_PORT, HBASE_MASTER_UI_PORT,
         HBASE_REGIONSERVER_PORT, HBASE_REGIONSERVER_UI_PORT, HBASE_ROOTDIR, HbaseRole,
@@ -110,9 +108,7 @@ pub fn build(
     };
 
     // configOverride come last
-    config.extend(resolved_overrides(overrides));
-
-    to_hadoop_xml(config.iter())
+    build_xml_config(config, overrides)
 }
 
 #[cfg(test)]

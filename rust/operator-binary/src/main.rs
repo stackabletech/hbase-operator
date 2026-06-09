@@ -33,7 +33,7 @@ use stackable_operator::{
 };
 
 use crate::{
-    crd::{HbaseCluster, HbaseClusterVersion, v1alpha1},
+    crd::{HbaseCluster, HbaseClusterVersion, OPERATOR_NAME, v1alpha1},
     webhooks::conversion::create_webhook_server,
 };
 
@@ -50,8 +50,6 @@ mod zookeeper;
 mod built_info {
     include!(concat!(env!("OUT_DIR"), "/built.rs"));
 }
-
-const OPERATOR_NAME: &str = "hbase.stackable.com";
 
 #[derive(Parser)]
 #[clap(about, author)]

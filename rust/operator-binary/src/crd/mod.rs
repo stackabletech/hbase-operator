@@ -47,6 +47,7 @@ pub mod security;
 
 pub const APP_NAME: &str = "hbase";
 pub const FIELD_MANAGER: &str = "hbase-operator";
+pub const OPERATOR_NAME: &str = "hbase.stackable.com";
 
 // This constant is hard coded in hbase-entrypoint.sh
 // You need to change it there too.
@@ -107,12 +108,6 @@ pub type RestServerRoleType =
 
 #[derive(Snafu, Debug)]
 pub enum Error {
-    #[snafu(display("the role [{role}] is invalid and does not exist in HBase"))]
-    InvalidRole {
-        source: strum::ParseError,
-        role: String,
-    },
-
     #[snafu(display("the HBase role [{role}] is missing from spec"))]
     MissingHbaseRole { role: String },
 
@@ -127,11 +122,6 @@ pub enum Error {
 
     #[snafu(display("role-group not found by name"))]
     RoleGroupNotFound,
-
-    #[snafu(display("failed to build listener volume source"))]
-    ListenerVolumeSource {
-        source: ListenerOperatorVolumeSourceBuilderError,
-    },
 
     #[snafu(display("failed to build listener volume"))]
     BuildListenerVolume {
@@ -441,11 +431,6 @@ impl v1alpha1::HbaseCluster {
         }
     }
 
-    /// The name of the role-level load-balanced Kubernetes `Service`
-    pub fn server_role_service_name(&self) -> Option<String> {
-        self.metadata.name.clone()
-    }
-
     /// Metadata about a server rolegroup
     pub fn server_rolegroup_ref(
         &self,
@@ -543,70 +528,6 @@ impl HbaseRole {
     const DEFAULT_REST_SECRET_LIFETIME: Duration = Duration::from_days_unchecked(1);
     const DEFAULT_REST_SERVER_GRACEFUL_SHUTDOWN_TIMEOUT: Duration =
         Duration::from_minutes_unchecked(5);
-
-    pub fn default_config(
-        &self,
-        cluster_name: &str,
-        hdfs_discovery_cm_name: &str,
-    ) -> HbaseConfigFragment {
-        let resources = match &self {
-            HbaseRole::Master => ResourcesFragment {
-                cpu: CpuLimitsFragment {
-                    min: Some(Quantity("250m".to_owned())),
-                    max: Some(Quantity("1".to_owned())),
-                },
-                memory: MemoryLimitsFragment {
-                    limit: Some(Quantity("1Gi".to_owned())),
-                    runtime_limits: NoRuntimeLimitsFragment {},
-                },
-                storage: HbaseStorageConfigFragment {},
-            },
-            HbaseRole::RegionServer => ResourcesFragment {
-                cpu: CpuLimitsFragment {
-                    min: Some(Quantity("250m".to_owned())),
-                    max: Some(Quantity("1".to_owned())),
-                },
-                memory: MemoryLimitsFragment {
-                    limit: Some(Quantity("1Gi".to_owned())),
-                    runtime_limits: NoRuntimeLimitsFragment {},
-                },
-                storage: HbaseStorageConfigFragment {},
-            },
-            HbaseRole::RestServer => ResourcesFragment {
-                cpu: CpuLimitsFragment {
-                    min: Some(Quantity("100m".to_owned())),
-                    max: Some(Quantity("400m".to_owned())),
-                },
-                memory: MemoryLimitsFragment {
-                    limit: Some(Quantity("512Mi".to_owned())),
-                    runtime_limits: NoRuntimeLimitsFragment {},
-                },
-                storage: HbaseStorageConfigFragment {},
-            },
-        };
-
-        let graceful_shutdown_timeout = match &self {
-            HbaseRole::Master => Self::DEFAULT_MASTER_GRACEFUL_SHUTDOWN_TIMEOUT,
-            HbaseRole::RegionServer => Self::DEFAULT_REGION_SERVER_GRACEFUL_SHUTDOWN_TIMEOUT,
-            HbaseRole::RestServer => Self::DEFAULT_REST_SERVER_GRACEFUL_SHUTDOWN_TIMEOUT,
-        };
-
-        let requested_secret_lifetime = match &self {
-            HbaseRole::Master => Self::DEFAULT_MASTER_SECRET_LIFETIME,
-            HbaseRole::RegionServer => Self::DEFAULT_REGION_SECRET_LIFETIME,
-            HbaseRole::RestServer => Self::DEFAULT_REST_SECRET_LIFETIME,
-        };
-
-        HbaseConfigFragment {
-            hbase_rootdir: Some(default_hbase_rootdir()),
-            resources,
-            logging: product_logging::spec::default_logging(),
-            affinity: get_affinity(cluster_name, self, hdfs_discovery_cm_name),
-            graceful_shutdown_timeout: Some(graceful_shutdown_timeout),
-            requested_secret_lifetime: Some(requested_secret_lifetime),
-            listener_class: Some(DEFAULT_LISTENER_CLASS.to_string()),
-        }
-    }
 
     /// Returns the name of the role as it is needed by the `bin/hbase {cli_role_name} start` command.
     pub fn cli_role_name(&self) -> String {

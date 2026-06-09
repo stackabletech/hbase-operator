@@ -5,7 +5,9 @@
 
 use std::collections::BTreeMap;
 
-use stackable_operator::v2::config_overrides::KeyValueConfigOverrides;
+use stackable_operator::v2::{
+    config_file_writer::to_hadoop_xml, config_overrides::KeyValueConfigOverrides,
+};
 
 pub mod hbase_env;
 pub mod hbase_site;
@@ -29,6 +31,16 @@ fn resolved_overrides(
     overrides: KeyValueConfigOverrides,
 ) -> impl Iterator<Item = (String, String)> {
     defined_entries(overrides.overrides)
+}
+
+/// Render an XML config file from base `settings` merged with user `overrides`
+/// (overrides applied last, so users win), serialized to the Hadoop-XML on-wire format.
+fn build_xml_config(
+    mut config: BTreeMap<String, String>,
+    overrides: KeyValueConfigOverrides,
+) -> String {
+    config.extend(resolved_overrides(overrides));
+    to_hadoop_xml(config.iter())
 }
 
 /// The names of the HBase config files assembled into the rolegroup `ConfigMap`.

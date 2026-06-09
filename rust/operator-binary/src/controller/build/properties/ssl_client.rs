@@ -1,18 +1,13 @@
 //! Builds the `ssl-client.xml` config file: kerberos/TLS client settings + overrides.
 use std::collections::BTreeMap;
 
-use stackable_operator::v2::{
-    config_file_writer::to_hadoop_xml, config_overrides::KeyValueConfigOverrides,
-};
+use stackable_operator::v2::config_overrides::KeyValueConfigOverrides;
 
-use crate::controller::build::properties::resolved_overrides;
+use crate::controller::build::properties::build_xml_config;
 
 /// Renders `ssl-client.xml`.
 pub fn build(settings: BTreeMap<String, String>, overrides: KeyValueConfigOverrides) -> String {
-    let mut config: BTreeMap<String, String> = BTreeMap::new();
-    config.extend(settings);
-    config.extend(resolved_overrides(overrides));
-    to_hadoop_xml(config.iter())
+    build_xml_config(settings, overrides)
 }
 
 #[cfg(test)]
