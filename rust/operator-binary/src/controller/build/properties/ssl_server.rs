@@ -9,9 +9,9 @@ use crate::controller::build::properties::resolved_overrides;
 
 /// Renders `ssl-server.xml`.
 pub fn build(settings: BTreeMap<String, String>, overrides: KeyValueConfigOverrides) -> String {
-    let mut config: BTreeMap<String, Option<String>> = BTreeMap::new();
-    config.extend(settings.into_iter().map(|(k, v)| (k, Some(v))));
-    config.extend(resolved_overrides(overrides).map(|(k, v)| (k, Some(v))));
+    let mut config: BTreeMap<String, String> = BTreeMap::new();
+    config.extend(settings);
+    config.extend(resolved_overrides(overrides));
     to_hadoop_xml(config.iter())
 }
 

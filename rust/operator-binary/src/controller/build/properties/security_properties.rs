@@ -27,18 +27,18 @@ pub fn build(
         HbaseRole::RestServer => "30",
     };
 
-    let mut config: BTreeMap<String, Option<String>> = BTreeMap::from([
+    let mut config: BTreeMap<String, String> = BTreeMap::from([
         (
             "networkaddress.cache.ttl".to_string(),
-            Some(positive_ttl.to_string()),
+            positive_ttl.to_string(),
         ),
         (
             "networkaddress.cache.negative.ttl".to_string(),
-            Some("0".to_string()),
+            "0".to_string(),
         ),
     ]);
     // Overrides applied last so users win.
-    config.extend(resolved_overrides(overrides).map(|(key, value)| (key, Some(value))));
+    config.extend(resolved_overrides(overrides));
     to_java_properties_string(config.iter())
 }
 

@@ -112,13 +112,7 @@ pub fn build(
     // configOverride come last
     config.extend(resolved_overrides(overrides));
 
-    to_hadoop_xml(
-        config
-            .into_iter()
-            .map(|(k, v)| (k, Some(v)))
-            .collect::<BTreeMap<_, _>>()
-            .iter(),
-    )
+    to_hadoop_xml(config.iter())
 }
 
 #[cfg(test)]

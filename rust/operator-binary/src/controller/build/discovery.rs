@@ -1,7 +1,5 @@
 //! Build the discovery `ConfigMap` for the HbaseCluster.
 
-use std::collections::BTreeMap;
-
 use snafu::{ResultExt, Snafu};
 use stackable_operator::{
     builder::{configmap::ConfigMapBuilder, meta::ObjectMetaBuilder},
@@ -55,13 +53,7 @@ pub fn build_discovery_config_map(cluster: &ValidatedCluster) -> Result<ConfigMa
         )
         .add_data(
             ConfigFileName::HbaseSite.to_string(),
-            to_hadoop_xml(
-                hbase_site
-                    .into_iter()
-                    .map(|(k, v)| (k, Some(v)))
-                    .collect::<BTreeMap<_, _>>()
-                    .iter(),
-            ),
+            to_hadoop_xml(hbase_site.iter()),
         )
         .build()
         .context(BuildConfigMapSnafu)
