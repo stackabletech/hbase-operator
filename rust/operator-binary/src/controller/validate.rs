@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, str::FromStr};
 
 use snafu::{ResultExt, Snafu};
 use stackable_operator::{
@@ -6,7 +6,10 @@ use stackable_operator::{
     config::merge::Merge,
     role_utils::GenericRoleConfig,
     utils::cluster_info::KubernetesClusterInfo,
-    v2::controller_utils::{get_cluster_name, get_namespace, get_uid},
+    v2::{
+        builder::pod::container::{self, EnvVarName, EnvVarSet},
+        controller_utils::{get_cluster_name, get_namespace, get_uid},
+    },
 };
 use strum::IntoEnumIterator;
 
@@ -48,6 +51,12 @@ pub enum Error {
 
     #[snafu(display("failed to construct role-specific JVM arguments"))]
     ConstructJvmArgument { source: crate::config::jvm::Error },
+
+    #[snafu(display("the environment variable override name {name:?} is invalid"))]
+    InvalidEnvVarName {
+        source: container::Error,
+        name: String,
+    },
 }
 
 pub fn validate_cluster(
@@ -102,12 +111,21 @@ pub fn validate_cluster(
                 )
                 .context(FailedToResolveConfigSnafu)?;
 
+            let rolegroup_ref =
+                hbase.server_rolegroup_ref(hbase_role.to_string(), rolegroup_name.clone());
+
             group_configs.insert(
                 rolegroup_name.clone(),
                 ValidatedRoleGroupConfig {
+                    replicas: hbase.replicas(&hbase_role, &rolegroup_ref),
                     merged_config,
                     config_overrides: merged_config_overrides(hbase, &hbase_role, &rolegroup_name),
-                    env_overrides: merged_env_overrides(hbase, &hbase_role, &rolegroup_name),
+                    env_overrides: env_var_set(merged_env_overrides(
+                        hbase,
+                        &hbase_role,
+                        &rolegroup_name,
+                    ))?,
+                    pod_overrides: hbase.merged_pod_overrides(&hbase_role, &rolegroup_ref),
                     non_heap_jvm_args: construct_role_specific_non_heap_jvm_args(
                         hbase,
                         &hbase_role,
@@ -283,6 +301,19 @@ fn merged_env_overrides(
         env_overrides.extend(role_group_overrides);
     }
     env_overrides
+}
+
+/// Converts merged env override pairs into a type-safe [`EnvVarSet`], validating each name so that
+/// invalid environment variable names are rejected during validation instead of producing a broken
+/// Pod.
+fn env_var_set(env_overrides: BTreeMap<String, String>) -> Result<EnvVarSet, Error> {
+    let mut set = EnvVarSet::new();
+    for (name, value) in env_overrides {
+        let env_var_name =
+            EnvVarName::from_str(&name).context(InvalidEnvVarNameSnafu { name: name.clone() })?;
+        set = set.with_value(&env_var_name, value);
+    }
+    Ok(set)
 }
 
 #[cfg(test)]

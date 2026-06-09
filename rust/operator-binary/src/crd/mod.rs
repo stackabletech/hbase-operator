@@ -351,12 +351,12 @@ impl v1alpha1::HbaseCluster {
         })
     }
 
-    pub fn merge_pod_overrides(
+    /// Returns the merged (role <- role group) pod template overrides for the given role group.
+    pub fn merged_pod_overrides(
         &self,
-        pod_template: &mut PodTemplateSpec,
         role: &HbaseRole,
         role_group_ref: &RoleGroupRef<Self>,
-    ) {
+    ) -> PodTemplateSpec {
         let (role_pod_overrides, role_group_pod_overrides) = match role {
             HbaseRole::Master => (
                 self.spec
@@ -393,41 +393,40 @@ impl v1alpha1::HbaseCluster {
             ),
         };
 
+        let mut merged = PodTemplateSpec::default();
         if let Some(rpo) = role_pod_overrides {
-            pod_template.merge_from(rpo);
+            merged.merge_from(rpo);
         }
         if let Some(rgpo) = role_group_pod_overrides {
-            pod_template.merge_from(rgpo);
+            merged.merge_from(rgpo);
         }
+        merged
     }
 
     pub fn replicas(
         &self,
         hbase_role: &HbaseRole,
         role_group_ref: &RoleGroupRef<Self>,
-    ) -> Option<i32> {
+    ) -> Option<u16> {
         match hbase_role {
             HbaseRole::Master => self
                 .spec
                 .masters
                 .as_ref()
                 .and_then(|r| r.role_groups.get(&role_group_ref.role_group))
-                .and_then(|rg| rg.replicas)
-                .map(i32::from),
+                .and_then(|rg| rg.replicas),
             HbaseRole::RegionServer => self
                 .spec
                 .region_servers
                 .as_ref()
                 .and_then(|r| r.role_groups.get(&role_group_ref.role_group))
-                .and_then(|rg| rg.replicas)
-                .map(i32::from),
+                .and_then(|rg| rg.replicas),
             HbaseRole::RestServer => self
                 .spec
                 .rest_servers
                 .as_ref()
                 .and_then(|r| r.role_groups.get(&role_group_ref.role_group))
-                .and_then(|rg| rg.replicas)
-                .map(i32::from),
+                .and_then(|rg| rg.replicas),
         }
     }
 

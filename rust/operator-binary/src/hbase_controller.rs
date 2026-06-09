@@ -19,11 +19,12 @@ use stackable_operator::{
     commons::{product_image_selection::ResolvedProductImage, rbac::build_rbac_resources},
     constants::RESTART_CONTROLLER_ENABLED_LABEL,
     k8s_openapi::{
+        DeepMerge,
         api::{
             apps::v1::{StatefulSet, StatefulSetSpec},
             core::v1::{
-                ConfigMapVolumeSource, ContainerPort, EnvVar, Probe, Service, ServiceAccount,
-                ServicePort, ServiceSpec, TCPSocketAction, Volume,
+                ConfigMapVolumeSource, ContainerPort, EnvVar, PodTemplateSpec, Probe, Service,
+                ServiceAccount, ServicePort, ServiceSpec, TCPSocketAction, Volume,
             },
         },
         apimachinery::pkg::{
@@ -54,6 +55,7 @@ use stackable_operator::{
     },
     v2::{
         HasName, HasUid, NameIsValidLabelValue,
+        builder::pod::container::EnvVarSet,
         types::{
             kubernetes::{NamespaceName, Uid},
             operator::ClusterName,
@@ -218,12 +220,19 @@ pub struct ValidatedRoleConfig {
 }
 
 /// Per-rolegroup configuration: the merged CRD config plus the merged
-/// (role <- role group) `configOverrides` and `envOverrides`.
+/// (role <- role group) `configOverrides`, `envOverrides` and `podOverrides`.
+///
+/// This carries every override channel so that the build step is a pure function of
+/// [`ValidatedCluster`] and never has to reach back into the raw `HbaseCluster`.
 #[derive(Clone, Debug)]
 pub struct ValidatedRoleGroupConfig {
+    /// The desired number of replicas (`None` lets Kubernetes default to 1).
+    pub replicas: Option<u16>,
     pub merged_config: AnyServiceConfig,
     pub config_overrides: v1alpha1::HbaseConfigOverrides,
-    pub env_overrides: BTreeMap<String, String>,
+    pub env_overrides: EnvVarSet,
+    /// Merged (role <- role group) pod template overrides.
+    pub pod_overrides: PodTemplateSpec,
     /// Pre-resolved role-specific non-heap JVM args (operator-generated + role/role-group overrides).
     pub non_heap_jvm_args: String,
 }
@@ -713,7 +722,9 @@ fn build_rolegroup_statefulset(
         ("HBASE_CONF_DIR".to_string(), CONFIG_DIR_NAME.to_string()),
         ("HADOOP_CONF_DIR".to_string(), CONFIG_DIR_NAME.to_string()),
     ]);
-    env_map.extend(validated_rg_config.env_overrides.clone());
+    for env_var in validated_rg_config.env_overrides.clone() {
+        env_map.insert(env_var.name, env_var.value.unwrap_or_default());
+    }
     let mut merged_env = merged_env(&env_map);
     // This env var is set for all roles to avoid bash's "unbound variable" errors
     merged_env.extend([
@@ -904,7 +915,7 @@ fn build_rolegroup_statefulset(
 
     let mut pod_template = pod_builder.build_template();
 
-    hbase.merge_pod_overrides(&mut pod_template, hbase_role, rolegroup_ref);
+    pod_template.merge_from(validated_rg_config.pod_overrides.clone());
 
     let metadata = ObjectMetaBuilder::new()
         .name_and_namespace(hbase)
@@ -931,7 +942,7 @@ fn build_rolegroup_statefulset(
 
     let statefulset_spec = StatefulSetSpec {
         pod_management_policy: Some("Parallel".to_string()),
-        replicas: hbase.replicas(hbase_role, rolegroup_ref),
+        replicas: validated_rg_config.replicas.map(i32::from),
         selector: LabelSelector {
             match_labels: Some(statefulset_match_labels.into()),
             ..LabelSelector::default()
