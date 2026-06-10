@@ -720,6 +720,7 @@ fn build_rolegroup_statefulset(
 
     let mut env_map: BTreeMap<String, String> = BTreeMap::from([
         ("HBASE_CONF_DIR".to_string(), CONFIG_DIR_NAME.to_string()),
+        // required by phoenix (for cases where Kerberos is enabled): see https://issues.apache.org/jira/browse/PHOENIX-2369
         ("HADOOP_CONF_DIR".to_string(), CONFIG_DIR_NAME.to_string()),
     ]);
     for env_var in validated_rg_config.env_overrides.clone() {
