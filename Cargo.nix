@@ -9619,7 +9619,7 @@ rec {
       "stackable-hbase-operator" = rec {
         crateName = "stackable-hbase-operator";
         version = "0.0.0-dev";
-        edition = "2021";
+        edition = "2024";
         crateBin = [
           {
             name = "stackable-hbase-operator";
