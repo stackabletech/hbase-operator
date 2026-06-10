@@ -1,15 +1,13 @@
-use std::{collections::BTreeMap, str::FromStr};
+use std::collections::BTreeMap;
 
 use snafu::{ResultExt, Snafu};
 use stackable_operator::{
     commons::product_image_selection::{self},
-    config::merge::Merge,
-    role_utils::GenericRoleConfig,
+    config::{fragment::FromFragment, merge::Merge},
+    kube::ResourceExt,
+    role_utils::{GenericRoleConfig, JavaCommonConfig, Role},
     utils::cluster_info::KubernetesClusterInfo,
-    v2::{
-        builder::pod::container::{self, EnvVarName, EnvVarSet},
-        controller_utils::{get_cluster_name, get_namespace, get_uid},
-    },
+    v2::controller_utils::{get_cluster_name, get_namespace, get_uid},
 };
 use strum::IntoEnumIterator;
 
@@ -19,7 +17,8 @@ use crate::{
         ValidatedCluster, ValidatedClusterConfig, ValidatedRoleConfig, ValidatedRoleGroupConfig,
         dereference::DereferencedObjects,
     },
-    crd::{HbaseRole, v1alpha1},
+    crd::{AnyServiceConfig, HbaseConfigFragment, HbaseRole, RegionServerConfigFragment, v1alpha1},
+    framework::role_utils::with_validated_config,
     kerberos::{
         self, kerberos_config_properties, kerberos_discovery_config_properties,
         kerberos_ssl_client_settings, kerberos_ssl_server_settings,
@@ -43,20 +42,16 @@ pub enum Error {
     #[snafu(display("the HbaseCluster has no {role} role defined"))]
     MissingRequiredRole { role: String },
 
-    #[snafu(display("failed to resolve and merge config for role and role group"))]
-    FailedToResolveConfig { source: crate::crd::Error },
+    #[snafu(display("failed to merge and validate the role group config"))]
+    ValidateRoleGroupConfig {
+        source: crate::framework::role_utils::Error,
+    },
 
     #[snafu(display("failed to resolve kerberos config"))]
     AddKerberosConfig { source: kerberos::Error },
 
     #[snafu(display("failed to construct role-specific JVM arguments"))]
     ConstructJvmArgument { source: crate::config::jvm::Error },
-
-    #[snafu(display("the environment variable override name {name:?} is invalid"))]
-    InvalidEnvVarName {
-        source: container::Error,
-        name: String,
-    },
 }
 
 pub fn validate_cluster(
@@ -78,11 +73,48 @@ pub fn validate_cluster(
     let mut role_groups = BTreeMap::new();
     let mut role_configs = BTreeMap::new();
 
+    let hdfs_discovery_cm_name = &hbase.spec.cluster_config.hdfs_config_map_name;
+    let cluster_name = hbase.name_any();
+
     for hbase_role in HbaseRole::iter() {
-        let role_group_names = role_group_names(hbase, &hbase_role);
+        let group_configs = match hbase_role {
+            HbaseRole::Master => validate_role_group_configs(
+                hbase,
+                &hbase_role,
+                hbase.spec.masters.as_ref(),
+                HbaseConfigFragment::default_config(
+                    &hbase_role,
+                    &cluster_name,
+                    hdfs_discovery_cm_name,
+                ),
+                AnyServiceConfig::Master,
+            )?,
+            HbaseRole::RegionServer => validate_role_group_configs(
+                hbase,
+                &hbase_role,
+                hbase.spec.region_servers.as_ref(),
+                RegionServerConfigFragment::default_config(
+                    &hbase_role,
+                    &cluster_name,
+                    hdfs_discovery_cm_name,
+                ),
+                AnyServiceConfig::RegionServer,
+            )?,
+            HbaseRole::RestServer => validate_role_group_configs(
+                hbase,
+                &hbase_role,
+                hbase.spec.rest_servers.as_ref(),
+                HbaseConfigFragment::default_config(
+                    &hbase_role,
+                    &cluster_name,
+                    hdfs_discovery_cm_name,
+                ),
+                AnyServiceConfig::RestServer,
+            )?,
+        };
 
         // masters and region servers are required; rest servers are optional.
-        if role_group_names.is_empty() {
+        if group_configs.is_empty() {
             match hbase_role {
                 HbaseRole::Master | HbaseRole::RegionServer => {
                     return MissingRequiredRoleSnafu {
@@ -99,41 +131,6 @@ pub fn validate_cluster(
         }) = hbase.role_config(&hbase_role)
         {
             role_configs.insert(hbase_role.clone(), ValidatedRoleConfig { pdb: pdb.clone() });
-        }
-
-        let mut group_configs = BTreeMap::new();
-        for rolegroup_name in role_group_names {
-            let merged_config = hbase
-                .merged_config(
-                    &hbase_role,
-                    &rolegroup_name,
-                    &hbase.spec.cluster_config.hdfs_config_map_name,
-                )
-                .context(FailedToResolveConfigSnafu)?;
-
-            let rolegroup_ref =
-                hbase.server_rolegroup_ref(hbase_role.to_string(), rolegroup_name.clone());
-
-            group_configs.insert(
-                rolegroup_name.clone(),
-                ValidatedRoleGroupConfig {
-                    replicas: hbase.replicas(&hbase_role, &rolegroup_ref),
-                    merged_config,
-                    config_overrides: merged_config_overrides(hbase, &hbase_role, &rolegroup_name),
-                    env_overrides: env_var_set(merged_env_overrides(
-                        hbase,
-                        &hbase_role,
-                        &rolegroup_name,
-                    ))?,
-                    pod_overrides: hbase.merged_pod_overrides(&hbase_role, &rolegroup_ref),
-                    non_heap_jvm_args: construct_role_specific_non_heap_jvm_args(
-                        hbase,
-                        &hbase_role,
-                        &rolegroup_name,
-                    )
-                    .context(ConstructJvmArgumentSnafu)?,
-                },
-            );
         }
 
         role_groups.insert(hbase_role, group_configs);
@@ -169,151 +166,62 @@ pub fn validate_cluster(
     ))
 }
 
-/// The names of the role groups defined for `role` in the spec.
-fn role_group_names(hbase: &v1alpha1::HbaseCluster, role: &HbaseRole) -> Vec<String> {
-    match role {
-        HbaseRole::Master => hbase
-            .spec
-            .masters
-            .as_ref()
-            .map(|r| r.role_groups.keys().cloned().collect()),
-        HbaseRole::RegionServer => hbase
-            .spec
-            .region_servers
-            .as_ref()
-            .map(|r| r.role_groups.keys().cloned().collect()),
-        HbaseRole::RestServer => hbase
-            .spec
-            .rest_servers
-            .as_ref()
-            .map(|r| r.role_groups.keys().cloned().collect()),
-    }
-    .unwrap_or_default()
-}
-
-/// Merge role-level then role-group-level `configOverrides` (role group wins).
-fn merged_config_overrides(
+/// Validates every role group of a role into a map keyed by role group name.
+///
+/// Each role group is merged and validated via the local-`framework`
+/// [`with_validated_config`], which folds the CRD config fragment (default <- role <-
+/// role group) plus the `configOverrides`, `envOverrides`, `cliOverrides` and
+/// `podOverrides` (role group wins) into a single
+/// [`RoleGroupConfig`](crate::framework::role_utils::RoleGroupConfig). The concrete
+/// per-role validated config is wrapped into [`AnyServiceConfig`] via `wrap`, and the
+/// role-specific non-heap JVM args are pre-resolved so the build step stays a pure
+/// function of [`ValidatedCluster`].
+///
+/// Returns an empty map if the role is not configured.
+fn validate_role_group_configs<Config, ValidatedConfig>(
     hbase: &v1alpha1::HbaseCluster,
-    role: &HbaseRole,
-    role_group: &str,
-) -> v1alpha1::HbaseConfigOverrides {
-    let (role_overrides, role_group_overrides) = match role {
-        HbaseRole::Master => (
-            hbase
-                .spec
-                .masters
-                .as_ref()
-                .map(|r| r.config.config_overrides.clone()),
-            hbase
-                .spec
-                .masters
-                .as_ref()
-                .and_then(|r| r.role_groups.get(role_group))
-                .map(|rg| rg.config.config_overrides.clone()),
-        ),
-        HbaseRole::RegionServer => (
-            hbase
-                .spec
-                .region_servers
-                .as_ref()
-                .map(|r| r.config.config_overrides.clone()),
-            hbase
-                .spec
-                .region_servers
-                .as_ref()
-                .and_then(|r| r.role_groups.get(role_group))
-                .map(|rg| rg.config.config_overrides.clone()),
-        ),
-        HbaseRole::RestServer => (
-            hbase
-                .spec
-                .rest_servers
-                .as_ref()
-                .map(|r| r.config.config_overrides.clone()),
-            hbase
-                .spec
-                .rest_servers
-                .as_ref()
-                .and_then(|r| r.role_groups.get(role_group))
-                .map(|rg| rg.config.config_overrides.clone()),
-        ),
+    hbase_role: &HbaseRole,
+    role: Option<
+        &Role<Config, v1alpha1::HbaseConfigOverrides, GenericRoleConfig, JavaCommonConfig>,
+    >,
+    default_config: Config,
+    wrap: fn(ValidatedConfig) -> AnyServiceConfig,
+) -> Result<BTreeMap<String, ValidatedRoleGroupConfig>, Error>
+where
+    Config: Clone + Merge,
+    ValidatedConfig: FromFragment<Fragment = Config>,
+{
+    let Some(role) = role else {
+        return Ok(BTreeMap::new());
     };
 
-    let role_overrides = role_overrides.unwrap_or_default();
-    let mut merged = role_group_overrides.unwrap_or_default();
-    merged.merge(&role_overrides);
-    merged
-}
+    role.role_groups
+        .iter()
+        .map(|(role_group_name, role_group)| {
+            let validated = with_validated_config::<
+                ValidatedConfig,
+                JavaCommonConfig,
+                Config,
+                GenericRoleConfig,
+                v1alpha1::HbaseConfigOverrides,
+            >(role_group, role, &default_config)
+            .context(ValidateRoleGroupConfigSnafu)?;
 
-/// Merge role-level then role-group-level `envOverrides` (role group wins).
-fn merged_env_overrides(
-    hbase: &v1alpha1::HbaseCluster,
-    role: &HbaseRole,
-    role_group: &str,
-) -> BTreeMap<String, String> {
-    let (role_overrides, role_group_overrides) = match role {
-        HbaseRole::Master => (
-            hbase
-                .spec
-                .masters
-                .as_ref()
-                .map(|r| r.config.env_overrides.clone()),
-            hbase
-                .spec
-                .masters
-                .as_ref()
-                .and_then(|r| r.role_groups.get(role_group))
-                .map(|rg| rg.config.env_overrides.clone()),
-        ),
-        HbaseRole::RegionServer => (
-            hbase
-                .spec
-                .region_servers
-                .as_ref()
-                .map(|r| r.config.env_overrides.clone()),
-            hbase
-                .spec
-                .region_servers
-                .as_ref()
-                .and_then(|r| r.role_groups.get(role_group))
-                .map(|rg| rg.config.env_overrides.clone()),
-        ),
-        HbaseRole::RestServer => (
-            hbase
-                .spec
-                .rest_servers
-                .as_ref()
-                .map(|r| r.config.env_overrides.clone()),
-            hbase
-                .spec
-                .rest_servers
-                .as_ref()
-                .and_then(|r| r.role_groups.get(role_group))
-                .map(|rg| rg.config.env_overrides.clone()),
-        ),
-    };
+            let non_heap_jvm_args =
+                construct_role_specific_non_heap_jvm_args(hbase, hbase_role, role_group_name)
+                    .context(ConstructJvmArgumentSnafu)?;
 
-    let mut env_overrides = BTreeMap::new();
-    if let Some(role_overrides) = role_overrides {
-        env_overrides.extend(role_overrides);
-    }
-    if let Some(role_group_overrides) = role_group_overrides {
-        env_overrides.extend(role_group_overrides);
-    }
-    env_overrides
-}
-
-/// Converts merged env override pairs into a type-safe [`EnvVarSet`], validating each name so that
-/// invalid environment variable names are rejected during validation instead of producing a broken
-/// Pod.
-fn env_var_set(env_overrides: BTreeMap<String, String>) -> Result<EnvVarSet, Error> {
-    let mut set = EnvVarSet::new();
-    for (name, value) in env_overrides {
-        let env_var_name =
-            EnvVarName::from_str(&name).context(InvalidEnvVarNameSnafu { name: name.clone() })?;
-        set = set.with_value(&env_var_name, value);
-    }
-    Ok(set)
+            let validated = ValidatedRoleGroupConfig {
+                replicas: validated.replicas,
+                config: wrap(validated.config),
+                config_overrides: validated.config_overrides,
+                env_overrides: validated.env_overrides,
+                pod_overrides: validated.pod_overrides,
+                non_heap_jvm_args,
+            };
+            Ok((role_group_name.clone(), validated))
+        })
+        .collect()
 }
 
 #[cfg(test)]
@@ -321,7 +229,10 @@ mod tests {
     use indoc::indoc;
 
     use super::*;
+    use crate::crd::HbaseConfig;
 
+    /// Role-level `envOverrides` are merged with role-group-level ones, with the role
+    /// group winning on key collisions.
     #[test]
     fn test_env_overrides() {
         let input = indoc! {r#"
@@ -371,19 +282,31 @@ spec:
         let hbase: v1alpha1::HbaseCluster =
             serde_yaml::with::singleton_map_recursive::deserialize(deserializer).unwrap();
 
-        let env_overrides = merged_env_overrides(&hbase, &HbaseRole::Master, "default");
+        let role = hbase.spec.masters.as_ref().unwrap();
+        let role_group = role.role_groups.get("default").unwrap();
+        let default_config = HbaseConfigFragment::default_config(
+            &HbaseRole::Master,
+            &hbase.name_any(),
+            &hbase.spec.cluster_config.hdfs_config_map_name,
+        );
 
-        assert_eq!(
-            env_overrides.get("TEST_VAR"),
-            Some(&"MASTER_RG".to_string())
-        );
-        assert_eq!(
-            env_overrides.get("TEST_VAR_FROM_MASTER"),
-            Some(&"MASTER".to_string())
-        );
-        assert_eq!(
-            env_overrides.get("TEST_VAR_FROM_MRG"),
-            Some(&"MASTER".to_string())
-        );
+        let validated = with_validated_config::<
+            HbaseConfig,
+            JavaCommonConfig,
+            HbaseConfigFragment,
+            GenericRoleConfig,
+            v1alpha1::HbaseConfigOverrides,
+        >(role_group, role, &default_config)
+        .unwrap();
+
+        let env: BTreeMap<String, String> = validated
+            .env_overrides
+            .into_iter()
+            .map(|env_var| (env_var.name, env_var.value.unwrap_or_default()))
+            .collect();
+
+        assert_eq!(env.get("TEST_VAR"), Some(&"MASTER_RG".to_string()));
+        assert_eq!(env.get("TEST_VAR_FROM_MASTER"), Some(&"MASTER".to_string()));
+        assert_eq!(env.get("TEST_VAR_FROM_MRG"), Some(&"MASTER".to_string()));
     }
 }

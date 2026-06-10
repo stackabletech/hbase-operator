@@ -525,7 +525,7 @@ fn build_rolegroup_statefulset(
     resolved_product_image: &ResolvedProductImage,
     service_account: &ServiceAccount,
 ) -> Result<StatefulSet> {
-    let merged_config = &validated_rg_config.merged_config;
+    let merged_config = &validated_rg_config.config;
     let hbase_version = &resolved_product_image.app_version_label_value;
 
     let ports = hbase_role
@@ -792,7 +792,7 @@ fn build_rolegroup_statefulset(
 
     let statefulset_spec = StatefulSetSpec {
         pod_management_policy: Some("Parallel".to_string()),
-        replicas: validated_rg_config.replicas.map(i32::from),
+        replicas: Some(i32::from(validated_rg_config.replicas)),
         selector: LabelSelector {
             match_labels: Some(statefulset_match_labels.into()),
             ..LabelSelector::default()

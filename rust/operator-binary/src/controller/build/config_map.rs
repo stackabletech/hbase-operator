@@ -71,7 +71,7 @@ pub fn build_rolegroup_config_map(
 
     let hbase_site_xml = hbase_site::build(
         role,
-        &rg.merged_config,
+        &rg.config,
         cluster_config
             .zookeeper_connection_information
             .as_hbase_settings(),
@@ -81,7 +81,7 @@ pub fn build_rolegroup_config_map(
     );
 
     let hbase_env_sh = hbase_env::build(
-        &rg.merged_config,
+        &rg.config,
         role,
         cluster_config.kerberos_enabled,
         rg.non_heap_jvm_args.clone(),
@@ -134,12 +134,10 @@ pub fn build_rolegroup_config_map(
         builder.add_data(ConfigFileName::SslClient.to_string(), ssl_client_xml);
     }
 
-    if let Some(log4j2_properties) = logging::build_log4j2(rg.merged_config.logging()) {
+    if let Some(log4j2_properties) = logging::build_log4j2(rg.config.logging()) {
         builder.add_data(ConfigFileName::Log4j2.to_string(), log4j2_properties);
     }
-    if let Some(vector_config) =
-        logging::build_vector_config(rolegroup_ref, rg.merged_config.logging())
-    {
+    if let Some(vector_config) = logging::build_vector_config(rolegroup_ref, rg.config.logging()) {
         builder.add_data(VECTOR_CONFIG_FILE, vector_config);
     }
 
