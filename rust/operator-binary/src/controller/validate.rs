@@ -15,11 +15,11 @@ use strum::IntoEnumIterator;
 
 use crate::{
     config::jvm::construct_role_specific_non_heap_jvm_args,
-    controller::dereference::DereferencedObjects,
-    crd::{HbaseRole, v1alpha1},
-    hbase_controller::{
+    controller::{
         ValidatedCluster, ValidatedClusterConfig, ValidatedRoleConfig, ValidatedRoleGroupConfig,
+        dereference::DereferencedObjects,
     },
+    crd::{HbaseRole, v1alpha1},
     kerberos::{
         self, kerberos_config_properties, kerberos_discovery_config_properties,
         kerberos_ssl_client_settings, kerberos_ssl_server_settings,

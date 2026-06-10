@@ -8,9 +8,9 @@ use stackable_operator::{
 };
 
 use crate::{
-    controller::build::properties::ConfigFileName,
+    controller::{ValidatedCluster, build::properties::ConfigFileName},
     crd::HbaseRole,
-    hbase_controller::{ValidatedCluster, build_recommended_labels},
+    hbase_controller::build_recommended_labels,
 };
 
 type Result<T, E = Error> = std::result::Result<T, E>;
