@@ -7,7 +7,6 @@ use stackable_operator::v2::config_overrides::KeyValueConfigOverrides;
 
 use crate::{
     config::jvm::{self, construct_global_jvm_args, construct_hbase_heapsize_env},
-    controller::build::properties::resolved_overrides,
     crd::{AnyServiceConfig, HbaseRole},
 };
 
@@ -50,7 +49,7 @@ pub fn build(
     }
 
     // configOverride come last
-    env.extend(resolved_overrides(overrides));
+    env.extend(overrides);
 
     Ok(env
         .iter()

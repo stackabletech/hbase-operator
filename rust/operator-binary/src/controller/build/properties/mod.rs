@@ -16,30 +16,13 @@ pub mod security_properties;
 pub mod ssl_client;
 pub mod ssl_server;
 
-/// Keep only the set (`Some`) entries of a `key -> optional value` map, as `(key, value)` pairs.
-fn defined_entries(
-    entries: BTreeMap<String, Option<String>>,
-) -> impl Iterator<Item = (String, String)> {
-    entries
-        .into_iter()
-        .filter_map(|(key, value)| value.map(|value| (key, value)))
-}
-
-/// Resolve user-provided [`KeyValueConfigOverrides`] into the key/value pairs to merge
-/// into a config file, dropping entries whose value is unset (`None`).
-fn resolved_overrides(
-    overrides: KeyValueConfigOverrides,
-) -> impl Iterator<Item = (String, String)> {
-    defined_entries(overrides.overrides)
-}
-
 /// Render an XML config file from base `settings` merged with user `overrides`
 /// (overrides applied last, so users win), serialized to the Hadoop-XML on-wire format.
 fn build_xml_config(
     mut config: BTreeMap<String, String>,
     overrides: KeyValueConfigOverrides,
 ) -> String {
-    config.extend(resolved_overrides(overrides));
+    config.extend(overrides);
     to_hadoop_xml(config.iter())
 }
 
@@ -86,7 +69,7 @@ pub(crate) mod test_support {
         KeyValueConfigOverrides {
             overrides: pairs
                 .iter()
-                .map(|(k, v)| (k.to_string(), Some(v.to_string())))
+                .map(|(k, v)| (k.to_string(), v.to_string()))
                 .collect(),
         }
     }

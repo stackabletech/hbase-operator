@@ -11,7 +11,7 @@ use stackable_operator::v2::{
     config_overrides::KeyValueConfigOverrides,
 };
 
-use crate::{controller::build::properties::resolved_overrides, crd::HbaseRole};
+use crate::crd::HbaseRole;
 
 /// Renders `security.properties`: role-specific DNS cache TTLs plus user overrides.
 pub fn build(
@@ -38,7 +38,7 @@ pub fn build(
         ),
     ]);
     // Overrides applied last so users win.
-    config.extend(resolved_overrides(overrides));
+    config.extend(overrides);
     to_java_properties_string(config.iter())
 }
 
