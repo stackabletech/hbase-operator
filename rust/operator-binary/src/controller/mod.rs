@@ -34,10 +34,6 @@ pub struct ValidatedCluster {
     metadata: ObjectMeta,
     /// The logical (and Kubernetes object) name of the cluster.
     pub name: ClusterName,
-    /// The namespace the cluster lives in. Part of the cluster identity; currently consumed via
-    /// the [`Resource`] metadata (`name_and_namespace`) rather than read directly.
-    #[allow(dead_code)]
-    pub namespace: NamespaceName,
     /// The UID of the `HbaseCluster` object, used to build owner references.
     pub uid: Uid,
     pub image: ResolvedProductImage,
@@ -65,7 +61,6 @@ impl ValidatedCluster {
                 ..ObjectMeta::default()
             },
             name,
-            namespace,
             uid,
             image,
             cluster_config,
