@@ -19,10 +19,9 @@ use stackable_operator::{
 use strum::IntoEnumIterator;
 
 use crate::{
-    config::jvm::construct_role_specific_non_heap_jvm_args,
     controller::{
         ValidatedCluster, ValidatedClusterConfig, ValidatedRoleConfig, ValidatedRoleGroupConfig,
-        dereference::DereferencedObjects,
+        build::jvm::construct_role_specific_non_heap_jvm_args, dereference::DereferencedObjects,
     },
     crd::{AnyServiceConfig, HbaseConfigFragment, HbaseRole, RegionServerConfigFragment, v1alpha1},
     kerberos::{

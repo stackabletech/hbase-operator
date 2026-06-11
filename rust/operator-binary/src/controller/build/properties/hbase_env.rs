@@ -6,7 +6,7 @@ use snafu::{ResultExt, Snafu};
 use stackable_operator::v2::config_overrides::KeyValueConfigOverrides;
 
 use crate::{
-    config::jvm::{self, construct_global_jvm_args, construct_hbase_heapsize_env},
+    controller::build::jvm::{self, construct_global_jvm_args, construct_hbase_heapsize_env},
     crd::{AnyServiceConfig, HbaseRole},
 };
 
