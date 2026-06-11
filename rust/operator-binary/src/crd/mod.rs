@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use security::AuthenticationConfig;
 use serde::{Deserialize, Serialize};
 use shell_escape::escape;
-use snafu::{OptionExt, ResultExt, Snafu};
+use snafu::{ResultExt, Snafu};
 use stackable_operator::{
     builder::pod::volume::{
         ListenerOperatorVolumeSourceBuilder, ListenerOperatorVolumeSourceBuilderError,
@@ -19,7 +19,7 @@ use stackable_operator::{
         },
     },
     config::{
-        fragment::{self, Fragment, ValidationError},
+        fragment::Fragment,
         merge::{Atomic, Merge},
     },
     deep_merger::ObjectOverrides,
@@ -27,7 +27,7 @@ use stackable_operator::{
         api::core::v1::{EnvVar, PersistentVolumeClaim, Volume},
         apimachinery::pkg::api::resource::Quantity,
     },
-    kube::{CustomResource, ResourceExt, runtime::reflector::ObjectRef},
+    kube::{CustomResource, runtime::reflector::ObjectRef},
     kvp::Labels,
     product_logging::{self, spec::Logging},
     role_utils::{GenericRoleConfig, Role, RoleGroupRef},
@@ -107,18 +107,6 @@ pub type RestServerRoleType =
 
 #[derive(Snafu, Debug)]
 pub enum Error {
-    #[snafu(display("the HBase role [{role}] is missing from spec"))]
-    MissingHbaseRole { role: String },
-
-    #[snafu(display("fragment validation failure"))]
-    FragmentValidationFailure { source: ValidationError },
-
-    #[snafu(display("empty values for role-group are not permitted"))]
-    EmptyRoleGroup,
-
-    #[snafu(display("role-group not found by name"))]
-    RoleGroupNotFound,
-
     #[snafu(display("failed to build listener volume"))]
     BuildListenerVolume {
         source: ListenerOperatorVolumeSourceBuilderError,
@@ -241,112 +229,6 @@ impl HasStatusCondition for v1alpha1::HbaseCluster {
 }
 
 impl v1alpha1::HbaseCluster {
-    /// Retrieve and merge resource configs for role and role groups
-    /// Merges and validates the config for `role`/`role_group`.
-    ///
-    /// The role-group config is merged on top of the role config on top of the
-    /// operator defaults (most specific wins) and the result is validated.
-    pub fn merged_config(
-        &self,
-        role: &HbaseRole,
-        role_group: &str,
-        hdfs_discovery_cm_name: &str,
-    ) -> Result<AnyServiceConfig, Error> {
-        // Trivial values for role-groups are not allowed
-        if role_group.is_empty() {
-            return Err(Error::EmptyRoleGroup);
-        }
-
-        match role {
-            HbaseRole::Master => {
-                let default_config = HbaseConfigFragment::default_config(
-                    role,
-                    &self.name_any(),
-                    hdfs_discovery_cm_name,
-                );
-                let role_obj = self.spec.masters.as_ref().context(MissingHbaseRoleSnafu {
-                    role: role.to_string(),
-                })?;
-
-                let mut role_config = role_obj.config.config.clone();
-                let mut role_group_config = role_obj
-                    .role_groups
-                    .get(role_group)
-                    .context(RoleGroupNotFoundSnafu)?
-                    .config
-                    .config
-                    .clone();
-
-                role_config.merge(&default_config);
-                role_group_config.merge(&role_config);
-                Ok(AnyServiceConfig::Master(
-                    fragment::validate(role_group_config)
-                        .context(FragmentValidationFailureSnafu)?,
-                ))
-            }
-            HbaseRole::RegionServer => {
-                let default_config = RegionServerConfigFragment::default_config(
-                    role,
-                    &self.name_any(),
-                    hdfs_discovery_cm_name,
-                );
-                let role_obj =
-                    self.spec
-                        .region_servers
-                        .as_ref()
-                        .context(MissingHbaseRoleSnafu {
-                            role: role.to_string(),
-                        })?;
-
-                let mut role_config = role_obj.config.config.clone();
-                let mut role_group_config = role_obj
-                    .role_groups
-                    .get(role_group)
-                    .context(RoleGroupNotFoundSnafu)?
-                    .config
-                    .config
-                    .clone();
-
-                role_config.merge(&default_config);
-                role_group_config.merge(&role_config);
-                Ok(AnyServiceConfig::RegionServer(
-                    fragment::validate(role_group_config)
-                        .context(FragmentValidationFailureSnafu)?,
-                ))
-            }
-            HbaseRole::RestServer => {
-                let default_config = HbaseConfigFragment::default_config(
-                    role,
-                    &self.name_any(),
-                    hdfs_discovery_cm_name,
-                );
-                let role_obj = self
-                    .spec
-                    .rest_servers
-                    .as_ref()
-                    .context(MissingHbaseRoleSnafu {
-                        role: role.to_string(),
-                    })?;
-
-                let mut role_config = role_obj.config.config.clone();
-                let mut role_group_config = role_obj
-                    .role_groups
-                    .get(role_group)
-                    .context(RoleGroupNotFoundSnafu)?
-                    .config
-                    .config
-                    .clone();
-
-                role_config.merge(&default_config);
-                role_group_config.merge(&role_config);
-                Ok(AnyServiceConfig::RestServer(
-                    fragment::validate(role_group_config)
-                        .context(FragmentValidationFailureSnafu)?,
-                ))
-            }
-        }
-    }
-
     /// Metadata about a server rolegroup
     pub fn server_rolegroup_ref(
         &self,
@@ -952,6 +834,110 @@ impl AnyServiceConfig {
 }
 
 #[cfg(test)]
+pub(crate) mod test_helpers {
+    use stackable_operator::{
+        config::{fragment::FromFragment, merge::Merge},
+        kube::ResourceExt,
+        role_utils::{GenericRoleConfig, Role},
+        v2::{
+            jvm_argument_overrides::JvmArgumentOverrides,
+            role_utils::{JavaCommonConfig, with_validated_config},
+        },
+    };
+
+    use super::{
+        AnyServiceConfig, HbaseConfig, HbaseConfigFragment, HbaseRole, RegionServerConfig,
+        RegionServerConfigFragment, v1alpha1,
+    };
+
+    /// Test helper: merge + validate a single role group via the production
+    /// [`with_validated_config`] path (the same merge the controller runs), returning the
+    /// role-specific [`AnyServiceConfig`] and the merged [`JvmArgumentOverrides`].
+    pub(crate) fn merged_role_group_config(
+        hbase: &v1alpha1::HbaseCluster,
+        role: &HbaseRole,
+        role_group: &str,
+        hdfs_discovery_cm_name: &str,
+    ) -> (AnyServiceConfig, JvmArgumentOverrides) {
+        match role {
+            HbaseRole::Master => merge::<HbaseConfig, _>(
+                hbase
+                    .spec
+                    .masters
+                    .as_ref()
+                    .expect("master role must be defined"),
+                role_group,
+                HbaseConfigFragment::default_config(
+                    role,
+                    &hbase.name_any(),
+                    hdfs_discovery_cm_name,
+                ),
+                AnyServiceConfig::Master,
+            ),
+            HbaseRole::RegionServer => merge::<RegionServerConfig, _>(
+                hbase
+                    .spec
+                    .region_servers
+                    .as_ref()
+                    .expect("region server role must be defined"),
+                role_group,
+                RegionServerConfigFragment::default_config(
+                    role,
+                    &hbase.name_any(),
+                    hdfs_discovery_cm_name,
+                ),
+                AnyServiceConfig::RegionServer,
+            ),
+            HbaseRole::RestServer => merge::<HbaseConfig, _>(
+                hbase
+                    .spec
+                    .rest_servers
+                    .as_ref()
+                    .expect("rest server role must be defined"),
+                role_group,
+                HbaseConfigFragment::default_config(
+                    role,
+                    &hbase.name_any(),
+                    hdfs_discovery_cm_name,
+                ),
+                AnyServiceConfig::RestServer,
+            ),
+        }
+    }
+
+    fn merge<ValidatedConfig, Config>(
+        role: &Role<Config, v1alpha1::HbaseConfigOverrides, GenericRoleConfig, JavaCommonConfig>,
+        role_group: &str,
+        default_config: Config,
+        wrap: fn(ValidatedConfig) -> AnyServiceConfig,
+    ) -> (AnyServiceConfig, JvmArgumentOverrides)
+    where
+        Config: Clone + Merge,
+        ValidatedConfig: FromFragment<Fragment = Config>,
+    {
+        let role_group = role
+            .role_groups
+            .get(role_group)
+            .expect("role group must be defined");
+        let validated = with_validated_config::<
+            ValidatedConfig,
+            JavaCommonConfig,
+            Config,
+            GenericRoleConfig,
+            v1alpha1::HbaseConfigOverrides,
+        >(role_group, role, &default_config)
+        .expect("role group config should merge and validate");
+        (
+            wrap(validated.config.config),
+            validated
+                .config
+                .product_specific_common_config
+                .jvm_argument_overrides,
+        )
+    }
+}
+
+#[cfg(test)]
 mod tests {
     use indoc::indoc;
     use rstest::rstest;
@@ -1011,13 +997,12 @@ spec:
         let hbase_role = HbaseRole::RegionServer;
         let rolegroup = hbase.server_rolegroup_ref(hbase_role.to_string(), role_group_name);
 
-        let merged_config = hbase
-            .merged_config(
-                &hbase_role,
-                &rolegroup.role_group,
-                &hbase.spec.cluster_config.hdfs_config_map_name,
-            )
-            .unwrap();
+        let (merged_config, _) = super::test_helpers::merged_role_group_config(
+            &hbase,
+            &hbase_role,
+            &rolegroup.role_group,
+            &hbase.spec.cluster_config.hdfs_config_map_name,
+        );
         if let AnyServiceConfig::RegionServer(config) = merged_config {
             assert_eq!(run_before_shutdown, config.region_mover.run_before_shutdown);
             assert_eq!(max_threads, config.region_mover.max_threads);

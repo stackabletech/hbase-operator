@@ -97,8 +97,6 @@ fn is_heap_jvm_argument(jvm_argument: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use stackable_operator::config::merge::Merge;
-
     use super::*;
     use crate::crd::{HbaseRole, v1alpha1};
 
@@ -212,23 +210,16 @@ mod tests {
         let hbase: v1alpha1::HbaseCluster =
             serde_yaml::from_str(hbase_cluster).expect("illegal test input");
 
-        let hbase_role = HbaseRole::RegionServer;
-        let merged_config = hbase
-            .merged_config(&hbase_role, "default", "my-hdfs")
-            .unwrap();
-
-        // Merge the role <- role-group JVM argument overrides the same way
-        // `with_validated_config` does, so the tests exercise the real merge path.
-        let role = hbase.spec.region_servers.as_ref().unwrap();
-        let mut merged_common = role
-            .role_groups
-            .get("default")
-            .unwrap()
-            .config
-            .product_specific_common_config
-            .clone();
-        merged_common.merge(&role.config.product_specific_common_config);
-        let merged_jvm_argument_overrides = merged_common.jvm_argument_overrides;
+        // Merge + validate the region server `default` role group via the real
+        // `with_validated_config` path, returning the merged config (for heap sizing) and the
+        // merged JVM argument overrides.
+        let (merged_config, merged_jvm_argument_overrides) =
+            crate::crd::test_helpers::merged_role_group_config(
+                &hbase,
+                &HbaseRole::RegionServer,
+                "default",
+                "my-hdfs",
+            );
 
         (hbase, merged_config, merged_jvm_argument_overrides)
     }

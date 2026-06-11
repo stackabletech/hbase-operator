@@ -124,15 +124,13 @@ mod tests {
         "#;
         let hbase: v1alpha1::HbaseCluster =
             serde_yaml::from_str(input).expect("illegal test input");
-        let affinity = hbase
-            .merged_config(
-                &role,
-                "default",
-                &hbase.spec.cluster_config.hdfs_config_map_name,
-            )
-            .unwrap()
-            .affinity()
-            .clone();
+        let (merged_config, _) = crate::crd::test_helpers::merged_role_group_config(
+            &hbase,
+            &role,
+            "default",
+            &hbase.spec.cluster_config.hdfs_config_map_name,
+        );
+        let affinity = merged_config.affinity().clone();
 
         let mut expected_affinities = vec![WeightedPodAffinityTerm {
             pod_affinity_term: PodAffinityTerm {
