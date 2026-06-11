@@ -62,33 +62,18 @@ pub fn build(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        controller::build::properties::test_support::{config_overrides, minimal_hbase},
-        crd::v1alpha1,
-    };
-
-    fn master_merged_config(hbase: &v1alpha1::HbaseCluster) -> AnyServiceConfig {
-        hbase
-            .merged_config(&HbaseRole::Master, "default", "simple-hdfs")
-            .expect("merged config for the minimal master group")
-    }
-
-    fn region_server_merged_config(hbase: &v1alpha1::HbaseCluster) -> AnyServiceConfig {
-        hbase
-            .merged_config(&HbaseRole::RegionServer, "default", "simple-hdfs")
-            .expect("merged config for the minimal region server group")
-    }
+    use crate::controller::build::properties::test_support::{merged_config, validated_cluster};
 
     #[test]
     fn renders_operator_defaults() {
-        let hbase = minimal_hbase();
-        let merged = master_merged_config(&hbase);
+        let validated_cluster = validated_cluster();
+        let merged = merged_config(&validated_cluster, &HbaseRole::Master);
         let env = build(
-            &merged,
+            merged,
             &HbaseRole::Master,
             false,
             "-Xtest".to_string(),
-            config_overrides(&[]),
+            KeyValueConfigOverrides::default(),
         )
         .unwrap();
         assert!(env.contains("export HBASE_MANAGES_ZK=\"false\""), "{env}");
@@ -97,14 +82,14 @@ mod tests {
 
     #[test]
     fn renders_region_server_opts() {
-        let hbase = minimal_hbase();
-        let merged = region_server_merged_config(&hbase);
+        let validated_cluster = validated_cluster();
+        let merged = merged_config(&validated_cluster, &HbaseRole::RegionServer);
         let env = build(
-            &merged,
+            merged,
             &HbaseRole::RegionServer,
             false,
             "-Xtest".to_string(),
-            config_overrides(&[]),
+            KeyValueConfigOverrides::default(),
         )
         .unwrap();
         assert!(env.contains("export HBASE_REGIONSERVER_OPTS="), "{env}");
@@ -112,14 +97,14 @@ mod tests {
 
     #[test]
     fn user_override_appears() {
-        let hbase = minimal_hbase();
-        let merged = master_merged_config(&hbase);
+        let validated_cluster = validated_cluster();
+        let merged = merged_config(&validated_cluster, &HbaseRole::Master);
         let env = build(
-            &merged,
+            merged,
             &HbaseRole::Master,
             false,
             "-Xtest".to_string(),
-            config_overrides(&[("CUSTOM_VAR", "custom_value")]),
+            [("CUSTOM_VAR", "custom_value")].into(),
         )
         .unwrap();
         assert!(env.contains("export CUSTOM_VAR=\"custom_value\""), "{env}");

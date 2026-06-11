@@ -60,19 +60,17 @@ mod tests {
 
 #[cfg(test)]
 pub(crate) mod test_support {
-    use stackable_operator::v2::config_overrides::KeyValueConfigOverrides;
+    use stackable_operator::{
+        commons::networking::DomainName, utils::cluster_info::KubernetesClusterInfo,
+    };
 
-    use crate::crd::v1alpha1;
-
-    /// Builds a [`KeyValueConfigOverrides`] from `(key, value)` pairs for tests.
-    pub fn config_overrides(pairs: &[(&str, &str)]) -> KeyValueConfigOverrides {
-        KeyValueConfigOverrides {
-            overrides: pairs
-                .iter()
-                .map(|(k, v)| (k.to_string(), v.to_string()))
-                .collect(),
-        }
-    }
+    use crate::{
+        controller::{
+            ValidatedCluster, dereference::DereferencedObjects, validate::validate_cluster,
+        },
+        crd::{AnyServiceConfig, HbaseRole, v1alpha1},
+        zookeeper::ZookeeperConnectionInformation,
+    };
 
     /// A minimal three-role HbaseCluster used to drive the per-file builder tests.
     pub const MINIMAL_HBASE_YAML: &str = r#"
@@ -82,6 +80,7 @@ kind: HbaseCluster
 metadata:
   name: hbase
   namespace: default
+  uid: c2c8c5c0-0b5a-4b1e-9f3e-1a2b3c4d5e6f
 spec:
   image:
     productVersion: 2.6.3
@@ -104,5 +103,36 @@ spec:
 
     pub fn minimal_hbase() -> v1alpha1::HbaseCluster {
         serde_yaml::from_str(MINIMAL_HBASE_YAML).expect("invalid test HbaseCluster YAML")
+    }
+
+    pub fn cluster_info() -> KubernetesClusterInfo {
+        KubernetesClusterInfo {
+            cluster_domain: DomainName::try_from("cluster.local").unwrap(),
+        }
+    }
+
+    /// Runs the real validation pipeline once over [`minimal_hbase`], with a fixed
+    /// dereferenced ZooKeeper connection (and no OPA), so the per-file builder tests can
+    /// pull merged configs straight from the [`ValidatedCluster`] instead of re-merging by
+    /// hand via `crd::merged_config`.
+    pub fn validated_cluster() -> ValidatedCluster {
+        validate_cluster(
+            &minimal_hbase(),
+            "oci.example.org",
+            &cluster_info(),
+            DereferencedObjects {
+                zookeeper_connection_information: ZookeeperConnectionInformation::for_tests(),
+                hbase_opa_config: None,
+            },
+        )
+        .expect("validate should succeed for the minimal fixture")
+    }
+
+    /// The merged [`AnyServiceConfig`] for the `default` role group of `role`.
+    pub fn merged_config<'a>(
+        validated_cluster: &'a ValidatedCluster,
+        role: &HbaseRole,
+    ) -> &'a AnyServiceConfig {
+        &validated_cluster.role_group_configs[role]["default"].config
     }
 }

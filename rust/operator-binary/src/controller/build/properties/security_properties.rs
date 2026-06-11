@@ -44,12 +44,11 @@ pub fn build(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::controller::build::properties::test_support::config_overrides;
 
     #[test]
     fn injects_master_dns_cache_ttl() {
         assert_eq!(
-            build(&HbaseRole::Master, config_overrides(&[])).unwrap(),
+            build(&HbaseRole::Master, KeyValueConfigOverrides::default()).unwrap(),
             "networkaddress.cache.negative.ttl=0\nnetworkaddress.cache.ttl=5\n"
         );
     }
@@ -57,7 +56,7 @@ mod tests {
     #[test]
     fn injects_regionserver_dns_cache_ttl() {
         assert_eq!(
-            build(&HbaseRole::RegionServer, config_overrides(&[])).unwrap(),
+            build(&HbaseRole::RegionServer, KeyValueConfigOverrides::default()).unwrap(),
             "networkaddress.cache.negative.ttl=0\nnetworkaddress.cache.ttl=10\n"
         );
     }
@@ -65,7 +64,7 @@ mod tests {
     #[test]
     fn injects_restserver_dns_cache_ttl() {
         assert_eq!(
-            build(&HbaseRole::RestServer, config_overrides(&[])).unwrap(),
+            build(&HbaseRole::RestServer, KeyValueConfigOverrides::default()).unwrap(),
             "networkaddress.cache.negative.ttl=0\nnetworkaddress.cache.ttl=30\n"
         );
     }
@@ -75,7 +74,7 @@ mod tests {
         assert_eq!(
             build(
                 &HbaseRole::Master,
-                config_overrides(&[("networkaddress.cache.ttl", "60")])
+                [("networkaddress.cache.ttl", "60")].into()
             )
             .unwrap(),
             "networkaddress.cache.negative.ttl=0\nnetworkaddress.cache.ttl=60\n"

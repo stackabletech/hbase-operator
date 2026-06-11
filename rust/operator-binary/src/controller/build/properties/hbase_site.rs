@@ -113,40 +113,19 @@ pub fn build(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        controller::build::properties::test_support::{config_overrides, minimal_hbase},
-        crd::v1alpha1,
-    };
-
-    fn master_merged_config(hbase: &v1alpha1::HbaseCluster) -> AnyServiceConfig {
-        hbase
-            .merged_config(&HbaseRole::Master, "default", "simple-hdfs")
-            .expect("merged config for the minimal master group")
-    }
-
-    fn region_server_merged_config(hbase: &v1alpha1::HbaseCluster) -> AnyServiceConfig {
-        hbase
-            .merged_config(&HbaseRole::RegionServer, "default", "simple-hdfs")
-            .expect("merged config for the minimal region server group")
-    }
-
-    fn rest_server_merged_config(hbase: &v1alpha1::HbaseCluster) -> AnyServiceConfig {
-        hbase
-            .merged_config(&HbaseRole::RestServer, "default", "simple-hdfs")
-            .expect("merged config for the minimal rest server group")
-    }
+    use crate::controller::build::properties::test_support::{merged_config, validated_cluster};
 
     #[test]
     fn renders_operator_defaults() {
-        let hbase = minimal_hbase();
-        let merged = master_merged_config(&hbase);
+        let validated_cluster = validated_cluster();
+        let merged = merged_config(&validated_cluster, &HbaseRole::Master);
         let xml = build(
             &HbaseRole::Master,
-            &merged,
+            merged,
             BTreeMap::new(),
             BTreeMap::new(),
             None,
-            config_overrides(&[]),
+            KeyValueConfigOverrides::default(),
         );
         assert!(
             xml.contains("<name>hbase.cluster.distributed</name>\n    <value>true</value>"),
@@ -160,15 +139,15 @@ mod tests {
 
     #[test]
     fn renders_region_server_bind_settings() {
-        let hbase = minimal_hbase();
-        let merged = region_server_merged_config(&hbase);
+        let validated_cluster = validated_cluster();
+        let merged = merged_config(&validated_cluster, &HbaseRole::RegionServer);
         let xml = build(
             &HbaseRole::RegionServer,
-            &merged,
+            merged,
             BTreeMap::new(),
             BTreeMap::new(),
             None,
-            config_overrides(&[]),
+            KeyValueConfigOverrides::default(),
         );
         assert!(
             xml.contains("<name>hbase.regionserver.ipc.address</name>\n    <value>0.0.0.0</value>"),
@@ -184,15 +163,15 @@ mod tests {
 
     #[test]
     fn renders_rest_server_endpoint() {
-        let hbase = minimal_hbase();
-        let merged = rest_server_merged_config(&hbase);
+        let validated_cluster = validated_cluster();
+        let merged = merged_config(&validated_cluster, &HbaseRole::RestServer);
         let xml = build(
             &HbaseRole::RestServer,
-            &merged,
+            merged,
             BTreeMap::new(),
             BTreeMap::new(),
             None,
-            config_overrides(&[]),
+            KeyValueConfigOverrides::default(),
         );
         assert!(
             xml.contains(
@@ -204,15 +183,15 @@ mod tests {
 
     #[test]
     fn user_override_wins() {
-        let hbase = minimal_hbase();
-        let merged = master_merged_config(&hbase);
+        let validated_cluster = validated_cluster();
+        let merged = merged_config(&validated_cluster, &HbaseRole::Master);
         let xml = build(
             &HbaseRole::Master,
-            &merged,
+            merged,
             BTreeMap::new(),
             BTreeMap::new(),
             None,
-            config_overrides(&[("hbase.cluster.distributed", "false")]),
+            [("hbase.cluster.distributed", "false")].into(),
         );
         assert!(
             xml.contains("<name>hbase.cluster.distributed</name>\n    <value>false</value>"),

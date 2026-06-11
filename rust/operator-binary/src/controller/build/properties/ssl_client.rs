@@ -13,7 +13,6 @@ pub fn build(settings: BTreeMap<String, String>, overrides: KeyValueConfigOverri
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::controller::build::properties::test_support::config_overrides;
 
     #[test]
     fn settings_appear_in_xml() {
@@ -22,7 +21,7 @@ mod tests {
                 "ssl.client.truststore.type".to_string(),
                 "pkcs12".to_string(),
             )]),
-            config_overrides(&[]),
+            KeyValueConfigOverrides::default(),
         );
         assert!(
             xml.contains("<name>ssl.client.truststore.type</name>\n    <value>pkcs12</value>"),
@@ -34,7 +33,7 @@ mod tests {
     fn user_override_appears_in_xml() {
         let xml = build(
             BTreeMap::new(),
-            config_overrides(&[("ssl.client.keystore.type", "jks")]),
+            [("ssl.client.keystore.type", "jks")].into(),
         );
         assert!(
             xml.contains("<name>ssl.client.keystore.type</name>\n    <value>jks</value>"),

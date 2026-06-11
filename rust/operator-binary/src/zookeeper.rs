@@ -53,6 +53,20 @@ pub struct ZookeeperConnectionInformation {
     port: u16,
 }
 
+#[cfg(test)]
+impl ZookeeperConnectionInformation {
+    /// A fixed connection used by the per-file builder tests, so they don't need a live
+    /// ZooKeeper/ZNode discovery `ConfigMap`.
+    pub(crate) fn for_tests() -> Self {
+        Self {
+            hosts: "simple-zk-server-default-0.simple-zk-server-default.default.svc.cluster.local"
+                .to_owned(),
+            chroot: "/znode-test".to_owned(),
+            port: 2282,
+        }
+    }
+}
+
 impl ZookeeperConnectionInformation {
     pub async fn retrieve(hbase: &v1alpha1::HbaseCluster, client: &Client) -> Result<Self> {
         let zk_discovery_cm_name = &hbase.spec.cluster_config.zookeeper_config_map_name;
