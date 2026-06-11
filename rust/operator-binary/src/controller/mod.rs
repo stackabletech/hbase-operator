@@ -146,7 +146,7 @@ pub struct ValidatedRoleConfig {
 /// (role <- role group) `configOverrides`, `envOverrides` and `podOverrides`.
 ///
 /// The merge and validation is performed by
-/// [`with_validated_config`](crate::framework::role_utils::with_validated_config); the
+/// [`with_validated_config`](stackable_operator::v2::role_utils::with_validated_config); the
 /// result is flattened into this struct and augmented with the pre-resolved
 /// `non_heap_jvm_args`. Carrying every override channel (and the JVM args) keeps the
 /// build step a pure function of [`ValidatedCluster`] that never has to reach back into

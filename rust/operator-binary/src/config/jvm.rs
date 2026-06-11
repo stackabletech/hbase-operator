@@ -1,12 +1,10 @@
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
     memory::{BinaryMultiple, MemoryQuantity},
-    role_utils::{self, JvmArgumentOverrides},
+    v2::jvm_argument_overrides::JvmArgumentOverrides,
 };
 
-use crate::crd::{
-    AnyServiceConfig, CONFIG_DIR_NAME, HbaseRole, JVM_SECURITY_PROPERTIES_FILE, v1alpha1,
-};
+use crate::crd::{AnyServiceConfig, CONFIG_DIR_NAME, JVM_SECURITY_PROPERTIES_FILE, v1alpha1};
 
 const JAVA_HEAP_FACTOR: f32 = 0.8;
 
@@ -19,12 +17,6 @@ pub enum Error {
     InvalidMemoryConfig {
         source: stackable_operator::memory::Error,
     },
-
-    #[snafu(display("failed to merge jvm argument overrides"))]
-    MergeJvmArgumentOverrides { source: role_utils::Error },
-
-    #[snafu(display("the HBase role [{role}] is missing from spec"))]
-    MissingHbaseRole { role: String },
 }
 
 // Applies to both the servers and the CLI
@@ -48,58 +40,28 @@ pub fn construct_global_jvm_args(kerberos_enabled: bool) -> String {
 
 /// JVM arguments that are specifically for the role (server), so will *not* be used e.g. by CLI tools.
 /// Heap settings are excluded, as they go into `HBASE_HEAPSIZE`.
+///
+/// `merged_jvm_argument_overrides` is the role <- role-group merged [`JvmArgumentOverrides`]
+/// produced by
+/// [`with_validated_config`](stackable_operator::v2::role_utils::with_validated_config). The
+/// operator-generated arguments below form the base that the user overrides are applied on top of.
 pub fn construct_role_specific_non_heap_jvm_args(
     hbase: &v1alpha1::HbaseCluster,
-    hbase_role: &HbaseRole,
-    role_group: &str,
-) -> Result<String, Error> {
-    let mut jvm_args = vec![format!(
+    merged_jvm_argument_overrides: &JvmArgumentOverrides,
+) -> String {
+    let mut operator_generated = vec![format!(
         "-Djava.security.properties={CONFIG_DIR_NAME}/{JVM_SECURITY_PROPERTIES_FILE}"
     )];
 
     if hbase.has_kerberos_enabled() {
-        jvm_args.push("-Djava.security.krb5.conf=/stackable/kerberos/krb5.conf".to_owned());
+        operator_generated
+            .push("-Djava.security.krb5.conf=/stackable/kerberos/krb5.conf".to_owned());
     }
 
-    let operator_generated = JvmArgumentOverrides::new_with_only_additions(jvm_args);
-
-    let merged = match hbase_role {
-        HbaseRole::Master => hbase
-            .spec
-            .masters
-            .as_ref()
-            .context(MissingHbaseRoleSnafu {
-                role: hbase_role.to_string(),
-            })?
-            .get_merged_jvm_argument_overrides(role_group, &operator_generated)
-            .context(MergeJvmArgumentOverridesSnafu)?,
-        HbaseRole::RegionServer => hbase
-            .spec
-            .region_servers
-            .as_ref()
-            .context(MissingHbaseRoleSnafu {
-                role: hbase_role.to_string(),
-            })?
-            .get_merged_jvm_argument_overrides(role_group, &operator_generated)
-            .context(MergeJvmArgumentOverridesSnafu)?,
-        HbaseRole::RestServer => hbase
-            .spec
-            .rest_servers
-            .as_ref()
-            .context(MissingHbaseRoleSnafu {
-                role: hbase_role.to_string(),
-            })?
-            .get_merged_jvm_argument_overrides(role_group, &operator_generated)
-            .context(MergeJvmArgumentOverridesSnafu)?,
-    };
-    jvm_args = merged
-        .effective_jvm_config_after_merging()
-        // Sorry for the clone, that's how operator-rs is currently modelled :P
-        .clone();
-
+    let mut jvm_args = merged_jvm_argument_overrides.apply_to(operator_generated);
     jvm_args.retain(|arg| !is_heap_jvm_argument(arg));
 
-    Ok(jvm_args.join(" "))
+    jvm_args.join(" ")
 }
 
 /// This will be put into `HBASE_HEAPSIZE`, which is just the heap size in megabytes (with the `m`
@@ -135,6 +97,8 @@ fn is_heap_jvm_argument(jvm_argument: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
+    use stackable_operator::config::merge::Merge;
+
     use super::*;
     use crate::crd::{HbaseRole, v1alpha1};
 
@@ -160,11 +124,11 @@ mod tests {
               default:
                 replicas: 1
         "#;
-        let (hbase, hbase_role, merged_config, role_group) = construct_boilerplate(input);
+        let (hbase, merged_config, merged_jvm_argument_overrides) = construct_boilerplate(input);
 
         let global_jvm_args = construct_global_jvm_args(false);
         let role_specific_non_heap_jvm_args =
-            construct_role_specific_non_heap_jvm_args(&hbase, &hbase_role, &role_group).unwrap();
+            construct_role_specific_non_heap_jvm_args(&hbase, &merged_jvm_argument_overrides);
         let hbase_heapsize_env = construct_hbase_heapsize_env(&merged_config).unwrap();
 
         assert_eq!(global_jvm_args, "");
@@ -216,11 +180,11 @@ mod tests {
                     - -Xmx40000m # This has no effect!
                     - -Dhttps.proxyPort=1234
         "#;
-        let (hbase, hbase_role, merged_config, role_group) = construct_boilerplate(input);
+        let (hbase, merged_config, merged_jvm_argument_overrides) = construct_boilerplate(input);
 
         let global_jvm_args = construct_global_jvm_args(hbase.has_kerberos_enabled());
         let role_specific_non_heap_jvm_args =
-            construct_role_specific_non_heap_jvm_args(&hbase, &hbase_role, &role_group).unwrap();
+            construct_role_specific_non_heap_jvm_args(&hbase, &merged_jvm_argument_overrides);
         let hbase_heapsize_env = construct_hbase_heapsize_env(&merged_config).unwrap();
 
         assert_eq!(
@@ -240,7 +204,11 @@ mod tests {
 
     fn construct_boilerplate(
         hbase_cluster: &str,
-    ) -> (v1alpha1::HbaseCluster, HbaseRole, AnyServiceConfig, String) {
+    ) -> (
+        v1alpha1::HbaseCluster,
+        AnyServiceConfig,
+        JvmArgumentOverrides,
+    ) {
         let hbase: v1alpha1::HbaseCluster =
             serde_yaml::from_str(hbase_cluster).expect("illegal test input");
 
@@ -249,6 +217,19 @@ mod tests {
             .merged_config(&hbase_role, "default", "my-hdfs")
             .unwrap();
 
-        (hbase, hbase_role, merged_config, "default".to_owned())
+        // Merge the role <- role-group JVM argument overrides the same way
+        // `with_validated_config` does, so the tests exercise the real merge path.
+        let role = hbase.spec.region_servers.as_ref().unwrap();
+        let mut merged_common = role
+            .role_groups
+            .get("default")
+            .unwrap()
+            .config
+            .product_specific_common_config
+            .clone();
+        merged_common.merge(&role.config.product_specific_common_config);
+        let merged_jvm_argument_overrides = merged_common.jvm_argument_overrides;
+
+        (hbase, merged_config, merged_jvm_argument_overrides)
     }
 }

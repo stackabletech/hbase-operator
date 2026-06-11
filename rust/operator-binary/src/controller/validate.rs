@@ -1,13 +1,20 @@
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, str::FromStr};
 
 use snafu::{ResultExt, Snafu};
 use stackable_operator::{
     commons::product_image_selection::{self},
-    config::{fragment::FromFragment, merge::Merge},
+    config::{
+        fragment::{self, FromFragment},
+        merge::Merge,
+    },
     kube::ResourceExt,
-    role_utils::{GenericRoleConfig, JavaCommonConfig, Role},
+    role_utils::{CommonConfiguration, GenericRoleConfig, Role},
     utils::cluster_info::KubernetesClusterInfo,
-    v2::controller_utils::{get_cluster_name, get_namespace, get_uid},
+    v2::{
+        builder::pod::container::{self, EnvVarName, EnvVarSet},
+        controller_utils::{get_cluster_name, get_namespace, get_uid},
+        role_utils::{JavaCommonConfig, with_validated_config},
+    },
 };
 use strum::IntoEnumIterator;
 
@@ -18,7 +25,6 @@ use crate::{
         dereference::DereferencedObjects,
     },
     crd::{AnyServiceConfig, HbaseConfigFragment, HbaseRole, RegionServerConfigFragment, v1alpha1},
-    framework::role_utils::with_validated_config,
     kerberos::{
         self, kerberos_config_properties, kerberos_discovery_config_properties,
         kerberos_ssl_client_settings, kerberos_ssl_server_settings,
@@ -43,15 +49,13 @@ pub enum Error {
     MissingRequiredRole { role: String },
 
     #[snafu(display("failed to merge and validate the role group config"))]
-    ValidateRoleGroupConfig {
-        source: crate::framework::role_utils::Error,
-    },
+    ValidateRoleGroupConfig { source: fragment::ValidationError },
+
+    #[snafu(display("invalid environment variable override name"))]
+    ParseEnvVarName { source: container::Error },
 
     #[snafu(display("failed to resolve kerberos config"))]
     AddKerberosConfig { source: kerberos::Error },
-
-    #[snafu(display("failed to construct role-specific JVM arguments"))]
-    ConstructJvmArgument { source: crate::config::jvm::Error },
 }
 
 pub fn validate_cluster(
@@ -80,7 +84,6 @@ pub fn validate_cluster(
         let group_configs = match hbase_role {
             HbaseRole::Master => validate_role_group_configs(
                 hbase,
-                &hbase_role,
                 hbase.spec.masters.as_ref(),
                 HbaseConfigFragment::default_config(
                     &hbase_role,
@@ -91,7 +94,6 @@ pub fn validate_cluster(
             )?,
             HbaseRole::RegionServer => validate_role_group_configs(
                 hbase,
-                &hbase_role,
                 hbase.spec.region_servers.as_ref(),
                 RegionServerConfigFragment::default_config(
                     &hbase_role,
@@ -102,7 +104,6 @@ pub fn validate_cluster(
             )?,
             HbaseRole::RestServer => validate_role_group_configs(
                 hbase,
-                &hbase_role,
                 hbase.spec.rest_servers.as_ref(),
                 HbaseConfigFragment::default_config(
                     &hbase_role,
@@ -168,19 +169,20 @@ pub fn validate_cluster(
 
 /// Validates every role group of a role into a map keyed by role group name.
 ///
-/// Each role group is merged and validated via the local-`framework`
-/// [`with_validated_config`], which folds the CRD config fragment (default <- role <-
-/// role group) plus the `configOverrides`, `envOverrides`, `cliOverrides` and
-/// `podOverrides` (role group wins) into a single
-/// [`RoleGroupConfig`](crate::framework::role_utils::RoleGroupConfig). The concrete
-/// per-role validated config is wrapped into [`AnyServiceConfig`] via `wrap`, and the
-/// role-specific non-heap JVM args are pre-resolved so the build step stays a pure
-/// function of [`ValidatedCluster`].
+/// Each role group is merged and validated via
+/// [`with_validated_config`](stackable_operator::v2::role_utils::with_validated_config),
+/// which folds the CRD config fragment (default <- role <- role group) plus the
+/// `configOverrides`, `envOverrides`, `cliOverrides`, `podOverrides` and the
+/// `jvmArgumentOverrides` (role group wins) into a single merged
+/// [`RoleGroup`](stackable_operator::role_utils::RoleGroup). The per-role validated config
+/// is wrapped into [`AnyServiceConfig`] via `wrap`; the merged `envOverrides` are converted
+/// into an [`EnvVarSet`] (validating each name eagerly), and the role-specific non-heap JVM
+/// args are pre-resolved from the merged `jvmArgumentOverrides` so the build step stays a
+/// pure function of [`ValidatedCluster`].
 ///
 /// Returns an empty map if the role is not configured.
 fn validate_role_group_configs<Config, ValidatedConfig>(
     hbase: &v1alpha1::HbaseCluster,
-    hbase_role: &HbaseRole,
     role: Option<
         &Role<Config, v1alpha1::HbaseConfigOverrides, GenericRoleConfig, JavaCommonConfig>,
     >,
@@ -207,16 +209,36 @@ where
             >(role_group, role, &default_config)
             .context(ValidateRoleGroupConfigSnafu)?;
 
-            let non_heap_jvm_args =
-                construct_role_specific_non_heap_jvm_args(hbase, hbase_role, role_group_name)
-                    .context(ConstructJvmArgumentSnafu)?;
+            let CommonConfiguration {
+                config,
+                config_overrides,
+                env_overrides,
+                cli_overrides: _,
+                pod_overrides,
+                product_specific_common_config,
+            } = validated.config;
+
+            let non_heap_jvm_args = construct_role_specific_non_heap_jvm_args(
+                hbase,
+                &product_specific_common_config.jvm_argument_overrides,
+            );
+
+            // Convert the merged env-override HashMap into an EnvVarSet, validating each name
+            // eagerly. Keys are unique (HashMap), so insertion order is irrelevant.
+            let mut env_overrides_set = EnvVarSet::new();
+            for (name, value) in env_overrides {
+                env_overrides_set = env_overrides_set.with_value(
+                    &EnvVarName::from_str(&name).context(ParseEnvVarNameSnafu)?,
+                    value,
+                );
+            }
 
             let validated = ValidatedRoleGroupConfig {
-                replicas: validated.replicas,
-                config: wrap(validated.config),
-                config_overrides: validated.config_overrides,
-                env_overrides: validated.env_overrides,
-                pod_overrides: validated.pod_overrides,
+                replicas: validated.replicas.unwrap_or(1),
+                config: wrap(config),
+                config_overrides,
+                env_overrides: env_overrides_set,
+                pod_overrides,
                 non_heap_jvm_args,
             };
             Ok((role_group_name.clone(), validated))
@@ -299,11 +321,7 @@ spec:
         >(role_group, role, &default_config)
         .unwrap();
 
-        let env: BTreeMap<String, String> = validated
-            .env_overrides
-            .into_iter()
-            .map(|env_var| (env_var.name, env_var.value.unwrap_or_default()))
-            .collect();
+        let env = validated.config.env_overrides;
 
         assert_eq!(env.get("TEST_VAR"), Some(&"MASTER_RG".to_string()));
         assert_eq!(env.get("TEST_VAR_FROM_MASTER"), Some(&"MASTER".to_string()));
