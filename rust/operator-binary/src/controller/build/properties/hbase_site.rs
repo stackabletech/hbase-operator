@@ -16,7 +16,6 @@ use crate::{
 };
 
 /// Renders `hbase-site.xml`.
-#[allow(clippy::too_many_arguments)]
 pub fn build(
     role: &HbaseRole,
     merged_config: &AnyServiceConfig,
@@ -27,7 +26,7 @@ pub fn build(
 ) -> String {
     let mut config: BTreeMap<String, String> = BTreeMap::new();
 
-    // Defaults previously injected by product-config's `compute_files`.
+    // Defaults
     config.insert(HBASE_CLUSTER_DISTRIBUTED.to_string(), "true".to_string());
     config.insert(HBASE_ROOTDIR.to_string(), merged_config.hbase_rootdir());
 

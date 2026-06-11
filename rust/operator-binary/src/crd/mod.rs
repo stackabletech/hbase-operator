@@ -886,8 +886,7 @@ impl AnyServiceConfig {
         }
     }
 
-    /// The configured `hbase.rootdir`. Previously injected into
-    /// `hbase-site.xml` via product-config's `compute_files`.
+    /// The configured `hbase.rootdir`.
     pub fn hbase_rootdir(&self) -> String {
         match self {
             AnyServiceConfig::Master(config) => config.hbase_rootdir.clone(),

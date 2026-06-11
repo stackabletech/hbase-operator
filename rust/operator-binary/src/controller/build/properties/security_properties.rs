@@ -1,8 +1,7 @@
 //! Builds the `security.properties` (JVM security) config file.
 //!
-//! The operator injects role-specific JVM DNS cache TTLs (preserving the
-//! behaviour previously defined in `properties.yaml`). User `configOverrides`
-//! are applied on top.
+//! The operator injects role-specific JVM DNS cache TTLs.
+//! User `configOverrides` are applied on top.
 
 use std::collections::BTreeMap;
 
@@ -37,7 +36,7 @@ pub fn build(
             "0".to_string(),
         ),
     ]);
-    // Overrides applied last so users win.
+    // Overrides applied last.
     config.extend(overrides);
     to_java_properties_string(config.iter())
 }
