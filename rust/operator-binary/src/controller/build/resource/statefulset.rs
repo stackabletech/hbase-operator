@@ -86,9 +86,6 @@ pub enum Error {
 
     #[snafu(display("failed to build listener volume"))]
     ListenerVolume { source: super::listener::Error },
-
-    #[snafu(display("failed to build listener persistent volume claim"))]
-    ListenerPersistentVolumeClaim { source: super::listener::Error },
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -299,8 +296,7 @@ pub fn build_rolegroup_statefulset(
     }
 
     let listener_pvc =
-        super::listener::build_listener_pvc(hbase_role, merged_config, &recommended_labels)
-            .context(ListenerPersistentVolumeClaimSnafu)?;
+        super::listener::build_listener_pvc(hbase_role, merged_config, &recommended_labels);
 
     if let Some(listener_volume) =
         super::listener::build_listener_volume(hbase_role, merged_config, &recommended_labels)

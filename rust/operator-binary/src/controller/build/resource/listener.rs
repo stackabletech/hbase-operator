@@ -1,5 +1,7 @@
 //! Build the listener `Volume`/`PersistentVolumeClaim` exposing a rolegroup.
 
+use std::str::FromStr;
+
 use snafu::{ResultExt, Snafu};
 use stackable_operator::{
     builder::pod::volume::{
@@ -8,6 +10,13 @@ use stackable_operator::{
     },
     k8s_openapi::api::core::v1::{PersistentVolumeClaim, Volume},
     kvp::Labels,
+    v2::{
+        builder::pod::volume::{
+            ListenerReference as TypedListenerReference,
+            listener_operator_volume_source_builder_build_pvc,
+        },
+        types::kubernetes::PersistentVolumeClaimName,
+    },
 };
 
 use crate::crd::{AnyServiceConfig, HbaseRole, LISTENER_VOLUME_NAME};
@@ -16,11 +25,6 @@ use crate::crd::{AnyServiceConfig, HbaseRole, LISTENER_VOLUME_NAME};
 pub enum Error {
     #[snafu(display("failed to build listener volume"))]
     BuildListenerVolume {
-        source: ListenerOperatorVolumeSourceBuilderError,
-    },
-
-    #[snafu(display("failed to build listener pvc"))]
-    BuildListenerPvc {
         source: ListenerOperatorVolumeSourceBuilderError,
     },
 }
@@ -62,17 +66,14 @@ pub fn build_listener_pvc(
     role: &HbaseRole,
     merged_config: &AnyServiceConfig,
     recommended_labels: &Labels,
-) -> Result<Option<Vec<PersistentVolumeClaim>>> {
-    let pvc = match role {
+) -> Option<Vec<PersistentVolumeClaim>> {
+    match role {
         HbaseRole::Master | HbaseRole::RegionServer => None,
-        HbaseRole::RestServer => Some(vec![
-            ListenerOperatorVolumeSourceBuilder::new(
-                &ListenerReference::ListenerClass(merged_config.listener_class().to_string()),
-                recommended_labels,
-            )
-            .build_pvc(LISTENER_VOLUME_NAME.to_string())
-            .context(BuildListenerPvcSnafu)?,
-        ]),
-    };
-    Ok(pvc)
+        HbaseRole::RestServer => Some(vec![listener_operator_volume_source_builder_build_pvc(
+            &TypedListenerReference::ListenerClass(merged_config.listener_class()),
+            recommended_labels,
+            &PersistentVolumeClaimName::from_str(LISTENER_VOLUME_NAME)
+                .expect("LISTENER_VOLUME_NAME is a valid PersistentVolumeClaim name"),
+        )]),
+    }
 }
