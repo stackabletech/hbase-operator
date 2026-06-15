@@ -426,4 +426,58 @@ spec:
         assert_eq!(env.get("TEST_VAR_FROM_MASTER"), Some(&"MASTER".to_string()));
         assert_eq!(env.get("TEST_VAR_FROM_MRG"), Some(&"MASTER".to_string()));
     }
+
+    /// A custom log ConfigMap name that is not a valid Kubernetes name is rejected up-front.
+    #[test]
+    fn validate_logging_rejects_invalid_custom_config_map_name() {
+        use stackable_operator::product_logging::spec::{
+            ConfigMapLogConfig, ContainerLogConfig, ContainerLogConfigChoice,
+            CustomContainerLogConfig,
+        };
+
+        let logging = Logging {
+            enable_vector_agent: false,
+            containers: [(
+                Container::Hbase,
+                ContainerLogConfig {
+                    choice: Some(ContainerLogConfigChoice::Custom(CustomContainerLogConfig {
+                        custom: ConfigMapLogConfig {
+                            config_map: "invalid ConfigMap name".to_owned(),
+                        },
+                    })),
+                },
+            )]
+            .into(),
+        };
+
+        assert!(validate_logging(&logging, &None).is_err());
+    }
+
+    /// Enabling the Vector agent without a Vector aggregator discovery ConfigMap name fails, but
+    /// succeeds once a valid name is provided.
+    #[test]
+    fn validate_logging_requires_vector_aggregator_when_enabled() {
+        use stackable_operator::product_logging::spec::{
+            AutomaticContainerLogConfig, ContainerLogConfig, ContainerLogConfigChoice,
+        };
+
+        let automatic = || ContainerLogConfig {
+            choice: Some(ContainerLogConfigChoice::Automatic(
+                AutomaticContainerLogConfig::default(),
+            )),
+        };
+        let logging = Logging {
+            enable_vector_agent: true,
+            containers: [
+                (Container::Hbase, automatic()),
+                (Container::Vector, automatic()),
+            ]
+            .into(),
+        };
+
+        assert!(validate_logging(&logging, &None).is_err());
+
+        let aggregator = ConfigMapName::from_str("vector-aggregator").expect("valid name");
+        assert!(validate_logging(&logging, &Some(aggregator)).is_ok());
+    }
 }

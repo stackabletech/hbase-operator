@@ -112,7 +112,7 @@ pub fn build(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::controller::build::properties::test_support::{merged_config, validated_cluster};
+    use crate::test_utils::{merged_config, validated_cluster};
 
     #[test]
     fn renders_operator_defaults() {

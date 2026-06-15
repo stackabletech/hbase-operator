@@ -808,110 +808,6 @@ impl AnyServiceConfig {
 }
 
 #[cfg(test)]
-pub(crate) mod test_helpers {
-    use stackable_operator::{
-        config::{fragment::FromFragment, merge::Merge},
-        kube::ResourceExt,
-        role_utils::{GenericRoleConfig, Role},
-        v2::{
-            jvm_argument_overrides::JvmArgumentOverrides,
-            role_utils::{JavaCommonConfig, with_validated_config},
-        },
-    };
-
-    use super::{
-        AnyServiceConfig, HbaseConfig, HbaseConfigFragment, HbaseRole, RegionServerConfig,
-        RegionServerConfigFragment, v1alpha1,
-    };
-
-    /// Test helper: merge + validate a single role group via the production
-    /// [`with_validated_config`] path (the same merge the controller runs), returning the
-    /// role-specific [`AnyServiceConfig`] and the merged [`JvmArgumentOverrides`].
-    pub(crate) fn merged_role_group_config(
-        hbase: &v1alpha1::HbaseCluster,
-        role: &HbaseRole,
-        role_group: &str,
-        hdfs_discovery_cm_name: &str,
-    ) -> (AnyServiceConfig, JvmArgumentOverrides) {
-        match role {
-            HbaseRole::Master => merge::<HbaseConfig, _>(
-                hbase
-                    .spec
-                    .masters
-                    .as_ref()
-                    .expect("master role must be defined"),
-                role_group,
-                HbaseConfigFragment::default_config(
-                    role,
-                    &hbase.name_any(),
-                    hdfs_discovery_cm_name,
-                ),
-                AnyServiceConfig::Master,
-            ),
-            HbaseRole::RegionServer => merge::<RegionServerConfig, _>(
-                hbase
-                    .spec
-                    .region_servers
-                    .as_ref()
-                    .expect("region server role must be defined"),
-                role_group,
-                RegionServerConfigFragment::default_config(
-                    role,
-                    &hbase.name_any(),
-                    hdfs_discovery_cm_name,
-                ),
-                AnyServiceConfig::RegionServer,
-            ),
-            HbaseRole::RestServer => merge::<HbaseConfig, _>(
-                hbase
-                    .spec
-                    .rest_servers
-                    .as_ref()
-                    .expect("rest server role must be defined"),
-                role_group,
-                HbaseConfigFragment::default_config(
-                    role,
-                    &hbase.name_any(),
-                    hdfs_discovery_cm_name,
-                ),
-                AnyServiceConfig::RestServer,
-            ),
-        }
-    }
-
-    fn merge<ValidatedConfig, Config>(
-        role: &Role<Config, v1alpha1::HbaseConfigOverrides, GenericRoleConfig, JavaCommonConfig>,
-        role_group: &str,
-        default_config: Config,
-        wrap: fn(ValidatedConfig) -> AnyServiceConfig,
-    ) -> (AnyServiceConfig, JvmArgumentOverrides)
-    where
-        Config: Clone + Merge,
-        ValidatedConfig: FromFragment<Fragment = Config>,
-    {
-        let role_group = role
-            .role_groups
-            .get(role_group)
-            .expect("role group must be defined");
-        let validated = with_validated_config::<
-            ValidatedConfig,
-            JavaCommonConfig,
-            Config,
-            GenericRoleConfig,
-            v1alpha1::HbaseConfigOverrides,
-        >(role_group, role, &default_config)
-        .expect("role group config should merge and validate");
-        (
-            wrap(validated.config.config),
-            validated
-                .config
-                .product_specific_common_config
-                .jvm_argument_overrides,
-        )
-    }
-}
-
-#[cfg(test)]
 mod tests {
     use indoc::indoc;
     use rstest::rstest;
@@ -921,7 +817,7 @@ mod tests {
 
     #[rstest]
     #[case("default", false, 1, vec![])]
-    #[case("groupRegionMover", true, 5, vec!["--some".to_string(), "extra".to_string()])]
+    #[case("group-region-mover", true, 5, vec!["--some".to_string(), "extra".to_string()])]
     pub fn test_region_mover_merge(
         #[case] role_group_name: &str,
         #[case] run_before_shutdown: bool,
@@ -934,6 +830,8 @@ apiVersion: hbase.stackable.tech/v1alpha1
 kind: HbaseCluster
 metadata:
   name: test-hbase
+  namespace: default
+  uid: 12345678-1234-1234-1234-123456789012
 spec:
   image:
     productVersion: 2.6.4
@@ -955,7 +853,7 @@ spec:
     roleGroups:
       default:
         replicas: 1
-      groupRegionMover:
+      group-region-mover:
         replicas: 1
         config:
           regionMover:
@@ -968,13 +866,11 @@ spec:
         let hbase: v1alpha1::HbaseCluster =
             serde_yaml::with::singleton_map_recursive::deserialize(deserializer).unwrap();
 
-        let hbase_role = HbaseRole::RegionServer;
-
-        let (merged_config, _) = super::test_helpers::merged_role_group_config(
-            &hbase,
-            &hbase_role,
+        let validated_cluster = crate::test_utils::validated_cluster_from(&hbase);
+        let merged_config = crate::test_utils::merged_config_for(
+            &validated_cluster,
+            &HbaseRole::RegionServer,
             role_group_name,
-            &hbase.spec.cluster_config.hdfs_config_map_name,
         );
         if let AnyServiceConfig::RegionServer(config) = merged_config {
             assert_eq!(run_before_shutdown, config.region_mover.run_before_shutdown);

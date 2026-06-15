@@ -100,7 +100,7 @@ fn is_heap_jvm_argument(jvm_argument: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::crd::{HbaseRole, v1alpha1};
+    use crate::{crd::HbaseRole, test_utils};
 
     #[test]
     fn test_construct_jvm_arguments_defaults() {
@@ -109,6 +109,8 @@ mod tests {
         kind: HbaseCluster
         metadata:
           name: simple-hbase
+          namespace: default
+          uid: 12345678-1234-1234-1234-123456789012
         spec:
           image:
             productVersion: 2.6.4
@@ -124,16 +126,20 @@ mod tests {
               default:
                 replicas: 1
         "#;
-        let (hbase, merged_config, merged_jvm_argument_overrides) = construct_boilerplate(input);
+        let hbase = test_utils::hbase_from_yaml(input);
+        let validated_cluster = test_utils::validated_cluster_from(&hbase);
+        let region_server = &validated_cluster.role_group_configs[&HbaseRole::RegionServer]
+            [&test_utils::role_group_name("default")];
 
-        let global_jvm_args = construct_global_jvm_args(false);
-        let role_specific_non_heap_jvm_args =
-            construct_role_specific_non_heap_jvm_args(&hbase, &merged_jvm_argument_overrides);
-        let hbase_heapsize_env = construct_hbase_heapsize_env(&merged_config).unwrap();
+        let global_jvm_args = construct_global_jvm_args(hbase.has_kerberos_enabled());
+        let hbase_heapsize_env =
+            construct_hbase_heapsize_env(&region_server.config.config).unwrap();
 
         assert_eq!(global_jvm_args, "");
+        // `non_heap_jvm_args` is the output of `construct_role_specific_non_heap_jvm_args`,
+        // pre-resolved during validation.
         assert_eq!(
-            role_specific_non_heap_jvm_args,
+            region_server.non_heap_jvm_args,
             "-Djava.security.properties=/stackable/conf/security.properties"
         );
         assert_eq!(hbase_heapsize_env, "819m");
@@ -146,6 +152,8 @@ mod tests {
         kind: HbaseCluster
         metadata:
           name: simple-hbase
+          namespace: default
+          uid: 12345678-1234-1234-1234-123456789012
         spec:
           image:
             productVersion: 2.6.4
@@ -180,19 +188,21 @@ mod tests {
                     - -Xmx40000m # This has no effect!
                     - -Dhttps.proxyPort=1234
         "#;
-        let (hbase, merged_config, merged_jvm_argument_overrides) = construct_boilerplate(input);
+        let hbase = test_utils::hbase_from_yaml(input);
+        let validated_cluster = test_utils::validated_cluster_from(&hbase);
+        let region_server = &validated_cluster.role_group_configs[&HbaseRole::RegionServer]
+            [&test_utils::role_group_name("default")];
 
         let global_jvm_args = construct_global_jvm_args(hbase.has_kerberos_enabled());
-        let role_specific_non_heap_jvm_args =
-            construct_role_specific_non_heap_jvm_args(&hbase, &merged_jvm_argument_overrides);
-        let hbase_heapsize_env = construct_hbase_heapsize_env(&merged_config).unwrap();
+        let hbase_heapsize_env =
+            construct_hbase_heapsize_env(&region_server.config.config).unwrap();
 
         assert_eq!(
             global_jvm_args,
             "-Djava.security.krb5.conf=/stackable/kerberos/krb5.conf"
         );
         assert_eq!(
-            role_specific_non_heap_jvm_args,
+            region_server.non_heap_jvm_args,
             "-Djava.security.properties=/stackable/conf/security.properties \
             -Djava.security.krb5.conf=/stackable/kerberos/krb5.conf \
             -Dhttps.proxyHost=proxy.my.corp \
@@ -200,29 +210,5 @@ mod tests {
             -Dhttps.proxyPort=1234"
         );
         assert_eq!(hbase_heapsize_env, "34406m");
-    }
-
-    fn construct_boilerplate(
-        hbase_cluster: &str,
-    ) -> (
-        v1alpha1::HbaseCluster,
-        AnyServiceConfig,
-        JvmArgumentOverrides,
-    ) {
-        let hbase: v1alpha1::HbaseCluster =
-            serde_yaml::from_str(hbase_cluster).expect("illegal test input");
-
-        // Merge + validate the region server `default` role group via the real
-        // `with_validated_config` path, returning the merged config (for heap sizing) and the
-        // merged JVM argument overrides.
-        let (merged_config, merged_jvm_argument_overrides) =
-            crate::crd::test_helpers::merged_role_group_config(
-                &hbase,
-                &HbaseRole::RegionServer,
-                "default",
-                "my-hdfs",
-            );
-
-        (hbase, merged_config, merged_jvm_argument_overrides)
     }
 }

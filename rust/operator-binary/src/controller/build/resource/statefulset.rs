@@ -48,11 +48,13 @@ use crate::{
 
 stackable_operator::constant!(VECTOR_CONTAINER_NAME: ContainerName = "vector");
 
-// The Vector container reads `vector.yaml` from the rolegroup ConfigMap (mounted as the
-// `hbase-config` volume) and writes to the shared `log` volume. These reuse the existing
-// volume-name string values so the produced volume mounts match the rest of the Pod.
-stackable_operator::constant!(VECTOR_LOG_CONFIG_VOLUME_NAME: VolumeName = "hbase-config");
-stackable_operator::constant!(VECTOR_LOG_VOLUME_NAME: VolumeName = "log");
+// Pod volume names. The Vector container reuses the `hbase-config` (rolegroup ConfigMap, which
+// carries `vector.yaml`) and `log` volumes, so the produced volume mounts match the rest of the
+// Pod.
+stackable_operator::constant!(HBASE_CONFIG_VOLUME_NAME: VolumeName = "hbase-config");
+stackable_operator::constant!(HDFS_DISCOVERY_VOLUME_NAME: VolumeName = "hdfs-discovery");
+stackable_operator::constant!(LOG_CONFIG_VOLUME_NAME: VolumeName = "log-config");
+stackable_operator::constant!(LOG_VOLUME_NAME: VolumeName = "log");
 
 pub static CONTAINERDEBUG_LOG_DIRECTORY: std::sync::LazyLock<String> =
     std::sync::LazyLock::new(|| format!("{STACKABLE_LOG_DIR}/containerdebug"));
@@ -192,13 +194,13 @@ pub fn build_rolegroup_statefulset(
             "CONTAINERDEBUG_LOG_DIRECTORY",
             &*CONTAINERDEBUG_LOG_DIRECTORY,
         )
-        .add_volume_mount("hbase-config", HBASE_CONFIG_TMP_DIR)
+        .add_volume_mount(&*HBASE_CONFIG_VOLUME_NAME, HBASE_CONFIG_TMP_DIR)
         .context(AddVolumeMountSnafu)?
-        .add_volume_mount("hdfs-discovery", HDFS_DISCOVERY_TMP_DIR)
+        .add_volume_mount(&*HDFS_DISCOVERY_VOLUME_NAME, HDFS_DISCOVERY_TMP_DIR)
         .context(AddVolumeMountSnafu)?
-        .add_volume_mount("log-config", HBASE_LOG_CONFIG_TMP_DIR)
+        .add_volume_mount(&*LOG_CONFIG_VOLUME_NAME, HBASE_LOG_CONFIG_TMP_DIR)
         .context(AddVolumeMountSnafu)?
-        .add_volume_mount("log", STACKABLE_LOG_DIR)
+        .add_volume_mount(&*LOG_VOLUME_NAME, STACKABLE_LOG_DIR)
         .context(AddVolumeMountSnafu)?
         .add_volume_mount(LISTENER_VOLUME_NAME, LISTENER_VOLUME_DIR)
         .context(AddVolumeMountSnafu)?
@@ -221,7 +223,7 @@ pub fn build_rolegroup_statefulset(
         .image_pull_secrets_from_product_image(resolved_product_image)
         .affinity(merged_config.affinity())
         .add_volume(Volume {
-            name: "hbase-config".to_string(),
+            name: HBASE_CONFIG_VOLUME_NAME.to_string(),
             config_map: Some(ConfigMapVolumeSource {
                 name: resource_names.role_group_config_map().to_string(),
                 ..Default::default()
@@ -230,7 +232,7 @@ pub fn build_rolegroup_statefulset(
         })
         .context(AddVolumeSnafu)?
         .add_volume(Volume {
-            name: "hdfs-discovery".to_string(),
+            name: HDFS_DISCOVERY_VOLUME_NAME.to_string(),
             config_map: Some(ConfigMapVolumeSource {
                 name: hbase.spec.cluster_config.hdfs_config_map_name.clone(),
                 ..Default::default()
@@ -239,7 +241,7 @@ pub fn build_rolegroup_statefulset(
         })
         .context(AddVolumeSnafu)?
         .add_empty_dir_volume(
-            "log",
+            &*LOG_VOLUME_NAME,
             Some(product_logging::framework::calculate_log_volume_size_limit(
                 &[MAX_HBASE_LOG_FILES_SIZE],
             )),
@@ -259,7 +261,7 @@ pub fn build_rolegroup_statefulset(
     };
     pod_builder
         .add_volume(Volume {
-            name: "log-config".to_string(),
+            name: LOG_CONFIG_VOLUME_NAME.to_string(),
             config_map: Some(ConfigMapVolumeSource {
                 name: log_config_config_map,
                 ..ConfigMapVolumeSource::default()
@@ -290,8 +292,8 @@ pub fn build_rolegroup_statefulset(
             resolved_product_image,
             vector_log_config,
             &resource_names,
-            &VECTOR_LOG_CONFIG_VOLUME_NAME,
-            &VECTOR_LOG_VOLUME_NAME,
+            &HBASE_CONFIG_VOLUME_NAME,
+            &LOG_VOLUME_NAME,
             EnvVarSet::new(),
         ));
     }

@@ -40,6 +40,8 @@ use crate::{
 mod controller;
 mod crd;
 mod hbase_controller;
+#[cfg(test)]
+mod test_utils;
 mod webhooks;
 
 mod built_info {

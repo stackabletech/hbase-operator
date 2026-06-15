@@ -103,6 +103,8 @@ mod tests {
         kind: HbaseCluster
         metadata:
           name: simple-hbase
+          namespace: default
+          uid: 12345678-1234-1234-1234-123456789012
         spec:
           image:
             productVersion: 2.6.4
@@ -124,13 +126,10 @@ mod tests {
         "#;
         let hbase: v1alpha1::HbaseCluster =
             serde_yaml::from_str(input).expect("illegal test input");
-        let (merged_config, _) = crate::crd::test_helpers::merged_role_group_config(
-            &hbase,
-            &role,
-            "default",
-            &hbase.spec.cluster_config.hdfs_config_map_name,
-        );
-        let affinity = merged_config.affinity().clone();
+        let validated_cluster = crate::test_utils::validated_cluster_from(&hbase);
+        let affinity = crate::test_utils::merged_config(&validated_cluster, &role)
+            .affinity()
+            .clone();
 
         let mut expected_affinities = vec![WeightedPodAffinityTerm {
             pod_affinity_term: PodAffinityTerm {

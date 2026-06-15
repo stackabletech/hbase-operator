@@ -137,13 +137,10 @@ fn prometheus_annotations(hbase: &v1alpha1::HbaseCluster, hbase_role: &HbaseRole
 
 #[cfg(test)]
 mod test {
-    use std::str::FromStr;
-
     use rstest::rstest;
-    use stackable_operator::v2::types::operator::RoleGroupName;
 
     use super::*;
-    use crate::controller::build::properties::test_support;
+    use crate::test_utils;
 
     #[rstest]
     #[case("2.6.3", HbaseRole::Master, vec!["master", "ui-http"])]
@@ -187,8 +184,8 @@ mod test {
         let hbase: v1alpha1::HbaseCluster =
             serde_yaml::from_str(&input).expect("illegal test input");
 
-        let cluster = test_support::validated_cluster();
-        let role_group_name = RoleGroupName::from_str("default").expect("valid role group name");
+        let cluster = test_utils::validated_cluster();
+        let role_group_name = test_utils::role_group_name("default");
         let service = build_rolegroup_service(&hbase, &cluster, &role, &role_group_name);
 
         assert_eq!(
