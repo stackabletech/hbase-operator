@@ -6,5 +6,6 @@ pub mod jvm;
 pub mod kerberos;
 pub mod opa;
 pub mod properties;
+pub mod region_mover;
 pub mod resource;
 pub mod role;

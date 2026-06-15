@@ -1,6 +1,5 @@
 use security::AuthenticationConfig;
 use serde::{Deserialize, Serialize};
-use shell_escape::escape;
 use stackable_operator::{
     commons::{
         affinity::StackableAffinity,
@@ -65,9 +64,6 @@ pub const HBASE_REST_UI_PORT: u16 = 8085;
 pub const HBASE_REST_METRICS_PORT: u16 = 8085;
 pub const LISTENER_VOLUME_NAME: &str = "listener";
 pub const LISTENER_VOLUME_DIR: &str = "/stackable/listener";
-
-const DEFAULT_REGION_MOVER_TIMEOUT: Duration = Duration::from_minutes_unchecked(59);
-const DEFAULT_REGION_MOVER_DELTA_TO_SHUTDOWN: Duration = Duration::from_minutes_unchecked(1);
 
 const DEFAULT_LISTENER_CLASS: &str = "cluster-internal";
 
@@ -462,17 +458,17 @@ pub struct HbaseConfig {
 )]
 pub struct RegionMover {
     /// Move local regions to other servers before terminating a region server's pod.
-    run_before_shutdown: bool,
+    pub run_before_shutdown: bool,
 
     /// Maximum number of threads to use for moving regions.
-    max_threads: u16,
+    pub max_threads: u16,
 
     /// If enabled (default), the region mover will confirm that regions are available on the
     /// source as well as the target pods before and after the move.
-    ack: bool,
+    pub ack: bool,
 
     #[fragment_attrs(serde(flatten))]
-    cli_opts: Option<RegionMoverExtraCliOpts>,
+    pub cli_opts: Option<RegionMoverExtraCliOpts>,
 }
 
 #[derive(Clone, Debug, Eq, Deserialize, JsonSchema, PartialEq, Serialize)]
@@ -600,61 +596,6 @@ impl AnyServiceConfig {
             AnyServiceConfig::Master(config) => config.hbase_rootdir.clone(),
             AnyServiceConfig::RegionServer(config) => config.hbase_rootdir.clone(),
             AnyServiceConfig::RestServer(config) => config.hbase_rootdir.clone(),
-        }
-    }
-
-    /// Returns command line arguments to pass on to the region mover tool.
-    /// The following arguments are excluded because they are already part of the
-    /// hbase-entrypoint.sh script.
-    /// The most important argument, '--regionserverhost' can only be computed on the Pod
-    /// because it contains the pod's hostname.
-    ///
-    /// Returns an empty string if the region mover is disabled or any other role is "self".
-    pub fn region_mover_args(&self) -> String {
-        match self {
-            AnyServiceConfig::RegionServer(config) => {
-                if config.region_mover.run_before_shutdown {
-                    let timeout = config
-                        .graceful_shutdown_timeout
-                        .map(|d| {
-                            if d.as_secs() <= DEFAULT_REGION_MOVER_DELTA_TO_SHUTDOWN.as_secs() {
-                                d.as_secs()
-                            } else {
-                                d.as_secs() - DEFAULT_REGION_MOVER_DELTA_TO_SHUTDOWN.as_secs()
-                            }
-                        })
-                        .unwrap_or(DEFAULT_REGION_MOVER_TIMEOUT.as_secs());
-                    let mut command = vec![
-                        "--maxthreads".to_string(),
-                        config.region_mover.max_threads.to_string(),
-                        "--timeout".to_string(),
-                        timeout.to_string(),
-                    ];
-                    if !config.region_mover.ack {
-                        command.push("--noack".to_string());
-                    }
-
-                    command.extend(
-                        config
-                            .region_mover
-                            .cli_opts
-                            .iter()
-                            .flat_map(|o| o.additional_mover_options.clone())
-                            .map(|s| escape(std::borrow::Cow::Borrowed(&s)).to_string()),
-                    );
-                    command.join(" ")
-                } else {
-                    "".to_string()
-                }
-            }
-            _ => "".to_string(),
-        }
-    }
-
-    pub fn run_region_mover(&self) -> bool {
-        match self {
-            AnyServiceConfig::RegionServer(config) => config.region_mover.run_before_shutdown,
-            _ => false,
         }
     }
 }
