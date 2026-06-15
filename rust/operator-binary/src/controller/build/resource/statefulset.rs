@@ -8,7 +8,7 @@ use stackable_operator::{
     builder::{
         self,
         meta::ObjectMetaBuilder,
-        pod::{PodBuilder, container::ContainerBuilder, security::PodSecurityContextBuilder},
+        pod::{PodBuilder, security::PodSecurityContextBuilder},
     },
     constants::RESTART_CONTROLLER_ENABLED_LABEL,
     k8s_openapi::{
@@ -25,7 +25,7 @@ use stackable_operator::{
     kube::ResourceExt,
     product_logging,
     v2::{
-        builder::pod::container::{EnvVarName, EnvVarSet},
+        builder::pod::container::{EnvVarName, EnvVarSet, new_container_builder},
         product_logging::framework::{ValidatedContainerLogConfigChoice, vector_container},
         types::{
             kubernetes::{ContainerName, VolumeName},
@@ -46,6 +46,7 @@ use crate::{
     crd::{CONFIG_DIR_NAME, HbaseRole, LISTENER_VOLUME_DIR, LISTENER_VOLUME_NAME},
 };
 
+stackable_operator::constant!(HBASE_CONTAINER_NAME: ContainerName = "hbase");
 stackable_operator::constant!(VECTOR_CONTAINER_NAME: ContainerName = "vector");
 
 // Pod volume names. The Vector container reuses the `hbase-config` (rolegroup ConfigMap, which
@@ -172,7 +173,7 @@ pub fn build_rolegroup_statefulset(
         );
 
     let role_name = hbase_role.cli_role_name();
-    let mut hbase_container = ContainerBuilder::new("hbase").expect("ContainerBuilder not created");
+    let mut hbase_container = new_container_builder(&HBASE_CONTAINER_NAME);
 
     hbase_container
         .image_from_product_image(resolved_product_image)
