@@ -7,12 +7,11 @@ use std::collections::BTreeMap;
 use stackable_operator::v2::config_overrides::KeyValueConfigOverrides;
 
 use crate::{
-    controller::build::properties::build_xml_config,
+    controller::build::{opa::HbaseOpaConfig, properties::build_xml_config},
     crd::{
         AnyServiceConfig, HBASE_CLUSTER_DISTRIBUTED, HBASE_MASTER_PORT, HBASE_MASTER_UI_PORT,
         HBASE_REGIONSERVER_PORT, HBASE_REGIONSERVER_UI_PORT, HBASE_ROOTDIR, HbaseRole,
     },
-    security::opa::HbaseOpaConfig,
 };
 
 /// Renders `hbase-site.xml`.

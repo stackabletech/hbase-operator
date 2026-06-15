@@ -6,8 +6,8 @@ use std::sync::Arc;
 
 use anyhow::anyhow;
 use clap::Parser;
+use controller::FULL_HBASE_CONTROLLER_NAME;
 use futures::{FutureExt, StreamExt, TryFutureExt};
-use hbase_controller::FULL_HBASE_CONTROLLER_NAME;
 use stackable_operator::{
     YamlSchema,
     cli::{Command, RunArguments},
@@ -40,11 +40,7 @@ use crate::{
 mod controller;
 mod crd;
 mod hbase_controller;
-mod kerberos;
-mod operations;
-mod security;
 mod webhooks;
-mod zookeeper;
 
 mod built_info {
     include!(concat!(env!("OUT_DIR"), "/built.rs"));

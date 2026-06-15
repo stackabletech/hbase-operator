@@ -20,15 +20,15 @@ use stackable_operator::{
 use strum::IntoEnumIterator;
 
 use crate::{
+    controller::build::kerberos::{
+        self, kerberos_config_properties, kerberos_discovery_config_properties,
+        kerberos_ssl_client_settings, kerberos_ssl_server_settings,
+    },
     controller::{
         ValidatedCluster, ValidatedClusterConfig, ValidatedRoleConfig, ValidatedRoleGroupConfig,
         build::jvm::construct_role_specific_non_heap_jvm_args, dereference::DereferencedObjects,
     },
     crd::{AnyServiceConfig, HbaseConfigFragment, HbaseRole, RegionServerConfigFragment, v1alpha1},
-    kerberos::{
-        self, kerberos_config_properties, kerberos_discovery_config_properties,
-        kerberos_ssl_client_settings, kerberos_ssl_server_settings,
-    },
 };
 
 const CONTAINER_IMAGE_BASE_NAME: &str = "hbase";

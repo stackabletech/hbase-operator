@@ -69,9 +69,9 @@ pub(crate) mod test_support {
     use crate::{
         controller::{
             ValidatedCluster, dereference::DereferencedObjects, validate::validate_cluster,
+            zookeeper::ZookeeperConnectionInformation,
         },
         crd::{AnyServiceConfig, HbaseRole, v1alpha1},
-        zookeeper::ZookeeperConnectionInformation,
     };
 
     /// A minimal three-role HbaseCluster used to drive the per-file builder tests.

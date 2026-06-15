@@ -1,9 +1,12 @@
 pub mod build;
 pub mod dereference;
 pub mod validate;
+pub mod zookeeper;
 
 use std::{collections::BTreeMap, str::FromStr};
 
+use const_format::concatcp;
+pub use stackable_operator::v2::types::operator::RoleGroupName;
 use stackable_operator::{
     builder::meta::ObjectMetaBuilder,
     commons::product_image_selection::ResolvedProductImage,
@@ -18,19 +21,19 @@ use stackable_operator::{
         types::{
             kubernetes::{NamespaceName, Uid},
             operator::{
-                ClusterName, ControllerName, OperatorName, ProductName, ProductVersion,
-                RoleGroupName, RoleName,
+                ClusterName, ControllerName, OperatorName, ProductName, ProductVersion, RoleName,
             },
         },
     },
 };
 
 use crate::{
+    controller::{build::opa::HbaseOpaConfig, zookeeper::ZookeeperConnectionInformation},
     crd::{APP_NAME, AnyServiceConfig, HbaseRole, OPERATOR_NAME, v1alpha1},
-    hbase_controller::HBASE_CONTROLLER_NAME,
-    security::opa::HbaseOpaConfig,
-    zookeeper::ZookeeperConnectionInformation,
 };
+
+pub const HBASE_CONTROLLER_NAME: &str = "hbasecluster";
+pub const FULL_HBASE_CONTROLLER_NAME: &str = concatcp!(HBASE_CONTROLLER_NAME, '.', OPERATOR_NAME);
 
 /// The product name (`hbase`) as a type-safe label value.
 pub(crate) fn product_name() -> ProductName {

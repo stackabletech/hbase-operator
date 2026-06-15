@@ -4,14 +4,19 @@ use snafu::{ResultExt, Snafu};
 use stackable_operator::{
     builder::{configmap::ConfigMapBuilder, meta::ObjectMetaBuilder},
     k8s_openapi::api::core::v1::ConfigMap,
+    kube::Resource,
+    kvp::ObjectLabels,
     v2::{builder::meta::ownerreference_from_resource, config_file_writer::to_hadoop_xml},
 };
 
 use crate::{
     controller::{ValidatedCluster, build::properties::ConfigFileName},
-    crd::HbaseRole,
-    hbase_controller::build_recommended_labels,
+    crd::{APP_NAME, HbaseRole, OPERATOR_NAME},
 };
+
+// The discovery `ConfigMap` is a cluster-wide object (not tied to a single role group), so it is
+// labelled with the region-server role and a `discovery` placeholder role-group.
+const DISCOVERY_ROLE_GROUP: &str = "discovery";
 
 type Result<T, E = Error> = std::result::Result<T, E>;
 
@@ -46,7 +51,7 @@ pub fn build_discovery_config_map(cluster: &ValidatedCluster) -> Result<ConfigMa
                     cluster,
                     &cluster.image.app_version_label_value,
                     &HbaseRole::RegionServer.to_string(),
-                    "discovery",
+                    DISCOVERY_ROLE_GROUP,
                 ))
                 .context(ObjectMetaSnafu)?
                 .build(),
@@ -57,4 +62,25 @@ pub fn build_discovery_config_map(cluster: &ValidatedCluster) -> Result<ConfigMa
         )
         .build()
         .context(BuildConfigMapSnafu)
+}
+
+/// Recommended labels for the cluster-wide discovery `ConfigMap`.
+fn build_recommended_labels<'a, R>(
+    owner: &'a R,
+    app_version: &'a str,
+    role: &'a str,
+    role_group: &'a str,
+) -> ObjectLabels<'a, R>
+where
+    R: Resource,
+{
+    ObjectLabels {
+        owner,
+        app_name: APP_NAME,
+        app_version,
+        operator_name: OPERATOR_NAME,
+        controller_name: crate::controller::HBASE_CONTROLLER_NAME,
+        role,
+        role_group,
+    }
 }
