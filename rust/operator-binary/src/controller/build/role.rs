@@ -2,6 +2,8 @@
 //! port name/number mapping. These are operator/product knowledge, kept out of the `crd` module
 //! so it stays a pure API definition.
 
+use stackable_operator::v2::types::common::Port;
+
 use crate::crd::{
     HBASE_MASTER_METRICS_PORT, HBASE_MASTER_PORT, HBASE_MASTER_UI_PORT,
     HBASE_REGIONSERVER_METRICS_PORT, HBASE_REGIONSERVER_PORT, HBASE_REGIONSERVER_UI_PORT,
@@ -29,7 +31,7 @@ impl HbaseRole {
     ///
     /// Hbase versions 2.6.* will have two ports for each role. The metrics are available on the
     /// UI port.
-    pub fn ports(&self, https_enabled: bool) -> Vec<(String, u16)> {
+    pub fn ports(&self, https_enabled: bool) -> Vec<(String, Port)> {
         vec![
             (self.data_port_name(https_enabled), self.data_port()),
             (
@@ -39,7 +41,7 @@ impl HbaseRole {
         ]
     }
 
-    pub fn data_port(&self) -> u16 {
+    pub fn data_port(&self) -> Port {
         match self {
             HbaseRole::Master => HBASE_MASTER_PORT,
             HbaseRole::RegionServer => HBASE_REGIONSERVER_PORT,
@@ -60,7 +62,7 @@ impl HbaseRole {
         }
     }
 
-    pub fn ui_port(&self) -> u16 {
+    pub fn ui_port(&self) -> Port {
         match self {
             HbaseRole::Master => HBASE_MASTER_UI_PORT,
             HbaseRole::RegionServer => HBASE_REGIONSERVER_UI_PORT,
@@ -77,7 +79,7 @@ impl HbaseRole {
         }
     }
 
-    pub fn metrics_port(&self) -> u16 {
+    pub fn metrics_port(&self) -> Port {
         match self {
             HbaseRole::Master => HBASE_MASTER_METRICS_PORT,
             HbaseRole::RegionServer => HBASE_REGIONSERVER_METRICS_PORT,

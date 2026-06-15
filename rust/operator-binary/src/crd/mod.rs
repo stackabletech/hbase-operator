@@ -27,7 +27,10 @@ use stackable_operator::{
     v2::{
         config_overrides::KeyValueConfigOverrides,
         role_utils::JavaCommonConfig,
-        types::kubernetes::{ConfigMapName, ListenerClassName, SecretClassName},
+        types::{
+            common::Port,
+            kubernetes::{ConfigMapName, ListenerClassName, SecretClassName},
+        },
     },
     versioned::versioned,
 };
@@ -56,18 +59,18 @@ pub const HBASE_CLUSTER_DISTRIBUTED: &str = "hbase.cluster.distributed";
 pub const HBASE_ROOTDIR: &str = "hbase.rootdir";
 const DEFAULT_HBASE_ROOTDIR: &str = "/hbase";
 
-pub const HBASE_MASTER_PORT: u16 = 16000;
+pub const HBASE_MASTER_PORT: Port = Port(16000);
 // HBase always uses 16010, regardless of http or https. On 2024-01-17 we decided in Arch-meeting that we want to stick
 // the port numbers to what the product is doing, so we get the least surprise for users - even when this means we have
 // inconsistency between Stackable products.
-pub const HBASE_MASTER_UI_PORT: u16 = 16010;
-pub const HBASE_MASTER_METRICS_PORT: u16 = 16010;
-pub const HBASE_REGIONSERVER_PORT: u16 = 16020;
-pub const HBASE_REGIONSERVER_UI_PORT: u16 = 16030;
-pub const HBASE_REGIONSERVER_METRICS_PORT: u16 = 16030;
-pub const HBASE_REST_PORT: u16 = 8080;
-pub const HBASE_REST_UI_PORT: u16 = 8085;
-pub const HBASE_REST_METRICS_PORT: u16 = 8085;
+pub const HBASE_MASTER_UI_PORT: Port = Port(16010);
+pub const HBASE_MASTER_METRICS_PORT: Port = Port(16010);
+pub const HBASE_REGIONSERVER_PORT: Port = Port(16020);
+pub const HBASE_REGIONSERVER_UI_PORT: Port = Port(16030);
+pub const HBASE_REGIONSERVER_METRICS_PORT: Port = Port(16030);
+pub const HBASE_REST_PORT: Port = Port(8080);
+pub const HBASE_REST_UI_PORT: Port = Port(8085);
+pub const HBASE_REST_METRICS_PORT: Port = Port(8085);
 pub const LISTENER_VOLUME_NAME: &str = "listener";
 pub const LISTENER_VOLUME_DIR: &str = "/stackable/listener";
 
