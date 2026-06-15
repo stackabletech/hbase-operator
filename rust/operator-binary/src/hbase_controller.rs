@@ -205,20 +205,15 @@ pub async fn reconcile_hbase(
     for (hbase_role, role_group_configs) in &validated_cluster.role_group_configs {
         for (role_group_name, validated_rg_config) in role_group_configs {
             let rg_service =
-                build_rolegroup_service(hbase, &validated_cluster, hbase_role, role_group_name);
+                build_rolegroup_service(&validated_cluster, hbase_role, role_group_name);
 
-            let rg_metrics_service = build_rolegroup_metrics_service(
-                hbase,
-                &validated_cluster,
-                hbase_role,
-                role_group_name,
-            );
+            let rg_metrics_service =
+                build_rolegroup_metrics_service(&validated_cluster, hbase_role, role_group_name);
 
             let rg_configmap =
                 build_rolegroup_config_map(&validated_cluster, hbase_role, role_group_name)
                     .context(BuildRolegroupConfigMapSnafu)?;
             let rg_statefulset = build_rolegroup_statefulset(
-                hbase,
                 &validated_cluster,
                 hbase_role,
                 role_group_name,

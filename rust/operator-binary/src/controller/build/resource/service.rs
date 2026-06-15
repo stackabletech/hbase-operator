@@ -7,7 +7,7 @@ use stackable_operator::{
 
 use crate::{
     controller::{RoleGroupName, ValidatedCluster},
-    crd::{HbaseRole, v1alpha1},
+    crd::HbaseRole,
 };
 
 /// The rolegroup [`Service`] is a headless service that allows direct access to the instances of a
@@ -16,13 +16,12 @@ use crate::{
 /// This is mostly useful for internal communication between peers, or for clients that perform
 /// client-side load balancing.
 pub fn build_rolegroup_service(
-    hbase: &v1alpha1::HbaseCluster,
     cluster: &ValidatedCluster,
     hbase_role: &HbaseRole,
     role_group_name: &RoleGroupName,
 ) -> Service {
     let ports = hbase_role
-        .ports(hbase)
+        .ports(cluster.has_https_enabled())
         .into_iter()
         .map(|(name, value)| ServicePort {
             name: Some(name),
@@ -63,7 +62,6 @@ pub fn build_rolegroup_service(
 /// The rolegroup metrics [`Service`] is a service that exposes metrics and a prometheus scraping
 /// label.
 pub fn build_rolegroup_metrics_service(
-    hbase: &v1alpha1::HbaseCluster,
     cluster: &ValidatedCluster,
     hbase_role: &HbaseRole,
     role_group_name: &RoleGroupName,
@@ -86,7 +84,10 @@ pub fn build_rolegroup_metrics_service(
                 role_group_name,
             )
             .with_labels(prometheus_labels())
-            .with_annotations(prometheus_annotations(hbase, hbase_role))
+            .with_annotations(prometheus_annotations(
+                cluster.has_https_enabled(),
+                hbase_role,
+            ))
             .build(),
         spec: Some(ServiceSpec {
             // Internal communication does not need to be exposed
@@ -115,7 +116,7 @@ fn prometheus_labels() -> Labels {
 /// These annotations can be used in a ServiceMonitor.
 ///
 /// see also <https://github.com/prometheus-community/helm-charts/blob/prometheus-27.32.0/charts/prometheus/values.yaml#L983-L1036>
-fn prometheus_annotations(hbase: &v1alpha1::HbaseCluster, hbase_role: &HbaseRole) -> Annotations {
+fn prometheus_annotations(https_enabled: bool, hbase_role: &HbaseRole) -> Annotations {
     Annotations::try_from([
         ("prometheus.io/path".to_owned(), "/prometheus".to_owned()),
         (
@@ -124,7 +125,7 @@ fn prometheus_annotations(hbase: &v1alpha1::HbaseCluster, hbase_role: &HbaseRole
         ),
         (
             "prometheus.io/scheme".to_owned(),
-            if hbase.has_https_enabled() {
+            if https_enabled {
                 "https".to_owned()
             } else {
                 "http".to_owned()
@@ -143,50 +144,13 @@ mod test {
     use crate::test_utils;
 
     #[rstest]
-    #[case("2.6.3", HbaseRole::Master, vec!["master", "ui-http"])]
-    #[case("2.6.3", HbaseRole::RegionServer, vec!["regionserver", "ui-http"])]
-    #[case("2.6.3", HbaseRole::RestServer, vec!["rest-http", "ui-http"])]
-    #[case("2.6.4", HbaseRole::Master, vec!["master", "ui-http"])]
-    #[case("2.6.4", HbaseRole::RegionServer, vec!["regionserver", "ui-http"])]
-    #[case("2.6.4", HbaseRole::RestServer, vec!["rest-http", "ui-http"])]
-    fn test_rolegroup_service_ports(
-        #[case] hbase_version: &str,
-        #[case] role: HbaseRole,
-        #[case] expected_ports: Vec<&str>,
-    ) {
-        let input = format!(
-            "
-        apiVersion: hbase.stackable.tech/v1alpha1
-        kind: HbaseCluster
-        metadata:
-          name: hbase
-          uid: c2e98fc1-6b88-4d11-9381-52530e3f431e
-        spec:
-          image:
-            productVersion: {hbase_version}
-          clusterConfig:
-            hdfsConfigMapName: simple-hdfs
-            zookeeperConfigMapName: simple-znode
-          masters:
-            roleGroups:
-              default:
-                replicas: 1
-          regionServers:
-            roleGroups:
-              default:
-                replicas: 1
-          restServers:
-            roleGroups:
-              default:
-                replicas: 1
-        "
-        );
-        let hbase: v1alpha1::HbaseCluster =
-            serde_yaml::from_str(&input).expect("illegal test input");
-
+    #[case(HbaseRole::Master, vec!["master", "ui-http"])]
+    #[case(HbaseRole::RegionServer, vec!["regionserver", "ui-http"])]
+    #[case(HbaseRole::RestServer, vec!["rest-http", "ui-http"])]
+    fn test_rolegroup_service_ports(#[case] role: HbaseRole, #[case] expected_ports: Vec<&str>) {
         let cluster = test_utils::validated_cluster();
         let role_group_name = test_utils::role_group_name("default");
-        let service = build_rolegroup_service(&hbase, &cluster, &role, &role_group_name);
+        let service = build_rolegroup_service(&cluster, &role, &role_group_name);
 
         assert_eq!(
             expected_ports,

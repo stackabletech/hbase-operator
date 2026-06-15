@@ -16,7 +16,10 @@ use stackable_operator::{
     utils::cluster_info::KubernetesClusterInfo,
 };
 
-use crate::crd::{TLS_STORE_DIR, TLS_STORE_PASSWORD, TLS_STORE_VOLUME_NAME, v1alpha1};
+use crate::{
+    controller::ValidatedCluster,
+    crd::{TLS_STORE_DIR, TLS_STORE_PASSWORD, TLS_STORE_VOLUME_NAME, v1alpha1},
+};
 
 /// Mount path of the Kerberos secret volume (keytab + `krb5.conf`).
 pub const STACKABLE_KERBEROS_DIR: &str = "/stackable/kerberos";
@@ -177,20 +180,20 @@ pub fn kerberos_ssl_client_settings(hbase: &v1alpha1::HbaseCluster) -> BTreeMap<
 }
 
 pub fn add_kerberos_pod_config(
-    hbase: &v1alpha1::HbaseCluster,
+    cluster: &ValidatedCluster,
     metrics_service_name: &str,
     cb: &mut ContainerBuilder,
     pb: &mut PodBuilder,
     requested_secret_lifetime: Duration,
 ) -> Result<(), Error> {
-    if let Some(kerberos_secret_class) = hbase.kerberos_secret_class() {
+    if let Some(kerberos_secret_class) = cluster.cluster_config.kerberos_secret_class.clone() {
         // Mount keytab
         let kerberos_secret_operator_volume = SecretOperatorVolumeSourceBuilder::new(
             kerberos_secret_class,
             // We need both public (krb5.conf) and private (keytab) parts.
             SecretClassVolumeProvisionParts::PublicPrivate,
         )
-        .with_service_scope(hbase.name_any())
+        .with_service_scope(cluster.name.to_string())
         .with_kerberos_service_name(kerberos_service_name())
         .with_kerberos_service_name("HTTP")
         .build()
@@ -208,7 +211,7 @@ pub fn add_kerberos_pod_config(
         cb.add_env_var("KRB5_CONFIG", KRB5_CONFIG_PATH);
     }
 
-    if let Some(https_secret_class) = hbase.https_secret_class() {
+    if let Some(https_secret_class) = cluster.cluster_config.https_secret_class.clone() {
         // Mount TLS keystore
         pb.add_volume(
             VolumeBuilder::new(TLS_STORE_VOLUME_NAME)

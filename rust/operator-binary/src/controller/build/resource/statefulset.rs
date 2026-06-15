@@ -43,7 +43,7 @@ use crate::{
             properties::logging::{MAX_HBASE_LOG_FILES_SIZE, STACKABLE_LOG_DIR},
         },
     },
-    crd::{CONFIG_DIR_NAME, HbaseRole, LISTENER_VOLUME_DIR, LISTENER_VOLUME_NAME, v1alpha1},
+    crd::{CONFIG_DIR_NAME, HbaseRole, LISTENER_VOLUME_DIR, LISTENER_VOLUME_NAME},
 };
 
 stackable_operator::constant!(VECTOR_CONTAINER_NAME: ContainerName = "vector");
@@ -98,7 +98,6 @@ type Result<T, E = Error> = std::result::Result<T, E>;
 /// The [`Pod`](stackable_operator::k8s_openapi::api::core::v1::Pod)s are accessible through the
 /// corresponding headless [`Service`](stackable_operator::k8s_openapi::api::core::v1::Service).
 pub fn build_rolegroup_statefulset(
-    hbase: &v1alpha1::HbaseCluster,
     cluster: &ValidatedCluster,
     hbase_role: &HbaseRole,
     role_group_name: &RoleGroupName,
@@ -109,9 +108,10 @@ pub fn build_rolegroup_statefulset(
     let merged_config = &validated_rg_config.config.config;
     let logging = &validated_rg_config.config.logging;
     let resource_names = cluster.resource_names(hbase_role, role_group_name);
+    let https_enabled = cluster.has_https_enabled();
 
     let ports = hbase_role
-        .ports(hbase)
+        .ports(https_enabled)
         .into_iter()
         .map(|(name, value)| ContainerPort {
             name: Some(name),
@@ -123,7 +123,7 @@ pub fn build_rolegroup_statefulset(
 
     let probe_template = Probe {
         tcp_socket: Some(TCPSocketAction {
-            port: IntOrString::String(hbase_role.data_port_name(hbase)),
+            port: IntOrString::String(hbase_role.data_port_name(https_enabled)),
             ..TCPSocketAction::default()
         }),
         ..Probe::default()
@@ -185,8 +185,8 @@ pub fn build_rolegroup_statefulset(
             entrypoint = "/stackable/hbase/bin/hbase-entrypoint.sh".to_string(),
             role = role_name,
             port = hbase_role.data_port(),
-            port_name = hbase_role.data_port_name(hbase),
-            ui_port_name = HbaseRole::ui_port_name(hbase.has_https_enabled()),
+            port_name = hbase_role.data_port_name(https_enabled),
+            ui_port_name = HbaseRole::ui_port_name(https_enabled),
         }])
         .add_env_vars(merged_env)
         // Needed for the `containerdebug` process to log it's tracing information to.
@@ -234,7 +234,7 @@ pub fn build_rolegroup_statefulset(
         .add_volume(Volume {
             name: HDFS_DISCOVERY_VOLUME_NAME.to_string(),
             config_map: Some(ConfigMapVolumeSource {
-                name: hbase.spec.cluster_config.hdfs_config_map_name.clone(),
+                name: cluster.cluster_config.hdfs_config_map_name.clone(),
                 ..Default::default()
             }),
             ..Default::default()
@@ -273,7 +273,7 @@ pub fn build_rolegroup_statefulset(
     add_graceful_shutdown_config(merged_config, &mut pod_builder).context(GracefulShutdownSnafu)?;
     if cluster.has_kerberos_enabled() {
         add_kerberos_pod_config(
-            hbase,
+            cluster,
             resource_names.metrics_service_name().as_ref(),
             &mut hbase_container,
             &mut pod_builder,

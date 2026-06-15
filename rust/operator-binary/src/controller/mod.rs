@@ -185,6 +185,11 @@ impl ValidatedCluster {
     pub fn has_kerberos_enabled(&self) -> bool {
         self.cluster_config.kerberos_enabled
     }
+
+    /// Whether HTTPS is enabled for this cluster.
+    pub fn has_https_enabled(&self) -> bool {
+        self.cluster_config.https_enabled
+    }
 }
 
 impl Resource for ValidatedCluster {
@@ -240,6 +245,14 @@ pub struct ValidatedClusterConfig {
     // Pre-resolved OPA connection configuration.
     pub hbase_opa_config: Option<HbaseOpaConfig>,
     pub kerberos_enabled: bool,
+    /// Whether HTTPS is enabled (a TLS `SecretClass` was configured).
+    pub https_enabled: bool,
+    /// The Kerberos `SecretClass` name, if Kerberos is enabled.
+    pub kerberos_secret_class: Option<String>,
+    /// The HTTPS/TLS `SecretClass` name, if HTTPS is enabled.
+    pub https_secret_class: Option<String>,
+    /// The HDFS discovery ConfigMap name the cluster connects to.
+    pub hdfs_config_map_name: String,
     // Pre-resolved kerberos properties for hbase-site.xml (empty when kerberos is disabled).
     pub hbase_site_kerberos_config: BTreeMap<String, String>,
     // Pre-resolved kerberos properties for the discovery `hbase-site.xml` exposed to clients

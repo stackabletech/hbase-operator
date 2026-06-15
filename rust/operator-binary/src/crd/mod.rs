@@ -361,11 +361,11 @@ impl HbaseRole {
     ///
     /// Hbase versions 2.6.* will have two ports for each role. The metrics are available on the
     /// UI port.
-    pub fn ports(&self, hbase: &v1alpha1::HbaseCluster) -> Vec<(String, u16)> {
+    pub fn ports(&self, https_enabled: bool) -> Vec<(String, u16)> {
         vec![
-            (self.data_port_name(hbase), self.data_port()),
+            (self.data_port_name(https_enabled), self.data_port()),
             (
-                Self::ui_port_name(hbase.has_https_enabled()).to_string(),
+                Self::ui_port_name(https_enabled).to_string(),
                 self.ui_port(),
             ),
         ]
@@ -379,11 +379,11 @@ impl HbaseRole {
         }
     }
 
-    pub fn data_port_name(&self, hbase: &v1alpha1::HbaseCluster) -> String {
+    pub fn data_port_name(&self, https_enabled: bool) -> String {
         match self {
             HbaseRole::Master | HbaseRole::RegionServer => self.to_string(),
             HbaseRole::RestServer => {
-                if hbase.has_https_enabled() {
+                if https_enabled {
                     HBASE_REST_PORT_NAME_HTTPS.to_owned()
                 } else {
                     HBASE_REST_PORT_NAME_HTTP.to_owned()
