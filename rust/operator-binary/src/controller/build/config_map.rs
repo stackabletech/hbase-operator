@@ -2,11 +2,10 @@
 
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
-    builder::{configmap::ConfigMapBuilder, meta::ObjectMetaBuilder},
+    builder::configmap::ConfigMapBuilder,
     k8s_openapi::api::core::v1::ConfigMap,
     product_logging::framework::VECTOR_CONFIG_FILE,
-    role_utils::RoleGroupRef,
-    v2::{builder::meta::ownerreference_from_resource, config_file_writer::PropertiesWriterError},
+    v2::{config_file_writer::PropertiesWriterError, types::operator::RoleGroupName},
 };
 
 use crate::{
@@ -17,8 +16,7 @@ use crate::{
             ssl_server,
         },
     },
-    crd::{HbaseRole, v1alpha1},
-    hbase_controller::build_recommended_labels,
+    crd::HbaseRole,
 };
 
 #[derive(Snafu, Debug)]
@@ -35,11 +33,6 @@ pub enum Error {
         role_group: String,
     },
 
-    #[snafu(display("failed to build object meta data"))]
-    ObjectMeta {
-        source: stackable_operator::builder::meta::Error,
-    },
-
     #[snafu(display("cannot build config map for role {role:?} and role group {role_group:?}"))]
     Assemble {
         source: stackable_operator::builder::configmap::Error,
@@ -53,17 +46,20 @@ type Result<T, E = Error> = std::result::Result<T, E>;
 pub fn build_rolegroup_config_map(
     cluster: &ValidatedCluster,
     role: &HbaseRole,
-    rolegroup_ref: &RoleGroupRef<v1alpha1::HbaseCluster>,
+    role_group_name: &RoleGroupName,
 ) -> Result<ConfigMap> {
-    tracing::info!("Setting up ConfigMap for {:?}", rolegroup_ref);
+    tracing::info!(
+        "Setting up ConfigMap for {role}/{role_group_name}",
+        role = role.to_string()
+    );
 
     let rg = cluster
         .role_group_configs
         .get(role)
-        .and_then(|groups| groups.get(&rolegroup_ref.role_group))
+        .and_then(|groups| groups.get(role_group_name))
         .with_context(|| MissingRoleGroupSnafu {
-            role: rolegroup_ref.role.clone(),
-            role_group: rolegroup_ref.role_group.clone(),
+            role: role.to_string(),
+            role_group: role_group_name.to_string(),
         })?;
 
     let cluster_config = &cluster.cluster_config;
@@ -101,21 +97,19 @@ pub fn build_rolegroup_config_map(
     let security_properties =
         security_properties::build(role, overrides.security_properties.clone()).with_context(
             |_| JvmSecurityPropertiesSnafu {
-                role_group: rolegroup_ref.role_group.clone(),
+                role_group: role_group_name.to_string(),
             },
         )?;
 
-    let cm_metadata = ObjectMetaBuilder::new()
-        .name_and_namespace(cluster)
-        .name(rolegroup_ref.object_name())
-        .ownerreference(ownerreference_from_resource(cluster, None, Some(true)))
-        .with_recommended_labels(&build_recommended_labels(
-            cluster,
-            &cluster.image.app_version_label_value,
-            &rolegroup_ref.role,
-            &rolegroup_ref.role_group,
-        ))
-        .context(ObjectMetaSnafu)?
+    let cm_metadata = cluster
+        .object_meta(
+            cluster
+                .resource_names(role, role_group_name)
+                .role_group_config_map()
+                .to_string(),
+            role,
+            role_group_name,
+        )
         .build();
 
     let mut builder = ConfigMapBuilder::new();
@@ -137,12 +131,14 @@ pub fn build_rolegroup_config_map(
     if let Some(log4j2_properties) = logging::build_log4j2(rg.config.logging()) {
         builder.add_data(ConfigFileName::Log4j2.to_string(), log4j2_properties);
     }
-    if let Some(vector_config) = logging::build_vector_config(rolegroup_ref, rg.config.logging()) {
+    if let Some(vector_config) =
+        logging::build_vector_config(cluster, role, role_group_name, rg.config.logging())
+    {
         builder.add_data(VECTOR_CONFIG_FILE, vector_config);
     }
 
     builder.build().with_context(|_| AssembleSnafu {
-        role: rolegroup_ref.role.clone(),
-        role_group: rolegroup_ref.role_group.clone(),
+        role: role.to_string(),
+        role_group: role_group_name.to_string(),
     })
 }

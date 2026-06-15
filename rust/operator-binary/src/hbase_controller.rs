@@ -16,7 +16,7 @@ use stackable_operator::{
     },
     cli::OperatorEnvironmentOptions,
     cluster_resources::{ClusterResourceApplyStrategy, ClusterResources},
-    commons::{product_image_selection::ResolvedProductImage, rbac::build_rbac_resources},
+    commons::rbac::build_rbac_resources,
     constants::RESTART_CONTROLLER_ENABLED_LABEL,
     k8s_openapi::{
         DeepMerge,
@@ -34,7 +34,7 @@ use stackable_operator::{
         core::{DeserializeGuard, error_boundary},
         runtime::controller::Action,
     },
-    kvp::{Annotations, Label, LabelError, Labels, ObjectLabels},
+    kvp::{Annotations, Label, LabelError, ObjectLabels},
     logging::controller::ReconcilerError,
     product_logging::{
         self,
@@ -44,18 +44,18 @@ use stackable_operator::{
             CustomContainerLogConfig,
         },
     },
-    role_utils::RoleGroupRef,
     shared::time::Duration,
     status::condition::{
         compute_conditions, operations::ClusterOperationsConditionBuilder,
         statefulset::StatefulSetConditionBuilder,
     },
+    v2::types::operator::RoleGroupName,
 };
 use strum::{EnumDiscriminants, IntoStaticStr};
 
 use crate::{
     controller::{
-        ValidatedRoleGroupConfig,
+        ValidatedCluster, ValidatedRoleGroupConfig,
         build::{
             discovery::build_discovery_config_map,
             properties::logging::{MAX_HBASE_LOG_FILES_SIZE, STACKABLE_LOG_DIR},
@@ -102,10 +102,10 @@ pub enum Error {
         source: stackable_operator::cluster_resources::Error,
     },
 
-    #[snafu(display("failed to apply Service for {}", rolegroup))]
+    #[snafu(display("failed to apply Service for role group {role_group}"))]
     ApplyRoleGroupService {
         source: stackable_operator::cluster_resources::Error,
-        rolegroup: RoleGroupRef<v1alpha1::HbaseCluster>,
+        role_group: RoleGroupName,
     },
 
     #[snafu(display("failed to apply discovery configmap"))]
@@ -123,21 +123,16 @@ pub enum Error {
         source: crate::controller::build::config_map::Error,
     },
 
-    #[snafu(display("failed to apply ConfigMap for {}", rolegroup))]
+    #[snafu(display("failed to apply ConfigMap for role group {role_group}"))]
     ApplyRoleGroupConfig {
         source: stackable_operator::cluster_resources::Error,
-        rolegroup: RoleGroupRef<v1alpha1::HbaseCluster>,
+        role_group: RoleGroupName,
     },
 
-    #[snafu(display("failed to apply StatefulSet for {}", rolegroup))]
+    #[snafu(display("failed to apply StatefulSet for role group {role_group}"))]
     ApplyRoleGroupStatefulSet {
         source: stackable_operator::cluster_resources::Error,
-        rolegroup: RoleGroupRef<v1alpha1::HbaseCluster>,
-    },
-
-    #[snafu(display("object is missing metadata to build owner reference"))]
-    ObjectMissingMetadataForOwnerRef {
-        source: stackable_operator::builder::meta::Error,
+        role_group: RoleGroupName,
     },
 
     #[snafu(display("failed to patch service account"))]
@@ -178,11 +173,6 @@ pub enum Error {
 
     #[snafu(display("failed to build label"))]
     BuildLabel { source: LabelError },
-
-    #[snafu(display("failed to build object meta data"))]
-    ObjectMeta {
-        source: stackable_operator::builder::meta::Error,
-    },
 
     #[snafu(display("failed to configure logging"))]
     ConfigureLogging { source: LoggingError },
@@ -286,50 +276,48 @@ pub async fn reconcile_hbase(
     let mut ss_cond_builder = StatefulSetConditionBuilder::default();
 
     for (hbase_role, role_group_configs) in &validated_cluster.role_group_configs {
-        for (rolegroup_name, validated_rg_config) in role_group_configs {
-            let rolegroup = hbase.server_rolegroup_ref(hbase_role.to_string(), rolegroup_name);
-
+        for (role_group_name, validated_rg_config) in role_group_configs {
             let rg_service =
-                build_rolegroup_service(hbase, hbase_role, &rolegroup, &validated_cluster.image)?;
+                build_rolegroup_service(hbase, &validated_cluster, hbase_role, role_group_name)?;
 
             let rg_metrics_service = build_rolegroup_metrics_service(
                 hbase,
+                &validated_cluster,
                 hbase_role,
-                &rolegroup,
-                &validated_cluster.image,
+                role_group_name,
             )?;
 
             let rg_configmap = crate::controller::build::config_map::build_rolegroup_config_map(
                 &validated_cluster,
                 hbase_role,
-                &rolegroup,
+                role_group_name,
             )
             .context(BuildRolegroupConfigMapSnafu)?;
             let rg_statefulset = build_rolegroup_statefulset(
                 hbase,
+                &validated_cluster,
                 hbase_role,
-                &rolegroup,
+                role_group_name,
                 validated_rg_config,
-                &validated_cluster.image,
                 &rbac_sa,
             )?;
             cluster_resources
                 .add(client, rg_service)
                 .await
                 .with_context(|_| ApplyRoleGroupServiceSnafu {
-                    rolegroup: rolegroup.clone(),
+                    role_group: role_group_name.clone(),
                 })?;
             cluster_resources
                 .add(client, rg_metrics_service)
                 .await
                 .with_context(|_| ApplyRoleGroupServiceSnafu {
-                    rolegroup: rolegroup.clone(),
+                    role_group: role_group_name.clone(),
                 })?;
             cluster_resources
                 .add(client, rg_configmap)
                 .await
                 .with_context(|_| ApplyRoleGroupConfigSnafu {
-                    rolegroup: rolegroup.clone(),
+                    role_group: role_group_name.clone(),
                 })?;
 
             // Note: The StatefulSet needs to be applied after all ConfigMaps and Secrets it mounts
@@ -340,7 +328,7 @@ pub async fn reconcile_hbase(
                     .add(client, rg_statefulset)
                     .await
                     .with_context(|_| ApplyRoleGroupStatefulSetSnafu {
-                        rolegroup: rolegroup.clone(),
+                        role_group: role_group_name.clone(),
                     })?,
             );
         }
@@ -391,9 +379,9 @@ pub async fn reconcile_hbase(
 /// This is mostly useful for internal communication between peers, or for clients that perform client-side load balancing.
 fn build_rolegroup_service(
     hbase: &v1alpha1::HbaseCluster,
+    cluster: &ValidatedCluster,
     hbase_role: &HbaseRole,
-    rolegroup: &RoleGroupRef<v1alpha1::HbaseCluster>,
-    resolved_product_image: &ResolvedProductImage,
+    role_group_name: &RoleGroupName,
 ) -> Result<Service> {
     let ports = hbase_role
         .ports(hbase)
@@ -406,23 +394,18 @@ fn build_rolegroup_service(
         })
         .collect();
 
-    let metadata = ObjectMetaBuilder::new()
-        .name_and_namespace(hbase)
-        .name(rolegroup.rolegroup_headless_service_name())
-        .ownerreference_from_resource(hbase, None, Some(true))
-        .context(ObjectMissingMetadataForOwnerRefSnafu)?
-        .with_recommended_labels(&build_recommended_labels(
-            hbase,
-            &resolved_product_image.app_version_label_value,
-            &rolegroup.role,
-            &rolegroup.role_group,
-        ))
-        .context(ObjectMetaSnafu)?
+    let metadata = cluster
+        .object_meta(
+            cluster
+                .resource_names(hbase_role, role_group_name)
+                .headless_service_name()
+                .to_string(),
+            hbase_role,
+            role_group_name,
+        )
         .build();
 
-    let service_selector =
-        Labels::role_group_selector(hbase, APP_NAME, &rolegroup.role, &rolegroup.role_group)
-            .context(BuildLabelSnafu)?;
+    let service_selector = cluster.role_group_selector(hbase_role, role_group_name);
 
     let service_spec = ServiceSpec {
         // Internal communication does not need to be exposed
@@ -444,9 +427,9 @@ fn build_rolegroup_service(
 /// The rolegroup metrics [`Service`] is a service that exposes metrics and a prometheus scraping label.
 fn build_rolegroup_metrics_service(
     hbase: &v1alpha1::HbaseCluster,
+    cluster: &ValidatedCluster,
     hbase_role: &HbaseRole,
-    rolegroup: &RoleGroupRef<v1alpha1::HbaseCluster>,
-    resolved_product_image: &ResolvedProductImage,
+    role_group_name: &RoleGroupName,
 ) -> Result<Service, Error> {
     let ports = vec![ServicePort {
         name: Some(HbaseRole::metrics_port_name().to_owned()),
@@ -455,23 +438,18 @@ fn build_rolegroup_metrics_service(
         ..ServicePort::default()
     }];
 
-    let service_selector =
-        Labels::role_group_selector(hbase, APP_NAME, &rolegroup.role, &rolegroup.role_group)
-            .context(BuildLabelSnafu)?;
+    let service_selector = cluster.role_group_selector(hbase_role, role_group_name);
 
     Ok(Service {
-        metadata: ObjectMetaBuilder::new()
-            .name_and_namespace(hbase)
-            .name(rolegroup.rolegroup_metrics_service_name())
-            .ownerreference_from_resource(hbase, None, Some(true))
-            .context(ObjectMissingMetadataForOwnerRefSnafu)?
-            .with_recommended_labels(&build_recommended_labels(
-                hbase,
-                &resolved_product_image.app_version_label_value,
-                &rolegroup.role,
-                &rolegroup.role_group,
-            ))
-            .context(ObjectMetaSnafu)?
+        metadata: cluster
+            .object_meta(
+                cluster
+                    .resource_names(hbase_role, role_group_name)
+                    .metrics_service_name()
+                    .to_string(),
+                hbase_role,
+                role_group_name,
+            )
             .with_label(Label::try_from(("prometheus.io/scrape", "true")).context(LabelBuildSnafu)?)
             .with_annotations(prometheus_annotations(hbase, hbase_role))
             .build(),
@@ -516,17 +494,17 @@ fn prometheus_annotations(hbase: &v1alpha1::HbaseCluster, hbase_role: &HbaseRole
 /// The rolegroup [`StatefulSet`] runs the rolegroup, as configured by the administrator.
 ///
 /// The [`Pod`](`stackable_operator::k8s_openapi::api::core::v1::Pod`)s are accessible through the corresponding [`Service`] (from [`build_rolegroup_service`]).
-#[allow(clippy::too_many_arguments)]
 fn build_rolegroup_statefulset(
     hbase: &v1alpha1::HbaseCluster,
+    cluster: &ValidatedCluster,
     hbase_role: &HbaseRole,
-    rolegroup_ref: &RoleGroupRef<v1alpha1::HbaseCluster>,
+    role_group_name: &RoleGroupName,
     validated_rg_config: &ValidatedRoleGroupConfig,
-    resolved_product_image: &ResolvedProductImage,
     service_account: &ServiceAccount,
 ) -> Result<StatefulSet> {
+    let resolved_product_image = &cluster.image;
     let merged_config = &validated_rg_config.config;
-    let hbase_version = &resolved_product_image.app_version_label_value;
+    let resource_names = cluster.resource_names(hbase_role, role_group_name);
 
     let ports = hbase_role
         .ports(hbase)
@@ -633,18 +611,10 @@ fn build_rolegroup_statefulset(
 
     let mut pod_builder = PodBuilder::new();
 
-    let recommended_object_labels = build_recommended_labels(
-        hbase,
-        hbase_version,
-        &rolegroup_ref.role,
-        &rolegroup_ref.role_group,
-    );
-    let recommended_labels =
-        Labels::recommended(&recommended_object_labels).context(LabelBuildSnafu)?;
+    let recommended_labels = cluster.recommended_labels(hbase_role, role_group_name);
 
     let pb_metadata = ObjectMetaBuilder::new()
-        .with_recommended_labels(&recommended_object_labels)
-        .context(ObjectMetaSnafu)?
+        .with_labels(recommended_labels.clone())
         .build();
 
     pod_builder
@@ -654,7 +624,7 @@ fn build_rolegroup_statefulset(
         .add_volume(stackable_operator::k8s_openapi::api::core::v1::Volume {
             name: "hbase-config".to_string(),
             config_map: Some(ConfigMapVolumeSource {
-                name: rolegroup_ref.object_name(),
+                name: resource_names.role_group_config_map().to_string(),
                 ..Default::default()
             }),
             ..Default::default()
@@ -701,7 +671,7 @@ fn build_rolegroup_statefulset(
             .add_volume(Volume {
                 name: "log-config".to_string(),
                 config_map: Some(ConfigMapVolumeSource {
-                    name: rolegroup_ref.object_name(),
+                    name: resource_names.role_group_config_map().to_string(),
                     ..ConfigMapVolumeSource::default()
                 }),
                 ..Volume::default()
@@ -710,10 +680,10 @@ fn build_rolegroup_statefulset(
     }
 
     add_graceful_shutdown_config(merged_config, &mut pod_builder).context(GracefulShutdownSnafu)?;
-    if hbase.has_kerberos_enabled() {
+    if cluster.has_kerberos_enabled() {
         add_kerberos_pod_config(
             hbase,
-            rolegroup_ref,
+            resource_names.metrics_service_name().as_ref(),
             &mut hbase_container,
             &mut pod_builder,
             merged_config
@@ -767,28 +737,16 @@ fn build_rolegroup_statefulset(
 
     pod_template.merge_from(validated_rg_config.pod_overrides.clone());
 
-    let metadata = ObjectMetaBuilder::new()
-        .name_and_namespace(hbase)
-        .name(rolegroup_ref.object_name())
-        .ownerreference_from_resource(hbase, None, Some(true))
-        .context(ObjectMissingMetadataForOwnerRefSnafu)?
-        .with_recommended_labels(&build_recommended_labels(
-            hbase,
-            hbase_version,
-            &rolegroup_ref.role,
-            &rolegroup_ref.role_group,
-        ))
-        .context(ObjectMetaSnafu)?
+    let metadata = cluster
+        .object_meta(
+            resource_names.stateful_set_name().to_string(),
+            hbase_role,
+            role_group_name,
+        )
         .with_label(RESTART_CONTROLLER_ENABLED_LABEL.to_owned())
         .build();
 
-    let statefulset_match_labels = Labels::role_group_selector(
-        hbase,
-        APP_NAME,
-        &rolegroup_ref.role,
-        &rolegroup_ref.role_group,
-    )
-    .context(BuildLabelSnafu)?;
+    let statefulset_match_labels = cluster.role_group_selector(hbase_role, role_group_name);
 
     let statefulset_spec = StatefulSetSpec {
         pod_management_policy: Some("Parallel".to_string()),
@@ -797,7 +755,7 @@ fn build_rolegroup_statefulset(
             match_labels: Some(statefulset_match_labels.into()),
             ..LabelSelector::default()
         },
-        service_name: Some(rolegroup_ref.rolegroup_headless_service_name()),
+        service_name: Some(resource_names.headless_service_name().to_string()),
         template: pod_template,
         volume_claim_templates: listener_pvc,
         ..StatefulSetSpec::default()
@@ -852,10 +810,13 @@ pub fn build_recommended_labels<'a, R>(
 
 #[cfg(test)]
 mod test {
+    use std::str::FromStr;
+
     use rstest::rstest;
-    use stackable_operator::kube::runtime::reflector::ObjectRef;
+    use stackable_operator::v2::types::operator::RoleGroupName;
 
     use super::*;
+    use crate::controller::build::properties::test_support;
 
     #[rstest]
     #[case("2.6.3", HbaseRole::Master, vec!["master", "ui-http"])]
@@ -899,22 +860,9 @@ mod test {
         let hbase: v1alpha1::HbaseCluster =
             serde_yaml::from_str(&input).expect("illegal test input");
 
-        let resolved_image = ResolvedProductImage {
-            image: format!("oci.stackable.tech/sdp/hbase:{hbase_version}-stackable0.0.0-dev"),
-            app_version_label_value: hbase_version
-                .parse()
-                .expect("test: hbase version is always valid"),
-            product_version: hbase_version.to_string(),
-            image_pull_policy: "Never".to_string(),
-            pull_secrets: None,
-        };
-
-        let role_group_ref = RoleGroupRef {
-            cluster: ObjectRef::<v1alpha1::HbaseCluster>::from_obj(&hbase),
-            role: role.to_string(),
-            role_group: "default".to_string(),
-        };
-        let service = build_rolegroup_service(&hbase, &role, &role_group_ref, &resolved_image)
+        let cluster = test_support::validated_cluster();
+        let role_group_name = RoleGroupName::from_str("default").expect("valid role group name");
+        let service = build_rolegroup_service(&hbase, &cluster, &role, &role_group_name)
             .expect("failed to build service");
 
         assert_eq!(

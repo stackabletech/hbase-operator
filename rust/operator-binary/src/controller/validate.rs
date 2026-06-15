@@ -14,6 +14,7 @@ use stackable_operator::{
         builder::pod::container::{self, EnvVarName, EnvVarSet},
         controller_utils::{get_cluster_name, get_namespace, get_uid},
         role_utils::{JavaCommonConfig, with_validated_config},
+        types::operator::RoleGroupName,
     },
 };
 use strum::IntoEnumIterator;
@@ -52,6 +53,12 @@ pub enum Error {
 
     #[snafu(display("invalid environment variable override name"))]
     ParseEnvVarName { source: container::Error },
+
+    #[snafu(display("invalid role group name {role_group}"))]
+    ParseRoleGroupName {
+        source: stackable_operator::v2::macros::attributed_string_type::Error,
+        role_group: String,
+    },
 
     #[snafu(display("failed to resolve kerberos config"))]
     AddKerberosConfig { source: kerberos::Error },
@@ -187,7 +194,7 @@ fn validate_role_group_configs<Config, ValidatedConfig>(
     >,
     default_config: Config,
     wrap: fn(ValidatedConfig) -> AnyServiceConfig,
-) -> Result<BTreeMap<String, ValidatedRoleGroupConfig>, Error>
+) -> Result<BTreeMap<RoleGroupName, ValidatedRoleGroupConfig>, Error>
 where
     Config: Clone + Merge,
     ValidatedConfig: FromFragment<Fragment = Config>,
@@ -199,6 +206,11 @@ where
     role.role_groups
         .iter()
         .map(|(role_group_name, role_group)| {
+            let role_group_name = RoleGroupName::from_str(role_group_name).with_context(|_| {
+                ParseRoleGroupNameSnafu {
+                    role_group: role_group_name.clone(),
+                }
+            })?;
             let validated = with_validated_config::<
                 ValidatedConfig,
                 JavaCommonConfig,

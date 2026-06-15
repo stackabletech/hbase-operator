@@ -60,6 +60,8 @@ mod tests {
 
 #[cfg(test)]
 pub(crate) mod test_support {
+    use std::str::FromStr;
+
     use stackable_operator::{
         commons::networking::DomainName, utils::cluster_info::KubernetesClusterInfo,
     };
@@ -133,6 +135,9 @@ spec:
         validated_cluster: &'a ValidatedCluster,
         role: &HbaseRole,
     ) -> &'a AnyServiceConfig {
-        &validated_cluster.role_group_configs[role]["default"].config
+        let default_role_group =
+            stackable_operator::v2::types::operator::RoleGroupName::from_str("default")
+                .expect("'default' is a valid role group name");
+        &validated_cluster.role_group_configs[role][&default_role_group].config
     }
 }

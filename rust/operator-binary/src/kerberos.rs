@@ -12,7 +12,6 @@ use stackable_operator::{
     },
     commons::secret_class::SecretClassVolumeProvisionParts,
     kube::{ResourceExt, runtime::reflector::ObjectRef},
-    role_utils::RoleGroupRef,
     shared::time::Duration,
     utils::cluster_info::KubernetesClusterInfo,
 };
@@ -171,7 +170,7 @@ pub fn kerberos_ssl_client_settings(hbase: &v1alpha1::HbaseCluster) -> BTreeMap<
 
 pub fn add_kerberos_pod_config(
     hbase: &v1alpha1::HbaseCluster,
-    rolegroup_ref: &RoleGroupRef<v1alpha1::HbaseCluster>,
+    metrics_service_name: &str,
     cb: &mut ContainerBuilder,
     pb: &mut PodBuilder,
     requested_secret_lifetime: Duration,
@@ -215,7 +214,7 @@ pub fn add_kerberos_pod_config(
                     .with_pod_scope()
                     .with_node_scope()
                     // We need to add the metrics service for scraping
-                    .with_service_scope(rolegroup_ref.rolegroup_metrics_service_name())
+                    .with_service_scope(metrics_service_name)
                     .with_format(SecretFormat::TlsPkcs12)
                     .with_tls_pkcs12_password(TLS_STORE_PASSWORD)
                     .with_auto_tls_cert_lifetime(requested_secret_lifetime)

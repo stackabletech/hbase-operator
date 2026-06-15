@@ -1,4 +1,5 @@
 use stackable_operator::{
+    kube::runtime::reflector::ObjectRef,
     memory::{BinaryMultiple, MemoryQuantity},
     product_logging::{
         self,
@@ -7,9 +8,13 @@ use stackable_operator::{
         },
     },
     role_utils::RoleGroupRef,
+    v2::types::operator::RoleGroupName,
 };
 
-use crate::crd::{Container, v1alpha1};
+use crate::{
+    controller::ValidatedCluster,
+    crd::{Container, HbaseRole},
+};
 
 pub const STACKABLE_LOG_DIR: &str = "/stackable/log";
 pub const MAX_HBASE_LOG_FILES_SIZE: MemoryQuantity = MemoryQuantity {
@@ -38,7 +43,9 @@ pub fn build_log4j2(logging: &Logging<Container>) -> Option<String> {
 ///
 /// Returns `None` when the Vector agent is disabled for this role group.
 pub fn build_vector_config(
-    rolegroup: &RoleGroupRef<v1alpha1::HbaseCluster>,
+    cluster: &ValidatedCluster,
+    role: &HbaseRole,
+    role_group_name: &RoleGroupName,
     logging: &Logging<Container>,
 ) -> Option<String> {
     if !logging.enable_vector_agent {
@@ -52,8 +59,14 @@ pub fn build_vector_config(
         _ => None,
     };
 
+    let rolegroup = RoleGroupRef {
+        cluster: ObjectRef::from_obj(cluster),
+        role: role.to_string(),
+        role_group: role_group_name.to_string(),
+    };
+
     Some(product_logging::framework::create_vector_config(
-        rolegroup,
+        &rolegroup,
         vector_log_config,
     ))
 }

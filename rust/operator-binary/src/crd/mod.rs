@@ -27,10 +27,10 @@ use stackable_operator::{
         api::core::v1::{EnvVar, PersistentVolumeClaim, Volume},
         apimachinery::pkg::api::resource::Quantity,
     },
-    kube::{CustomResource, runtime::reflector::ObjectRef},
+    kube::CustomResource,
     kvp::Labels,
     product_logging::{self, spec::Logging},
-    role_utils::{GenericRoleConfig, Role, RoleGroupRef},
+    role_utils::{GenericRoleConfig, Role},
     schemars::{self, JsonSchema},
     shared::time::Duration,
     status::condition::{ClusterCondition, HasStatusCondition},
@@ -229,19 +229,6 @@ impl HasStatusCondition for v1alpha1::HbaseCluster {
 }
 
 impl v1alpha1::HbaseCluster {
-    /// Metadata about a server rolegroup
-    pub fn server_rolegroup_ref(
-        &self,
-        role_name: impl Into<String>,
-        group_name: impl Into<String>,
-    ) -> RoleGroupRef<Self> {
-        RoleGroupRef {
-            cluster: ObjectRef::from_obj(self),
-            role: role_name.into(),
-            role_group: group_name.into(),
-        }
-    }
-
     pub fn role_config(&self, role: &HbaseRole) -> Option<&GenericRoleConfig> {
         match role {
             HbaseRole::Master => self.spec.masters.as_ref().map(|m| &m.role_config),
@@ -995,12 +982,11 @@ spec:
             serde_yaml::with::singleton_map_recursive::deserialize(deserializer).unwrap();
 
         let hbase_role = HbaseRole::RegionServer;
-        let rolegroup = hbase.server_rolegroup_ref(hbase_role.to_string(), role_group_name);
 
         let (merged_config, _) = super::test_helpers::merged_role_group_config(
             &hbase,
             &hbase_role,
-            &rolegroup.role_group,
+            role_group_name,
             &hbase.spec.cluster_config.hdfs_config_map_name,
         );
         if let AnyServiceConfig::RegionServer(config) = merged_config {
