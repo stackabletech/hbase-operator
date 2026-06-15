@@ -10,10 +10,9 @@ use std::sync::Arc;
 use snafu::{ResultExt, Snafu};
 use stackable_operator::{
     cli::OperatorEnvironmentOptions,
-    cluster_resources::{ClusterResourceApplyStrategy, ClusterResources},
+    cluster_resources::ClusterResourceApplyStrategy,
     commons::rbac::build_rbac_resources,
     kube::{
-        Resource,
         core::{DeserializeGuard, error_boundary},
         runtime::controller::Action,
     },
@@ -24,12 +23,13 @@ use stackable_operator::{
         compute_conditions, operations::ClusterOperationsConditionBuilder,
         statefulset::StatefulSetConditionBuilder,
     },
+    v2::cluster_resources::cluster_resources_new,
 };
 use strum::{EnumDiscriminants, IntoStaticStr};
 
 use crate::{
     controller::{
-        HBASE_CONTROLLER_NAME, RoleGroupName,
+        RoleGroupName,
         build::resource::{
             config_map::build_rolegroup_config_map,
             discovery::build_discovery_config_map,
@@ -37,6 +37,7 @@ use crate::{
             service::{build_rolegroup_metrics_service, build_rolegroup_service},
             statefulset::build_rolegroup_statefulset,
         },
+        controller_name, operator_name, product_name,
     },
     crd::{APP_NAME, HbaseClusterStatus, OPERATOR_NAME, v1alpha1},
 };
@@ -49,11 +50,6 @@ pub struct Ctx {
 #[derive(Snafu, Debug, EnumDiscriminants)]
 #[strum_discriminants(derive(IntoStaticStr))]
 pub enum Error {
-    #[snafu(display("failed to create cluster resources"))]
-    CreateClusterResources {
-        source: stackable_operator::cluster_resources::Error,
-    },
-
     #[snafu(display("failed to delete orphaned resources"))]
     DeleteOrphanedResources {
         source: stackable_operator::cluster_resources::Error,
@@ -176,15 +172,16 @@ pub async fn reconcile_hbase(
     )
     .context(ValidateSnafu)?;
 
-    let mut cluster_resources = ClusterResources::new(
-        APP_NAME,
-        OPERATOR_NAME,
-        HBASE_CONTROLLER_NAME,
-        &hbase.object_ref(&()),
+    let mut cluster_resources = cluster_resources_new(
+        &product_name(),
+        &operator_name(),
+        &controller_name(),
+        &validated_cluster.name,
+        &validated_cluster.namespace,
+        &validated_cluster.uid,
         ClusterResourceApplyStrategy::from(&hbase.spec.cluster_operation),
         &hbase.spec.object_overrides,
-    )
-    .context(CreateClusterResourcesSnafu)?;
+    );
 
     let (rbac_sa, rbac_rolebinding) = build_rbac_resources(
         hbase,
