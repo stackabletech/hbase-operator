@@ -258,18 +258,20 @@ pub struct ValidatedRoleConfig {
 
 /// Per-rolegroup configuration: the merged CRD config plus the merged
 /// (role <- role group) `configOverrides`, `envOverrides` and `podOverrides`.
-///
-/// The merge and validation is performed by
-/// [`with_validated_config`](stackable_operator::v2::role_utils::with_validated_config); the
-/// result is flattened into this struct and augmented with the pre-resolved
-/// `non_heap_jvm_args`. Carrying every override channel (and the JVM args) keeps the
-/// build step a pure function of [`ValidatedCluster`] that never has to reach back into
-/// the raw `HbaseCluster`.
+#[derive(Clone, Debug)]
+pub struct ValidatedHbaseConfig {
+    /// The merged, role-specific product config.
+    pub config: AnyServiceConfig,
+    /// The validated logging configuration (HBase + optional Vector container), resolved up-front
+    /// during validation.
+    pub logging: validate::ValidatedLogging,
+}
+
 #[derive(Clone, Debug)]
 pub struct ValidatedRoleGroupConfig {
     /// The desired number of replicas (defaulted to 1 during validation).
     pub replicas: u16,
-    pub config: AnyServiceConfig,
+    pub config: ValidatedHbaseConfig,
     pub config_overrides: v1alpha1::HbaseConfigOverrides,
     pub env_overrides: EnvVarSet,
     /// Merged (role <- role group) pod template overrides.

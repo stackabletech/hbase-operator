@@ -138,6 +138,8 @@ spec:
         let default_role_group =
             stackable_operator::v2::types::operator::RoleGroupName::from_str("default")
                 .expect("'default' is a valid role group name");
-        &validated_cluster.role_group_configs[role][&default_role_group].config
+        &validated_cluster.role_group_configs[role][&default_role_group]
+            .config
+            .config
     }
 }

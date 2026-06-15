@@ -1,6 +1,6 @@
 //! Build the per-rolegroup `StatefulSet` for the HbaseCluster.
 
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, str::FromStr};
 
 use indoc::formatdoc;
 use snafu::{OptionExt, ResultExt, Snafu};
@@ -8,10 +8,7 @@ use stackable_operator::{
     builder::{
         self,
         meta::ObjectMetaBuilder,
-        pod::{
-            PodBuilder, container::ContainerBuilder, resources::ResourceRequirementsBuilder,
-            security::PodSecurityContextBuilder,
-        },
+        pod::{PodBuilder, container::ContainerBuilder, security::PodSecurityContextBuilder},
     },
     constants::RESTART_CONTROLLER_ENABLED_LABEL,
     k8s_openapi::{
@@ -26,15 +23,15 @@ use stackable_operator::{
         apimachinery::pkg::{apis::meta::v1::LabelSelector, util::intstr::IntOrString},
     },
     kube::ResourceExt,
-    product_logging::{
-        self,
-        framework::LoggingError,
-        spec::{
-            ConfigMapLogConfig, ContainerLogConfig, ContainerLogConfigChoice,
-            CustomContainerLogConfig,
+    product_logging,
+    v2::{
+        builder::pod::container::EnvVarSet,
+        product_logging::framework::{ValidatedContainerLogConfigChoice, vector_container},
+        types::{
+            kubernetes::{ContainerName, VolumeName},
+            operator::RoleGroupName,
         },
     },
-    v2::types::operator::RoleGroupName,
 };
 
 use crate::{
@@ -47,10 +44,17 @@ use crate::{
         },
     },
     crd::{
-        CONFIG_DIR_NAME, Container, HbaseRole, LISTENER_VOLUME_DIR, LISTENER_VOLUME_NAME,
-        merged_env, v1alpha1,
+        CONFIG_DIR_NAME, HbaseRole, LISTENER_VOLUME_DIR, LISTENER_VOLUME_NAME, merged_env, v1alpha1,
     },
 };
+
+stackable_operator::constant!(VECTOR_CONTAINER_NAME: ContainerName = "vector");
+
+// The Vector container reads `vector.yaml` from the rolegroup ConfigMap (mounted as the
+// `hbase-config` volume) and writes to the shared `log` volume. These reuse the existing
+// volume-name string values so the produced volume mounts match the rest of the Pod.
+stackable_operator::constant!(VECTOR_LOG_CONFIG_VOLUME_NAME: VolumeName = "hbase-config");
+stackable_operator::constant!(VECTOR_LOG_VOLUME_NAME: VolumeName = "log");
 
 pub static CONTAINERDEBUG_LOG_DIRECTORY: std::sync::LazyLock<String> =
     std::sync::LazyLock::new(|| format!("{STACKABLE_LOG_DIR}/containerdebug"));
@@ -71,12 +75,6 @@ pub enum Error {
 
     #[snafu(display("failed to configure graceful shutdown"))]
     GracefulShutdown { source: graceful_shutdown::Error },
-
-    #[snafu(display("vector agent is enabled but vector aggregator ConfigMap is missing"))]
-    VectorAggregatorConfigMapMissing,
-
-    #[snafu(display("failed to configure logging"))]
-    ConfigureLogging { source: LoggingError },
 
     #[snafu(display("failed to add needed volume"))]
     AddVolume { source: builder::pod::Error },
@@ -108,7 +106,8 @@ pub fn build_rolegroup_statefulset(
     service_account: &ServiceAccount,
 ) -> Result<StatefulSet> {
     let resolved_product_image = &cluster.image;
-    let merged_config = &validated_rg_config.config;
+    let merged_config = &validated_rg_config.config.config;
+    let logging = &validated_rg_config.config.logging;
     let resource_names = cluster.resource_names(hbase_role, role_group_name);
 
     let ports = hbase_role
@@ -254,35 +253,25 @@ pub fn build_rolegroup_statefulset(
         .service_account_name(service_account.name_any())
         .security_context(PodSecurityContextBuilder::new().fs_group(1000).build());
 
-    if let Some(ContainerLogConfig {
-        choice:
-            Some(ContainerLogConfigChoice::Custom(CustomContainerLogConfig {
-                custom: ConfigMapLogConfig { config_map },
-            })),
-    }) = merged_config.logging().containers.get(&Container::Hbase)
-    {
-        pod_builder
-            .add_volume(Volume {
-                name: "log-config".to_string(),
-                config_map: Some(ConfigMapVolumeSource {
-                    name: config_map.into(),
-                    ..ConfigMapVolumeSource::default()
-                }),
-                ..Volume::default()
-            })
-            .context(AddVolumeSnafu)?;
-    } else {
-        pod_builder
-            .add_volume(Volume {
-                name: "log-config".to_string(),
-                config_map: Some(ConfigMapVolumeSource {
-                    name: resource_names.role_group_config_map().to_string(),
-                    ..ConfigMapVolumeSource::default()
-                }),
-                ..Volume::default()
-            })
-            .context(AddVolumeSnafu)?;
-    }
+    // The HBase container's log config ConfigMap: either the operator-generated one (the
+    // rolegroup ConfigMap, which carries the automatic `log4j2.properties`) or a user-provided
+    // custom ConfigMap. This branches on the *validated* logging choice (see `ValidatedLogging`).
+    let log_config_config_map = match &logging.hbase_container {
+        ValidatedContainerLogConfigChoice::Custom(config_map_name) => config_map_name.to_string(),
+        ValidatedContainerLogConfigChoice::Automatic(_) => {
+            resource_names.role_group_config_map().to_string()
+        }
+    };
+    pod_builder
+        .add_volume(Volume {
+            name: "log-config".to_string(),
+            config_map: Some(ConfigMapVolumeSource {
+                name: log_config_config_map,
+                ..ConfigMapVolumeSource::default()
+            }),
+            ..Volume::default()
+        })
+        .context(AddVolumeSnafu)?;
 
     add_graceful_shutdown_config(merged_config, &mut pod_builder).context(GracefulShutdownSnafu)?;
     if cluster.has_kerberos_enabled() {
@@ -299,30 +288,17 @@ pub fn build_rolegroup_statefulset(
     }
     pod_builder.add_container(hbase_container.build());
 
-    // Vector sidecar shall be the last container in the list
-    if merged_config.logging().enable_vector_agent {
-        if let Some(vector_aggregator_config_map_name) =
-            &hbase.spec.cluster_config.vector_aggregator_config_map_name
-        {
-            pod_builder.add_container(
-                product_logging::framework::vector_container(
-                    resolved_product_image,
-                    "hbase-config",
-                    "log",
-                    merged_config.logging().containers.get(&Container::Vector),
-                    ResourceRequirementsBuilder::new()
-                        .with_cpu_request("250m")
-                        .with_cpu_limit("500m")
-                        .with_memory_request("128Mi")
-                        .with_memory_limit("128Mi")
-                        .build(),
-                    vector_aggregator_config_map_name,
-                )
-                .context(ConfigureLoggingSnafu)?,
-            );
-        } else {
-            VectorAggregatorConfigMapMissingSnafu.fail()?;
-        }
+    // Vector sidecar shall be the last container in the list.
+    if let Some(vector_log_config) = &logging.vector_container {
+        pod_builder.add_container(vector_container(
+            &VECTOR_CONTAINER_NAME,
+            resolved_product_image,
+            vector_log_config,
+            &resource_names,
+            &VECTOR_LOG_CONFIG_VOLUME_NAME,
+            &VECTOR_LOG_VOLUME_NAME,
+            EnvVarSet::new(),
+        ));
     }
 
     let listener_pvc = hbase_role

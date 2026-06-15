@@ -1,6 +1,6 @@
 use std::{collections::BTreeMap, str::FromStr};
 
-use snafu::{ResultExt, Snafu};
+use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
     commons::product_image_selection::{self},
     config::{
@@ -8,27 +8,39 @@ use stackable_operator::{
         merge::Merge,
     },
     kube::ResourceExt,
+    product_logging::spec::Logging,
     role_utils::{CommonConfiguration, GenericRoleConfig, Role},
     utils::cluster_info::KubernetesClusterInfo,
     v2::{
         builder::pod::container::{self, EnvVarName, EnvVarSet},
         controller_utils::{get_cluster_name, get_namespace, get_uid},
+        product_logging::framework::{
+            ValidatedContainerLogConfigChoice, VectorContainerLogConfig,
+            validate_logging_configuration_for_container,
+        },
         role_utils::{JavaCommonConfig, with_validated_config},
-        types::operator::RoleGroupName,
+        types::{kubernetes::ConfigMapName, operator::RoleGroupName},
     },
 };
 use strum::IntoEnumIterator;
 
 use crate::{
-    controller::build::kerberos::{
-        self, kerberos_config_properties, kerberos_discovery_config_properties,
-        kerberos_ssl_client_settings, kerberos_ssl_server_settings,
-    },
     controller::{
-        ValidatedCluster, ValidatedClusterConfig, ValidatedRoleConfig, ValidatedRoleGroupConfig,
-        build::jvm::construct_role_specific_non_heap_jvm_args, dereference::DereferencedObjects,
+        ValidatedCluster, ValidatedClusterConfig, ValidatedHbaseConfig, ValidatedRoleConfig,
+        ValidatedRoleGroupConfig,
+        build::{
+            jvm::construct_role_specific_non_heap_jvm_args,
+            kerberos::{
+                self, kerberos_config_properties, kerberos_discovery_config_properties,
+                kerberos_ssl_client_settings, kerberos_ssl_server_settings,
+            },
+        },
+        dereference::DereferencedObjects,
     },
-    crd::{AnyServiceConfig, HbaseConfigFragment, HbaseRole, RegionServerConfigFragment, v1alpha1},
+    crd::{
+        AnyServiceConfig, Container, HbaseConfigFragment, HbaseRole, RegionServerConfigFragment,
+        v1alpha1,
+    },
 };
 
 const CONTAINER_IMAGE_BASE_NAME: &str = "hbase";
@@ -62,6 +74,60 @@ pub enum Error {
 
     #[snafu(display("failed to resolve kerberos config"))]
     AddKerberosConfig { source: kerberos::Error },
+
+    #[snafu(display("failed to validate logging configuration"))]
+    ValidateLoggingConfig {
+        source: stackable_operator::v2::product_logging::framework::Error,
+    },
+
+    #[snafu(display(
+        "the Vector aggregator discovery ConfigMap name is required when the Vector agent is enabled"
+    ))]
+    MissingVectorAggregatorConfigMapName,
+
+    #[snafu(display("invalid Vector aggregator discovery ConfigMap name"))]
+    ParseVectorAggregatorConfigMapName {
+        source: stackable_operator::v2::macros::attributed_string_type::Error,
+    },
+}
+
+/// Validated logging configuration for the HBase and (optional) Vector container.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ValidatedLogging {
+    pub hbase_container: ValidatedContainerLogConfigChoice,
+    pub vector_container: Option<VectorContainerLogConfig>,
+    pub enable_vector_agent: bool,
+}
+
+/// Validates the logging configuration for the HBase (and optional Vector) container.
+///
+/// `vector_aggregator_config_map_name` is the discovery ConfigMap name of the Vector aggregator;
+/// it is required (and validated) only when the Vector agent is enabled.
+fn validate_logging(
+    logging: &Logging<Container>,
+    vector_aggregator_config_map_name: &Option<ConfigMapName>,
+) -> Result<ValidatedLogging, Error> {
+    let hbase_container = validate_logging_configuration_for_container(logging, &Container::Hbase)
+        .context(ValidateLoggingConfigSnafu)?;
+
+    let vector_container = if logging.enable_vector_agent {
+        let vector_aggregator_config_map_name = vector_aggregator_config_map_name
+            .clone()
+            .context(MissingVectorAggregatorConfigMapNameSnafu)?;
+        Some(VectorContainerLogConfig {
+            log_config: validate_logging_configuration_for_container(logging, &Container::Vector)
+                .context(ValidateLoggingConfigSnafu)?,
+            vector_aggregator_config_map_name,
+        })
+    } else {
+        None
+    };
+
+    Ok(ValidatedLogging {
+        hbase_container,
+        vector_container,
+        enable_vector_agent: logging.enable_vector_agent,
+    })
 }
 
 pub fn validate_cluster(
@@ -86,6 +152,17 @@ pub fn validate_cluster(
     let hdfs_discovery_cm_name = &hbase.spec.cluster_config.hdfs_config_map_name;
     let cluster_name = hbase.name_any();
 
+    // The Vector aggregator discovery ConfigMap name (validated here so an invalid name fails
+    // up-front). It is only required when the Vector agent is enabled for a role group.
+    let vector_aggregator_config_map_name = hbase
+        .spec
+        .cluster_config
+        .vector_aggregator_config_map_name
+        .as_deref()
+        .map(ConfigMapName::from_str)
+        .transpose()
+        .context(ParseVectorAggregatorConfigMapNameSnafu)?;
+
     for hbase_role in HbaseRole::iter() {
         let group_configs = match hbase_role {
             HbaseRole::Master => validate_role_group_configs(
@@ -97,6 +174,7 @@ pub fn validate_cluster(
                     hdfs_discovery_cm_name,
                 ),
                 AnyServiceConfig::Master,
+                &vector_aggregator_config_map_name,
             )?,
             HbaseRole::RegionServer => validate_role_group_configs(
                 hbase,
@@ -107,6 +185,7 @@ pub fn validate_cluster(
                     hdfs_discovery_cm_name,
                 ),
                 AnyServiceConfig::RegionServer,
+                &vector_aggregator_config_map_name,
             )?,
             HbaseRole::RestServer => validate_role_group_configs(
                 hbase,
@@ -117,6 +196,7 @@ pub fn validate_cluster(
                     hdfs_discovery_cm_name,
                 ),
                 AnyServiceConfig::RestServer,
+                &vector_aggregator_config_map_name,
             )?,
         };
 
@@ -194,6 +274,7 @@ fn validate_role_group_configs<Config, ValidatedConfig>(
     >,
     default_config: Config,
     wrap: fn(ValidatedConfig) -> AnyServiceConfig,
+    vector_aggregator_config_map_name: &Option<ConfigMapName>,
 ) -> Result<BTreeMap<RoleGroupName, ValidatedRoleGroupConfig>, Error>
 where
     Config: Clone + Merge,
@@ -244,9 +325,16 @@ where
                 );
             }
 
+            let config = wrap(config);
+
+            // Validate the logging configuration up-front so an invalid custom log ConfigMap name
+            // or a missing Vector aggregator discovery ConfigMap fails here rather than at build
+            // time. The build step then consumes the validated logging instead of the raw config.
+            let logging = validate_logging(config.logging(), vector_aggregator_config_map_name)?;
+
             let validated = ValidatedRoleGroupConfig {
                 replicas: validated.replicas.unwrap_or(1),
-                config: wrap(config),
+                config: ValidatedHbaseConfig { config, logging },
                 config_overrides,
                 env_overrides: env_overrides_set,
                 pod_overrides,
