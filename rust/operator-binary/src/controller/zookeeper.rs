@@ -72,7 +72,7 @@ impl ZookeeperConnectionInformation {
         let zk_discovery_cm_name = &hbase.spec.cluster_config.zookeeper_config_map_name;
         let mut zk_discovery_cm = client
             .get::<ConfigMap>(
-                zk_discovery_cm_name,
+                zk_discovery_cm_name.as_ref(),
                 hbase
                     .namespace()
                     .as_deref()
@@ -88,7 +88,7 @@ impl ZookeeperConnectionInformation {
             .as_mut()
             .and_then(|data| data.remove(ZOOKEEPER_DISCOVERY_CM_HOSTS_ENTRY))
             .context(MissingConfigMapEntrySnafu {
-                cm_name: zk_discovery_cm_name.as_str(),
+                cm_name: zk_discovery_cm_name.to_string(),
                 entry: ZOOKEEPER_DISCOVERY_CM_HOSTS_ENTRY,
             })?;
         let mut chroot = zk_discovery_cm
@@ -96,7 +96,7 @@ impl ZookeeperConnectionInformation {
             .as_mut()
             .and_then(|data| data.remove(ZOOKEEPER_DISCOVERY_CM_CHROOT_ENTRY))
             .context(MissingConfigMapEntrySnafu {
-                cm_name: zk_discovery_cm_name.as_str(),
+                cm_name: zk_discovery_cm_name.to_string(),
                 entry: ZOOKEEPER_DISCOVERY_CM_CHROOT_ENTRY,
             })?;
         let port = zk_discovery_cm
@@ -104,12 +104,12 @@ impl ZookeeperConnectionInformation {
             .as_mut()
             .and_then(|data| data.remove(ZOOKEEPER_DISCOVERY_CM_CLIENT_PORT_ENTRY))
             .context(MissingConfigMapEntrySnafu {
-                cm_name: zk_discovery_cm_name.as_str(),
+                cm_name: zk_discovery_cm_name.to_string(),
                 entry: ZOOKEEPER_DISCOVERY_CM_CLIENT_PORT_ENTRY,
             })?
             .parse()
             .context(ParseZookeeperPortSnafu {
-                cm_name: zk_discovery_cm_name.as_str(),
+                cm_name: zk_discovery_cm_name.to_string(),
                 entry: ZOOKEEPER_DISCOVERY_CM_CLIENT_PORT_ENTRY,
             })?;
 

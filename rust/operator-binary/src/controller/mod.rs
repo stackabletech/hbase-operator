@@ -19,7 +19,7 @@ use stackable_operator::{
         kvp::label::{recommended_labels, role_group_selector},
         role_group_utils::ResourceNames,
         types::{
-            kubernetes::{NamespaceName, Uid},
+            kubernetes::{ConfigMapName, NamespaceName, SecretClassName, Uid},
             operator::{
                 ClusterName, ControllerName, OperatorName, ProductName, ProductVersion, RoleName,
             },
@@ -248,11 +248,11 @@ pub struct ValidatedClusterConfig {
     /// Whether HTTPS is enabled (a TLS `SecretClass` was configured).
     pub https_enabled: bool,
     /// The Kerberos `SecretClass` name, if Kerberos is enabled.
-    pub kerberos_secret_class: Option<String>,
+    pub kerberos_secret_class: Option<SecretClassName>,
     /// The HTTPS/TLS `SecretClass` name, if HTTPS is enabled.
-    pub https_secret_class: Option<String>,
+    pub https_secret_class: Option<SecretClassName>,
     /// The HDFS discovery ConfigMap name the cluster connects to.
-    pub hdfs_config_map_name: String,
+    pub hdfs_config_map_name: ConfigMapName,
     // Pre-resolved kerberos properties for hbase-site.xml (empty when kerberos is disabled).
     pub hbase_site_kerberos_config: BTreeMap<String, String>,
     // Pre-resolved kerberos properties for the discovery `hbase-site.xml` exposed to clients

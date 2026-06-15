@@ -84,11 +84,6 @@ pub enum Error {
         "the Vector aggregator discovery ConfigMap name is required when the Vector agent is enabled"
     ))]
     MissingVectorAggregatorConfigMapName,
-
-    #[snafu(display("invalid Vector aggregator discovery ConfigMap name"))]
-    ParseVectorAggregatorConfigMapName {
-        source: stackable_operator::v2::macros::attributed_string_type::Error,
-    },
 }
 
 /// Validated logging configuration for the HBase and (optional) Vector container.
@@ -149,19 +144,17 @@ pub fn validate_cluster(
     let mut role_groups = BTreeMap::new();
     let mut role_configs = BTreeMap::new();
 
-    let hdfs_discovery_cm_name = &hbase.spec.cluster_config.hdfs_config_map_name;
+    let hdfs_discovery_cm_name = hbase.spec.cluster_config.hdfs_config_map_name.as_ref();
     let cluster_name = hbase.name_any();
 
-    // The Vector aggregator discovery ConfigMap name (validated here so an invalid name fails
-    // up-front). It is only required when the Vector agent is enabled for a role group.
+    // The Vector aggregator discovery ConfigMap name. It is validated already at deserialize time
+    // (it is a `ConfigMapName`), and only required when the Vector agent is enabled for a role
+    // group.
     let vector_aggregator_config_map_name = hbase
         .spec
         .cluster_config
         .vector_aggregator_config_map_name
-        .as_deref()
-        .map(ConfigMapName::from_str)
-        .transpose()
-        .context(ParseVectorAggregatorConfigMapNameSnafu)?;
+        .clone();
 
     for hbase_role in HbaseRole::iter() {
         let group_configs = match hbase_role {
@@ -412,7 +405,7 @@ spec:
         let default_config = HbaseConfigFragment::default_config(
             &HbaseRole::Master,
             &hbase.name_any(),
-            &hbase.spec.cluster_config.hdfs_config_map_name,
+            hbase.spec.cluster_config.hdfs_config_map_name.as_ref(),
         );
 
         let validated = with_validated_config::<

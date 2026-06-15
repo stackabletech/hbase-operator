@@ -234,7 +234,7 @@ pub fn build_rolegroup_statefulset(
         .add_volume(Volume {
             name: HDFS_DISCOVERY_VOLUME_NAME.to_string(),
             config_map: Some(ConfigMapVolumeSource {
-                name: cluster.cluster_config.hdfs_config_map_name.clone(),
+                name: cluster.cluster_config.hdfs_config_map_name.to_string(),
                 ..Default::default()
             }),
             ..Default::default()

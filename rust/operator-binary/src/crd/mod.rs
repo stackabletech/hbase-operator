@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use security::AuthenticationConfig;
 use serde::{Deserialize, Serialize};
 use stackable_operator::{
@@ -22,7 +24,11 @@ use stackable_operator::{
     schemars::{self, JsonSchema},
     shared::time::Duration,
     status::condition::{ClusterCondition, HasStatusCondition},
-    v2::{config_overrides::KeyValueConfigOverrides, role_utils::JavaCommonConfig},
+    v2::{
+        config_overrides::KeyValueConfigOverrides,
+        role_utils::JavaCommonConfig,
+        types::kubernetes::{ConfigMapName, ListenerClassName, SecretClassName},
+    },
     versioned::versioned,
 };
 use strum::{Display, EnumIter, EnumString};
@@ -140,23 +146,23 @@ pub mod versioned {
         pub rest_servers: Option<RestServerRoleType>,
     }
 
-    #[derive(Clone, Debug, Default, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
+    #[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
     #[serde(rename_all = "camelCase")]
     pub struct HbaseClusterConfig {
         /// Name of the [discovery ConfigMap](DOCS_BASE_URL_PLACEHOLDER/concepts/service_discovery)
         /// for an HDFS cluster.
-        pub hdfs_config_map_name: String,
+        pub hdfs_config_map_name: ConfigMapName,
 
         /// Name of the Vector aggregator [discovery ConfigMap](DOCS_BASE_URL_PLACEHOLDER/concepts/service_discovery).
         /// It must contain the key `ADDRESS` with the address of the Vector aggregator.
         /// Follow the [logging tutorial](DOCS_BASE_URL_PLACEHOLDER/tutorials/logging-vector-aggregator)
         /// to learn how to configure log aggregation with Vector.
         #[serde(skip_serializing_if = "Option::is_none")]
-        pub vector_aggregator_config_map_name: Option<String>,
+        pub vector_aggregator_config_map_name: Option<ConfigMapName>,
 
         /// Name of the [discovery ConfigMap](DOCS_BASE_URL_PLACEHOLDER/concepts/service_discovery)
         /// for a ZooKeeper cluster.
-        pub zookeeper_config_map_name: String,
+        pub zookeeper_config_map_name: ConfigMapName,
 
         /// Settings related to user [authentication](DOCS_BASE_URL_PLACEHOLDER/usage-guide/security).
         pub authentication: Option<AuthenticationConfig>,
@@ -207,7 +213,7 @@ impl v1alpha1::HbaseCluster {
         self.kerberos_secret_class().is_some()
     }
 
-    pub fn kerberos_secret_class(&self) -> Option<String> {
+    pub fn kerberos_secret_class(&self) -> Option<SecretClassName> {
         self.spec
             .cluster_config
             .authentication
@@ -220,7 +226,7 @@ impl v1alpha1::HbaseCluster {
         self.https_secret_class().is_some()
     }
 
-    pub fn https_secret_class(&self) -> Option<String> {
+    pub fn https_secret_class(&self) -> Option<SecretClassName> {
         self.spec
             .cluster_config
             .authentication
@@ -332,7 +338,10 @@ impl HbaseConfigFragment {
             affinity: get_affinity(cluster_name, role, hdfs_discovery_cm_name),
             graceful_shutdown_timeout: Some(graceful_shutdown_timeout),
             requested_secret_lifetime: Some(requested_secret_lifetime),
-            listener_class: Some(DEFAULT_LISTENER_CLASS.to_string()),
+            listener_class: Some(
+                ListenerClassName::from_str(DEFAULT_LISTENER_CLASS)
+                    .expect("DEFAULT_LISTENER_CLASS is a valid listener class name"),
+            ),
         }
     }
 }
@@ -359,7 +368,10 @@ impl RegionServerConfigFragment {
                 cli_opts: None,
             },
             requested_secret_lifetime: Some(HbaseRole::DEFAULT_REGION_SECRET_LIFETIME),
-            listener_class: Some(DEFAULT_LISTENER_CLASS.to_string()),
+            listener_class: Some(
+                ListenerClassName::from_str(DEFAULT_LISTENER_CLASS)
+                    .expect("DEFAULT_LISTENER_CLASS is a valid listener class name"),
+            ),
         }
     }
 }
@@ -401,7 +413,7 @@ pub enum Container {
     Vector,
 }
 
-#[derive(Clone, Debug, Default, Fragment, JsonSchema, PartialEq)]
+#[derive(Clone, Debug, Fragment, JsonSchema, PartialEq)]
 #[fragment_attrs(
     derive(
         Clone,
@@ -439,7 +451,7 @@ pub struct HbaseConfig {
     pub requested_secret_lifetime: Option<Duration>,
 
     /// This field controls which [ListenerClass](DOCS_BASE_URL_PLACEHOLDER/listener-operator/listenerclass.html) is used to expose this rolegroup.
-    pub listener_class: String,
+    pub listener_class: ListenerClassName,
 }
 
 #[derive(Fragment, Clone, Debug, JsonSchema, PartialEq, Serialize, Deserialize)]
@@ -524,7 +536,7 @@ pub struct RegionServerConfig {
     pub region_mover: RegionMover,
 
     /// This field controls which [ListenerClass](DOCS_BASE_URL_PLACEHOLDER/listener-operator/listenerclass.html) is used to expose this rolegroup.
-    pub listener_class: String,
+    pub listener_class: ListenerClassName,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
@@ -582,7 +594,7 @@ impl AnyServiceConfig {
         }
     }
 
-    pub fn listener_class(&self) -> String {
+    pub fn listener_class(&self) -> ListenerClassName {
         match self {
             AnyServiceConfig::Master(config) => config.listener_class.clone(),
             AnyServiceConfig::RegionServer(config) => config.listener_class.clone(),

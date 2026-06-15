@@ -42,6 +42,9 @@ spec:
                         properties:
                           secretClass:
                             description: Name of the SecretClass providing the keytab for the HBase services.
+                            maxLength: 253
+                            minLength: 1
+                            pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
                             type: string
                         required:
                         - secretClass
@@ -49,6 +52,9 @@ spec:
                       tlsSecretClass:
                         default: tls
                         description: Name of the SecretClass providing the tls certificates for the WebUIs.
+                        maxLength: 253
+                        minLength: 1
+                        pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
                         type: string
                     required:
                     - kerberos
@@ -82,6 +88,9 @@ spec:
                     description: |-
                       Name of the [discovery ConfigMap](https://docs.stackable.tech/home/nightly/concepts/service_discovery)
                       for an HDFS cluster.
+                    maxLength: 253
+                    minLength: 1
+                    pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
                     type: string
                   vectorAggregatorConfigMapName:
                     description: |-
@@ -89,12 +98,18 @@ spec:
                       It must contain the key `ADDRESS` with the address of the Vector aggregator.
                       Follow the [logging tutorial](https://docs.stackable.tech/home/nightly/tutorials/logging-vector-aggregator)
                       to learn how to configure log aggregation with Vector.
+                    maxLength: 253
+                    minLength: 1
                     nullable: true
+                    pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
                     type: string
                   zookeeperConfigMapName:
                     description: |-
                       Name of the [discovery ConfigMap](https://docs.stackable.tech/home/nightly/concepts/service_discovery)
                       for a ZooKeeper cluster.
+                    maxLength: 253
+                    minLength: 1
+                    pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
                     type: string
                 required:
                 - hdfsConfigMapName
@@ -247,7 +262,10 @@ spec:
                         type: string
                       listenerClass:
                         description: This field controls which [ListenerClass](https://docs.stackable.tech/home/nightly/listener-operator/listenerclass.html) is used to expose this rolegroup.
+                        maxLength: 253
+                        minLength: 1
                         nullable: true
+                        pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
                         type: string
                       logging:
                         default:
@@ -668,7 +686,10 @@ spec:
                               type: string
                             listenerClass:
                               description: This field controls which [ListenerClass](https://docs.stackable.tech/home/nightly/listener-operator/listenerclass.html) is used to expose this rolegroup.
+                              maxLength: 253
+                              minLength: 1
                               nullable: true
+                              pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
                               type: string
                             logging:
                               default:
@@ -1075,7 +1096,10 @@ spec:
                         type: string
                       listenerClass:
                         description: This field controls which [ListenerClass](https://docs.stackable.tech/home/nightly/listener-operator/listenerclass.html) is used to expose this rolegroup.
+                        maxLength: 253
+                        minLength: 1
                         nullable: true
+                        pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
                         type: string
                       logging:
                         default:
@@ -1531,7 +1555,10 @@ spec:
                               type: string
                             listenerClass:
                               description: This field controls which [ListenerClass](https://docs.stackable.tech/home/nightly/listener-operator/listenerclass.html) is used to expose this rolegroup.
+                              maxLength: 253
+                              minLength: 1
                               nullable: true
+                              pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
                               type: string
                             logging:
                               default:
@@ -1961,7 +1988,10 @@ spec:
                         type: string
                       listenerClass:
                         description: This field controls which [ListenerClass](https://docs.stackable.tech/home/nightly/listener-operator/listenerclass.html) is used to expose this rolegroup.
+                        maxLength: 253
+                        minLength: 1
                         nullable: true
+                        pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
                         type: string
                       logging:
                         default:
@@ -2382,7 +2412,10 @@ spec:
                               type: string
                             listenerClass:
                               description: This field controls which [ListenerClass](https://docs.stackable.tech/home/nightly/listener-operator/listenerclass.html) is used to expose this rolegroup.
+                              maxLength: 253
+                              minLength: 1
                               nullable: true
+                              pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
                               type: string
                             logging:
                               default:
