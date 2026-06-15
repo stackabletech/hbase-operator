@@ -7,3 +7,4 @@ pub mod kerberos;
 pub mod opa;
 pub mod properties;
 pub mod resource;
+pub mod role;
