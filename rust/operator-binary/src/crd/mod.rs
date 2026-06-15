@@ -1,12 +1,7 @@
 use security::AuthenticationConfig;
 use serde::{Deserialize, Serialize};
 use shell_escape::escape;
-use snafu::{ResultExt, Snafu};
 use stackable_operator::{
-    builder::pod::volume::{
-        ListenerOperatorVolumeSourceBuilder, ListenerOperatorVolumeSourceBuilderError,
-        ListenerReference, VolumeBuilder,
-    },
     commons::{
         affinity::StackableAffinity,
         cluster_operation::ClusterOperation,
@@ -21,12 +16,8 @@ use stackable_operator::{
         merge::{Atomic, Merge},
     },
     deep_merger::ObjectOverrides,
-    k8s_openapi::{
-        api::core::v1::{PersistentVolumeClaim, Volume},
-        apimachinery::pkg::api::resource::Quantity,
-    },
+    k8s_openapi::apimachinery::pkg::api::resource::Quantity,
     kube::CustomResource,
-    kvp::Labels,
     product_logging::{self, spec::Logging},
     role_utils::{GenericRoleConfig, Role},
     schemars::{self, JsonSchema},
@@ -102,19 +93,6 @@ pub type RegionServerRoleType = Role<
 
 pub type RestServerRoleType =
     Role<HbaseConfigFragment, v1alpha1::HbaseConfigOverrides, GenericRoleConfig, JavaCommonConfig>;
-
-#[derive(Snafu, Debug)]
-pub enum Error {
-    #[snafu(display("failed to build listener volume"))]
-    BuildListenerVolume {
-        source: ListenerOperatorVolumeSourceBuilderError,
-    },
-
-    #[snafu(display("failed to build listener pvc"))]
-    BuildListenerPvc {
-        source: ListenerOperatorVolumeSourceBuilderError,
-    },
-}
 
 #[versioned(
     version(name = "v1alpha1"),
@@ -309,52 +287,6 @@ impl HbaseRole {
             // instead of just letting the Display impl do it's thing ;P
             HbaseRole::RestServer => "rest".to_string(),
         }
-    }
-
-    pub fn listener_volume(
-        &self,
-        merged_config: &AnyServiceConfig,
-        recommended_labels: &Labels,
-    ) -> Result<Option<Volume>, Error> {
-        let volume = match &self {
-            // Master and regionservers should use ephemeral listener volumes
-            // since clients pull the latest address from ZooKeeper
-            HbaseRole::Master | HbaseRole::RegionServer => Some(
-                VolumeBuilder::new(LISTENER_VOLUME_NAME)
-                    .ephemeral(
-                        ListenerOperatorVolumeSourceBuilder::new(
-                            &ListenerReference::ListenerClass(
-                                merged_config.listener_class().to_string(),
-                            ),
-                            recommended_labels,
-                        )
-                        .build_ephemeral()
-                        .context(BuildListenerVolumeSnafu)?,
-                    )
-                    .build(),
-            ),
-            HbaseRole::RestServer => None,
-        };
-        Ok(volume)
-    }
-
-    pub fn listener_pvc(
-        &self,
-        merged_config: &AnyServiceConfig,
-        recommended_labels: &Labels,
-    ) -> Result<Option<Vec<PersistentVolumeClaim>>, Error> {
-        let pvc = match &self {
-            HbaseRole::Master | HbaseRole::RegionServer => None,
-            HbaseRole::RestServer => Some(vec![
-                ListenerOperatorVolumeSourceBuilder::new(
-                    &ListenerReference::ListenerClass(merged_config.listener_class().to_string()),
-                    recommended_labels,
-                )
-                .build_pvc(LISTENER_VOLUME_NAME.to_string())
-                .context(BuildListenerPvcSnafu)?,
-            ]),
-        };
-        Ok(pvc)
     }
 
     /// Returns required port name and port number tuples depending on the role.
