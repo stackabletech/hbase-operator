@@ -1,5 +1,3 @@
-use std::collections::BTreeMap;
-
 use security::AuthenticationConfig;
 use serde::{Deserialize, Serialize};
 use shell_escape::escape;
@@ -24,7 +22,7 @@ use stackable_operator::{
     },
     deep_merger::ObjectOverrides,
     k8s_openapi::{
-        api::core::v1::{EnvVar, PersistentVolumeClaim, Volume},
+        api::core::v1::{PersistentVolumeClaim, Volume},
         apimachinery::pkg::api::resource::Quantity,
     },
     kube::CustomResource,
@@ -261,17 +259,6 @@ impl v1alpha1::HbaseCluster {
             .as_ref()
             .map(|a| a.tls_secret_class.clone())
     }
-}
-
-pub fn merged_env(rolegroup_config: &BTreeMap<String, String>) -> Vec<EnvVar> {
-    rolegroup_config
-        .iter()
-        .map(|(env_name, env_value)| EnvVar {
-            name: env_name.clone(),
-            value: Some(env_value.to_owned()),
-            value_from: None,
-        })
-        .collect()
 }
 
 #[derive(

@@ -18,6 +18,14 @@ use stackable_operator::{
 
 use crate::crd::{TLS_STORE_DIR, TLS_STORE_PASSWORD, TLS_STORE_VOLUME_NAME, v1alpha1};
 
+/// Mount path of the Kerberos secret volume (keytab + `krb5.conf`).
+pub const STACKABLE_KERBEROS_DIR: &str = "/stackable/kerberos";
+/// Path of the `krb5.conf` rendered into the Kerberos secret volume. Referenced both here (the
+/// `KRB5_CONFIG` env var) and by the JVM args builder.
+pub const KRB5_CONFIG_PATH: &str = const_format::concatcp!(STACKABLE_KERBEROS_DIR, "/krb5.conf");
+/// Name of the Kerberos secret volume.
+const KERBEROS_VOLUME_NAME: &str = "kerberos";
+
 #[derive(Snafu, Debug)]
 pub enum Error {
     #[snafu(display("object {hbase} is missing namespace"))]
@@ -188,16 +196,16 @@ pub fn add_kerberos_pod_config(
         .build()
         .context(AddKerberosSecretVolumeSnafu)?;
         pb.add_volume(
-            VolumeBuilder::new("kerberos")
+            VolumeBuilder::new(KERBEROS_VOLUME_NAME)
                 .ephemeral(kerberos_secret_operator_volume)
                 .build(),
         )
         .context(AddVolumeSnafu)?;
-        cb.add_volume_mount("kerberos", "/stackable/kerberos")
+        cb.add_volume_mount(KERBEROS_VOLUME_NAME, STACKABLE_KERBEROS_DIR)
             .context(AddVolumeMountSnafu)?;
 
         // Needed env vars
-        cb.add_env_var("KRB5_CONFIG", "/stackable/kerberos/krb5.conf");
+        cb.add_env_var("KRB5_CONFIG", KRB5_CONFIG_PATH);
     }
 
     if let Some(https_secret_class) = hbase.https_secret_class() {

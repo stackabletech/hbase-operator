@@ -4,7 +4,10 @@ use stackable_operator::{
     v2::jvm_argument_overrides::JvmArgumentOverrides,
 };
 
-use crate::crd::{AnyServiceConfig, CONFIG_DIR_NAME, JVM_SECURITY_PROPERTIES_FILE, v1alpha1};
+use crate::{
+    controller::build::kerberos::KRB5_CONFIG_PATH,
+    crd::{AnyServiceConfig, CONFIG_DIR_NAME, JVM_SECURITY_PROPERTIES_FILE, v1alpha1},
+};
 
 const JAVA_HEAP_FACTOR: f32 = 0.8;
 
@@ -24,7 +27,7 @@ pub fn construct_global_jvm_args(kerberos_enabled: bool) -> String {
     let mut jvm_args = Vec::new();
 
     if kerberos_enabled {
-        jvm_args.push("-Djava.security.krb5.conf=/stackable/kerberos/krb5.conf");
+        jvm_args.push(format!("-Djava.security.krb5.conf={KRB5_CONFIG_PATH}"));
     }
 
     // We do *not* add user overrides to the global JVM args, but only the role specific JVM arguments.
@@ -54,8 +57,7 @@ pub fn construct_role_specific_non_heap_jvm_args(
     )];
 
     if hbase.has_kerberos_enabled() {
-        operator_generated
-            .push("-Djava.security.krb5.conf=/stackable/kerberos/krb5.conf".to_owned());
+        operator_generated.push(format!("-Djava.security.krb5.conf={KRB5_CONFIG_PATH}"));
     }
 
     let mut jvm_args = merged_jvm_argument_overrides.apply_to(operator_generated);

@@ -1,6 +1,6 @@
 //! Build the per-rolegroup `StatefulSet` for the HbaseCluster.
 
-use std::{collections::BTreeMap, str::FromStr};
+use std::str::FromStr;
 
 use indoc::formatdoc;
 use snafu::{OptionExt, ResultExt, Snafu};
@@ -16,8 +16,8 @@ use stackable_operator::{
         api::{
             apps::v1::{StatefulSet, StatefulSetSpec},
             core::v1::{
-                ConfigMapVolumeSource, ContainerPort, EnvVar, Probe, ServiceAccount,
-                TCPSocketAction, Volume,
+                ConfigMapVolumeSource, ContainerPort, Probe, ServiceAccount, TCPSocketAction,
+                Volume,
             },
         },
         apimachinery::pkg::{apis::meta::v1::LabelSelector, util::intstr::IntOrString},
@@ -25,7 +25,7 @@ use stackable_operator::{
     kube::ResourceExt,
     product_logging,
     v2::{
-        builder::pod::container::EnvVarSet,
+        builder::pod::container::{EnvVarName, EnvVarSet},
         product_logging::framework::{ValidatedContainerLogConfigChoice, vector_container},
         types::{
             kubernetes::{ContainerName, VolumeName},
@@ -43,9 +43,7 @@ use crate::{
             properties::logging::{MAX_HBASE_LOG_FILES_SIZE, STACKABLE_LOG_DIR},
         },
     },
-    crd::{
-        CONFIG_DIR_NAME, HbaseRole, LISTENER_VOLUME_DIR, LISTENER_VOLUME_NAME, merged_env, v1alpha1,
-    },
+    crd::{CONFIG_DIR_NAME, HbaseRole, LISTENER_VOLUME_DIR, LISTENER_VOLUME_NAME, v1alpha1},
 };
 
 stackable_operator::constant!(VECTOR_CONTAINER_NAME: ContainerName = "vector");
@@ -149,33 +147,30 @@ pub fn build_rolegroup_statefulset(
         ..probe_template
     };
 
-    let mut env_map: BTreeMap<String, String> = BTreeMap::from([
-        ("HBASE_CONF_DIR".to_string(), CONFIG_DIR_NAME.to_string()),
+    let merged_env = EnvVarSet::new()
+        .with_value(
+            &EnvVarName::from_str_unsafe("HBASE_CONF_DIR"),
+            CONFIG_DIR_NAME,
+        )
         // required by phoenix (for cases where Kerberos is enabled): see https://issues.apache.org/jira/browse/PHOENIX-2369
-        ("HADOOP_CONF_DIR".to_string(), CONFIG_DIR_NAME.to_string()),
-    ]);
-    for env_var in validated_rg_config.env_overrides.clone() {
-        env_map.insert(env_var.name, env_var.value.unwrap_or_default());
-    }
-    let mut merged_env = merged_env(&env_map);
-    // This env var is set for all roles to avoid bash's "unbound variable" errors
-    merged_env.extend([
-        EnvVar {
-            name: "REGION_MOVER_OPTS".to_string(),
-            value: Some(merged_config.region_mover_args()),
-            ..EnvVar::default()
-        },
-        EnvVar {
-            name: "RUN_REGION_MOVER".to_string(),
-            value: Some(merged_config.run_region_mover().to_string()),
-            ..EnvVar::default()
-        },
-        EnvVar {
-            name: "STACKABLE_LOG_DIR".to_string(),
-            value: Some(STACKABLE_LOG_DIR.to_string()),
-            ..EnvVar::default()
-        },
-    ]);
+        .with_value(
+            &EnvVarName::from_str_unsafe("HADOOP_CONF_DIR"),
+            CONFIG_DIR_NAME,
+        )
+        .merge(validated_rg_config.env_overrides.clone())
+        // These env vars are set for all roles to avoid bash's "unbound variable" errors.
+        .with_value(
+            &EnvVarName::from_str_unsafe("REGION_MOVER_OPTS"),
+            merged_config.region_mover_args(),
+        )
+        .with_value(
+            &EnvVarName::from_str_unsafe("RUN_REGION_MOVER"),
+            merged_config.run_region_mover().to_string(),
+        )
+        .with_value(
+            &EnvVarName::from_str_unsafe("STACKABLE_LOG_DIR"),
+            STACKABLE_LOG_DIR,
+        );
 
     let role_name = hbase_role.cli_role_name();
     let mut hbase_container = ContainerBuilder::new("hbase").expect("ContainerBuilder not created");
