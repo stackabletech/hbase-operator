@@ -6,7 +6,7 @@ use stackable_operator::{
 
 use crate::{
     controller::build::kerberos::KRB5_CONFIG_PATH,
-    crd::{AnyServiceConfig, CONFIG_DIR_NAME, JVM_SECURITY_PROPERTIES_FILE, v1alpha1},
+    crd::{AnyServiceConfig, CONFIG_DIR_NAME, JVM_SECURITY_PROPERTIES_FILE},
 };
 
 const JAVA_HEAP_FACTOR: f32 = 0.8;
@@ -49,14 +49,14 @@ pub fn construct_global_jvm_args(kerberos_enabled: bool) -> String {
 /// [`with_validated_config`](stackable_operator::v2::role_utils::with_validated_config). The
 /// operator-generated arguments below form the base that the user overrides are applied on top of.
 pub fn construct_role_specific_non_heap_jvm_args(
-    hbase: &v1alpha1::HbaseCluster,
+    kerberos_enabled: bool,
     merged_jvm_argument_overrides: &JvmArgumentOverrides,
 ) -> String {
     let mut operator_generated = vec![format!(
         "-Djava.security.properties={CONFIG_DIR_NAME}/{JVM_SECURITY_PROPERTIES_FILE}"
     )];
 
-    if hbase.has_kerberos_enabled() {
+    if kerberos_enabled {
         operator_generated.push(format!("-Djava.security.krb5.conf={KRB5_CONFIG_PATH}"));
     }
 

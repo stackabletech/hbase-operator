@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use snafu::{OptionExt, ResultExt, Snafu};
+use snafu::{ResultExt, Snafu};
 use stackable_operator::{
     builder::{
         self,
@@ -11,14 +11,13 @@ use stackable_operator::{
         },
     },
     commons::secret_class::SecretClassVolumeProvisionParts,
-    kube::{ResourceExt, runtime::reflector::ObjectRef},
     shared::time::Duration,
     utils::cluster_info::KubernetesClusterInfo,
 };
 
 use crate::{
     controller::ValidatedCluster,
-    crd::{TLS_STORE_DIR, TLS_STORE_PASSWORD, TLS_STORE_VOLUME_NAME, v1alpha1},
+    crd::{TLS_STORE_DIR, TLS_STORE_PASSWORD, TLS_STORE_VOLUME_NAME},
 };
 
 /// Mount path of the Kerberos secret volume (keytab + `krb5.conf`).
@@ -31,18 +30,13 @@ const KERBEROS_VOLUME_NAME: &str = "kerberos";
 
 #[derive(Snafu, Debug)]
 pub enum Error {
-    #[snafu(display("object {hbase} is missing namespace"))]
-    ObjectMissingNamespace {
-        hbase: ObjectRef<v1alpha1::HbaseCluster>,
-    },
-
-    #[snafu(display("failed to add Kerberos secret volume"))]
-    AddKerberosSecretVolume {
+    #[snafu(display("failed to build Kerberos secret volume"))]
+    BuildKerberosSecretVolume {
         source: stackable_operator::builder::pod::volume::SecretOperatorVolumeSourceBuilderError,
     },
 
-    #[snafu(display("failed to add TLS secret volume"))]
-    AddTlsSecretVolume {
+    #[snafu(display("failed to build TLS secret volume"))]
+    BuildTlsSecretVolume {
         source: stackable_operator::builder::pod::volume::SecretOperatorVolumeSourceBuilderError,
     },
 
@@ -56,14 +50,11 @@ pub enum Error {
 }
 
 pub fn kerberos_config_properties(
-    hbase: &v1alpha1::HbaseCluster,
+    hbase_name: &str,
+    hbase_namespace: &str,
     cluster_info: &KubernetesClusterInfo,
-) -> Result<BTreeMap<String, String>, Error> {
-    if !hbase.has_kerberos_enabled() {
-        return Ok(BTreeMap::new());
-    }
-
-    let principal_host_part = principal_host_part(hbase, cluster_info)?;
+) -> BTreeMap<String, String> {
+    let principal_host_part = principal_host_part(hbase_name, hbase_namespace, cluster_info);
 
     let mut config = BTreeMap::from([
         // Kerberos settings
@@ -126,18 +117,15 @@ pub fn kerberos_config_properties(
         ("hbase.rest.ssl.keystore.type".to_string(), "pkcs12".to_string()),
     ]);
     config.extend(kerberos_principals(&principal_host_part));
-    Ok(config)
+    config
 }
 
 pub fn kerberos_discovery_config_properties(
-    hbase: &v1alpha1::HbaseCluster,
+    hbase_name: &str,
+    hbase_namespace: &str,
     cluster_info: &KubernetesClusterInfo,
-) -> Result<BTreeMap<String, String>, Error> {
-    if !hbase.has_kerberos_enabled() {
-        return Ok(BTreeMap::new());
-    }
-
-    let principal_host_part = principal_host_part(hbase, cluster_info)?;
+) -> BTreeMap<String, String> {
+    let principal_host_part = principal_host_part(hbase_name, hbase_namespace, cluster_info);
 
     let mut config = BTreeMap::from([
         (
@@ -148,14 +136,10 @@ pub fn kerberos_discovery_config_properties(
         ("hbase.ssl.enabled".to_string(), "true".to_string()),
     ]);
     config.extend(kerberos_principals(&principal_host_part));
-    Ok(config)
+    config
 }
 
-pub fn kerberos_ssl_server_settings(hbase: &v1alpha1::HbaseCluster) -> BTreeMap<String, String> {
-    if !hbase.has_https_enabled() {
-        return BTreeMap::new();
-    }
-
+pub fn kerberos_ssl_server_settings() -> BTreeMap<String, String> {
     let mut settings = truststore_settings("server");
     settings.extend([
         (
@@ -171,11 +155,7 @@ pub fn kerberos_ssl_server_settings(hbase: &v1alpha1::HbaseCluster) -> BTreeMap<
     settings
 }
 
-pub fn kerberos_ssl_client_settings(hbase: &v1alpha1::HbaseCluster) -> BTreeMap<String, String> {
-    if !hbase.has_https_enabled() {
-        return BTreeMap::new();
-    }
-
+pub fn kerberos_ssl_client_settings() -> BTreeMap<String, String> {
     truststore_settings("client")
 }
 
@@ -197,7 +177,7 @@ pub fn add_kerberos_pod_config(
         .with_kerberos_service_name(kerberos_service_name())
         .with_kerberos_service_name("HTTP")
         .build()
-        .context(AddKerberosSecretVolumeSnafu)?;
+        .context(BuildKerberosSecretVolumeSnafu)?;
         pb.add_volume(
             VolumeBuilder::new(KERBEROS_VOLUME_NAME)
                 .ephemeral(kerberos_secret_operator_volume)
@@ -230,7 +210,7 @@ pub fn add_kerberos_pod_config(
                     .with_tls_pkcs12_password(TLS_STORE_PASSWORD)
                     .with_auto_tls_cert_lifetime(requested_secret_lifetime)
                     .build()
-                    .context(AddTlsSecretVolumeSnafu)?,
+                    .context(BuildTlsSecretVolumeSnafu)?,
                 )
                 .build(),
         )
@@ -279,17 +259,12 @@ fn truststore_settings(role: &str) -> BTreeMap<String, String> {
 }
 
 fn principal_host_part(
-    hbase: &v1alpha1::HbaseCluster,
+    hbase_name: &str,
+    hbase_namespace: &str,
     cluster_info: &KubernetesClusterInfo,
-) -> Result<String, Error> {
-    let hbase_name = hbase.name_any();
-    let hbase_namespace = hbase.namespace().context(ObjectMissingNamespaceSnafu {
-        hbase: ObjectRef::from_obj(hbase),
-    })?;
+) -> String {
     let cluster_domain = &cluster_info.cluster_domain;
-    Ok(format!(
-        "{hbase_name}.{hbase_namespace}.svc.{cluster_domain}@${{env:KERBEROS_REALM}}"
-    ))
+    format!("{hbase_name}.{hbase_namespace}.svc.{cluster_domain}@${{env:KERBEROS_REALM}}")
 }
 
 /// We could have different service names depended on the role (e.g. "hbase-master", "hbase-regionserver" and

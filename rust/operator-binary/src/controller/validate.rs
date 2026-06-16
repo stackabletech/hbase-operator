@@ -31,7 +31,7 @@ use crate::{
         build::{
             jvm::construct_role_specific_non_heap_jvm_args,
             kerberos::{
-                self, kerberos_config_properties, kerberos_discovery_config_properties,
+                kerberos_config_properties, kerberos_discovery_config_properties,
                 kerberos_ssl_client_settings, kerberos_ssl_server_settings,
             },
         },
@@ -71,9 +71,6 @@ pub enum Error {
         source: stackable_operator::v2::macros::attributed_string_type::Error,
         role_group: String,
     },
-
-    #[snafu(display("failed to resolve kerberos config"))]
-    AddKerberosConfig { source: kerberos::Error },
 
     #[snafu(display("failed to validate logging configuration"))]
     ValidateLoggingConfig {
@@ -216,16 +213,35 @@ pub fn validate_cluster(
         role_groups.insert(hbase_role, group_configs);
     }
 
-    let hbase_site_kerberos_config =
-        kerberos_config_properties(hbase, cluster_info).context(AddKerberosConfigSnafu)?;
-    let discovery_kerberos_config = kerberos_discovery_config_properties(hbase, cluster_info)
-        .context(AddKerberosConfigSnafu)?;
-    let ssl_server_settings = kerberos_ssl_server_settings(hbase);
-    let ssl_client_settings = kerberos_ssl_client_settings(hbase);
-
     let name = get_cluster_name(hbase).context(GetClusterIdentitySnafu)?;
     let namespace = get_namespace(hbase).context(GetClusterIdentitySnafu)?;
     let uid = get_uid(hbase).context(GetClusterIdentitySnafu)?;
+
+    let kerberos_enabled = hbase.has_kerberos_enabled();
+    let https_enabled = hbase.has_https_enabled();
+
+    // Kerberos- and TLS-related properties, pre-resolved here so the build step stays a pure
+    // function of `ValidatedCluster` (empty when the respective feature is disabled).
+    let hbase_site_kerberos_config = if kerberos_enabled {
+        kerberos_config_properties(name.as_ref(), namespace.as_ref(), cluster_info)
+    } else {
+        BTreeMap::new()
+    };
+    let discovery_kerberos_config = if kerberos_enabled {
+        kerberos_discovery_config_properties(name.as_ref(), namespace.as_ref(), cluster_info)
+    } else {
+        BTreeMap::new()
+    };
+    let ssl_server_settings = if https_enabled {
+        kerberos_ssl_server_settings()
+    } else {
+        BTreeMap::new()
+    };
+    let ssl_client_settings = if https_enabled {
+        kerberos_ssl_client_settings()
+    } else {
+        BTreeMap::new()
+    };
 
     Ok(ValidatedCluster::new(
         name,
@@ -235,8 +251,8 @@ pub fn validate_cluster(
         ValidatedClusterConfig {
             zookeeper_connection_information: dereferenced_objects.zookeeper_connection_information,
             hbase_opa_config: dereferenced_objects.hbase_opa_config,
-            kerberos_enabled: hbase.has_kerberos_enabled(),
-            https_enabled: hbase.has_https_enabled(),
+            kerberos_enabled,
+            https_enabled,
             kerberos_secret_class: hbase.kerberos_secret_class(),
             https_secret_class: hbase.https_secret_class(),
             hdfs_config_map_name: hbase.spec.cluster_config.hdfs_config_map_name.clone(),
@@ -308,7 +324,7 @@ where
             } = validated.config;
 
             let non_heap_jvm_args = construct_role_specific_non_heap_jvm_args(
-                hbase,
+                hbase.has_kerberos_enabled(),
                 &product_specific_common_config.jvm_argument_overrides,
             );
 
