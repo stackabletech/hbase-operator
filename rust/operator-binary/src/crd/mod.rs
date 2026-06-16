@@ -52,6 +52,8 @@ pub const CONFIG_DIR_NAME: &str = "/stackable/conf";
 pub const TLS_STORE_DIR: &str = "/stackable/tls";
 pub const TLS_STORE_VOLUME_NAME: &str = "tls";
 pub const TLS_STORE_PASSWORD: &str = "changeit";
+/// The key- and truststore type used for all HBase TLS stores.
+pub const TLS_STORE_TYPE: &str = "pkcs12";
 
 pub const JVM_SECURITY_PROPERTIES_FILE: &str = "security.properties";
 

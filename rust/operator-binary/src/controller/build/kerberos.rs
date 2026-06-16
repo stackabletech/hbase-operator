@@ -17,7 +17,7 @@ use stackable_operator::{
 
 use crate::{
     controller::ValidatedCluster,
-    crd::{TLS_STORE_DIR, TLS_STORE_PASSWORD, TLS_STORE_VOLUME_NAME},
+    crd::{TLS_STORE_DIR, TLS_STORE_PASSWORD, TLS_STORE_TYPE, TLS_STORE_VOLUME_NAME},
 };
 
 /// Mount path of the Kerberos secret volume (keytab + `krb5.conf`).
@@ -27,6 +27,8 @@ pub const STACKABLE_KERBEROS_DIR: &str = "/stackable/kerberos";
 pub const KRB5_CONFIG_PATH: &str = const_format::concatcp!(STACKABLE_KERBEROS_DIR, "/krb5.conf");
 /// Name of the Kerberos secret volume.
 const KERBEROS_VOLUME_NAME: &str = "kerberos";
+/// The RPC/data-transfer quality-of-protection level used when Kerberos is enabled.
+const PROTECTION_PRIVACY: &str = "privacy";
 
 #[derive(Snafu, Debug)]
 pub enum Error {
@@ -66,10 +68,13 @@ pub fn kerberos_config_properties(
             "hbase.security.authorization".to_string(),
             "true".to_string(),
         ),
-        ("hbase.rpc.protection".to_string(), "privacy".to_string()),
+        (
+            "hbase.rpc.protection".to_string(),
+            PROTECTION_PRIVACY.to_string(),
+        ),
         (
             "dfs.data.transfer.protection".to_string(),
-            "privacy".to_string(),
+            PROTECTION_PRIVACY.to_string(),
         ),
         (
             "hbase.rpc.engine".to_string(),
@@ -77,15 +82,15 @@ pub fn kerberos_config_properties(
         ),
         (
             "hbase.master.keytab.file".to_string(),
-            "/stackable/kerberos/keytab".to_string(),
+            format!("{STACKABLE_KERBEROS_DIR}/keytab"),
         ),
         (
             "hbase.regionserver.keytab.file".to_string(),
-            "/stackable/kerberos/keytab".to_string(),
+            format!("{STACKABLE_KERBEROS_DIR}/keytab"),
         ),
         (
             "hbase.rest.keytab.file".to_string(),
-            "/stackable/kerberos/keytab".to_string(),
+            format!("{STACKABLE_KERBEROS_DIR}/keytab"),
         ),
         (
             "hbase.coprocessor.master.classes".to_string(),
@@ -101,7 +106,7 @@ pub fn kerberos_config_properties(
         ("hbase.rest.authentication.kerberos.principal".to_string(), format!(
             "HTTP/{principal_host_part}"
         )),
-        ("hbase.rest.authentication.kerberos.keytab".to_string(), "/stackable/kerberos/keytab".to_string()),
+        ("hbase.rest.authentication.kerberos.keytab".to_string(), format!("{STACKABLE_KERBEROS_DIR}/keytab")),
 
         // Enabled https as well
         ("hbase.ssl.enabled".to_string(), "true".to_string()),
@@ -114,7 +119,7 @@ pub fn kerberos_config_properties(
         ("hbase.rest.ssl.enabled".to_string(), "true".to_string()),
         ("hbase.rest.ssl.keystore.store".to_string(), format!("{TLS_STORE_DIR}/keystore.p12")),
         ("hbase.rest.ssl.keystore.password".to_string(), TLS_STORE_PASSWORD.to_string()),
-        ("hbase.rest.ssl.keystore.type".to_string(), "pkcs12".to_string()),
+        ("hbase.rest.ssl.keystore.type".to_string(), TLS_STORE_TYPE.to_string()),
     ]);
     config.extend(kerberos_principals(&principal_host_part));
     config
@@ -132,7 +137,10 @@ pub fn kerberos_discovery_config_properties(
             "hbase.security.authentication".to_string(),
             "kerberos".to_string(),
         ),
-        ("hbase.rpc.protection".to_string(), "privacy".to_string()),
+        (
+            "hbase.rpc.protection".to_string(),
+            PROTECTION_PRIVACY.to_string(),
+        ),
         ("hbase.ssl.enabled".to_string(), "true".to_string()),
     ]);
     config.extend(kerberos_principals(&principal_host_part));
@@ -146,7 +154,10 @@ pub fn kerberos_ssl_server_settings() -> BTreeMap<String, String> {
             "ssl.server.keystore.location".to_string(),
             format!("{TLS_STORE_DIR}/keystore.p12"),
         ),
-        ("ssl.server.keystore.type".to_string(), "pkcs12".to_string()),
+        (
+            "ssl.server.keystore.type".to_string(),
+            TLS_STORE_TYPE.to_string(),
+        ),
         (
             "ssl.server.keystore.password".to_string(),
             TLS_STORE_PASSWORD.to_string(),
@@ -250,7 +261,10 @@ fn truststore_settings(role: &str) -> BTreeMap<String, String> {
             format!("ssl.{role}.truststore.location"),
             format!("{TLS_STORE_DIR}/truststore.p12"),
         ),
-        (format!("ssl.{role}.truststore.type"), "pkcs12".to_string()),
+        (
+            format!("ssl.{role}.truststore.type"),
+            TLS_STORE_TYPE.to_string(),
+        ),
         (
             format!("ssl.{role}.truststore.password"),
             TLS_STORE_PASSWORD.to_string(),
