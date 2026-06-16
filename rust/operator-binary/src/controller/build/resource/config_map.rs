@@ -11,9 +11,12 @@ use stackable_operator::{
 use crate::{
     controller::{
         ValidatedCluster,
-        build::properties::{
-            ConfigFileName, hbase_env, hbase_site, logging, security_properties, ssl_client,
-            ssl_server,
+        build::{
+            jvm::construct_role_specific_non_heap_jvm_args,
+            properties::{
+                ConfigFileName, hbase_env, hbase_site, logging, security_properties, ssl_client,
+                ssl_server,
+            },
         },
     },
     crd::HbaseRole,
@@ -81,7 +84,7 @@ pub fn build_rolegroup_config_map(
         merged_config,
         role,
         cluster_config.kerberos_enabled,
-        rg.non_heap_jvm_args.clone(),
+        construct_role_specific_non_heap_jvm_args(cluster, rg),
         overrides.hbase_env_sh.clone(),
     )
     .context(BuildHbaseEnvSnafu)?;

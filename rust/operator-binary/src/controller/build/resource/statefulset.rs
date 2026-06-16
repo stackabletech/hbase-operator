@@ -36,7 +36,7 @@ use stackable_operator::{
 
 use crate::{
     controller::{
-        ValidatedCluster, ValidatedRoleGroupConfig,
+        HbaseRoleGroupConfig, ValidatedCluster,
         build::{
             graceful_shutdown::{self, add_graceful_shutdown_config},
             kerberos::{self, add_kerberos_pod_config},
@@ -99,7 +99,7 @@ pub fn build_rolegroup_statefulset(
     cluster: &ValidatedCluster,
     hbase_role: &HbaseRole,
     role_group_name: &RoleGroupName,
-    validated_rg_config: &ValidatedRoleGroupConfig,
+    validated_rg_config: &HbaseRoleGroupConfig,
     service_account: &ServiceAccount,
 ) -> Result<StatefulSet> {
     let resolved_product_image = &cluster.image;

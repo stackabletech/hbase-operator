@@ -26,14 +26,11 @@ use strum::IntoEnumIterator;
 
 use crate::{
     controller::{
-        ValidatedCluster, ValidatedClusterConfig, ValidatedHbaseConfig, ValidatedRoleConfig,
-        ValidatedRoleGroupConfig,
-        build::{
-            jvm::construct_role_specific_non_heap_jvm_args,
-            kerberos::{
-                kerberos_config_properties, kerberos_discovery_config_properties,
-                kerberos_ssl_client_settings, kerberos_ssl_server_settings,
-            },
+        HbaseRoleGroupConfig, ValidatedCluster, ValidatedClusterConfig, ValidatedHbaseConfig,
+        ValidatedRoleConfig,
+        build::kerberos::{
+            kerberos_config_properties, kerberos_discovery_config_properties,
+            kerberos_ssl_client_settings, kerberos_ssl_server_settings,
         },
         dereference::DereferencedObjects,
     },
@@ -156,7 +153,6 @@ pub fn validate_cluster(
     for hbase_role in HbaseRole::iter() {
         let group_configs = match hbase_role {
             HbaseRole::Master => validate_role_group_configs(
-                hbase,
                 hbase.spec.masters.as_ref(),
                 HbaseConfigFragment::default_config(
                     &hbase_role,
@@ -167,7 +163,6 @@ pub fn validate_cluster(
                 &vector_aggregator_config_map_name,
             )?,
             HbaseRole::RegionServer => validate_role_group_configs(
-                hbase,
                 hbase.spec.region_servers.as_ref(),
                 RegionServerConfigFragment::default_config(
                     &hbase_role,
@@ -178,7 +173,6 @@ pub fn validate_cluster(
                 &vector_aggregator_config_map_name,
             )?,
             HbaseRole::RestServer => validate_role_group_configs(
-                hbase,
                 hbase.spec.rest_servers.as_ref(),
                 HbaseConfigFragment::default_config(
                     &hbase_role,
@@ -275,20 +269,18 @@ pub fn validate_cluster(
 /// `jvmArgumentOverrides` (role group wins) into a single merged
 /// [`RoleGroup`](stackable_operator::role_utils::RoleGroup). The per-role validated config
 /// is wrapped into [`AnyServiceConfig`] via `wrap`; the merged `envOverrides` are converted
-/// into an [`EnvVarSet`] (validating each name eagerly), and the role-specific non-heap JVM
-/// args are pre-resolved from the merged `jvmArgumentOverrides` so the build step stays a
-/// pure function of [`ValidatedCluster`].
+/// into an [`EnvVarSet`] (validating each name eagerly). The merged `jvmArgumentOverrides` are
+/// kept in `product_specific_common_config` and applied at build time.
 ///
 /// Returns an empty map if the role is not configured.
 fn validate_role_group_configs<Config, ValidatedConfig>(
-    hbase: &v1alpha1::HbaseCluster,
     role: Option<
         &Role<Config, v1alpha1::HbaseConfigOverrides, GenericRoleConfig, JavaCommonConfig>,
     >,
     default_config: Config,
     wrap: fn(ValidatedConfig) -> AnyServiceConfig,
     vector_aggregator_config_map_name: &Option<ConfigMapName>,
-) -> Result<BTreeMap<RoleGroupName, ValidatedRoleGroupConfig>, Error>
+) -> Result<BTreeMap<RoleGroupName, HbaseRoleGroupConfig>, Error>
 where
     Config: Clone + Merge,
     ValidatedConfig: FromFragment<Fragment = Config>,
@@ -318,15 +310,10 @@ where
                 config,
                 config_overrides,
                 env_overrides,
-                cli_overrides: _,
+                cli_overrides,
                 pod_overrides,
                 product_specific_common_config,
             } = validated.config;
-
-            let non_heap_jvm_args = construct_role_specific_non_heap_jvm_args(
-                hbase.has_kerberos_enabled(),
-                &product_specific_common_config.jvm_argument_overrides,
-            );
 
             // Convert the merged env-override HashMap into an EnvVarSet, validating each name
             // eagerly. Keys are unique (HashMap), so insertion order is irrelevant.
@@ -345,13 +332,14 @@ where
             // time. The build step then consumes the validated logging instead of the raw config.
             let logging = validate_logging(config.logging(), vector_aggregator_config_map_name)?;
 
-            let validated = ValidatedRoleGroupConfig {
+            let validated = HbaseRoleGroupConfig {
                 replicas: validated.replicas.unwrap_or(1),
                 config: ValidatedHbaseConfig { config, logging },
                 config_overrides,
                 env_overrides: env_overrides_set,
+                cli_overrides,
                 pod_overrides,
-                non_heap_jvm_args,
+                product_specific_common_config,
             };
             Ok((role_group_name.clone(), validated))
         })

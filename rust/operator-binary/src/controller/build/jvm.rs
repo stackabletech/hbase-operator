@@ -1,11 +1,8 @@
 use snafu::{OptionExt, ResultExt, Snafu};
-use stackable_operator::{
-    memory::{BinaryMultiple, MemoryQuantity},
-    v2::jvm_argument_overrides::JvmArgumentOverrides,
-};
+use stackable_operator::memory::{BinaryMultiple, MemoryQuantity};
 
 use crate::{
-    controller::build::kerberos::KRB5_CONFIG_PATH,
+    controller::{HbaseRoleGroupConfig, ValidatedCluster, build::kerberos::KRB5_CONFIG_PATH},
     crd::{AnyServiceConfig, CONFIG_DIR_NAME, JVM_SECURITY_PROPERTIES_FILE},
 };
 
@@ -44,23 +41,24 @@ pub fn construct_global_jvm_args(kerberos_enabled: bool) -> String {
 /// JVM arguments that are specifically for the role (server), so will *not* be used e.g. by CLI tools.
 /// Heap settings are excluded, as they go into `HBASE_HEAPSIZE`.
 ///
-/// `merged_jvm_argument_overrides` is the role <- role-group merged [`JvmArgumentOverrides`]
-/// produced by
-/// [`with_validated_config`](stackable_operator::v2::role_utils::with_validated_config). The
-/// operator-generated arguments below form the base that the user overrides are applied on top of.
+/// The role <- role-group merged `jvmArgumentOverrides` (from `rg.product_specific_common_config`)
+/// are applied on top of the operator-generated base arguments below.
 pub fn construct_role_specific_non_heap_jvm_args(
-    kerberos_enabled: bool,
-    merged_jvm_argument_overrides: &JvmArgumentOverrides,
+    cluster: &ValidatedCluster,
+    rg: &HbaseRoleGroupConfig,
 ) -> String {
     let mut operator_generated = vec![format!(
         "-Djava.security.properties={CONFIG_DIR_NAME}/{JVM_SECURITY_PROPERTIES_FILE}"
     )];
 
-    if kerberos_enabled {
+    if cluster.has_kerberos_enabled() {
         operator_generated.push(format!("-Djava.security.krb5.conf={KRB5_CONFIG_PATH}"));
     }
 
-    let mut jvm_args = merged_jvm_argument_overrides.apply_to(operator_generated);
+    let mut jvm_args = rg
+        .product_specific_common_config
+        .jvm_argument_overrides
+        .apply_to(operator_generated);
     jvm_args.retain(|arg| !is_heap_jvm_argument(arg));
 
     jvm_args.join(" ")
@@ -136,10 +134,8 @@ mod tests {
             construct_hbase_heapsize_env(&region_server.config.config).unwrap();
 
         assert_eq!(global_jvm_args, "");
-        // `non_heap_jvm_args` is the output of `construct_role_specific_non_heap_jvm_args`,
-        // pre-resolved during validation.
         assert_eq!(
-            region_server.non_heap_jvm_args,
+            construct_role_specific_non_heap_jvm_args(&validated_cluster, region_server),
             "-Djava.security.properties=/stackable/conf/security.properties"
         );
         assert_eq!(hbase_heapsize_env, "819m");
@@ -202,7 +198,7 @@ mod tests {
             "-Djava.security.krb5.conf=/stackable/kerberos/krb5.conf"
         );
         assert_eq!(
-            region_server.non_heap_jvm_args,
+            construct_role_specific_non_heap_jvm_args(&validated_cluster, region_server),
             "-Djava.security.properties=/stackable/conf/security.properties \
             -Djava.security.krb5.conf=/stackable/kerberos/krb5.conf \
             -Dhttps.proxyHost=proxy.my.corp \

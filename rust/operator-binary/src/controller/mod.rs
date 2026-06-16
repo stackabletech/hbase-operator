@@ -10,12 +10,12 @@ pub use stackable_operator::v2::types::operator::RoleGroupName;
 use stackable_operator::{
     builder::meta::ObjectMetaBuilder,
     commons::product_image_selection::ResolvedProductImage,
-    k8s_openapi::{api::core::v1::PodTemplateSpec, apimachinery::pkg::apis::meta::v1::ObjectMeta},
+    k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta,
     kube::Resource,
     kvp::Labels,
     v2::{
         HasName, HasUid, NameIsValidLabelValue,
-        builder::{meta::ownerreference_from_resource, pod::container::EnvVarSet},
+        builder::meta::ownerreference_from_resource,
         kvp::label::{recommended_labels, role_group_selector},
         role_group_utils::ResourceNames,
         types::{
@@ -71,7 +71,7 @@ pub struct ValidatedCluster {
     /// value.
     pub product_version: ProductVersion,
     pub cluster_config: ValidatedClusterConfig,
-    pub role_group_configs: BTreeMap<HbaseRole, BTreeMap<RoleGroupName, ValidatedRoleGroupConfig>>,
+    pub role_group_configs: BTreeMap<HbaseRole, BTreeMap<RoleGroupName, HbaseRoleGroupConfig>>,
     pub role_configs: BTreeMap<HbaseRole, ValidatedRoleConfig>,
 }
 
@@ -83,7 +83,7 @@ impl ValidatedCluster {
         uid: Uid,
         image: ResolvedProductImage,
         cluster_config: ValidatedClusterConfig,
-        role_group_configs: BTreeMap<HbaseRole, BTreeMap<RoleGroupName, ValidatedRoleGroupConfig>>,
+        role_group_configs: BTreeMap<HbaseRole, BTreeMap<RoleGroupName, HbaseRoleGroupConfig>>,
         role_configs: BTreeMap<HbaseRole, ValidatedRoleConfig>,
     ) -> Self {
         // `app_version_label_value` is constructed to be a valid label value, so it is also a
@@ -283,15 +283,13 @@ pub struct ValidatedHbaseConfig {
     pub logging: validate::ValidatedLogging,
 }
 
-#[derive(Clone, Debug)]
-pub struct ValidatedRoleGroupConfig {
-    /// The desired number of replicas (defaulted to 1 during validation).
-    pub replicas: u16,
-    pub config: ValidatedHbaseConfig,
-    pub config_overrides: v1alpha1::HbaseConfigOverrides,
-    pub env_overrides: EnvVarSet,
-    /// Merged (role <- role group) pod template overrides.
-    pub pod_overrides: PodTemplateSpec,
-    /// Pre-resolved role-specific non-heap JVM args (operator-generated + role/role-group overrides).
-    pub non_heap_jvm_args: String,
-}
+/// Per-rolegroup configuration: a v2
+/// [`RoleGroupConfig`](stackable_operator::v2::role_utils::RoleGroupConfig) over the validated
+/// HBase config. The merged (role <- role group) `jvmArgumentOverrides` are available via
+/// `product_specific_common_config` and applied at build time by
+/// [`construct_role_specific_non_heap_jvm_args`](build::jvm::construct_role_specific_non_heap_jvm_args).
+pub type HbaseRoleGroupConfig = stackable_operator::v2::role_utils::RoleGroupConfig<
+    ValidatedHbaseConfig,
+    stackable_operator::v2::role_utils::JavaCommonConfig,
+    v1alpha1::HbaseConfigOverrides,
+>;
