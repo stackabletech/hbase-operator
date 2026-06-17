@@ -7,7 +7,12 @@ use stackable_operator::shared::time::Duration;
 
 use crate::crd::AnyServiceConfig;
 
+/// Fallback region-mover timeout, used only when no graceful shutdown timeout is set. In practice
+/// the merged config always defaults `graceful_shutdown_timeout` (60m for region servers), so this
+/// is a defensive default; it mirrors that 60m default minus [`DEFAULT_REGION_MOVER_DELTA_TO_SHUTDOWN`].
 const DEFAULT_REGION_MOVER_TIMEOUT: Duration = Duration::from_minutes_unchecked(59);
+/// Time reserved before the graceful shutdown deadline, subtracted from the configured timeout so
+/// the region move finishes before the pod is terminated.
 const DEFAULT_REGION_MOVER_DELTA_TO_SHUTDOWN: Duration = Duration::from_minutes_unchecked(1);
 
 impl AnyServiceConfig {

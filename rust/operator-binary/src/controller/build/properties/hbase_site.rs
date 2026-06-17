@@ -55,7 +55,9 @@ pub fn build(
 
     config.extend(zookeeper_config);
     config.extend(kerberos_config);
-    config.extend(opa_config.map_or(vec![], |config| config.hbase_site_config()));
+    if let Some(opa_config) = opa_config {
+        config.extend(opa_config.hbase_site_config());
+    }
 
     // Set flag to override default behaviour, which is that the
     // RPC client should bind the client address (forcing outgoing

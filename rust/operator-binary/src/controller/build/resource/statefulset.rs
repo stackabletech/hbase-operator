@@ -26,7 +26,9 @@ use stackable_operator::{
     product_logging,
     v2::{
         builder::pod::container::{EnvVarName, EnvVarSet, new_container_builder},
-        product_logging::framework::{ValidatedContainerLogConfigChoice, vector_container},
+        product_logging::framework::{
+            STACKABLE_LOG_DIR, ValidatedContainerLogConfigChoice, vector_container,
+        },
         types::{
             kubernetes::{ContainerName, VolumeName},
             operator::RoleGroupName,
@@ -40,7 +42,7 @@ use crate::{
         build::{
             graceful_shutdown::{self, add_graceful_shutdown_config},
             kerberos::{self, add_kerberos_pod_config},
-            properties::product_logging::{MAX_HBASE_LOG_FILES_SIZE, STACKABLE_LOG_DIR},
+            properties::product_logging::MAX_HBASE_LOG_FILES_SIZE,
         },
     },
     crd::{CONFIG_DIR_NAME, HbaseRole, LISTENER_VOLUME_DIR, LISTENER_VOLUME_NAME},

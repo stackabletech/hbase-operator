@@ -1,11 +1,10 @@
 //! Renders the logging config files (`log4j2.properties` and the Vector agent config)
 //! assembled into the rolegroup `ConfigMap`.
 
-pub use stackable_operator::v2::product_logging::framework::STACKABLE_LOG_DIR;
 use stackable_operator::{
     memory::{BinaryMultiple, MemoryQuantity},
     product_logging::{self, spec::AutomaticContainerLogConfig},
-    v2::product_logging::framework::ValidatedContainerLogConfigChoice,
+    v2::product_logging::framework::{STACKABLE_LOG_DIR, ValidatedContainerLogConfigChoice},
 };
 
 pub const MAX_HBASE_LOG_FILES_SIZE: MemoryQuantity = MemoryQuantity {
