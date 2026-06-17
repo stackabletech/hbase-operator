@@ -57,6 +57,14 @@ stackable_operator::constant!(HDFS_DISCOVERY_VOLUME_NAME: VolumeName = "hdfs-dis
 stackable_operator::constant!(LOG_CONFIG_VOLUME_NAME: VolumeName = "log-config");
 stackable_operator::constant!(LOG_VOLUME_NAME: VolumeName = "log");
 
+// Environment variable names set on the HBase container. Declared as typed constants (instead of
+// `EnvVarName::from_str_unsafe` at the use site) and validated by `env_var_names_are_valid`.
+stackable_operator::constant!(HBASE_CONF_DIR_ENV: EnvVarName = "HBASE_CONF_DIR");
+stackable_operator::constant!(HADOOP_CONF_DIR_ENV: EnvVarName = "HADOOP_CONF_DIR");
+stackable_operator::constant!(REGION_MOVER_OPTS_ENV: EnvVarName = "REGION_MOVER_OPTS");
+stackable_operator::constant!(RUN_REGION_MOVER_ENV: EnvVarName = "RUN_REGION_MOVER");
+stackable_operator::constant!(STACKABLE_LOG_DIR_ENV: EnvVarName = "STACKABLE_LOG_DIR");
+
 pub static CONTAINERDEBUG_LOG_DIRECTORY: std::sync::LazyLock<String> =
     std::sync::LazyLock::new(|| format!("{STACKABLE_LOG_DIR}/containerdebug"));
 
@@ -148,29 +156,17 @@ pub fn build_rolegroup_statefulset(
     };
 
     let merged_env = EnvVarSet::new()
-        .with_value(
-            &EnvVarName::from_str_unsafe("HBASE_CONF_DIR"),
-            CONFIG_DIR_NAME,
-        )
+        .with_value(&HBASE_CONF_DIR_ENV, CONFIG_DIR_NAME)
         // required by phoenix (for cases where Kerberos is enabled): see https://issues.apache.org/jira/browse/PHOENIX-2369
-        .with_value(
-            &EnvVarName::from_str_unsafe("HADOOP_CONF_DIR"),
-            CONFIG_DIR_NAME,
-        )
+        .with_value(&HADOOP_CONF_DIR_ENV, CONFIG_DIR_NAME)
         .merge(validated_rg_config.env_overrides.clone())
         // These env vars are set for all roles to avoid bash's "unbound variable" errors.
+        .with_value(&REGION_MOVER_OPTS_ENV, merged_config.region_mover_args())
         .with_value(
-            &EnvVarName::from_str_unsafe("REGION_MOVER_OPTS"),
-            merged_config.region_mover_args(),
-        )
-        .with_value(
-            &EnvVarName::from_str_unsafe("RUN_REGION_MOVER"),
+            &RUN_REGION_MOVER_ENV,
             merged_config.run_region_mover().to_string(),
         )
-        .with_value(
-            &EnvVarName::from_str_unsafe("STACKABLE_LOG_DIR"),
-            STACKABLE_LOG_DIR,
-        );
+        .with_value(&STACKABLE_LOG_DIR_ENV, STACKABLE_LOG_DIR);
 
     let role_name = hbase_role.cli_role_name();
     let mut hbase_container = new_container_builder(&HBASE_CONTAINER_NAME);
@@ -352,4 +348,21 @@ fn command() -> Vec<String> {
         "pipefail".to_string(),
         "-c".to_string(),
     ]
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The env-var-name constants are built with `EnvVarName::from_str`, which panics on an invalid
+    /// name. This test forces every constant to be evaluated so a typo is caught at test time rather
+    /// than during reconciliation.
+    #[test]
+    fn env_var_names_are_valid() {
+        assert_eq!(HBASE_CONF_DIR_ENV.to_string(), "HBASE_CONF_DIR");
+        assert_eq!(HADOOP_CONF_DIR_ENV.to_string(), "HADOOP_CONF_DIR");
+        assert_eq!(REGION_MOVER_OPTS_ENV.to_string(), "REGION_MOVER_OPTS");
+        assert_eq!(RUN_REGION_MOVER_ENV.to_string(), "RUN_REGION_MOVER");
+        assert_eq!(STACKABLE_LOG_DIR_ENV.to_string(), "STACKABLE_LOG_DIR");
+    }
 }

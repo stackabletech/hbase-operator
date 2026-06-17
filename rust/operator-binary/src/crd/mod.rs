@@ -29,7 +29,7 @@ use stackable_operator::{
         role_utils::JavaCommonConfig,
         types::{
             common::Port,
-            kubernetes::{ConfigMapName, ListenerClassName, SecretClassName},
+            kubernetes::{ConfigMapName, ListenerClassName, SecretClassName, VolumeName},
         },
     },
     versioned::versioned,
@@ -50,7 +50,7 @@ pub const OPERATOR_NAME: &str = "hbase.stackable.com";
 pub const CONFIG_DIR_NAME: &str = "/stackable/conf";
 
 pub const TLS_STORE_DIR: &str = "/stackable/tls";
-pub const TLS_STORE_VOLUME_NAME: &str = "tls";
+stackable_operator::constant!(pub TLS_STORE_VOLUME_NAME: VolumeName = "tls");
 pub const TLS_STORE_PASSWORD: &str = "changeit";
 /// The key- and truststore type used for all HBase TLS stores.
 pub const TLS_STORE_TYPE: &str = "pkcs12";

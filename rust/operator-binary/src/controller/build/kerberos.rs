@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, str::FromStr};
 
 use snafu::{ResultExt, Snafu};
 use stackable_operator::{
@@ -13,6 +13,7 @@ use stackable_operator::{
     commons::secret_class::SecretClassVolumeProvisionParts,
     shared::time::Duration,
     utils::cluster_info::KubernetesClusterInfo,
+    v2::types::kubernetes::VolumeName,
 };
 
 use crate::{
@@ -25,8 +26,8 @@ pub const STACKABLE_KERBEROS_DIR: &str = "/stackable/kerberos";
 /// Path of the `krb5.conf` rendered into the Kerberos secret volume. Referenced both here (the
 /// `KRB5_CONFIG` env var) and by the JVM args builder.
 pub const KRB5_CONFIG_PATH: &str = const_format::concatcp!(STACKABLE_KERBEROS_DIR, "/krb5.conf");
-/// Name of the Kerberos secret volume.
-const KERBEROS_VOLUME_NAME: &str = "kerberos";
+// Name of the Kerberos secret volume.
+stackable_operator::constant!(KERBEROS_VOLUME_NAME: VolumeName = "kerberos");
 /// The RPC/data-transfer quality-of-protection level used when Kerberos is enabled.
 const PROTECTION_PRIVACY: &str = "privacy";
 
@@ -242,12 +243,12 @@ pub fn add_kerberos_pod_config(
         .build()
         .context(BuildKerberosSecretVolumeSnafu)?;
         pb.add_volume(
-            VolumeBuilder::new(KERBEROS_VOLUME_NAME)
+            VolumeBuilder::new(&*KERBEROS_VOLUME_NAME)
                 .ephemeral(kerberos_secret_operator_volume)
                 .build(),
         )
         .context(AddVolumeSnafu)?;
-        cb.add_volume_mount(KERBEROS_VOLUME_NAME, STACKABLE_KERBEROS_DIR)
+        cb.add_volume_mount(&*KERBEROS_VOLUME_NAME, STACKABLE_KERBEROS_DIR)
             .context(AddVolumeMountSnafu)?;
 
         // Needed env vars
@@ -257,7 +258,7 @@ pub fn add_kerberos_pod_config(
     if let Some(https_secret_class) = cluster.cluster_config.https_secret_class.clone() {
         // Mount TLS keystore
         pb.add_volume(
-            VolumeBuilder::new(TLS_STORE_VOLUME_NAME)
+            VolumeBuilder::new(&*TLS_STORE_VOLUME_NAME)
                 .ephemeral(
                     SecretOperatorVolumeSourceBuilder::new(
                         https_secret_class,
@@ -278,7 +279,7 @@ pub fn add_kerberos_pod_config(
                 .build(),
         )
         .context(AddVolumeSnafu)?;
-        cb.add_volume_mount(TLS_STORE_VOLUME_NAME, TLS_STORE_DIR)
+        cb.add_volume_mount(&*TLS_STORE_VOLUME_NAME, TLS_STORE_DIR)
             .context(AddVolumeMountSnafu)?;
     }
     Ok(())
