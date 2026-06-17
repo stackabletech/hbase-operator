@@ -126,12 +126,13 @@ pub fn build_rolegroup_config_map(
         .add_data(ConfigFileName::HbaseEnv.to_string(), hbase_env_sh)
         .add_data(ConfigFileName::Security.to_string(), security_properties);
 
-    // HBase does not like empty config files:
+    // HBase does not like empty config files, so the ssl-*.xml files are only
+    // written when they actually carry settings (see `ssl_server::build`):
     // Caused by: com.ctc.wstx.exc.WstxEOFException: Unexpected EOF in prolog at [row,col,system-id]: [1,0,"file:/stackable/conf/ssl-server.xml"]
-    if !ssl_server_xml.is_empty() {
+    if let Some(ssl_server_xml) = ssl_server_xml {
         builder.add_data(ConfigFileName::SslServer.to_string(), ssl_server_xml);
     }
-    if !ssl_client_xml.is_empty() {
+    if let Some(ssl_client_xml) = ssl_client_xml {
         builder.add_data(ConfigFileName::SslClient.to_string(), ssl_client_xml);
     }
 

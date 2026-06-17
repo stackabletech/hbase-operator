@@ -26,6 +26,25 @@ fn build_xml_config(
     to_hadoop_xml(config.iter())
 }
 
+/// Like [`build_xml_config`], but returns `None` when the merged config is empty
+/// so the caller can omit the file entirely.
+///
+/// HBase rejects empty XML config files (`com.ctc.wstx.exc.WstxEOFException:
+/// Unexpected EOF in prolog`), and [`to_hadoop_xml`] always emits a non-empty
+/// `<configuration>` wrapper, so emptiness must be detected on the input map
+/// before serialization.
+fn build_optional_xml_config(
+    mut config: BTreeMap<String, String>,
+    overrides: KeyValueConfigOverrides,
+) -> Option<String> {
+    config.extend(overrides);
+    if config.is_empty() {
+        None
+    } else {
+        Some(to_hadoop_xml(config.iter()))
+    }
+}
+
 /// The names of the HBase config files assembled into the rolegroup `ConfigMap`.
 #[derive(Clone, Copy, Debug, strum::Display)]
 pub enum ConfigFileName {
