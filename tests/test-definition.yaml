@@ -17,6 +17,7 @@ dimensions:
       # - x.x.x,oci.stackable.tech/sandbox/hbase:x.x.x-stackable0.0.0-dev
   - name: hdfs
     values:
+      - 3.4.2
       - 3.4.3
       - 3.5.0
   - name: hdfs-latest
