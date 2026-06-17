@@ -294,7 +294,7 @@ where
             let logging = validate_logging(config.logging(), vector_aggregator_config_map_name)?;
 
             let validated = HbaseRoleGroupConfig {
-                replicas: validated.replicas.unwrap_or(1),
+                replicas: validated.replicas,
                 config: ValidatedHbaseConfig { config, logging },
                 config_overrides,
                 env_overrides: env_overrides_set,
