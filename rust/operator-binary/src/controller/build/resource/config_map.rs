@@ -83,7 +83,7 @@ pub fn build_rolegroup_config_map(
     let hbase_env_sh = hbase_env::build(
         merged_config,
         role,
-        cluster_config.kerberos_enabled,
+        cluster.has_kerberos_enabled(),
         construct_role_specific_non_heap_jvm_args(cluster, rg),
         overrides.hbase_env_sh.clone(),
     )

@@ -245,8 +245,6 @@ pub fn validate_cluster(
         ValidatedClusterConfig {
             zookeeper_connection_information: dereferenced_objects.zookeeper_connection_information,
             hbase_opa_config: dereferenced_objects.hbase_opa_config,
-            kerberos_enabled,
-            https_enabled,
             kerberos_secret_class: hbase.kerberos_secret_class(),
             https_secret_class: hbase.https_secret_class(),
             hdfs_config_map_name: hbase.spec.cluster_config.hdfs_config_map_name.clone(),

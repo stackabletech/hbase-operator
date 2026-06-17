@@ -183,12 +183,14 @@ impl ValidatedCluster {
     /// Mirrors [`v1alpha1::HbaseCluster::has_kerberos_enabled`], derived here from the validated
     /// config so build steps don't have to re-read the raw cluster.
     pub fn has_kerberos_enabled(&self) -> bool {
-        self.cluster_config.kerberos_enabled
+        self.cluster_config.kerberos_secret_class.is_some()
     }
 
     /// Whether HTTPS is enabled for this cluster.
+    ///
+    /// Derived from the validated config (a TLS `SecretClass` was configured).
     pub fn has_https_enabled(&self) -> bool {
-        self.cluster_config.https_enabled
+        self.cluster_config.https_secret_class.is_some()
     }
 }
 
@@ -244,9 +246,6 @@ impl NameIsValidLabelValue for ValidatedCluster {
 pub struct ValidatedClusterConfig {
     // Pre-resolved OPA connection configuration.
     pub hbase_opa_config: Option<HbaseOpaConfig>,
-    pub kerberos_enabled: bool,
-    /// Whether HTTPS is enabled (a TLS `SecretClass` was configured).
-    pub https_enabled: bool,
     /// The Kerberos `SecretClass` name, if Kerberos is enabled.
     pub kerberos_secret_class: Option<SecretClassName>,
     /// The HTTPS/TLS `SecretClass` name, if HTTPS is enabled.
