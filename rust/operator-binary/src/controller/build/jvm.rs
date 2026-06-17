@@ -129,7 +129,7 @@ mod tests {
         let region_server = &validated_cluster.role_group_configs[&HbaseRole::RegionServer]
             [&test_utils::role_group_name("default")];
 
-        let global_jvm_args = construct_global_jvm_args(hbase.has_kerberos_enabled());
+        let global_jvm_args = construct_global_jvm_args(validated_cluster.has_kerberos_enabled());
         let hbase_heapsize_env =
             construct_hbase_heapsize_env(&region_server.config.config).unwrap();
 
@@ -189,7 +189,7 @@ mod tests {
         let region_server = &validated_cluster.role_group_configs[&HbaseRole::RegionServer]
             [&test_utils::role_group_name("default")];
 
-        let global_jvm_args = construct_global_jvm_args(hbase.has_kerberos_enabled());
+        let global_jvm_args = construct_global_jvm_args(validated_cluster.has_kerberos_enabled());
         let hbase_heapsize_env =
             construct_hbase_heapsize_env(&region_server.config.config).unwrap();
 

@@ -7,10 +7,7 @@
 
 use std::str::FromStr;
 
-use stackable_operator::{
-    commons::networking::DomainName, utils::cluster_info::KubernetesClusterInfo,
-    v2::types::operator::RoleGroupName,
-};
+use stackable_operator::v2::types::operator::RoleGroupName;
 
 use crate::{
     controller::{
@@ -59,19 +56,12 @@ pub fn minimal_hbase() -> v1alpha1::HbaseCluster {
     hbase_from_yaml(MINIMAL_HBASE_YAML)
 }
 
-pub fn cluster_info() -> KubernetesClusterInfo {
-    KubernetesClusterInfo {
-        cluster_domain: DomainName::try_from("cluster.local").expect("valid domain"),
-    }
-}
-
 /// Runs the real validation pipeline over `hbase`, with a fixed dereferenced ZooKeeper connection
 /// and no OPA.
 pub fn validated_cluster_from(hbase: &v1alpha1::HbaseCluster) -> ValidatedCluster {
     validate_cluster(
         hbase,
         "oci.example.org",
-        &cluster_info(),
         DereferencedObjects {
             zookeeper_connection_information: ZookeeperConnectionInformation::for_tests(),
             hbase_opa_config: None,

@@ -5,6 +5,7 @@ use stackable_operator::{
     builder::configmap::ConfigMapBuilder,
     k8s_openapi::api::core::v1::ConfigMap,
     product_logging::framework::VECTOR_CONFIG_FILE,
+    utils::cluster_info::KubernetesClusterInfo,
     v2::{config_file_writer::PropertiesWriterError, types::operator::RoleGroupName},
 };
 
@@ -13,6 +14,7 @@ use crate::{
         ValidatedCluster,
         build::{
             jvm::construct_role_specific_non_heap_jvm_args,
+            kerberos,
             properties::{
                 ConfigFileName, hbase_env, hbase_site, logging, security_properties, ssl_client,
                 ssl_server,
@@ -48,6 +50,7 @@ type Result<T, E = Error> = std::result::Result<T, E>;
 
 pub fn build_rolegroup_config_map(
     cluster: &ValidatedCluster,
+    cluster_info: &KubernetesClusterInfo,
     role: &HbaseRole,
     role_group_name: &RoleGroupName,
 ) -> Result<ConfigMap> {
@@ -75,7 +78,7 @@ pub fn build_rolegroup_config_map(
         cluster_config
             .zookeeper_connection_information
             .as_hbase_settings(),
-        cluster_config.hbase_site_kerberos_config.clone(),
+        kerberos::hbase_site_kerberos_config(cluster, cluster_info),
         cluster_config.hbase_opa_config.as_ref(),
         overrides.hbase_site_xml.clone(),
     );
@@ -90,11 +93,11 @@ pub fn build_rolegroup_config_map(
     .context(BuildHbaseEnvSnafu)?;
 
     let ssl_server_xml = ssl_server::build(
-        cluster_config.ssl_server_settings.clone(),
+        kerberos::ssl_server_settings(cluster),
         overrides.ssl_server_xml.clone(),
     );
     let ssl_client_xml = ssl_client::build(
-        cluster_config.ssl_client_settings.clone(),
+        kerberos::ssl_client_settings(cluster),
         overrides.ssl_client_xml.clone(),
     );
 

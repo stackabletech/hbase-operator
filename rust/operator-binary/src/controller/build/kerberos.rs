@@ -51,6 +51,58 @@ pub enum Error {
     },
 }
 
+/// The `hbase-site.xml` Kerberos properties for `cluster`, gated on Kerberos being enabled
+/// (empty when disabled). Derived in the build step from the validated cluster.
+pub fn hbase_site_kerberos_config(
+    cluster: &ValidatedCluster,
+    cluster_info: &KubernetesClusterInfo,
+) -> BTreeMap<String, String> {
+    if cluster.has_kerberos_enabled() {
+        kerberos_config_properties(
+            cluster.name.as_ref(),
+            cluster.namespace.as_ref(),
+            cluster_info,
+        )
+    } else {
+        BTreeMap::new()
+    }
+}
+
+/// The Kerberos properties for the discovery `hbase-site.xml` exposed to clients, gated on
+/// Kerberos being enabled (empty when disabled).
+pub fn discovery_kerberos_config(
+    cluster: &ValidatedCluster,
+    cluster_info: &KubernetesClusterInfo,
+) -> BTreeMap<String, String> {
+    if cluster.has_kerberos_enabled() {
+        kerberos_discovery_config_properties(
+            cluster.name.as_ref(),
+            cluster.namespace.as_ref(),
+            cluster_info,
+        )
+    } else {
+        BTreeMap::new()
+    }
+}
+
+/// The `ssl-server.xml` settings for `cluster`, gated on HTTPS being enabled (empty when disabled).
+pub fn ssl_server_settings(cluster: &ValidatedCluster) -> BTreeMap<String, String> {
+    if cluster.has_https_enabled() {
+        kerberos_ssl_server_settings()
+    } else {
+        BTreeMap::new()
+    }
+}
+
+/// The `ssl-client.xml` settings for `cluster`, gated on HTTPS being enabled (empty when disabled).
+pub fn ssl_client_settings(cluster: &ValidatedCluster) -> BTreeMap<String, String> {
+    if cluster.has_https_enabled() {
+        kerberos_ssl_client_settings()
+    } else {
+        BTreeMap::new()
+    }
+}
+
 pub fn kerberos_config_properties(
     hbase_name: &str,
     hbase_namespace: &str,

@@ -6,11 +6,15 @@ use stackable_operator::{
     k8s_openapi::api::core::v1::ConfigMap,
     kube::Resource,
     kvp::ObjectLabels,
+    utils::cluster_info::KubernetesClusterInfo,
     v2::{builder::meta::ownerreference_from_resource, config_file_writer::to_hadoop_xml},
 };
 
 use crate::{
-    controller::{ValidatedCluster, build::properties::ConfigFileName},
+    controller::{
+        ValidatedCluster,
+        build::{kerberos, properties::ConfigFileName},
+    },
     crd::{APP_NAME, HbaseRole, OPERATOR_NAME},
 };
 
@@ -34,13 +38,16 @@ pub enum Error {
 }
 
 /// Creates a discovery config map containing the `hbase-site.xml` for clients.
-pub fn build_discovery_config_map(cluster: &ValidatedCluster) -> Result<ConfigMap> {
+pub fn build_discovery_config_map(
+    cluster: &ValidatedCluster,
+    cluster_info: &KubernetesClusterInfo,
+) -> Result<ConfigMap> {
     let cluster_config = &cluster.cluster_config;
 
     let mut hbase_site = cluster_config
         .zookeeper_connection_information
         .as_hbase_settings();
-    hbase_site.extend(cluster_config.discovery_kerberos_config.clone());
+    hbase_site.extend(kerberos::discovery_kerberos_config(cluster, cluster_info));
 
     ConfigMapBuilder::new()
         .metadata(

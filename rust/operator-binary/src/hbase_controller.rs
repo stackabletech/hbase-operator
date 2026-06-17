@@ -167,7 +167,6 @@ pub async fn reconcile_hbase(
     let validated_cluster = crate::controller::validate::validate_cluster(
         hbase,
         &ctx.operator_environment.image_repository,
-        &client.kubernetes_cluster_info,
         dereferenced_objects,
     )
     .context(ValidateSnafu)?;
@@ -210,9 +209,13 @@ pub async fn reconcile_hbase(
             let rg_metrics_service =
                 build_rolegroup_metrics_service(&validated_cluster, hbase_role, role_group_name);
 
-            let rg_configmap =
-                build_rolegroup_config_map(&validated_cluster, hbase_role, role_group_name)
-                    .context(BuildRolegroupConfigMapSnafu)?;
+            let rg_configmap = build_rolegroup_config_map(
+                &validated_cluster,
+                &client.kubernetes_cluster_info,
+                hbase_role,
+                role_group_name,
+            )
+            .context(BuildRolegroupConfigMapSnafu)?;
             let rg_statefulset = build_rolegroup_statefulset(
                 &validated_cluster,
                 hbase_role,
@@ -268,7 +271,8 @@ pub async fn reconcile_hbase(
     // Discovery CM will fail to build until the rest of the cluster has been deployed, so do it last
     // so that failure won't inhibit the rest of the cluster from booting up.
     let discovery_cm =
-        build_discovery_config_map(&validated_cluster).context(BuildDiscoveryConfigMapSnafu)?;
+        build_discovery_config_map(&validated_cluster, &client.kubernetes_cluster_info)
+            .context(BuildDiscoveryConfigMapSnafu)?;
     cluster_resources
         .add(client, discovery_cm)
         .await

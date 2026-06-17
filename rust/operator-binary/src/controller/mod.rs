@@ -179,9 +179,6 @@ impl ValidatedCluster {
     }
 
     /// Whether Kerberos is enabled for this cluster.
-    ///
-    /// Mirrors [`v1alpha1::HbaseCluster::has_kerberos_enabled`], derived here from the validated
-    /// config so build steps don't have to re-read the raw cluster.
     pub fn has_kerberos_enabled(&self) -> bool {
         self.cluster_config.kerberos_secret_class.is_some()
     }
@@ -252,15 +249,6 @@ pub struct ValidatedClusterConfig {
     pub https_secret_class: Option<SecretClassName>,
     /// The HDFS discovery ConfigMap name the cluster connects to.
     pub hdfs_config_map_name: ConfigMapName,
-    // Pre-resolved kerberos properties for hbase-site.xml (empty when kerberos is disabled).
-    pub hbase_site_kerberos_config: BTreeMap<String, String>,
-    // Pre-resolved kerberos properties for the discovery `hbase-site.xml` exposed to clients
-    // (empty when kerberos is disabled).
-    pub discovery_kerberos_config: BTreeMap<String, String>,
-    // Pre-resolved ssl-server.xml settings (empty when HTTPS is disabled).
-    pub ssl_server_settings: BTreeMap<String, String>,
-    // Pre-resolved ssl-client.xml settings (empty when HTTPS is disabled).
-    pub ssl_client_settings: BTreeMap<String, String>,
     // Pre-resolved zookeeper connection settings.
     pub zookeeper_connection_information: ZookeeperConnectionInformation,
 }
