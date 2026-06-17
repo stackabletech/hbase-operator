@@ -312,7 +312,8 @@ fn default_resources(role: &HbaseRole) -> ResourcesFragment<HbaseStorageConfig, 
 }
 
 impl HbaseConfigFragment {
-    /// The operator defaults for a `masters` or `restServers` role group.
+    /// The operator defaults for the `masters` and `restServers` roles, which share this config
+    /// fragment (`regionServers` use [`RegionServerConfigFragment::default_config`]).
     pub fn default_config(
         role: &HbaseRole,
         cluster_name: &str,

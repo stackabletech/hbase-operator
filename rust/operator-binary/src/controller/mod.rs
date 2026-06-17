@@ -259,8 +259,10 @@ pub struct ValidatedRoleConfig {
     pub pdb: stackable_operator::commons::pdb::PdbConfig,
 }
 
-/// Per-rolegroup configuration: the merged CRD config plus the merged
-/// (role <- role group) `configOverrides`, `envOverrides` and `podOverrides`.
+/// The validated per-rolegroup product configuration: the merged CRD config and the resolved
+/// logging settings. The merged (role <- role group) `configOverrides`, `envOverrides` and
+/// `podOverrides` live on the enclosing [`HbaseRoleGroupConfig`] (the `RoleGroupConfig` wrapper),
+/// not here.
 #[derive(Clone, Debug)]
 pub struct ValidatedHbaseConfig {
     /// The merged, role-specific product config.

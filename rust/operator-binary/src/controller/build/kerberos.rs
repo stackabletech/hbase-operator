@@ -230,10 +230,10 @@ pub fn add_kerberos_pod_config(
     pb: &mut PodBuilder,
     requested_secret_lifetime: Duration,
 ) -> Result<(), Error> {
-    if let Some(kerberos_secret_class) = cluster.cluster_config.kerberos_secret_class.clone() {
+    if let Some(kerberos_secret_class) = &cluster.cluster_config.kerberos_secret_class {
         // Mount keytab
         let kerberos_secret_operator_volume = SecretOperatorVolumeSourceBuilder::new(
-            kerberos_secret_class,
+            kerberos_secret_class.clone(),
             // We need both public (krb5.conf) and private (keytab) parts.
             SecretClassVolumeProvisionParts::PublicPrivate,
         )
@@ -255,13 +255,13 @@ pub fn add_kerberos_pod_config(
         cb.add_env_var("KRB5_CONFIG", KRB5_CONFIG_PATH);
     }
 
-    if let Some(https_secret_class) = cluster.cluster_config.https_secret_class.clone() {
+    if let Some(https_secret_class) = &cluster.cluster_config.https_secret_class {
         // Mount TLS keystore
         pb.add_volume(
             VolumeBuilder::new(&*TLS_STORE_VOLUME_NAME)
                 .ephemeral(
                     SecretOperatorVolumeSourceBuilder::new(
-                        https_secret_class,
+                        https_secret_class.clone(),
                         // HBase serves its own TLS endpoints, so the Pod needs both the public
                         // certificate and the private key.
                         SecretClassVolumeProvisionParts::PublicPrivate,

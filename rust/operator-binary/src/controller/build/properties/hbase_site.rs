@@ -14,6 +14,30 @@ use crate::{
     },
 };
 
+// `hbase-site.xml` property keys (the `port` keys carry a `_KEY` suffix to avoid clashing with the
+// `Port`-typed `HBASE_*_PORT` constants imported from the `crd` module).
+const HBASE_CLIENT_RPC_BIND_ADDRESS: &str = "hbase.client.rpc.bind.address";
+const HBASE_MASTER_IPC_ADDRESS: &str = "hbase.master.ipc.address";
+const HBASE_MASTER_IPC_PORT: &str = "hbase.master.ipc.port";
+const HBASE_MASTER_HOSTNAME: &str = "hbase.master.hostname";
+const HBASE_MASTER_PORT_KEY: &str = "hbase.master.port";
+const HBASE_MASTER_INFO_PORT: &str = "hbase.master.info.port";
+const HBASE_MASTER_BOUND_INFO_PORT: &str = "hbase.master.bound.info.port";
+const HBASE_REGIONSERVER_IPC_ADDRESS: &str = "hbase.regionserver.ipc.address";
+const HBASE_REGIONSERVER_IPC_PORT: &str = "hbase.regionserver.ipc.port";
+const HBASE_UNSAFE_REGIONSERVER_HOSTNAME: &str = "hbase.unsafe.regionserver.hostname";
+const HBASE_REGIONSERVER_PORT_KEY: &str = "hbase.regionserver.port";
+const HBASE_REGIONSERVER_INFO_PORT: &str = "hbase.regionserver.info.port";
+const HBASE_REGIONSERVER_BOUND_INFO_PORT: &str = "hbase.regionserver.bound.info.port";
+const HBASE_REST_ENDPOINT: &str = "hbase.rest.endpoint";
+
+// `hbase-site.xml` property values that recur across roles. The `${env:...}` placeholders are
+// resolved by HBase at runtime from the Pod's environment.
+const BIND_ALL_ADDRESSES: &str = "0.0.0.0";
+const ENV_HBASE_SERVICE_HOST: &str = "${env:HBASE_SERVICE_HOST}";
+const ENV_HBASE_SERVICE_PORT: &str = "${env:HBASE_SERVICE_PORT}";
+const ENV_HBASE_INFO_PORT: &str = "${env:HBASE_INFO_PORT}";
+
 /// Renders `hbase-site.xml`.
 pub fn build(
     role: &HbaseRole,
@@ -38,60 +62,60 @@ pub fn build(
     // RPC traffic to happen from the same network interface that
     // the RPC server is bound on).
     config.insert(
-        "hbase.client.rpc.bind.address".to_string(),
+        HBASE_CLIENT_RPC_BIND_ADDRESS.to_string(),
         "false".to_string(),
     );
 
     match role {
         HbaseRole::Master => {
             config.insert(
-                "hbase.master.ipc.address".to_string(),
-                "0.0.0.0".to_string(),
+                HBASE_MASTER_IPC_ADDRESS.to_string(),
+                BIND_ALL_ADDRESSES.to_string(),
             );
             config.insert(
-                "hbase.master.ipc.port".to_string(),
+                HBASE_MASTER_IPC_PORT.to_string(),
                 HBASE_MASTER_PORT.to_string(),
             );
             config.insert(
-                "hbase.master.hostname".to_string(),
-                "${env:HBASE_SERVICE_HOST}".to_string(),
+                HBASE_MASTER_HOSTNAME.to_string(),
+                ENV_HBASE_SERVICE_HOST.to_string(),
             );
             config.insert(
-                "hbase.master.port".to_string(),
-                "${env:HBASE_SERVICE_PORT}".to_string(),
+                HBASE_MASTER_PORT_KEY.to_string(),
+                ENV_HBASE_SERVICE_PORT.to_string(),
             );
             config.insert(
-                "hbase.master.info.port".to_string(),
-                "${env:HBASE_INFO_PORT}".to_string(),
+                HBASE_MASTER_INFO_PORT.to_string(),
+                ENV_HBASE_INFO_PORT.to_string(),
             );
             config.insert(
-                "hbase.master.bound.info.port".to_string(),
+                HBASE_MASTER_BOUND_INFO_PORT.to_string(),
                 HBASE_MASTER_UI_PORT.to_string(),
             );
         }
         HbaseRole::RegionServer => {
             config.insert(
-                "hbase.regionserver.ipc.address".to_string(),
-                "0.0.0.0".to_string(),
+                HBASE_REGIONSERVER_IPC_ADDRESS.to_string(),
+                BIND_ALL_ADDRESSES.to_string(),
             );
             config.insert(
-                "hbase.regionserver.ipc.port".to_string(),
+                HBASE_REGIONSERVER_IPC_PORT.to_string(),
                 HBASE_REGIONSERVER_PORT.to_string(),
             );
             config.insert(
-                "hbase.unsafe.regionserver.hostname".to_string(),
-                "${env:HBASE_SERVICE_HOST}".to_string(),
+                HBASE_UNSAFE_REGIONSERVER_HOSTNAME.to_string(),
+                ENV_HBASE_SERVICE_HOST.to_string(),
             );
             config.insert(
-                "hbase.regionserver.port".to_string(),
-                "${env:HBASE_SERVICE_PORT}".to_string(),
+                HBASE_REGIONSERVER_PORT_KEY.to_string(),
+                ENV_HBASE_SERVICE_PORT.to_string(),
             );
             config.insert(
-                "hbase.regionserver.info.port".to_string(),
-                "${env:HBASE_INFO_PORT}".to_string(),
+                HBASE_REGIONSERVER_INFO_PORT.to_string(),
+                ENV_HBASE_INFO_PORT.to_string(),
             );
             config.insert(
-                "hbase.regionserver.bound.info.port".to_string(),
+                HBASE_REGIONSERVER_BOUND_INFO_PORT.to_string(),
                 HBASE_REGIONSERVER_UI_PORT.to_string(),
             );
         }
@@ -99,8 +123,8 @@ pub fn build(
             config.insert(
                 // N.B. a custom tag, so as not to interfere with HBase internals.
                 // The other roles use a patch to correctly resolve host/port.
-                "hbase.rest.endpoint".to_string(),
-                "${env:HBASE_SERVICE_HOST}:${env:HBASE_SERVICE_PORT}".to_string(),
+                HBASE_REST_ENDPOINT.to_string(),
+                format!("{ENV_HBASE_SERVICE_HOST}:{ENV_HBASE_SERVICE_PORT}"),
             );
         }
     };
