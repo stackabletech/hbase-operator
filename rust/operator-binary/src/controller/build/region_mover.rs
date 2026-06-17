@@ -66,3 +66,146 @@ impl AnyServiceConfig {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use indoc::indoc;
+
+    use crate::{crd::HbaseRole, test_utils};
+
+    /// Renders the region-mover args for the default region-server role group of a cluster whose
+    /// `regionServers.config` is built from `config_lines`. Each entry is one YAML line nested
+    /// under `config:`; indentation relative to `config:` is written as leading spaces in the entry
+    /// (e.g. `"  runBeforeShutdown: true"` for a key under `regionMover:`).
+    fn region_mover_args_for(config_lines: &[&str]) -> String {
+        // `regionServers.config` is placed last so the generated config lines simply extend the
+        // document, avoiding any trailing-key indentation juggling.
+        const HEADER: &str = indoc! {r#"
+            apiVersion: hbase.stackable.tech/v1alpha1
+            kind: HbaseCluster
+            metadata:
+              name: test-hbase
+              namespace: default
+              uid: 12345678-1234-1234-1234-123456789012
+            spec:
+              image:
+                productVersion: 2.6.4
+              clusterConfig:
+                hdfsConfigMapName: test-hdfs
+                zookeeperConfigMapName: test-znode
+              masters:
+                roleGroups:
+                  default:
+                    replicas: 1
+              restServers:
+                roleGroups:
+                  default:
+                    replicas: 1
+              regionServers:
+                roleGroups:
+                  default:
+                    replicas: 1
+                config:
+        "#};
+
+        let config = config_lines
+            .iter()
+            .map(|line| format!("      {line}"))
+            .collect::<Vec<_>>()
+            .join("\n");
+        let yaml = format!("{HEADER}{config}\n");
+
+        let hbase = test_utils::hbase_from_yaml(&yaml);
+        let validated = test_utils::validated_cluster_from(&hbase);
+        test_utils::merged_config_for(&validated, &HbaseRole::RegionServer, "default")
+            .region_mover_args()
+    }
+
+    #[test]
+    fn empty_when_disabled() {
+        assert_eq!(
+            region_mover_args_for(&["regionMover:", "  runBeforeShutdown: false"]),
+            ""
+        );
+    }
+
+    #[test]
+    fn empty_for_non_region_server_role() {
+        // The region mover only applies to region servers; every other role returns no args.
+        let validated = test_utils::validated_cluster();
+        assert_eq!(
+            test_utils::merged_config(&validated, &HbaseRole::Master).region_mover_args(),
+            ""
+        );
+    }
+
+    #[test]
+    fn uses_default_graceful_shutdown_timeout_minus_delta() {
+        // Default region-server graceful shutdown timeout is 60m (3600s); the region mover reserves
+        // a 1m (60s) delta, leaving 3540s.
+        assert_eq!(
+            region_mover_args_for(&["regionMover:", "  runBeforeShutdown: true"]),
+            "--maxthreads 1 --timeout 3540"
+        );
+    }
+
+    #[test]
+    fn subtracts_delta_when_timeout_above_delta() {
+        // 5m (300s) - 1m delta = 240s.
+        assert_eq!(
+            region_mover_args_for(&[
+                "gracefulShutdownTimeout: 5m",
+                "regionMover:",
+                "  runBeforeShutdown: true",
+            ]),
+            "--maxthreads 1 --timeout 240"
+        );
+    }
+
+    #[test]
+    fn keeps_timeout_when_exactly_at_delta() {
+        // 1m (60s) is not greater than the 60s delta, so it is used verbatim (no underflow).
+        assert_eq!(
+            region_mover_args_for(&[
+                "gracefulShutdownTimeout: 1m",
+                "regionMover:",
+                "  runBeforeShutdown: true",
+            ]),
+            "--maxthreads 1 --timeout 60"
+        );
+    }
+
+    #[test]
+    fn keeps_timeout_when_below_delta() {
+        // 30s is below the 60s delta, so it is used verbatim rather than underflowing.
+        assert_eq!(
+            region_mover_args_for(&[
+                "gracefulShutdownTimeout: 30s",
+                "regionMover:",
+                "  runBeforeShutdown: true",
+            ]),
+            "--maxthreads 1 --timeout 30"
+        );
+    }
+
+    #[test]
+    fn appends_noack_when_ack_disabled() {
+        assert_eq!(
+            region_mover_args_for(&["regionMover:", "  runBeforeShutdown: true", "  ack: false",]),
+            "--maxthreads 1 --timeout 3540 --noack"
+        );
+    }
+
+    #[test]
+    fn appends_shell_escaped_extra_options() {
+        // Extra options are passed through verbatim except for shell escaping of unsafe values.
+        assert_eq!(
+            region_mover_args_for(&[
+                "regionMover:",
+                "  runBeforeShutdown: true",
+                r#"  additionalMoverOptions: ["--foo", "a b"]"#,
+            ]),
+            "--maxthreads 1 --timeout 3540 --foo 'a b'"
+        );
+    }
+}

@@ -17,6 +17,10 @@ const HBASE_ZOOKEEPER_QUORUM: &str = "hbase.zookeeper.quorum";
 const HBASE_ZOOKEEPER_PROPERTY_CLIENT_PORT: &str = "hbase.zookeeper.property.clientPort";
 const ZOOKEEPER_ZNODE_PARENT: &str = "zookeeper.znode.parent";
 
+/// The znode sub-path HBase stores its data under, appended to the chroot read from the discovery
+/// `ConfigMap` (see [`chroot_with_hbase_suffix`]).
+const HBASE_ZNODE_SUFFIX: &str = "hbase";
+
 #[derive(Snafu, Debug, EnumDiscriminants)]
 #[strum_discriminants(derive(IntoStaticStr))]
 pub enum Error {
@@ -91,7 +95,7 @@ impl ZookeeperConnectionInformation {
                 cm_name: zk_discovery_cm_name.to_string(),
                 entry: ZOOKEEPER_DISCOVERY_CM_HOSTS_ENTRY,
             })?;
-        let mut chroot = zk_discovery_cm
+        let chroot = zk_discovery_cm
             .data
             .as_mut()
             .and_then(|data| data.remove(ZOOKEEPER_DISCOVERY_CM_CHROOT_ENTRY))
@@ -113,26 +117,9 @@ impl ZookeeperConnectionInformation {
                 entry: ZOOKEEPER_DISCOVERY_CM_CLIENT_PORT_ENTRY,
             })?;
 
-        // IMPORTANT!
-        // Before https://github.com/stackabletech/hbase-operator/issues/354, hbase automatically added a `/hbase` suffix, ending up with a chroot of e.g. `/znode-fe51edff-8df9-43a8-ac5f-4781b071ae5f/hbase`.
-        // Because the chroot we read from the ZNode discovery CM is only `/znode-fe51edff-8df9-43a8-ac5f-4781b071ae5f`, we need to prepend the `/hbase` suffix ourselves.
-        // If we don't do so, hbase clusters created before #354 would need to be migrated to the different znode path!
-
-        // Check if a user points to a discovery CM of a HBaseCluster rather than a ZNode.
-        if chroot == "/" {
-            warn!(
-                "It is recommended to let the HBase cluster point to a discovery ConfigMap of a ZNode rather than a ZookeeperCluster. \
-            This prevents accidental reuse of the same Zookeeper path for multiple product instances. \
-            See https://docs.stackable.tech/home/stable/zookeeper/getting_started/first_steps for details"
-            );
-            chroot = "/hbase".to_string();
-        } else {
-            chroot = format!("{chroot}/hbase");
-        }
-
         Ok(Self {
             hosts,
-            chroot,
+            chroot: chroot_with_hbase_suffix(&chroot),
             port,
         })
     }
@@ -153,5 +140,45 @@ impl ZookeeperConnectionInformation {
             // As we only pass in the hosts (and not the znode) in the zookeeper quorum, we need to specify the znode path
             (ZOOKEEPER_ZNODE_PARENT.to_string(), self.chroot.clone()),
         ])
+    }
+}
+
+/// Appends the [`HBASE_ZNODE_SUFFIX`] to the chroot read from the discovery `ConfigMap`.
+///
+/// IMPORTANT!
+/// Before <https://github.com/stackabletech/hbase-operator/issues/354>, hbase automatically added a
+/// `/hbase` suffix, ending up with a chroot of e.g. `/znode-fe51edff-.../hbase`. Because the chroot
+/// we read from the ZNode discovery `ConfigMap` is only `/znode-fe51edff-...`, we need to append the
+/// `/hbase` suffix ourselves. If we don't, hbase clusters created before #354 would need to be
+/// migrated to the different znode path!
+fn chroot_with_hbase_suffix(chroot: &str) -> String {
+    // Check if a user points to a discovery CM of a HBaseCluster rather than a ZNode.
+    if chroot == "/" {
+        warn!(
+            "It is recommended to let the HBase cluster point to a discovery ConfigMap of a ZNode rather than a ZookeeperCluster. \
+            This prevents accidental reuse of the same Zookeeper path for multiple product instances. \
+            See https://docs.stackable.tech/home/stable/zookeeper/getting_started/first_steps for details"
+        );
+        format!("/{HBASE_ZNODE_SUFFIX}")
+    } else {
+        format!("{chroot}/{HBASE_ZNODE_SUFFIX}")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn appends_suffix_to_znode_chroot() {
+        // A ZNode discovery CM exposes e.g. `/znode-test`; HBase stores its data under `.../hbase`.
+        assert_eq!(chroot_with_hbase_suffix("/znode-test"), "/znode-test/hbase");
+    }
+
+    #[test]
+    fn replaces_root_chroot_with_suffix() {
+        // Pointing directly at a ZookeeperCluster discovery CM yields a `/` chroot, which becomes
+        // `/hbase` (rather than `//hbase`).
+        assert_eq!(chroot_with_hbase_suffix("/"), "/hbase");
     }
 }
