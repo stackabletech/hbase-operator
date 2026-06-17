@@ -270,11 +270,6 @@ pub struct ValidatedHbaseConfig {
     pub logging: validate::ValidatedLogging,
 }
 
-/// Per-rolegroup configuration: a v2
-/// [`RoleGroupConfig`](stackable_operator::v2::role_utils::RoleGroupConfig) over the validated
-/// HBase config. The merged (role <- role group) `jvmArgumentOverrides` are available via
-/// `product_specific_common_config` and applied at build time by
-/// [`construct_role_specific_non_heap_jvm_args`](build::jvm::construct_role_specific_non_heap_jvm_args).
 pub type HbaseRoleGroupConfig = stackable_operator::v2::role_utils::RoleGroupConfig<
     ValidatedHbaseConfig,
     stackable_operator::v2::role_utils::JavaCommonConfig,
