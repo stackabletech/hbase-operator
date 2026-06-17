@@ -51,6 +51,12 @@ pub fn build_listener_volume(
         HbaseRole::Master | HbaseRole::RegionServer => Some(
             VolumeBuilder::new(LISTENER_VOLUME_NAME)
                 .ephemeral(
+                    // The v2 framework only exposes a PVC builder
+                    // (`listener_operator_volume_source_builder_build_pvc`, used by
+                    // `build_listener_pvc`), so the ephemeral case still uses the legacy
+                    // `ListenerOperatorVolumeSourceBuilder` and its stringly-typed
+                    // `ListenerReference`. We keep the typed `listener_class()` and convert to a
+                    // `String` only at this boundary; switch to a v2 helper once one exists.
                     ListenerOperatorVolumeSourceBuilder::new(
                         &ListenerReference::ListenerClass(
                             merged_config.listener_class().to_string(),

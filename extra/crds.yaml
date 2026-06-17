@@ -68,6 +68,7 @@ spec:
                           and the name of the Rego package containing your authorization rules.
                           Consult the [OPA authorization documentation](https://docs.stackable.tech/home/nightly/concepts/opa)
                           to learn how to deploy Rego authorization rules with OPA.
+                        nullable: true
                         properties:
                           configMapName:
                             description: |-
@@ -81,8 +82,6 @@ spec:
                         required:
                         - configMapName
                         type: object
-                    required:
-                    - opa
                     type: object
                   hdfsConfigMapName:
                     description: |-

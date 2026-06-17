@@ -40,7 +40,7 @@ use crate::{
         build::{
             graceful_shutdown::{self, add_graceful_shutdown_config},
             kerberos::{self, add_kerberos_pod_config},
-            properties::logging::{MAX_HBASE_LOG_FILES_SIZE, STACKABLE_LOG_DIR},
+            properties::product_logging::{MAX_HBASE_LOG_FILES_SIZE, STACKABLE_LOG_DIR},
         },
     },
     crd::{CONFIG_DIR_NAME, HbaseRole, LISTENER_VOLUME_DIR, LISTENER_VOLUME_NAME},

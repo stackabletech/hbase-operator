@@ -11,7 +11,7 @@ use stackable_operator::v2::{
 
 pub mod hbase_env;
 pub mod hbase_site;
-pub mod logging;
+pub mod product_logging;
 pub mod security_properties;
 pub mod ssl_client;
 pub mod ssl_server;

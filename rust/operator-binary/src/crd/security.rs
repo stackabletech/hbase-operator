@@ -32,5 +32,26 @@ pub struct KerberosConfig {
 #[serde(rename_all = "camelCase")]
 pub struct AuthorizationConfig {
     // No doc - it's in the struct.
-    pub opa: OpaConfig,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub opa: Option<OpaConfig>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn authorization_without_opa_is_valid() {
+        // `opa` is optional (matching the hive template), so an empty `authorization` deserializes.
+        let config: AuthorizationConfig = serde_yaml::from_str("{}").expect("empty authorization");
+        assert!(config.opa.is_none());
+    }
+
+    #[test]
+    fn authorization_with_opa_is_parsed() {
+        let yaml = ["opa:", "  configMapName: my-opa", "  package: hbase"].join("\n");
+        let config: AuthorizationConfig =
+            serde_yaml::from_str(&yaml).expect("authorization with opa");
+        assert!(config.opa.is_some());
+    }
 }

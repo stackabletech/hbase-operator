@@ -32,7 +32,13 @@ pub async fn dereference(
         .await
         .context(RetrieveZookeeperConnectionInformationSnafu)?;
 
-    let hbase_opa_config = match &hbase.spec.cluster_config.authorization {
+    let hbase_opa_config = match hbase
+        .spec
+        .cluster_config
+        .authorization
+        .as_ref()
+        .and_then(|authorization| authorization.opa.as_ref())
+    {
         Some(opa_config) => Some(
             HbaseOpaConfig::from_opa_config(client, hbase, opa_config)
                 .await

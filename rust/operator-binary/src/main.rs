@@ -200,10 +200,11 @@ fn references_config_map(
         .to_string()
         == config_map.name_any()
         || hbase.spec.cluster_config.hdfs_config_map_name.to_string() == config_map.name_any()
-        || match &hbase.spec.cluster_config.authorization {
-            Some(hbase_authorization) => {
-                hbase_authorization.opa.config_map_name == config_map.name_any()
-            }
-            None => false,
-        }
+        || hbase
+            .spec
+            .cluster_config
+            .authorization
+            .as_ref()
+            .and_then(|authorization| authorization.opa.as_ref())
+            .is_some_and(|opa| opa.config_map_name == config_map.name_any())
 }

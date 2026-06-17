@@ -16,8 +16,8 @@ use crate::{
             jvm::construct_role_specific_non_heap_jvm_args,
             kerberos,
             properties::{
-                ConfigFileName, hbase_env, hbase_site, logging, security_properties, ssl_client,
-                ssl_server,
+                ConfigFileName, hbase_env, hbase_site, product_logging, security_properties,
+                ssl_client, ssl_server,
             },
         },
     },
@@ -136,11 +136,16 @@ pub fn build_rolegroup_config_map(
         builder.add_data(ConfigFileName::SslClient.to_string(), ssl_client_xml);
     }
 
-    if let Some(log4j2_properties) = logging::build_log4j2(&rg.config.logging.hbase_container) {
+    if let Some(log4j2_properties) =
+        product_logging::build_log4j2(&rg.config.logging.hbase_container)
+    {
         builder.add_data(ConfigFileName::Log4j2.to_string(), log4j2_properties);
     }
     if rg.config.logging.enable_vector_agent {
-        builder.add_data(VECTOR_CONFIG_FILE, logging::vector_config_file_content());
+        builder.add_data(
+            VECTOR_CONFIG_FILE,
+            product_logging::vector_config_file_content(),
+        );
     }
 
     builder.build().with_context(|_| AssembleSnafu {
