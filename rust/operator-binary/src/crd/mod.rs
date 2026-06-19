@@ -1393,7 +1393,7 @@ metadata:
   name: test-hbase
 spec:
   image:
-    productVersion: 2.6.4
+    productVersion: 2.6.6
   clusterConfig:
     hdfsConfigMapName: test-hdfs
     zookeeperConfigMapName: test-znode
@@ -1441,7 +1441,7 @@ spec:
         )]);
 
         let validated_config = validate_all_roles_and_groups_config(
-            "2.6.4",
+            "2.6.6",
             &transform_all_roles_to_config(&hbase, &roles).unwrap(),
             &ProductConfigManager::from_yaml_file("../../deploy/config-spec/properties.yaml")
                 .unwrap(),
@@ -1494,7 +1494,7 @@ metadata:
   name: test-hbase
 spec:
   image:
-    productVersion: 2.6.4
+    productVersion: 2.6.6
   clusterConfig:
     hdfsConfigMapName: test-hdfs
     zookeeperConfigMapName: test-znode
@@ -1554,7 +1554,7 @@ spec:
         fn roundtrip_test_data() -> Vec<Self> {
             stackable_operator::utils::yaml_from_str_singleton_map(indoc::indoc! {r#"
               - image:
-                  productVersion: 2.6.4
+                  productVersion: 2.6.6
                   pullPolicy: IfNotPresent
                 clusterOperation:
                   reconciliationPaused: false
