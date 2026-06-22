@@ -20,9 +20,9 @@ spec:
         - name: AWS_ENDPOINT
           value: https://s3endpoint:9000/
         - name: AWS_SSL_ENABLED
-          value: true
+          value: "true"
         - name: AWS_PATH_STYLE_ACCESS
-          value: true
+          value: "true"
         - name: AWS_ACCESS_KEY_ID
           valueFrom:
             secretKeyRef:
