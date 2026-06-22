@@ -95,14 +95,6 @@ log4j2.properties: |-
 security.properties: |
   networkaddress.cache.negative.ttl=0
   networkaddress.cache.ttl=10
-ssl-client.xml: |-
-  <?xml version="1.0"?>
-  <configuration>
-  </configuration>
-ssl-server.xml: |-
-  <?xml version="1.0"?>
-  <configuration>
-  </configuration>
 {% if lookup('env', 'VECTOR_AGGREGATOR') %}
 vector.yaml: |
   ---
