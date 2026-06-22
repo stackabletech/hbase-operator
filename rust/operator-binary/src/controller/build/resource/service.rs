@@ -2,7 +2,7 @@
 
 use stackable_operator::{
     k8s_openapi::api::core::v1::{Service, ServicePort, ServiceSpec},
-    kvp::{Annotations, Labels},
+    v2::builder::service::{Scheme, Scraping, prometheus_annotations, prometheus_labels},
 };
 
 use crate::{
@@ -83,10 +83,16 @@ pub fn build_rolegroup_metrics_service(
                 hbase_role,
                 role_group_name,
             )
-            .with_labels(prometheus_labels())
+            .with_labels(prometheus_labels(&Scraping::Enabled))
             .with_annotations(prometheus_annotations(
-                cluster.has_https_enabled(),
-                hbase_role,
+                &Scraping::Enabled,
+                if cluster.has_https_enabled() {
+                    &Scheme::Https
+                } else {
+                    &Scheme::Http
+                },
+                "/prometheus",
+                &hbase_role.metrics_port(),
             ))
             .build(),
         spec: Some(ServiceSpec {
@@ -104,36 +110,6 @@ pub fn build_rolegroup_metrics_service(
         }),
         status: None,
     }
-}
-
-/// Common labels for Prometheus.
-fn prometheus_labels() -> Labels {
-    Labels::try_from([("prometheus.io/scrape", "true")]).expect("should be a valid label")
-}
-
-/// Common annotations for Prometheus.
-///
-/// These annotations can be used in a ServiceMonitor.
-///
-/// see also <https://github.com/prometheus-community/helm-charts/blob/prometheus-27.32.0/charts/prometheus/values.yaml#L983-L1036>
-fn prometheus_annotations(https_enabled: bool, hbase_role: &HbaseRole) -> Annotations {
-    Annotations::try_from([
-        ("prometheus.io/path".to_owned(), "/prometheus".to_owned()),
-        (
-            "prometheus.io/port".to_owned(),
-            hbase_role.metrics_port().to_string(),
-        ),
-        (
-            "prometheus.io/scheme".to_owned(),
-            if https_enabled {
-                "https".to_owned()
-            } else {
-                "http".to_owned()
-            },
-        ),
-        ("prometheus.io/scrape".to_owned(), "true".to_owned()),
-    ])
-    .expect("should be valid annotations")
 }
 
 #[cfg(test)]
