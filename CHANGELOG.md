@@ -5,6 +5,7 @@
 ### Added
 
 - BREAKING: Add required CLI argument and env var to set the image repository used to construct final product image names: `IMAGE_REPOSITORY` (`--image-repository`), eg. `oci.example.org/my/namespace` ([#752]).
+- Add support for HBase 2.6.6 (as LTS) ([#767]).
 
 ### Changed
 
@@ -19,12 +20,17 @@
 - BREAKING: Removed product-config machinery. This is a breaking change in terms of configuration.
   Users relying on the product-config `properties.yaml` file have to set these properties via the CRD ([#765]).
 
+### Removed
+
+- Remove support for 2.6.3 ([#767]).
+
 [#745]: https://github.com/stackabletech/hbase-operator/pull/745
 [#751]: https://github.com/stackabletech/hbase-operator/pull/751
 [#752]: https://github.com/stackabletech/hbase-operator/pull/752
 [#757]: https://github.com/stackabletech/hbase-operator/pull/757
 [#762]: https://github.com/stackabletech/hbase-operator/pull/762
 [#765]: https://github.com/stackabletech/hbase-operator/pull/765
+[#767]: https://github.com/stackabletech/hbase-operator/pull/767
 
 ## [26.3.0] - 2026-03-16
 

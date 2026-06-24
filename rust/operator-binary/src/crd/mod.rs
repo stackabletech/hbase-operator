@@ -637,7 +637,7 @@ metadata:
   uid: 12345678-1234-1234-1234-123456789012
 spec:
   image:
-    productVersion: 2.6.4
+    productVersion: 2.6.6
   clusterConfig:
     hdfsConfigMapName: test-hdfs
     zookeeperConfigMapName: test-znode
@@ -693,7 +693,7 @@ spec:
         fn roundtrip_test_data() -> Vec<Self> {
             stackable_operator::utils::yaml_from_str_singleton_map(indoc::indoc! {r#"
               - image:
-                  productVersion: 2.6.4
+                  productVersion: 2.6.6
                   pullPolicy: IfNotPresent
                 clusterOperation:
                   reconciliationPaused: false

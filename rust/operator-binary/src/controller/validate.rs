@@ -226,7 +226,7 @@ pub fn validate_cluster(
 /// Validates every role group of a role into a map keyed by role group name.
 ///
 /// Each role group is merged and validated via
-/// [`with_validated_config`](stackable_operator::v2::role_utils::with_validated_config),
+/// [`with_validated_config`],
 /// which folds the CRD config fragment (default <- role <- role group) plus the
 /// `configOverrides`, `envOverrides`, `cliOverrides`, `podOverrides` and the
 /// `jvmArgumentOverrides` (role group wins) into a single merged
