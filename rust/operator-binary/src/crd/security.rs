@@ -38,6 +38,8 @@ pub struct AuthorizationConfig {
 
 #[cfg(test)]
 mod tests {
+    use indoc::indoc;
+
     use super::*;
 
     #[test]
@@ -49,9 +51,13 @@ mod tests {
 
     #[test]
     fn authorization_with_opa_is_parsed() {
-        let yaml = ["opa:", "  configMapName: my-opa", "  package: hbase"].join("\n");
+        let yaml = indoc! {"
+            opa:
+              configMapName: my-opa
+              package: hbase
+        "};
         let config: AuthorizationConfig =
-            serde_yaml::from_str(&yaml).expect("authorization with opa");
+            serde_yaml::from_str(yaml).expect("authorization with opa");
         assert!(config.opa.is_some());
     }
 }
