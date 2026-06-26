@@ -1,7 +1,10 @@
 use snafu::{ResultExt, Snafu};
-use stackable_operator::{client::Client, commons::opa::OpaApiVersion};
+use stackable_operator::{
+    client::Client,
+    commons::opa::{OpaApiVersion, OpaConfig},
+};
 
-use crate::crd::{security::AuthorizationConfig, v1alpha1};
+use crate::crd::v1alpha1;
 
 const DEFAULT_DRY_RUN: bool = false;
 const DEFAULT_CACHE_ACTIVE: bool = true;
@@ -51,10 +54,9 @@ impl HbaseOpaConfig {
     pub async fn from_opa_config(
         client: &Client,
         hbase: &v1alpha1::HbaseCluster,
-        authorization_config: &AuthorizationConfig,
+        opa_config: &OpaConfig,
     ) -> Result<Self> {
-        let authorization_connection_string = authorization_config
-            .opa
+        let authorization_connection_string = opa_config
             .full_document_url_from_config_map(client, hbase, Some("allow"), &OpaApiVersion::V1)
             .await
             .context(ConstructOpaEndpointForAuthorizerSnafu)?;

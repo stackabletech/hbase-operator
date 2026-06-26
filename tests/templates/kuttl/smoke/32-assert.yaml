@@ -1,0 +1,76 @@
+---
+# Snapshot the full `.data` of each operator-managed rolegroup ConfigMap.
+# Any code change that alters a rendered config value will fail these diffs.
+#
+# How the comparison stays robust:
+#   * The snapshot files (32_cm-*.yaml) are read straight from disk, so no shell
+#     `$`-expansion happens: the literal ${NAMESPACE}/${DATA_DIR}/... that the
+#     operator writes into vector.yaml (Vector resolves them at runtime) survive
+#     verbatim. Only the two genuinely dynamic values use sentinels:
+#       - __NAMESPACE__ -> substituted with the random kuttl namespace via sed.
+#       - __ZNODE__     -> the zk operator mints a fresh znode UUID per install,
+#                          so we normalize the *actual* side instead of guessing
+#                          it (see the sed on the `actual=` pipeline).
+#   * Both sides are canonicalized to JSON with `yq -o=json`, so block-scalar
+#     style and trailing-newline differences never cause false positives.
+#   * On drift we print a `diff -u` so the failing keys are obvious in the logs.
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 60
+commands:
+  #
+  # ConfigMap data snapshot: test-hbase-master-default
+  #
+  - script: |
+      expected=$(sed "s|__NAMESPACE__|$NAMESPACE|g" 32_cm-test-hbase-master-default.yaml | yq -o=json)
+      actual=$(kubectl -n $NAMESPACE get cm test-hbase-master-default -o yaml \
+        | yq -o=json '.data' \
+        | sed -E 's|/znode-[a-f0-9-]+|/znode-__ZNODE__|')
+      expected_file=$(mktemp) && actual_file=$(mktemp)
+      printf '%s\n' "$expected" > "$expected_file"
+      printf '%s\n' "$actual" > "$actual_file"
+      if ! diff_out=$(diff -u "$expected_file" "$actual_file"); then
+        echo "ERROR: ConfigMap test-hbase-master-default data drifted from snapshot."
+        printf '%s\n' "$diff_out"
+        rm -f "$expected_file" "$actual_file"
+        exit 1
+      fi
+      rm -f "$expected_file" "$actual_file"
+
+  #
+  # ConfigMap data snapshot: test-hbase-regionserver-default
+  #
+  - script: |
+      expected=$(sed "s|__NAMESPACE__|$NAMESPACE|g" 32_cm-test-hbase-regionserver-default.yaml | yq -o=json)
+      actual=$(kubectl -n $NAMESPACE get cm test-hbase-regionserver-default -o yaml \
+        | yq -o=json '.data' \
+        | sed -E 's|/znode-[a-f0-9-]+|/znode-__ZNODE__|')
+      expected_file=$(mktemp) && actual_file=$(mktemp)
+      printf '%s\n' "$expected" > "$expected_file"
+      printf '%s\n' "$actual" > "$actual_file"
+      if ! diff_out=$(diff -u "$expected_file" "$actual_file"); then
+        echo "ERROR: ConfigMap test-hbase-regionserver-default data drifted from snapshot."
+        printf '%s\n' "$diff_out"
+        rm -f "$expected_file" "$actual_file"
+        exit 1
+      fi
+      rm -f "$expected_file" "$actual_file"
+
+  #
+  # ConfigMap data snapshot: test-hbase-restserver-default
+  #
+  - script: |
+      expected=$(sed "s|__NAMESPACE__|$NAMESPACE|g" 32_cm-test-hbase-restserver-default.yaml | yq -o=json)
+      actual=$(kubectl -n $NAMESPACE get cm test-hbase-restserver-default -o yaml \
+        | yq -o=json '.data' \
+        | sed -E 's|/znode-[a-f0-9-]+|/znode-__ZNODE__|')
+      expected_file=$(mktemp) && actual_file=$(mktemp)
+      printf '%s\n' "$expected" > "$expected_file"
+      printf '%s\n' "$actual" > "$actual_file"
+      if ! diff_out=$(diff -u "$expected_file" "$actual_file"); then
+        echo "ERROR: ConfigMap test-hbase-restserver-default data drifted from snapshot."
+        printf '%s\n' "$diff_out"
+        rm -f "$expected_file" "$actual_file"
+        exit 1
+      fi
+      rm -f "$expected_file" "$actual_file"

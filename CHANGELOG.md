@@ -15,7 +15,10 @@
   Previously, arbitrary file names were silently accepted and ignored ([#751]).
 - Bump `stackable-operator` to 0.111.1 and snafu to 0.9 ([#751], [#752]).
 - Internal operator refactoring: introduce dereference() and validate() steps in the reconciler ([#757]).
+- Removed the `product-config` dependency; configuration is now rendered from typed, validated inputs ([#757]).
 - test: Bump vector-aggregator to 0.55.0, replace /graphql call with gRPC call ([#762]).
+- BREAKING: Removed product-config machinery. This is a breaking change in terms of configuration.
+  Users relying on the product-config `properties.yaml` file have to set these properties via the CRD ([#765]).
 
 ### Removed
 
@@ -26,6 +29,7 @@
 [#752]: https://github.com/stackabletech/hbase-operator/pull/752
 [#757]: https://github.com/stackabletech/hbase-operator/pull/757
 [#762]: https://github.com/stackabletech/hbase-operator/pull/762
+[#765]: https://github.com/stackabletech/hbase-operator/pull/765
 [#767]: https://github.com/stackabletech/hbase-operator/pull/767
 
 ## [26.3.0] - 2026-03-16

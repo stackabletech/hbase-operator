@@ -6,8 +6,8 @@ use std::sync::Arc;
 
 use anyhow::anyhow;
 use clap::Parser;
+use controller::FULL_HBASE_CONTROLLER_NAME;
 use futures::{FutureExt, StreamExt, TryFutureExt};
-use hbase_controller::FULL_HBASE_CONTROLLER_NAME;
 use stackable_operator::{
     YamlSchema,
     cli::{Command, RunArguments},
@@ -33,27 +33,20 @@ use stackable_operator::{
 };
 
 use crate::{
-    crd::{HbaseCluster, HbaseClusterVersion, v1alpha1},
+    crd::{HbaseCluster, HbaseClusterVersion, OPERATOR_NAME, v1alpha1},
     webhooks::conversion::create_webhook_server,
 };
 
-mod config;
 mod controller;
 mod crd;
-mod discovery;
 mod hbase_controller;
-mod kerberos;
-mod operations;
-mod product_logging;
-mod security;
+#[cfg(test)]
+mod test_utils;
 mod webhooks;
-mod zookeeper;
 
 mod built_info {
     include!(concat!(env!("OUT_DIR"), "/built.rs"));
 }
-
-const OPERATOR_NAME: &str = "hbase.stackable.com";
 
 #[derive(Parser)]
 #[clap(about, author)]
@@ -73,7 +66,7 @@ async fn main() -> anyhow::Result<()> {
         Command::Run(RunArguments {
             operator_environment,
             watch_namespace,
-            product_config,
+            product_config: _,
             maintenance,
             common,
         }) => {
@@ -120,11 +113,6 @@ async fn main() -> anyhow::Result<()> {
                 .run(sigterm_watcher.handle())
                 .map_err(|err| anyhow!(err).context("failed to run webhook server"));
 
-            let product_config = product_config.load(&[
-                "deploy/config-spec/properties.yaml",
-                "/etc/stackable/hbase-operator/config-spec/properties.yaml",
-            ])?;
-
             let event_recorder = Arc::new(Recorder::new(
                 client.as_kube_client(),
                 Reporter {
@@ -165,7 +153,6 @@ async fn main() -> anyhow::Result<()> {
                     Arc::new(hbase_controller::Ctx {
                         client: client.clone(),
                         operator_environment,
-                        product_config,
                     }),
                 )
                 .for_each_concurrent(
@@ -206,12 +193,18 @@ fn references_config_map(
         return false;
     };
 
-    hbase.spec.cluster_config.zookeeper_config_map_name == config_map.name_any()
-        || hbase.spec.cluster_config.hdfs_config_map_name == config_map.name_any()
-        || match &hbase.spec.cluster_config.authorization {
-            Some(hbase_authorization) => {
-                hbase_authorization.opa.config_map_name == config_map.name_any()
-            }
-            None => false,
-        }
+    hbase
+        .spec
+        .cluster_config
+        .zookeeper_config_map_name
+        .to_string()
+        == config_map.name_any()
+        || hbase.spec.cluster_config.hdfs_config_map_name.to_string() == config_map.name_any()
+        || hbase
+            .spec
+            .cluster_config
+            .authorization
+            .as_ref()
+            .and_then(|authorization| authorization.opa.as_ref())
+            .is_some_and(|opa| opa.config_map_name == config_map.name_any())
 }

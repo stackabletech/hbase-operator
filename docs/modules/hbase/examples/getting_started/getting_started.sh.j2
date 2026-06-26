@@ -135,7 +135,7 @@ version() {
 echo "Check cluster status..."
 # tag::cluster-status[]
 kubectl exec -n default simple-hbase-restserver-default-0 \
--- curl -s -XGET -H "Accept: application/json" "http://simple-hbase-restserver-default-headless:8080/status/cluster" | json_pp
+-- curl -s -XGET -H "Accept: application/json" "http://simple-hbase-restserver-default-headless:8080/status/cluster" | jq
 # end::cluster-status[]
 
 echo "Check table via REST API..."
@@ -148,13 +148,13 @@ kubectl exec -n default simple-hbase-restserver-default-0 \
 
 # tag::get-table[]
 kubectl exec -n default simple-hbase-restserver-default-0 \
--- curl -s -XGET -H "Accept: application/json" "http://simple-hbase-restserver-default-headless:8080/users/schema" | json_pp
+-- curl -s -XGET -H "Accept: application/json" "http://simple-hbase-restserver-default-headless:8080/users/schema" | jq
 # end::get-table[]
 
 get_all() {
   # tag::get-tables[]
   kubectl exec -n default simple-hbase-restserver-default-0 \
-  -- curl -s -XGET -H "Accept: application/json" "http://simple-hbase-restserver-default-headless:8080/" |  json_pp
+  -- curl -s -XGET -H "Accept: application/json" "http://simple-hbase-restserver-default-headless:8080/" |  jq
   # end::get-tables[]
 }
 
