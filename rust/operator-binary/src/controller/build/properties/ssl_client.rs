@@ -16,6 +16,8 @@ pub fn build(
 
 #[cfg(test)]
 mod tests {
+    use indoc::indoc;
+
     use super::*;
 
     #[test]
@@ -36,7 +38,9 @@ mod tests {
         )
         .expect("settings present, so ssl-client.xml is rendered");
         assert!(
-            xml.contains("<name>ssl.client.truststore.type</name>\n    <value>pkcs12</value>"),
+            xml.contains(indoc! {"
+                <name>ssl.client.truststore.type</name>
+                    <value>pkcs12</value>"}),
             "{xml}"
         );
     }
@@ -49,7 +53,9 @@ mod tests {
         )
         .expect("override present, so ssl-client.xml is rendered");
         assert!(
-            xml.contains("<name>ssl.client.keystore.type</name>\n    <value>jks</value>"),
+            xml.contains(indoc! {"
+                <name>ssl.client.keystore.type</name>
+                    <value>jks</value>"}),
             "{xml}"
         );
     }

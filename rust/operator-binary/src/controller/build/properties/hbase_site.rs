@@ -137,6 +137,8 @@ pub fn build(
 
 #[cfg(test)]
 mod tests {
+    use indoc::indoc;
+
     use super::*;
     use crate::test_utils::{merged_config, validated_cluster};
 
@@ -153,11 +155,15 @@ mod tests {
             KeyValueConfigOverrides::default(),
         );
         assert!(
-            xml.contains("<name>hbase.cluster.distributed</name>\n    <value>true</value>"),
+            xml.contains(indoc! {"
+                <name>hbase.cluster.distributed</name>
+                    <value>true</value>"}),
             "{xml}"
         );
         assert!(
-            xml.contains("<name>hbase.master.ipc.address</name>\n    <value>0.0.0.0</value>"),
+            xml.contains(indoc! {"
+                <name>hbase.master.ipc.address</name>
+                    <value>0.0.0.0</value>"}),
             "{xml}"
         );
     }
@@ -175,13 +181,15 @@ mod tests {
             KeyValueConfigOverrides::default(),
         );
         assert!(
-            xml.contains("<name>hbase.regionserver.ipc.address</name>\n    <value>0.0.0.0</value>"),
+            xml.contains(indoc! {"
+                <name>hbase.regionserver.ipc.address</name>
+                    <value>0.0.0.0</value>"}),
             "{xml}"
         );
         assert!(
-            xml.contains(
-                "<name>hbase.unsafe.regionserver.hostname</name>\n    <value>${env:HBASE_SERVICE_HOST}</value>"
-            ),
+            xml.contains(indoc! {"
+                <name>hbase.unsafe.regionserver.hostname</name>
+                    <value>${env:HBASE_SERVICE_HOST}</value>"}),
             "{xml}"
         );
     }
@@ -199,9 +207,9 @@ mod tests {
             KeyValueConfigOverrides::default(),
         );
         assert!(
-            xml.contains(
-                "<name>hbase.rest.endpoint</name>\n    <value>${env:HBASE_SERVICE_HOST}:${env:HBASE_SERVICE_PORT}</value>"
-            ),
+            xml.contains(indoc! {"
+                <name>hbase.rest.endpoint</name>
+                    <value>${env:HBASE_SERVICE_HOST}:${env:HBASE_SERVICE_PORT}</value>"}),
             "{xml}"
         );
     }
@@ -219,7 +227,9 @@ mod tests {
             [("hbase.cluster.distributed", "false")].into(),
         );
         assert!(
-            xml.contains("<name>hbase.cluster.distributed</name>\n    <value>false</value>"),
+            xml.contains(indoc! {"
+                <name>hbase.cluster.distributed</name>
+                    <value>false</value>"}),
             "{xml}"
         );
     }
