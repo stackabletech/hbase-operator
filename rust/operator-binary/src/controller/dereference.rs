@@ -1,16 +1,21 @@
 use snafu::{ResultExt, Snafu};
 
 use crate::{
-    crd::v1alpha1, security::opa::HbaseOpaConfig, zookeeper::ZookeeperConnectionInformation,
+    controller::{build::opa::HbaseOpaConfig, zookeeper::ZookeeperConnectionInformation},
+    crd::v1alpha1,
 };
 
 #[derive(Snafu, Debug)]
 pub enum Error {
     #[snafu(display("failed to retrieve zookeeper connection information"))]
-    RetrieveZookeeperConnectionInformation { source: crate::zookeeper::Error },
+    RetrieveZookeeperConnectionInformation {
+        source: crate::controller::zookeeper::Error,
+    },
 
     #[snafu(display("invalid OPA configuration"))]
-    InvalidOpaConfig { source: crate::security::opa::Error },
+    InvalidOpaConfig {
+        source: crate::controller::build::opa::Error,
+    },
 }
 
 /// External references resolved during the dereference step.
@@ -27,7 +32,13 @@ pub async fn dereference(
         .await
         .context(RetrieveZookeeperConnectionInformationSnafu)?;
 
-    let hbase_opa_config = match &hbase.spec.cluster_config.authorization {
+    let hbase_opa_config = match hbase
+        .spec
+        .cluster_config
+        .authorization
+        .as_ref()
+        .and_then(|authorization| authorization.opa.as_ref())
+    {
         Some(opa_config) => Some(
             HbaseOpaConfig::from_opa_config(client, hbase, opa_config)
                 .await
