@@ -9,6 +9,7 @@
 
 ### Changed
 
+- Bump stackable-operator to 0.113.3 ([#774]).
 - Document Helm deployed RBAC permissions and remove unnecessary permissions ([#745]).
 - BREAKING: `configOverrides` now only accepts the known config files (`hbase-site.xml`,
   `hbase-env.sh`, `ssl-server.xml`, `ssl-client.xml` and `security.properties`).
@@ -31,6 +32,7 @@
 [#762]: https://github.com/stackabletech/hbase-operator/pull/762
 [#765]: https://github.com/stackabletech/hbase-operator/pull/765
 [#767]: https://github.com/stackabletech/hbase-operator/pull/767
+[#774]: https://github.com/stackabletech/hbase-operator/pull/774
 
 ## [26.3.0] - 2026-03-16
 
