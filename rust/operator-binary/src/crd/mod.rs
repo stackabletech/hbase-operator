@@ -112,6 +112,7 @@ pub mod versioned {
     ///
     /// The CRD contains three roles: `masters`, `regionServers` and `restServers`.
     #[versioned(crd(
+        doc = "An HBase cluster stacklet. This resource is managed by the Stackable operator for Apache HBase.",
         group = "hbase.stackable.tech",
         kind = "HbaseCluster",
         plural = "hbaseclusters",
