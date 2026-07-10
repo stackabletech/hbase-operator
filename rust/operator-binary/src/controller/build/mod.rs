@@ -12,6 +12,7 @@ use crate::controller::{
     KubernetesResources, ValidatedCluster,
     build::resource::{
         config_map::{self, build_rolegroup_config_map},
+        discovery::{self, build_discovery_config_map},
         pdb::build_pdb,
         service::{build_rolegroup_metrics_service, build_rolegroup_service},
         statefulset::{self, build_rolegroup_statefulset},
@@ -35,6 +36,9 @@ pub enum Error {
         source: statefulset::Error,
         role_group: RoleGroupName,
     },
+
+    #[snafu(display("failed to build discovery ConfigMap"))]
+    Discovery { source: discovery::Error },
 }
 
 /// Builds every Kubernetes resource for the given validated cluster.
@@ -44,9 +48,6 @@ pub enum Error {
 /// failures only. `cluster_info` is static cluster metadata (not a client call), and
 /// `service_account_name` is the name of the RBAC `ServiceAccount` the role-group Pods run under
 /// (RBAC resources are built and applied separately, in the reconcile step).
-///
-/// The role-level discovery `ConfigMap` is applied separately in the reconcile step and is not
-/// part of this bundle.
 pub fn build(
     cluster: &ValidatedCluster,
     cluster_info: &KubernetesClusterInfo,
@@ -95,6 +96,10 @@ pub fn build(
             pod_disruption_budgets.push(pdb);
         }
     }
+
+    // The role-level discovery ConfigMap advertises the cluster's connection information; it is
+    // deterministic (derived only from the validated cluster and static cluster info).
+    config_maps.push(build_discovery_config_map(cluster, cluster_info).context(DiscoverySnafu)?);
 
     Ok(KubernetesResources {
         stateful_sets,

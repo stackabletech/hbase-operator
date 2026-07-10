@@ -29,10 +29,7 @@ use stackable_operator::{
 use strum::{EnumDiscriminants, IntoStaticStr};
 
 use crate::{
-    controller::{
-        build::{self, resource::discovery::build_discovery_config_map},
-        controller_name, operator_name, product_name,
-    },
+    controller::{build, controller_name, operator_name, product_name},
     crd::{APP_NAME, HbaseClusterStatus, OPERATOR_NAME, v1alpha1},
 };
 
@@ -72,16 +69,6 @@ pub enum Error {
 
     #[snafu(display("failed to apply cluster resource"))]
     ApplyResource {
-        source: stackable_operator::cluster_resources::Error,
-    },
-
-    #[snafu(display("failed to build discovery configmap"))]
-    BuildDiscoveryConfigMap {
-        source: crate::controller::build::resource::discovery::Error,
-    },
-
-    #[snafu(display("failed to apply discovery configmap"))]
-    ApplyDiscoveryConfigMap {
         source: stackable_operator::cluster_resources::Error,
     },
 
@@ -209,16 +196,6 @@ pub async fn reconcile_hbase(
                 .context(ApplyResourceSnafu)?,
         );
     }
-
-    // Discovery CM will fail to build until the rest of the cluster has been deployed, so do it last
-    // so that failure won't inhibit the rest of the cluster from booting up.
-    let discovery_cm =
-        build_discovery_config_map(&validated_cluster, &client.kubernetes_cluster_info)
-            .context(BuildDiscoveryConfigMapSnafu)?;
-    cluster_resources
-        .add(client, discovery_cm)
-        .await
-        .context(ApplyDiscoveryConfigMapSnafu)?;
 
     let cluster_operation_cond_builder =
         ClusterOperationsConditionBuilder::new(&hbase.spec.cluster_operation);
