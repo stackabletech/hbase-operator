@@ -117,3 +117,66 @@ pub mod properties;
 pub mod region_mover;
 pub mod resource;
 pub mod role;
+
+#[cfg(test)]
+mod tests {
+    use stackable_operator::kube::Resource;
+
+    use super::build;
+    use crate::test_utils;
+
+    /// Collects the `.metadata.name`s of the given resources, sorted for stable comparison.
+    fn sorted_names(resources: &[impl Resource]) -> Vec<&str> {
+        let mut names: Vec<&str> = resources
+            .iter()
+            .filter_map(|resource| resource.meta().name.as_deref())
+            .collect();
+        names.sort();
+        names
+    }
+
+    #[test]
+    fn build_produces_expected_resource_names() {
+        let cluster = test_utils::validated_cluster();
+        let cluster_info = test_utils::cluster_info();
+        let resources =
+            build(&cluster, &cluster_info, "hbase-serviceaccount").expect("build succeeds");
+
+        // One StatefulSet per role group (one `default` group for each of the three roles).
+        assert_eq!(
+            sorted_names(&resources.stateful_sets),
+            [
+                "hbase-master-default",
+                "hbase-regionserver-default",
+                "hbase-restserver-default",
+            ]
+        );
+        // One headless and one metrics Service per role group.
+        assert_eq!(
+            sorted_names(&resources.services),
+            [
+                "hbase-master-default-headless",
+                "hbase-master-default-metrics",
+                "hbase-regionserver-default-headless",
+                "hbase-regionserver-default-metrics",
+                "hbase-restserver-default-headless",
+                "hbase-restserver-default-metrics",
+            ]
+        );
+        // One ConfigMap per role group plus the cluster-wide discovery ConfigMap (`hbase`).
+        assert_eq!(
+            sorted_names(&resources.config_maps),
+            [
+                "hbase",
+                "hbase-master-default",
+                "hbase-regionserver-default",
+                "hbase-restserver-default",
+            ]
+        );
+        // A default PodDisruptionBudget per role.
+        assert_eq!(
+            sorted_names(&resources.pod_disruption_budgets),
+            ["hbase-master", "hbase-regionserver", "hbase-restserver"]
+        );
+    }
+}
