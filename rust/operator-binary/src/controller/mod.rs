@@ -10,7 +10,14 @@ pub use stackable_operator::v2::types::operator::RoleGroupName;
 use stackable_operator::{
     builder::meta::ObjectMetaBuilder,
     commons::product_image_selection::ResolvedProductImage,
-    k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta,
+    k8s_openapi::{
+        api::{
+            apps::v1::StatefulSet,
+            core::v1::{ConfigMap, Service},
+            policy::v1::PodDisruptionBudget,
+        },
+        apimachinery::pkg::apis::meta::v1::ObjectMeta,
+    },
     kube::Resource,
     kvp::Labels,
     v2::{
@@ -49,6 +56,17 @@ pub(crate) fn operator_name() -> OperatorName {
 pub(crate) fn controller_name() -> ControllerName {
     ControllerName::from_str(HBASE_CONTROLLER_NAME)
         .expect("the controller name is a valid label value")
+}
+
+/// The complete set of Kubernetes resources built for a [`ValidatedCluster`], ready to be applied.
+///
+/// hbase exposes its listeners as volume/PVC sources inside the `StatefulSet` rather than as
+/// top-level `Listener` objects, so (unlike some sibling operators) there is no `listeners` field.
+pub struct KubernetesResources {
+    pub stateful_sets: Vec<StatefulSet>,
+    pub services: Vec<Service>,
+    pub config_maps: Vec<ConfigMap>,
+    pub pod_disruption_budgets: Vec<PodDisruptionBudget>,
 }
 
 /// The validated cluster: proves that config merging and validation succeeded for
