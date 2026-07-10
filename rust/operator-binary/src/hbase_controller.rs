@@ -13,6 +13,7 @@ use stackable_operator::{
     cluster_resources::ClusterResourceApplyStrategy,
     commons::rbac::build_rbac_resources,
     kube::{
+        ResourceExt,
         core::{DeserializeGuard, error_boundary},
         runtime::controller::Action,
     },
@@ -199,6 +200,10 @@ pub async fn reconcile_hbase(
         .await
         .context(ApplyRoleBindingSnafu)?;
 
+    // The ServiceAccount name is deterministic on the built object, so the build step does not
+    // depend on the applied ServiceAccount.
+    let service_account_name = rbac_sa.name_any();
+
     let mut ss_cond_builder = StatefulSetConditionBuilder::default();
 
     for (hbase_role, role_group_configs) in &validated_cluster.role_group_configs {
@@ -221,7 +226,7 @@ pub async fn reconcile_hbase(
                 hbase_role,
                 role_group_name,
                 validated_rg_config,
-                &rbac_sa,
+                &service_account_name,
             )
             .with_context(|_| BuildRoleGroupStatefulSetSnafu {
                 role_group: role_group_name.clone(),
