@@ -8,15 +8,18 @@ use stackable_operator::{
     utils::cluster_info::KubernetesClusterInfo, v2::types::operator::RoleGroupName,
 };
 
-use crate::controller::{
-    KubernetesResources, ValidatedCluster,
-    build::resource::{
-        config_map::{self, build_rolegroup_config_map},
-        discovery::{self, build_discovery_config_map},
-        pdb::build_pdb,
-        service::{build_rolegroup_metrics_service, build_rolegroup_service},
-        statefulset::{self, build_rolegroup_statefulset},
+use crate::{
+    controller::{
+        KubernetesResources, ValidatedCluster,
+        build::resource::{
+            config_map::{self, build_rolegroup_config_map},
+            discovery::{self, build_discovery_config_map},
+            pdb::build_pdb,
+            service::{build_rolegroup_metrics_service, build_rolegroup_service},
+            statefulset::{self, build_rolegroup_statefulset},
+        },
     },
+    crd::HbaseRole,
 };
 
 // Placeholder role-group name used for the recommended labels of the role-level discovery
@@ -25,15 +28,17 @@ stackable_operator::constant!(pub(crate) PLACEHOLDER_DISCOVERY_ROLE_GROUP: RoleG
 
 #[derive(Snafu, Debug)]
 pub enum Error {
-    #[snafu(display("failed to build ConfigMap for role group {role_group}"))]
+    #[snafu(display("failed to build ConfigMap for role {hbase_role} role group {role_group}"))]
     ConfigMap {
         source: config_map::Error,
+        hbase_role: HbaseRole,
         role_group: RoleGroupName,
     },
 
-    #[snafu(display("failed to build StatefulSet for role group {role_group}"))]
+    #[snafu(display("failed to build StatefulSet for role {hbase_role} role group {role_group}"))]
     StatefulSet {
         source: statefulset::Error,
+        hbase_role: HbaseRole,
         role_group: RoleGroupName,
     },
 
@@ -72,7 +77,8 @@ pub fn build(
             ));
             config_maps.push(
                 build_rolegroup_config_map(cluster, cluster_info, hbase_role, role_group_name)
-                    .context(ConfigMapSnafu {
+                    .with_context(|_| ConfigMapSnafu {
+                        hbase_role: hbase_role.clone(),
                         role_group: role_group_name.clone(),
                     })?,
             );
@@ -84,7 +90,8 @@ pub fn build(
                     rg_config,
                     service_account_name,
                 )
-                .context(StatefulSetSnafu {
+                .with_context(|_| StatefulSetSnafu {
+                    hbase_role: hbase_role.clone(),
                     role_group: role_group_name.clone(),
                 })?,
             );
