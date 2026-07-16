@@ -3045,7 +3045,7 @@ dependencies = [
 
 [[package]]
 name = "stackable-hbase-operator"
-version = "0.0.0-dev"
+version = "26.7.0-rc1"
 dependencies = [
  "anyhow",
  "built",
