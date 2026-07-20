@@ -106,7 +106,6 @@ pub fn build_rolegroup_statefulset(
     hbase_role: &HbaseRole,
     role_group_name: &RoleGroupName,
     validated_rg_config: &HbaseRoleGroupConfig,
-    service_account_name: &str,
 ) -> Result<StatefulSet> {
     let resolved_product_image = &cluster.image;
     let merged_config = &validated_rg_config.config.config;
@@ -239,7 +238,12 @@ pub fn build_rolegroup_statefulset(
             )),
         )
         .context(AddVolumeSnafu)?
-        .service_account_name(service_account_name)
+        .service_account_name(
+            cluster
+                .rbac_resource_names()
+                .service_account_name()
+                .to_string(),
+        )
         .security_context(PodSecurityContextBuilder::new().fs_group(1000).build());
 
     // The HBase container's log config ConfigMap: either the operator-generated one (the

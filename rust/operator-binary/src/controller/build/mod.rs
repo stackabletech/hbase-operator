@@ -1,4 +1,4 @@
-//! Builders that turn a [`ValidatedCluster`](crate::controller::ValidatedCluster) into
+//! Builders that turn a [`ValidatedCluster`] into
 //! Kubernetes resources.
 
 use std::str::FromStr;
@@ -15,6 +15,7 @@ use crate::{
             config_map::{self, build_rolegroup_config_map},
             discovery::{self, build_discovery_config_map},
             pdb::build_pdb,
+            rbac::{build_role_binding, build_service_account},
             service::{build_rolegroup_metrics_service, build_rolegroup_service},
             statefulset::{self, build_rolegroup_statefulset},
         },
@@ -56,7 +57,6 @@ pub enum Error {
 pub fn build(
     cluster: &ValidatedCluster,
     cluster_info: &KubernetesClusterInfo,
-    service_account_name: &str,
 ) -> Result<KubernetesResources, Error> {
     let mut stateful_sets = vec![];
     let mut services = vec![];
@@ -83,17 +83,11 @@ pub fn build(
                     })?,
             );
             stateful_sets.push(
-                build_rolegroup_statefulset(
-                    cluster,
-                    hbase_role,
-                    role_group_name,
-                    rg_config,
-                    service_account_name,
-                )
-                .with_context(|_| StatefulSetSnafu {
-                    hbase_role: hbase_role.clone(),
-                    role_group: role_group_name.clone(),
-                })?,
+                build_rolegroup_statefulset(cluster, hbase_role, role_group_name, rg_config)
+                    .with_context(|_| StatefulSetSnafu {
+                        hbase_role: hbase_role.clone(),
+                        role_group: role_group_name.clone(),
+                    })?,
             );
         }
 
@@ -113,6 +107,8 @@ pub fn build(
         services,
         config_maps,
         pod_disruption_budgets,
+        service_accounts: vec![build_service_account(cluster)],
+        role_bindings: vec![build_role_binding(cluster)],
     })
 }
 
@@ -127,6 +123,8 @@ pub mod role;
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeMap;
+
     use stackable_operator::kube::Resource;
 
     use super::build;
@@ -146,8 +144,7 @@ mod tests {
     fn build_produces_expected_resource_names() {
         let cluster = test_utils::validated_cluster();
         let cluster_info = test_utils::cluster_info();
-        let resources =
-            build(&cluster, &cluster_info, "hbase-serviceaccount").expect("build succeeds");
+        let resources = build(&cluster, &cluster_info).expect("build succeeds");
 
         // One StatefulSet per role group (one `default` group for each of the three roles).
         assert_eq!(
@@ -185,5 +182,59 @@ mod tests {
             sorted_names(&resources.pod_disruption_budgets),
             ["hbase-master", "hbase-regionserver", "hbase-restserver"]
         );
+    }
+
+    /// Locks the RBAC resource names, the roleRef, and the recommended label set against
+    /// accidental drift. The cluster name deliberately differs from the product name so that
+    /// swapped `name`/`instance` label values cannot pass unnoticed (the shared fixture is named
+    /// `hbase`, which would mask exactly that swap).
+    #[test]
+    fn build_produces_rbac() {
+        let hbase = test_utils::hbase_from_yaml(
+            &test_utils::MINIMAL_HBASE_YAML.replace("name: hbase", "name: my-hbase"),
+        );
+        let cluster = test_utils::validated_cluster_from(&hbase);
+        let cluster_info = test_utils::cluster_info();
+        let resources = build(&cluster, &cluster_info).expect("build succeeds");
+
+        assert_eq!(
+            sorted_names(&resources.service_accounts),
+            ["my-hbase-serviceaccount"]
+        );
+        assert_eq!(
+            sorted_names(&resources.role_bindings),
+            ["my-hbase-rolebinding"]
+        );
+
+        let expected_labels = BTreeMap::from(
+            [
+                ("app.kubernetes.io/component", "none"),
+                ("app.kubernetes.io/instance", "my-hbase"),
+                (
+                    "app.kubernetes.io/managed-by",
+                    "hbase.stackable.com_hbasecluster",
+                ),
+                ("app.kubernetes.io/name", "hbase"),
+                ("app.kubernetes.io/role-group", "none"),
+                ("app.kubernetes.io/version", "2.6.3-stackable0.0.0-dev"),
+                ("stackable.tech/vendor", "Stackable"),
+            ]
+            .map(|(key, value)| (key.to_string(), value.to_string())),
+        );
+        let service_account = resources
+            .service_accounts
+            .first()
+            .expect("a ServiceAccount is built");
+        assert_eq!(
+            service_account.metadata.labels,
+            Some(expected_labels.clone())
+        );
+
+        let role_binding = resources
+            .role_bindings
+            .first()
+            .expect("a RoleBinding is built");
+        assert_eq!(role_binding.metadata.labels, Some(expected_labels));
+        assert_eq!(role_binding.role_ref.name, "hbase-clusterrole");
     }
 }

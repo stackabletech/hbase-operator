@@ -13,8 +13,9 @@ use stackable_operator::{
     k8s_openapi::{
         api::{
             apps::v1::StatefulSet,
-            core::v1::{ConfigMap, Service},
+            core::v1::{ConfigMap, Service, ServiceAccount},
             policy::v1::PodDisruptionBudget,
+            rbac::v1::RoleBinding,
         },
         apimachinery::pkg::apis::meta::v1::ObjectMeta,
     },
@@ -25,6 +26,7 @@ use stackable_operator::{
         builder::meta::ownerreference_from_resource,
         kvp::label::{recommended_labels, role_group_selector},
         role_group_utils::ResourceNames,
+        role_utils,
         types::{
             kubernetes::{ConfigMapName, NamespaceName, SecretClassName, Uid},
             operator::{
@@ -67,6 +69,8 @@ pub struct KubernetesResources {
     pub services: Vec<Service>,
     pub config_maps: Vec<ConfigMap>,
     pub pod_disruption_budgets: Vec<PodDisruptionBudget>,
+    pub service_accounts: Vec<ServiceAccount>,
+    pub role_bindings: Vec<RoleBinding>,
 }
 
 /// The validated cluster: proves that config merging and validation succeeded for
@@ -132,6 +136,15 @@ impl ValidatedCluster {
         RoleName::from_str(&hbase_role.to_string()).expect("an HbaseRole name is a valid role name")
     }
 
+    /// Type-safe names for the per-cluster RBAC resources: the ServiceAccount shared by all
+    /// Pods, its (namespaced) RoleBinding, and the operator-deployed ClusterRole it binds.
+    pub fn rbac_resource_names(&self) -> role_utils::ResourceNames {
+        role_utils::ResourceNames {
+            cluster_name: self.name.clone(),
+            product_name: product_name(),
+        }
+    }
+
     /// Type-safe names for the resources of a given role group.
     pub(crate) fn resource_names(
         &self,
@@ -146,18 +159,33 @@ impl ValidatedCluster {
     }
 
     /// Recommended labels for a role-group resource.
-    pub fn recommended_labels(
+    pub fn recommended_labels(&self, role: &HbaseRole, role_group_name: &RoleGroupName) -> Labels {
+        self.recommended_labels_for(&Self::role_name(role), role_group_name)
+    }
+
+    /// Recommended labels for a resource that is not tied to a concrete [`HbaseRole`] (e.g. the
+    /// Kubernetes executor pod template), using a free-form role/role-group label value.
+    pub fn recommended_labels_for(
         &self,
-        hbase_role: &HbaseRole,
+        role_name: &RoleName,
+        role_group_name: &RoleGroupName,
+    ) -> Labels {
+        self.recommended_labels_with(&self.product_version, role_name, role_group_name)
+    }
+
+    fn recommended_labels_with(
+        &self,
+        product_version: &ProductVersion,
+        role_name: &RoleName,
         role_group_name: &RoleGroupName,
     ) -> Labels {
         recommended_labels(
             self,
             &product_name(),
-            &self.product_version,
+            product_version,
             &operator_name(),
             &controller_name(),
-            &Self::role_name(hbase_role),
+            role_name,
             role_group_name,
         )
     }
