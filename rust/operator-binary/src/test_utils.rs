@@ -7,7 +7,10 @@
 
 use std::str::FromStr;
 
-use stackable_operator::v2::types::operator::RoleGroupName;
+use stackable_operator::{
+    commons::networking::DomainName, utils::cluster_info::KubernetesClusterInfo,
+    v2::types::operator::RoleGroupName,
+};
 
 use crate::{
     controller::{
@@ -78,6 +81,14 @@ pub fn validated_cluster() -> ValidatedCluster {
 /// Parses a [`RoleGroupName`], panicking on invalid input.
 pub fn role_group_name(name: &str) -> RoleGroupName {
     RoleGroupName::from_str(name).expect("valid role group name")
+}
+
+/// A fixed [`KubernetesClusterInfo`] (`cluster.local` domain) for builders that need cluster
+/// metadata such as the discovery `ConfigMap` and Kerberos principals.
+pub fn cluster_info() -> KubernetesClusterInfo {
+    KubernetesClusterInfo {
+        cluster_domain: DomainName::from_str("cluster.local").expect("valid cluster domain"),
+    }
 }
 
 /// The merged [`AnyServiceConfig`] for the given `role` and `role_group`.

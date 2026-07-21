@@ -15,14 +15,10 @@ use stackable_operator::{
         DeepMerge,
         api::{
             apps::v1::{StatefulSet, StatefulSetSpec},
-            core::v1::{
-                ConfigMapVolumeSource, ContainerPort, Probe, ServiceAccount, TCPSocketAction,
-                Volume,
-            },
+            core::v1::{ConfigMapVolumeSource, ContainerPort, Probe, TCPSocketAction, Volume},
         },
         apimachinery::pkg::{apis::meta::v1::LabelSelector, util::intstr::IntOrString},
     },
-    kube::ResourceExt,
     product_logging,
     v2::{
         builder::pod::container::{EnvVarName, EnvVarSet, new_container_builder},
@@ -110,7 +106,7 @@ pub fn build_rolegroup_statefulset(
     hbase_role: &HbaseRole,
     role_group_name: &RoleGroupName,
     validated_rg_config: &HbaseRoleGroupConfig,
-    service_account: &ServiceAccount,
+    service_account_name: &str,
 ) -> Result<StatefulSet> {
     let resolved_product_image = &cluster.image;
     let merged_config = &validated_rg_config.config.config;
@@ -243,7 +239,7 @@ pub fn build_rolegroup_statefulset(
             )),
         )
         .context(AddVolumeSnafu)?
-        .service_account_name(service_account.name_any())
+        .service_account_name(service_account_name)
         .security_context(PodSecurityContextBuilder::new().fs_group(1000).build());
 
     // The HBase container's log config ConfigMap: either the operator-generated one (the

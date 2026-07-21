@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Internal operator refactoring: introduce a build() step in the reconciler that
+  assembles all relevant Kubernetes resources before anything is applied ([#776]).
+
+[#776]: https://github.com/stackabletech/hbase-operator/pull/776
+
 ## [26.7.0] - 2026-07-21
 
 ## [26.7.0-rc1] - 2026-07-16

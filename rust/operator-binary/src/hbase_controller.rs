@@ -13,6 +13,7 @@ use stackable_operator::{
     cluster_resources::ClusterResourceApplyStrategy,
     commons::rbac::build_rbac_resources,
     kube::{
+        ResourceExt,
         core::{DeserializeGuard, error_boundary},
         runtime::controller::Action,
     },
@@ -28,17 +29,7 @@ use stackable_operator::{
 use strum::{EnumDiscriminants, IntoStaticStr};
 
 use crate::{
-    controller::{
-        RoleGroupName,
-        build::resource::{
-            config_map::build_rolegroup_config_map,
-            discovery::build_discovery_config_map,
-            pdb::build_pdb,
-            service::{build_rolegroup_metrics_service, build_rolegroup_service},
-            statefulset::build_rolegroup_statefulset,
-        },
-        controller_name, operator_name, product_name,
-    },
+    controller::{build, controller_name, operator_name, product_name},
     crd::{APP_NAME, HbaseClusterStatus, OPERATOR_NAME, v1alpha1},
 };
 
@@ -73,47 +64,11 @@ pub enum Error {
         source: stackable_operator::cluster_resources::Error,
     },
 
-    #[snafu(display("failed to apply Service for role group {role_group}"))]
-    ApplyRoleGroupService {
-        source: stackable_operator::cluster_resources::Error,
-        role_group: RoleGroupName,
-    },
+    #[snafu(display("failed to build cluster resources"))]
+    BuildResources { source: build::Error },
 
-    #[snafu(display("failed to build rolegroup ConfigMap"))]
-    BuildRolegroupConfigMap {
-        source: crate::controller::build::resource::config_map::Error,
-    },
-
-    #[snafu(display("failed to apply ConfigMap for role group {role_group}"))]
-    ApplyRoleGroupConfig {
-        source: stackable_operator::cluster_resources::Error,
-        role_group: RoleGroupName,
-    },
-
-    #[snafu(display("failed to build StatefulSet for role group {role_group}"))]
-    BuildRoleGroupStatefulSet {
-        source: crate::controller::build::resource::statefulset::Error,
-        role_group: RoleGroupName,
-    },
-
-    #[snafu(display("failed to apply StatefulSet for role group {role_group}"))]
-    ApplyRoleGroupStatefulSet {
-        source: stackable_operator::cluster_resources::Error,
-        role_group: RoleGroupName,
-    },
-
-    #[snafu(display("failed to apply PodDisruptionBudget"))]
-    ApplyPdb {
-        source: stackable_operator::cluster_resources::Error,
-    },
-
-    #[snafu(display("failed to build discovery configmap"))]
-    BuildDiscoveryConfigMap {
-        source: crate::controller::build::resource::discovery::Error,
-    },
-
-    #[snafu(display("failed to apply discovery configmap"))]
-    ApplyDiscoveryConfigMap {
+    #[snafu(display("failed to apply cluster resource"))]
+    ApplyResource {
         source: stackable_operator::cluster_resources::Error,
     },
 
@@ -199,84 +154,48 @@ pub async fn reconcile_hbase(
         .await
         .context(ApplyRoleBindingSnafu)?;
 
+    // The ServiceAccount name is deterministic on the built object, so the build step does not
+    // depend on the applied ServiceAccount.
+    let service_account_name = rbac_sa.name_any();
+
+    let resources = build::build(
+        &validated_cluster,
+        &client.kubernetes_cluster_info,
+        &service_account_name,
+    )
+    .context(BuildResourcesSnafu)?;
+
     let mut ss_cond_builder = StatefulSetConditionBuilder::default();
 
-    for (hbase_role, role_group_configs) in &validated_cluster.role_group_configs {
-        for (role_group_name, validated_rg_config) in role_group_configs {
-            let rg_service =
-                build_rolegroup_service(&validated_cluster, hbase_role, role_group_name);
-
-            let rg_metrics_service =
-                build_rolegroup_metrics_service(&validated_cluster, hbase_role, role_group_name);
-
-            let rg_configmap = build_rolegroup_config_map(
-                &validated_cluster,
-                &client.kubernetes_cluster_info,
-                hbase_role,
-                role_group_name,
-            )
-            .context(BuildRolegroupConfigMapSnafu)?;
-            let rg_statefulset = build_rolegroup_statefulset(
-                &validated_cluster,
-                hbase_role,
-                role_group_name,
-                validated_rg_config,
-                &rbac_sa,
-            )
-            .with_context(|_| BuildRoleGroupStatefulSetSnafu {
-                role_group: role_group_name.clone(),
-            })?;
-            cluster_resources
-                .add(client, rg_service)
-                .await
-                .with_context(|_| ApplyRoleGroupServiceSnafu {
-                    role_group: role_group_name.clone(),
-                })?;
-            cluster_resources
-                .add(client, rg_metrics_service)
-                .await
-                .with_context(|_| ApplyRoleGroupServiceSnafu {
-                    role_group: role_group_name.clone(),
-                })?;
-            cluster_resources
-                .add(client, rg_configmap)
-                .await
-                .with_context(|_| ApplyRoleGroupConfigSnafu {
-                    role_group: role_group_name.clone(),
-                })?;
-
-            // Note: The StatefulSet needs to be applied after all ConfigMaps and Secrets it mounts
-            // to prevent unnecessary Pod restarts.
-            // See https://github.com/stackabletech/commons-operator/issues/111 for details.
-            ss_cond_builder.add(
-                cluster_resources
-                    .add(client, rg_statefulset)
-                    .await
-                    .with_context(|_| ApplyRoleGroupStatefulSetSnafu {
-                        role_group: role_group_name.clone(),
-                    })?,
-            );
-        }
-
-        if let Some(role_config) = validated_cluster.role_configs.get(hbase_role)
-            && let Some(pdb) = build_pdb(&role_config.pdb, &validated_cluster, hbase_role)
-        {
-            cluster_resources
-                .add(client, pdb)
-                .await
-                .context(ApplyPdbSnafu)?;
-        }
+    // Apply order: everything before the StatefulSets, StatefulSets last. A changed ConfigMap or
+    // Secret a Pod mounts must exist before the Pod restarts, otherwise the Pod restarts again
+    // unnecessarily. See https://github.com/stackabletech/commons-operator/issues/111 for details.
+    for service in resources.services {
+        cluster_resources
+            .add(client, service)
+            .await
+            .context(ApplyResourceSnafu)?;
     }
-
-    // Discovery CM will fail to build until the rest of the cluster has been deployed, so do it last
-    // so that failure won't inhibit the rest of the cluster from booting up.
-    let discovery_cm =
-        build_discovery_config_map(&validated_cluster, &client.kubernetes_cluster_info)
-            .context(BuildDiscoveryConfigMapSnafu)?;
-    cluster_resources
-        .add(client, discovery_cm)
-        .await
-        .context(ApplyDiscoveryConfigMapSnafu)?;
+    for config_map in resources.config_maps {
+        cluster_resources
+            .add(client, config_map)
+            .await
+            .context(ApplyResourceSnafu)?;
+    }
+    for pdb in resources.pod_disruption_budgets {
+        cluster_resources
+            .add(client, pdb)
+            .await
+            .context(ApplyResourceSnafu)?;
+    }
+    for statefulset in resources.stateful_sets {
+        ss_cond_builder.add(
+            cluster_resources
+                .add(client, statefulset)
+                .await
+                .context(ApplyResourceSnafu)?,
+        );
+    }
 
     let cluster_operation_cond_builder =
         ClusterOperationsConditionBuilder::new(&hbase.spec.cluster_operation);
