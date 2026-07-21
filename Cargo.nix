@@ -10007,7 +10007,7 @@ rec {
       };
       "stackable-hbase-operator" = rec {
         crateName = "stackable-hbase-operator";
-        version = "26.7.0-rc1";
+        version = "26.7.0";
         edition = "2024";
         crateBin = [
           {
