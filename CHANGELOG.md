@@ -6,8 +6,11 @@
 
 - Internal operator refactoring: introduce a build() step in the reconciler that
   assembles all relevant Kubernetes resources before anything is applied ([#776]).
+- The RBAC ServiceAccount and RoleBinding are now built with the operator-rs `v2::rbac`
+  functions and carry the full set of recommended labels ([#782]).
 
 [#776]: https://github.com/stackabletech/hbase-operator/pull/776
+[#782]: https://github.com/stackabletech/hbase-operator/pull/782
 
 ## [26.7.0] - 2026-07-21
 
