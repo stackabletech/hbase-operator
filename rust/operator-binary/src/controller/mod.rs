@@ -138,7 +138,7 @@ impl ValidatedCluster {
 
     /// Type-safe names for the per-cluster RBAC resources: the ServiceAccount shared by all
     /// Pods, its (namespaced) RoleBinding, and the operator-deployed ClusterRole it binds.
-    pub fn rbac_resource_names(&self) -> role_utils::ResourceNames {
+    pub fn cluster_resource_names(&self) -> role_utils::ResourceNames {
         role_utils::ResourceNames {
             cluster_name: self.name.clone(),
             product_name: product_name(),
@@ -146,7 +146,7 @@ impl ValidatedCluster {
     }
 
     /// Type-safe names for the resources of a given role group.
-    pub(crate) fn resource_names(
+    pub(crate) fn role_group_resource_names(
         &self,
         hbase_role: &HbaseRole,
         role_group_name: &RoleGroupName,
@@ -323,3 +323,20 @@ pub type HbaseRoleGroupConfig = stackable_operator::v2::role_utils::RoleGroupCon
     stackable_operator::v2::role_utils::JavaCommonConfig,
     v1alpha1::HbaseConfigOverrides,
 >;
+
+#[cfg(test)]
+mod tests {
+    use strum::IntoEnumIterator;
+
+    use super::ValidatedCluster;
+    use crate::crd::HbaseRole;
+
+    /// Locks the invariant behind the `expect` in [`ValidatedCluster::role_name`]: every
+    /// `HbaseRole` variant (present and future) must serialise to a valid `RoleName`.
+    #[test]
+    fn every_hbase_role_serialises_to_a_valid_role_name() {
+        for role in HbaseRole::iter() {
+            ValidatedCluster::role_name(&role);
+        }
+    }
+}

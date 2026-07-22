@@ -35,7 +35,7 @@ pub fn build_rolegroup_service(
         metadata: cluster
             .object_meta(
                 cluster
-                    .resource_names(hbase_role, role_group_name)
+                    .role_group_resource_names(hbase_role, role_group_name)
                     .headless_service_name()
                     .to_string(),
                 hbase_role,
@@ -77,7 +77,7 @@ pub fn build_rolegroup_metrics_service(
         metadata: cluster
             .object_meta(
                 cluster
-                    .resource_names(hbase_role, role_group_name)
+                    .role_group_resource_names(hbase_role, role_group_name)
                     .metrics_service_name()
                     .to_string(),
                 hbase_role,

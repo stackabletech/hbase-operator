@@ -110,7 +110,7 @@ pub fn build_rolegroup_statefulset(
     let resolved_product_image = &cluster.image;
     let merged_config = &validated_rg_config.config.config;
     let logging = &validated_rg_config.config.logging;
-    let resource_names = cluster.resource_names(hbase_role, role_group_name);
+    let resource_names = cluster.role_group_resource_names(hbase_role, role_group_name);
     let https_enabled = cluster.has_https_enabled();
 
     let ports = hbase_role
@@ -240,7 +240,7 @@ pub fn build_rolegroup_statefulset(
         .context(AddVolumeSnafu)?
         .service_account_name(
             cluster
-                .rbac_resource_names()
+                .cluster_resource_names()
                 .service_account_name()
                 .to_string(),
         )
