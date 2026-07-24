@@ -13,8 +13,9 @@ use stackable_operator::{
     k8s_openapi::{
         api::{
             apps::v1::StatefulSet,
-            core::v1::{ConfigMap, Service},
+            core::v1::{ConfigMap, Service, ServiceAccount},
             policy::v1::PodDisruptionBudget,
+            rbac::v1::RoleBinding,
         },
         apimachinery::pkg::apis::meta::v1::ObjectMeta,
     },
@@ -25,6 +26,7 @@ use stackable_operator::{
         builder::meta::ownerreference_from_resource,
         kvp::label::{recommended_labels, role_group_selector},
         role_group_utils::ResourceNames,
+        role_utils,
         types::{
             kubernetes::{ConfigMapName, NamespaceName, SecretClassName, Uid},
             operator::{
@@ -67,6 +69,8 @@ pub struct KubernetesResources {
     pub services: Vec<Service>,
     pub config_maps: Vec<ConfigMap>,
     pub pod_disruption_budgets: Vec<PodDisruptionBudget>,
+    pub service_accounts: Vec<ServiceAccount>,
+    pub role_bindings: Vec<RoleBinding>,
 }
 
 /// The validated cluster: proves that config merging and validation succeeded for
@@ -126,38 +130,56 @@ impl ValidatedCluster {
         }
     }
 
-    /// The Kubernetes role name for an [`HbaseRole`] (e.g. `master`, `regionserver`,
-    /// `restserver`).
-    pub fn role_name(hbase_role: &HbaseRole) -> RoleName {
-        RoleName::from_str(&hbase_role.to_string()).expect("an HbaseRole name is a valid role name")
+    /// Type-safe names for the per-cluster RBAC resources: the ServiceAccount shared by all
+    /// Pods, its (namespaced) RoleBinding, and the operator-deployed ClusterRole it binds.
+    pub fn cluster_resource_names(&self) -> role_utils::ResourceNames {
+        role_utils::ResourceNames {
+            cluster_name: self.name.clone(),
+            product_name: product_name(),
+        }
     }
 
     /// Type-safe names for the resources of a given role group.
-    pub(crate) fn resource_names(
+    pub(crate) fn role_group_resource_names(
         &self,
         hbase_role: &HbaseRole,
         role_group_name: &RoleGroupName,
     ) -> ResourceNames {
         ResourceNames {
             cluster_name: self.name.clone(),
-            role_name: Self::role_name(hbase_role),
+            role_name: hbase_role.into(),
             role_group_name: role_group_name.clone(),
         }
     }
 
     /// Recommended labels for a role-group resource.
-    pub fn recommended_labels(
+    pub fn recommended_labels(&self, role: &HbaseRole, role_group_name: &RoleGroupName) -> Labels {
+        self.recommended_labels_for(&role.into(), role_group_name)
+    }
+
+    /// Recommended labels for a resource that is not tied to a concrete [`HbaseRole`] (e.g. the
+    /// Kubernetes executor pod template), using a free-form role/role-group label value.
+    pub fn recommended_labels_for(
         &self,
-        hbase_role: &HbaseRole,
+        role_name: &RoleName,
+        role_group_name: &RoleGroupName,
+    ) -> Labels {
+        self.recommended_labels_with(&self.product_version, role_name, role_group_name)
+    }
+
+    fn recommended_labels_with(
+        &self,
+        product_version: &ProductVersion,
+        role_name: &RoleName,
         role_group_name: &RoleGroupName,
     ) -> Labels {
         recommended_labels(
             self,
             &product_name(),
-            &self.product_version,
+            product_version,
             &operator_name(),
             &controller_name(),
-            &Self::role_name(hbase_role),
+            role_name,
             role_group_name,
         )
     }
@@ -168,12 +190,7 @@ impl ValidatedCluster {
         hbase_role: &HbaseRole,
         role_group_name: &RoleGroupName,
     ) -> Labels {
-        role_group_selector(
-            self,
-            &product_name(),
-            &Self::role_name(hbase_role),
-            role_group_name,
-        )
+        role_group_selector(self, &product_name(), &hbase_role.into(), role_group_name)
     }
 
     /// Returns an [`ObjectMetaBuilder`] pre-filled with the namespace, an owner reference back to
@@ -295,3 +312,21 @@ pub type HbaseRoleGroupConfig = stackable_operator::v2::role_utils::RoleGroupCon
     stackable_operator::v2::role_utils::JavaCommonConfig,
     v1alpha1::HbaseConfigOverrides,
 >;
+
+#[cfg(test)]
+mod tests {
+    use stackable_operator::v2::types::operator::RoleName;
+    use strum::IntoEnumIterator;
+
+    use crate::crd::HbaseRole;
+
+    /// Locks the invariant behind the `expect` in the `From<HbaseRole> for RoleName` impls:
+    /// every `HbaseRole` variant (present and future) must serialise to a valid `RoleName`.
+    #[test]
+    fn every_hbase_role_serialises_to_a_valid_role_name() {
+        for role in HbaseRole::iter() {
+            let _: RoleName = (&role).into();
+            let _: RoleName = role.into();
+        }
+    }
+}

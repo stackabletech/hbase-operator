@@ -11,13 +11,10 @@ use snafu::{ResultExt, Snafu};
 use stackable_operator::{
     cli::OperatorEnvironmentOptions,
     cluster_resources::ClusterResourceApplyStrategy,
-    commons::rbac::build_rbac_resources,
     kube::{
-        ResourceExt,
         core::{DeserializeGuard, error_boundary},
         runtime::controller::Action,
     },
-    kvp::LabelError,
     logging::controller::ReconcilerError,
     shared::time::Duration,
     status::condition::{
@@ -30,7 +27,7 @@ use strum::{EnumDiscriminants, IntoStaticStr};
 
 use crate::{
     controller::{build, controller_name, operator_name, product_name},
-    crd::{APP_NAME, HbaseClusterStatus, OPERATOR_NAME, v1alpha1},
+    crd::{HbaseClusterStatus, OPERATOR_NAME, v1alpha1},
 };
 
 pub struct Ctx {
@@ -43,24 +40,6 @@ pub struct Ctx {
 pub enum Error {
     #[snafu(display("failed to delete orphaned resources"))]
     DeleteOrphanedResources {
-        source: stackable_operator::cluster_resources::Error,
-    },
-
-    #[snafu(display("failed to build RBAC resources"))]
-    BuildRbacResources {
-        source: stackable_operator::commons::rbac::Error,
-    },
-
-    #[snafu(display("failed to build label"))]
-    BuildLabel { source: LabelError },
-
-    #[snafu(display("failed to patch service account"))]
-    ApplyServiceAccount {
-        source: stackable_operator::cluster_resources::Error,
-    },
-
-    #[snafu(display("failed to patch role binding"))]
-    ApplyRoleBinding {
         source: stackable_operator::cluster_resources::Error,
     },
 
@@ -137,39 +116,26 @@ pub async fn reconcile_hbase(
         &hbase.spec.object_overrides,
     );
 
-    let (rbac_sa, rbac_rolebinding) = build_rbac_resources(
-        hbase,
-        APP_NAME,
-        cluster_resources
-            .get_required_labels()
-            .context(BuildLabelSnafu)?,
-    )
-    .context(BuildRbacResourcesSnafu)?;
-    cluster_resources
-        .add(client, rbac_sa.clone())
-        .await
-        .context(ApplyServiceAccountSnafu)?;
-    cluster_resources
-        .add(client, rbac_rolebinding)
-        .await
-        .context(ApplyRoleBindingSnafu)?;
-
-    // The ServiceAccount name is deterministic on the built object, so the build step does not
-    // depend on the applied ServiceAccount.
-    let service_account_name = rbac_sa.name_any();
-
-    let resources = build::build(
-        &validated_cluster,
-        &client.kubernetes_cluster_info,
-        &service_account_name,
-    )
-    .context(BuildResourcesSnafu)?;
+    let resources = build::build(&validated_cluster, &client.kubernetes_cluster_info)
+        .context(BuildResourcesSnafu)?;
 
     let mut ss_cond_builder = StatefulSetConditionBuilder::default();
 
     // Apply order: everything before the StatefulSets, StatefulSets last. A changed ConfigMap or
     // Secret a Pod mounts must exist before the Pod restarts, otherwise the Pod restarts again
     // unnecessarily. See https://github.com/stackabletech/commons-operator/issues/111 for details.
+    for service_account in resources.service_accounts {
+        cluster_resources
+            .add(client, service_account)
+            .await
+            .context(ApplyResourceSnafu)?;
+    }
+    for role_binding in resources.role_bindings {
+        cluster_resources
+            .add(client, role_binding)
+            .await
+            .context(ApplyResourceSnafu)?;
+    }
     for service in resources.services {
         cluster_resources
             .add(client, service)
