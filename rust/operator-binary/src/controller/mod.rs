@@ -130,12 +130,6 @@ impl ValidatedCluster {
         }
     }
 
-    /// The Kubernetes role name for an [`HbaseRole`] (e.g. `master`, `regionserver`,
-    /// `restserver`).
-    pub fn role_name(hbase_role: &HbaseRole) -> RoleName {
-        RoleName::from_str(&hbase_role.to_string()).expect("an HbaseRole name is a valid role name")
-    }
-
     /// Type-safe names for the per-cluster RBAC resources: the ServiceAccount shared by all
     /// Pods, its (namespaced) RoleBinding, and the operator-deployed ClusterRole it binds.
     pub fn cluster_resource_names(&self) -> role_utils::ResourceNames {
@@ -153,14 +147,14 @@ impl ValidatedCluster {
     ) -> ResourceNames {
         ResourceNames {
             cluster_name: self.name.clone(),
-            role_name: Self::role_name(hbase_role),
+            role_name: hbase_role.into(),
             role_group_name: role_group_name.clone(),
         }
     }
 
     /// Recommended labels for a role-group resource.
     pub fn recommended_labels(&self, role: &HbaseRole, role_group_name: &RoleGroupName) -> Labels {
-        self.recommended_labels_for(&Self::role_name(role), role_group_name)
+        self.recommended_labels_for(&role.into(), role_group_name)
     }
 
     /// Recommended labels for a resource that is not tied to a concrete [`HbaseRole`] (e.g. the
@@ -196,12 +190,7 @@ impl ValidatedCluster {
         hbase_role: &HbaseRole,
         role_group_name: &RoleGroupName,
     ) -> Labels {
-        role_group_selector(
-            self,
-            &product_name(),
-            &Self::role_name(hbase_role),
-            role_group_name,
-        )
+        role_group_selector(self, &product_name(), &hbase_role.into(), role_group_name)
     }
 
     /// Returns an [`ObjectMetaBuilder`] pre-filled with the namespace, an owner reference back to
@@ -326,17 +315,18 @@ pub type HbaseRoleGroupConfig = stackable_operator::v2::role_utils::RoleGroupCon
 
 #[cfg(test)]
 mod tests {
+    use stackable_operator::v2::types::operator::RoleName;
     use strum::IntoEnumIterator;
 
-    use super::ValidatedCluster;
     use crate::crd::HbaseRole;
 
-    /// Locks the invariant behind the `expect` in [`ValidatedCluster::role_name`]: every
-    /// `HbaseRole` variant (present and future) must serialise to a valid `RoleName`.
+    /// Locks the invariant behind the `expect` in the `From<HbaseRole> for RoleName` impls:
+    /// every `HbaseRole` variant (present and future) must serialise to a valid `RoleName`.
     #[test]
     fn every_hbase_role_serialises_to_a_valid_role_name() {
         for role in HbaseRole::iter() {
-            ValidatedCluster::role_name(&role);
+            let _: RoleName = (&role).into();
+            let _: RoleName = role.into();
         }
     }
 }

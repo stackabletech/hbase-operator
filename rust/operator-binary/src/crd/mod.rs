@@ -30,6 +30,7 @@ use stackable_operator::{
         types::{
             common::Port,
             kubernetes::{ConfigMapName, ListenerClassName, SecretClassName, VolumeName},
+            operator::RoleName,
         },
     },
     versioned::versioned,
@@ -260,6 +261,18 @@ pub enum HbaseRole {
     #[serde(rename = "restserver")]
     #[strum(serialize = "restserver")]
     RestServer,
+}
+
+impl From<HbaseRole> for RoleName {
+    fn from(value: HbaseRole) -> Self {
+        RoleName::from_str(&value.to_string()).expect("an HbaseRole name is a valid role name")
+    }
+}
+
+impl From<&HbaseRole> for RoleName {
+    fn from(value: &HbaseRole) -> Self {
+        RoleName::from_str(&value.to_string()).expect("an HbaseRole name is a valid role name")
+    }
 }
 
 impl HbaseRole {
