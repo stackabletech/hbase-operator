@@ -38,6 +38,7 @@ use crate::{
         build::{
             graceful_shutdown::{self, add_graceful_shutdown_config},
             kerberos::{self, add_kerberos_pod_config},
+            object_meta,
             properties::product_logging::MAX_HBASE_LOG_FILES_SIZE,
         },
     },
@@ -310,14 +311,13 @@ pub fn build_rolegroup_statefulset(
 
     pod_template.merge_from(validated_rg_config.pod_overrides.clone());
 
-    let metadata = cluster
-        .object_meta(
-            resource_names.stateful_set_name().to_string(),
-            hbase_role,
-            role_group_name,
-        )
-        .with_label(RESTART_CONTROLLER_ENABLED_LABEL.to_owned())
-        .build();
+    let metadata = object_meta(
+        cluster,
+        resource_names.stateful_set_name().to_string(),
+        cluster.recommended_labels(hbase_role, role_group_name),
+    )
+    .with_label(RESTART_CONTROLLER_ENABLED_LABEL.to_owned())
+    .build();
 
     let statefulset_match_labels = cluster.role_group_selector(hbase_role, role_group_name);
 

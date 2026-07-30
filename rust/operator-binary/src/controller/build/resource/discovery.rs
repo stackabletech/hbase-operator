@@ -9,7 +9,9 @@ use stackable_operator::{
 use crate::{
     controller::{
         ValidatedCluster,
-        build::{PLACEHOLDER_DISCOVERY_ROLE_GROUP, kerberos, properties::ConfigFileName},
+        build::{
+            PLACEHOLDER_DISCOVERY_ROLE_GROUP, kerberos, object_meta, properties::ConfigFileName,
+        },
     },
     crd::HbaseRole,
 };
@@ -41,13 +43,15 @@ pub fn build_discovery_config_map(
             // The discovery `ConfigMap` is a cluster-wide object (not tied to a single role
             // group), so it is named after the cluster and labelled with the region-server role
             // and a `discovery` placeholder role-group.
-            cluster
-                .object_meta(
-                    cluster.name.to_string(),
+            object_meta(
+                cluster,
+                cluster.name.to_string(),
+                cluster.recommended_labels(
                     &HbaseRole::RegionServer,
                     &PLACEHOLDER_DISCOVERY_ROLE_GROUP,
-                )
-                .build(),
+                ),
+            )
+            .build(),
         )
         .add_data(
             ConfigFileName::HbaseSite.to_string(),
