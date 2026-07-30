@@ -1,7 +1,7 @@
 //! Builders that turn a [`ValidatedCluster`] into
 //! Kubernetes resources.
 
-use std::str::FromStr;
+use std::{marker::PhantomData, str::FromStr};
 
 use snafu::{ResultExt, Snafu};
 use stackable_operator::{
@@ -13,7 +13,7 @@ use stackable_operator::{
 
 use crate::{
     controller::{
-        KubernetesResources, ValidatedCluster,
+        KubernetesResources, Prepared, ValidatedCluster,
         build::resource::{
             config_map::{self, build_rolegroup_config_map},
             discovery::{self, build_discovery_config_map},
@@ -77,7 +77,7 @@ pub enum Error {
 pub fn build(
     cluster: &ValidatedCluster,
     cluster_info: &KubernetesClusterInfo,
-) -> Result<KubernetesResources, Error> {
+) -> Result<KubernetesResources<Prepared>, Error> {
     let mut stateful_sets = vec![];
     let mut services = vec![];
     let mut config_maps = vec![];
@@ -129,6 +129,7 @@ pub fn build(
         pod_disruption_budgets,
         service_accounts: vec![build_service_account(cluster)],
         role_bindings: vec![build_role_binding(cluster)],
+        status: PhantomData,
     })
 }
 

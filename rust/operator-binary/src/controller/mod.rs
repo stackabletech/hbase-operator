@@ -1,9 +1,11 @@
+pub mod apply;
 pub mod build;
 pub mod dereference;
+pub mod update_status;
 pub mod validate;
 pub mod zookeeper;
 
-use std::{collections::BTreeMap, str::FromStr};
+use std::{collections::BTreeMap, marker::PhantomData, str::FromStr};
 
 use const_format::concatcp;
 pub use stackable_operator::v2::types::operator::RoleGroupName;
@@ -58,17 +60,28 @@ pub(crate) fn controller_name() -> ControllerName {
         .expect("the controller name is a valid label value")
 }
 
+/// Marker for prepared Kubernetes resources which are not applied yet.
+pub struct Prepared;
+
+/// Marker for applied Kubernetes resources.
+pub struct Applied;
+
 /// The complete set of Kubernetes resources built for a [`ValidatedCluster`], ready to be applied.
 ///
 /// hbase exposes its listeners as volume/PVC sources inside the `StatefulSet` rather than as
 /// top-level `Listener` objects, so (unlike some sibling operators) there is no `listeners` field.
-pub struct KubernetesResources {
+///
+/// `T` is a marker that indicates if these resources are only [`Prepared`] or already [`Applied`].
+/// The marker is useful e.g. to ensure that the cluster status is updated based on the applied
+/// resources.
+pub struct KubernetesResources<T> {
     pub stateful_sets: Vec<StatefulSet>,
     pub services: Vec<Service>,
     pub config_maps: Vec<ConfigMap>,
     pub pod_disruption_budgets: Vec<PodDisruptionBudget>,
     pub service_accounts: Vec<ServiceAccount>,
     pub role_bindings: Vec<RoleBinding>,
+    pub status: PhantomData<T>,
 }
 
 /// The validated cluster: proves that config merging and validation succeeded for
