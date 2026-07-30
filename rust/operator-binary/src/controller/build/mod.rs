@@ -150,6 +150,18 @@ mod tests {
     use super::build;
     use crate::test_utils;
 
+    /// The expected `app.kubernetes.io/version` label value for the given product version.
+    ///
+    /// The `-stackable` suffix carries the operator's own version, which is `0.0.0-dev` on main
+    /// but rewritten by the release process — so tests must derive it rather than hardcode it,
+    /// or they fail on release branches.
+    fn app_version_label(product_version: &str) -> String {
+        format!(
+            "{product_version}-stackable{}",
+            crate::built_info::PKG_VERSION
+        )
+    }
+
     /// Collects the `.metadata.name`s of the given resources, sorted for stable comparison.
     fn sorted_names(resources: &[impl Resource]) -> Vec<&str> {
         let mut names: Vec<&str> = resources
@@ -228,18 +240,18 @@ mod tests {
 
         let expected_labels = BTreeMap::from(
             [
-                ("app.kubernetes.io/component", "none"),
-                ("app.kubernetes.io/instance", "my-hbase"),
+                ("app.kubernetes.io/component", "none".to_string()),
+                ("app.kubernetes.io/instance", "my-hbase".to_string()),
                 (
                     "app.kubernetes.io/managed-by",
-                    "hbase.stackable.com_hbasecluster",
+                    "hbase.stackable.com_hbasecluster".to_string(),
                 ),
-                ("app.kubernetes.io/name", "hbase"),
-                ("app.kubernetes.io/role-group", "none"),
-                ("app.kubernetes.io/version", "2.6.3-stackable0.0.0-dev"),
-                ("stackable.tech/vendor", "Stackable"),
+                ("app.kubernetes.io/name", "hbase".to_string()),
+                ("app.kubernetes.io/role-group", "none".to_string()),
+                ("app.kubernetes.io/version", app_version_label("2.6.3")),
+                ("stackable.tech/vendor", "Stackable".to_string()),
             ]
-            .map(|(key, value)| (key.to_string(), value.to_string())),
+            .map(|(key, value)| (key.to_string(), value)),
         );
         let service_account = resources
             .service_accounts
