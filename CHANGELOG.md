@@ -9,10 +9,13 @@
 - The RBAC ServiceAccount and RoleBinding are now built with the operator-rs `v2::rbac`
   functions and carry the full set of recommended labels ([#782]).
 - Bump stackable-operator to 0.114.0 ([#786]).
+- The reconciler now applies resources and derives the cluster status in discrete
+  apply and update_status steps ([#787]).
 
 [#776]: https://github.com/stackabletech/hbase-operator/pull/776
 [#782]: https://github.com/stackabletech/hbase-operator/pull/782
 [#786]: https://github.com/stackabletech/hbase-operator/pull/786
+[#787]: https://github.com/stackabletech/hbase-operator/pull/787
 
 ## [26.7.0] - 2026-07-21
 
