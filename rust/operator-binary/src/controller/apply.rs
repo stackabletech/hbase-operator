@@ -70,15 +70,27 @@ impl<'a> Applier<'a> {
         mut self,
         resources: KubernetesResources<Prepared>,
     ) -> Result<KubernetesResources<Applied>> {
+        // Destructured without `..`, so adding a field to [`KubernetesResources`] fails to
+        // compile here instead of silently never being applied.
+        let KubernetesResources {
+            stateful_sets,
+            services,
+            config_maps,
+            pod_disruption_budgets,
+            service_accounts,
+            role_bindings,
+            status: _,
+        } = resources;
+
         // Apply order is: StatefulSets last (a changed mounted ConfigMap/Secret
         // must exist first, else Pods restart -- commons-operator#111). The ServiceAccount comes
         // first because the Pods reference it at creation time.
-        let service_accounts = self.add_resources(resources.service_accounts).await?;
-        let role_bindings = self.add_resources(resources.role_bindings).await?;
-        let services = self.add_resources(resources.services).await?;
-        let config_maps = self.add_resources(resources.config_maps).await?;
-        let pod_disruption_budgets = self.add_resources(resources.pod_disruption_budgets).await?;
-        let stateful_sets = self.add_resources(resources.stateful_sets).await?;
+        let service_accounts = self.add_resources(service_accounts).await?;
+        let role_bindings = self.add_resources(role_bindings).await?;
+        let services = self.add_resources(services).await?;
+        let config_maps = self.add_resources(config_maps).await?;
+        let pod_disruption_budgets = self.add_resources(pod_disruption_budgets).await?;
+        let stateful_sets = self.add_resources(stateful_sets).await?;
 
         self.cluster_resources
             .delete_orphaned_resources(self.client)
