@@ -1,14 +1,15 @@
+pub mod apply;
 pub mod build;
 pub mod dereference;
+pub mod update_status;
 pub mod validate;
 pub mod zookeeper;
 
-use std::{collections::BTreeMap, str::FromStr};
+use std::{collections::BTreeMap, marker::PhantomData, str::FromStr};
 
 use const_format::concatcp;
 pub use stackable_operator::v2::types::operator::RoleGroupName;
 use stackable_operator::{
-    builder::meta::ObjectMetaBuilder,
     commons::product_image_selection::ResolvedProductImage,
     k8s_openapi::{
         api::{
@@ -23,7 +24,6 @@ use stackable_operator::{
     kvp::Labels,
     v2::{
         HasName, HasUid, NameIsValidLabelValue,
-        builder::meta::ownerreference_from_resource,
         kvp::label::{recommended_labels, role_group_selector},
         role_group_utils::ResourceNames,
         role_utils,
@@ -60,17 +60,28 @@ pub(crate) fn controller_name() -> ControllerName {
         .expect("the controller name is a valid label value")
 }
 
+/// Marker for prepared Kubernetes resources which are not applied yet.
+pub struct Prepared;
+
+/// Marker for applied Kubernetes resources.
+pub struct Applied;
+
 /// The complete set of Kubernetes resources built for a [`ValidatedCluster`], ready to be applied.
 ///
 /// hbase exposes its listeners as volume/PVC sources inside the `StatefulSet` rather than as
 /// top-level `Listener` objects, so (unlike some sibling operators) there is no `listeners` field.
-pub struct KubernetesResources {
+///
+/// `T` is a marker that indicates if these resources are only [`Prepared`] or already [`Applied`].
+/// The marker is useful e.g. to ensure that the cluster status is updated based on the applied
+/// resources.
+pub struct KubernetesResources<T> {
     pub stateful_sets: Vec<StatefulSet>,
     pub services: Vec<Service>,
     pub config_maps: Vec<ConfigMap>,
     pub pod_disruption_budgets: Vec<PodDisruptionBudget>,
     pub service_accounts: Vec<ServiceAccount>,
     pub role_bindings: Vec<RoleBinding>,
+    pub status: PhantomData<T>,
 }
 
 /// The validated cluster: proves that config merging and validation succeeded for
@@ -191,26 +202,6 @@ impl ValidatedCluster {
         role_group_name: &RoleGroupName,
     ) -> Labels {
         role_group_selector(self, &product_name(), &hbase_role.into(), role_group_name)
-    }
-
-    /// Returns an [`ObjectMetaBuilder`] pre-filled with the namespace, an owner reference back to
-    /// this cluster, and the recommended labels for a resource named `name` in `role_group_name`.
-    ///
-    /// Consolidates the metadata chain repeated by the child-resource builders. Call sites that
-    /// need extra labels/annotations chain them onto the returned builder.
-    pub(crate) fn object_meta(
-        &self,
-        name: impl Into<String>,
-        hbase_role: &HbaseRole,
-        role_group_name: &RoleGroupName,
-    ) -> ObjectMetaBuilder {
-        let mut builder = ObjectMetaBuilder::new();
-        builder
-            .name_and_namespace(self)
-            .name(name)
-            .ownerreference(ownerreference_from_resource(self, None, Some(true)))
-            .with_labels(self.recommended_labels(hbase_role, role_group_name));
-        builder
     }
 
     /// Whether Kerberos is enabled for this cluster.

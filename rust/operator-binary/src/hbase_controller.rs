@@ -1,7 +1,7 @@
 //! Ensures that `Pod`s are configured and running for each [`v1alpha1::HbaseCluster`].
 //!
-//! This is the controller driver: it runs the `dereference -> validate -> build -> apply`
-//! pipeline. The validated cluster type and the resource builders live under the
+//! This is the controller driver: it runs the
+//! `dereference -> validate -> build -> apply -> update_status` pipeline. The validated cluster type and the resource builders live under the
 //! [`crate::controller`] module tree; this file is kept next to `main.rs` for consistency with
 //! the other Stackable operators.
 
@@ -17,17 +17,16 @@ use stackable_operator::{
     },
     logging::controller::ReconcilerError,
     shared::time::Duration,
-    status::condition::{
-        compute_conditions, operations::ClusterOperationsConditionBuilder,
-        statefulset::StatefulSetConditionBuilder,
-    },
-    v2::cluster_resources::cluster_resources_new,
 };
 use strum::{EnumDiscriminants, IntoStaticStr};
 
 use crate::{
-    controller::{build, controller_name, operator_name, product_name},
-    crd::{HbaseClusterStatus, OPERATOR_NAME, v1alpha1},
+    controller::{
+        apply::{self, Applier},
+        build,
+        update_status::{self, update_status},
+    },
+    crd::v1alpha1,
 };
 
 pub struct Ctx {
@@ -38,23 +37,11 @@ pub struct Ctx {
 #[derive(Snafu, Debug, EnumDiscriminants)]
 #[strum_discriminants(derive(IntoStaticStr))]
 pub enum Error {
-    #[snafu(display("failed to delete orphaned resources"))]
-    DeleteOrphanedResources {
-        source: stackable_operator::cluster_resources::Error,
-    },
+    #[snafu(display("failed to apply the Kubernetes resources"))]
+    ApplyResources { source: apply::Error },
 
     #[snafu(display("failed to build cluster resources"))]
     BuildResources { source: build::Error },
-
-    #[snafu(display("failed to apply cluster resource"))]
-    ApplyResource {
-        source: stackable_operator::cluster_resources::Error,
-    },
-
-    #[snafu(display("failed to update status"))]
-    ApplyStatus {
-        source: stackable_operator::client::Error,
-    },
 
     #[snafu(display("HBaseCluster object is invalid"))]
     InvalidHBaseCluster {
@@ -70,6 +57,9 @@ pub enum Error {
     Validate {
         source: crate::controller::validate::Error,
     },
+
+    #[snafu(display("failed to update the cluster status"))]
+    UpdateStatus { source: update_status::Error },
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -105,79 +95,22 @@ pub async fn reconcile_hbase(
     )
     .context(ValidateSnafu)?;
 
-    let mut cluster_resources = cluster_resources_new(
-        &product_name(),
-        &operator_name(),
-        &controller_name(),
-        &validated_cluster.name,
-        &validated_cluster.namespace,
-        &validated_cluster.uid,
-        ClusterResourceApplyStrategy::from(&hbase.spec.cluster_operation),
-        &hbase.spec.object_overrides,
-    );
-
     let resources = build::build(&validated_cluster, &client.kubernetes_cluster_info)
         .context(BuildResourcesSnafu)?;
 
-    let mut ss_cond_builder = StatefulSetConditionBuilder::default();
+    let applied = Applier::new(
+        client,
+        &validated_cluster,
+        ClusterResourceApplyStrategy::from(&hbase.spec.cluster_operation),
+        &hbase.spec.object_overrides,
+    )
+    .apply(resources)
+    .await
+    .context(ApplyResourcesSnafu)?;
 
-    // Apply order: everything before the StatefulSets, StatefulSets last. A changed ConfigMap or
-    // Secret a Pod mounts must exist before the Pod restarts, otherwise the Pod restarts again
-    // unnecessarily. See https://github.com/stackabletech/commons-operator/issues/111 for details.
-    for service_account in resources.service_accounts {
-        cluster_resources
-            .add(client, service_account)
-            .await
-            .context(ApplyResourceSnafu)?;
-    }
-    for role_binding in resources.role_bindings {
-        cluster_resources
-            .add(client, role_binding)
-            .await
-            .context(ApplyResourceSnafu)?;
-    }
-    for service in resources.services {
-        cluster_resources
-            .add(client, service)
-            .await
-            .context(ApplyResourceSnafu)?;
-    }
-    for config_map in resources.config_maps {
-        cluster_resources
-            .add(client, config_map)
-            .await
-            .context(ApplyResourceSnafu)?;
-    }
-    for pdb in resources.pod_disruption_budgets {
-        cluster_resources
-            .add(client, pdb)
-            .await
-            .context(ApplyResourceSnafu)?;
-    }
-    for statefulset in resources.stateful_sets {
-        ss_cond_builder.add(
-            cluster_resources
-                .add(client, statefulset)
-                .await
-                .context(ApplyResourceSnafu)?,
-        );
-    }
-
-    let cluster_operation_cond_builder =
-        ClusterOperationsConditionBuilder::new(&hbase.spec.cluster_operation);
-
-    let status = HbaseClusterStatus {
-        conditions: compute_conditions(hbase, &[&ss_cond_builder, &cluster_operation_cond_builder]),
-    };
-
-    cluster_resources
-        .delete_orphaned_resources(client)
+    update_status(client, hbase, &applied)
         .await
-        .context(DeleteOrphanedResourcesSnafu)?;
-    client
-        .apply_patch_status(OPERATOR_NAME, hbase, &status)
-        .await
-        .context(ApplyStatusSnafu)?;
+        .context(UpdateStatusSnafu)?;
 
     Ok(Action::await_change())
 }
@@ -188,7 +121,7 @@ pub fn error_policy(
     _ctx: Arc<Ctx>,
 ) -> Action {
     match error {
-        // root object is invalid, will be requed when modified
+        // root object is invalid, will be requeued when modified
         Error::InvalidHBaseCluster { .. } => Action::await_change(),
         _ => Action::requeue(*Duration::from_secs(5)),
     }

@@ -14,7 +14,7 @@ use crate::{
         ValidatedCluster,
         build::{
             jvm::construct_role_specific_non_heap_jvm_args,
-            kerberos,
+            kerberos, object_meta,
             properties::{
                 ConfigFileName, hbase_env, hbase_site, product_logging, security_properties,
                 ssl_client, ssl_server,
@@ -108,16 +108,15 @@ pub fn build_rolegroup_config_map(
             },
         )?;
 
-    let cm_metadata = cluster
-        .object_meta(
-            cluster
-                .role_group_resource_names(role, role_group_name)
-                .role_group_config_map()
-                .to_string(),
-            role,
-            role_group_name,
-        )
-        .build();
+    let cm_metadata = object_meta(
+        cluster,
+        cluster
+            .role_group_resource_names(role, role_group_name)
+            .role_group_config_map()
+            .to_string(),
+        cluster.recommended_labels(role, role_group_name),
+    )
+    .build();
 
     let mut builder = ConfigMapBuilder::new();
     builder

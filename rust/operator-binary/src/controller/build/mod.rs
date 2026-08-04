@@ -1,16 +1,19 @@
 //! Builders that turn a [`ValidatedCluster`] into
 //! Kubernetes resources.
 
-use std::str::FromStr;
+use std::{marker::PhantomData, str::FromStr};
 
 use snafu::{ResultExt, Snafu};
 use stackable_operator::{
-    utils::cluster_info::KubernetesClusterInfo, v2::types::operator::RoleGroupName,
+    builder::meta::ObjectMetaBuilder,
+    kvp::Labels,
+    utils::cluster_info::KubernetesClusterInfo,
+    v2::{builder::meta::ownerreference_from_resource, types::operator::RoleGroupName},
 };
 
 use crate::{
     controller::{
-        KubernetesResources, ValidatedCluster,
+        KubernetesResources, Prepared, ValidatedCluster,
         build::resource::{
             config_map::{self, build_rolegroup_config_map},
             discovery::{self, build_discovery_config_map},
@@ -26,6 +29,25 @@ use crate::{
 // Placeholder role-group name used for the recommended labels of the role-level discovery
 // `ConfigMap` (which is not tied to a single role group).
 stackable_operator::constant!(pub(crate) PLACEHOLDER_DISCOVERY_ROLE_GROUP: RoleGroupName = "discovery");
+
+/// Returns an [`ObjectMetaBuilder`] pre-filled with the cluster's namespace, an owner
+/// reference back to the cluster, the resource `name` and the given `recommended_labels`.
+///
+/// Consolidates the metadata chain repeated by the child-resource builders. Call sites that
+/// need extra labels/annotations chain them onto the returned builder.
+pub(crate) fn object_meta(
+    cluster: &ValidatedCluster,
+    name: impl Into<String>,
+    recommended_labels: Labels,
+) -> ObjectMetaBuilder {
+    let mut builder = ObjectMetaBuilder::new();
+    builder
+        .name_and_namespace(cluster)
+        .name(name)
+        .ownerreference(ownerreference_from_resource(cluster, None, Some(true)))
+        .with_labels(recommended_labels);
+    builder
+}
 
 #[derive(Snafu, Debug)]
 pub enum Error {
@@ -55,7 +77,7 @@ pub enum Error {
 pub fn build(
     cluster: &ValidatedCluster,
     cluster_info: &KubernetesClusterInfo,
-) -> Result<KubernetesResources, Error> {
+) -> Result<KubernetesResources<Prepared>, Error> {
     let mut stateful_sets = vec![];
     let mut services = vec![];
     let mut config_maps = vec![];
@@ -107,6 +129,7 @@ pub fn build(
         pod_disruption_budgets,
         service_accounts: vec![build_service_account(cluster)],
         role_bindings: vec![build_role_binding(cluster)],
+        status: PhantomData,
     })
 }
 
@@ -127,6 +150,18 @@ mod tests {
 
     use super::build;
     use crate::test_utils;
+
+    /// The expected `app.kubernetes.io/version` label value for the given product version.
+    ///
+    /// The `-stackable` suffix carries the operator's own version, which is `0.0.0-dev` on main
+    /// but rewritten by the release process — so tests must derive it rather than hardcode it,
+    /// or they fail on release branches.
+    fn app_version_label(product_version: &str) -> String {
+        format!(
+            "{product_version}-stackable{}",
+            crate::built_info::PKG_VERSION
+        )
+    }
 
     /// Collects the `.metadata.name`s of the given resources, sorted for stable comparison.
     fn sorted_names(resources: &[impl Resource]) -> Vec<&str> {
@@ -206,18 +241,18 @@ mod tests {
 
         let expected_labels = BTreeMap::from(
             [
-                ("app.kubernetes.io/component", "none"),
-                ("app.kubernetes.io/instance", "my-hbase"),
+                ("app.kubernetes.io/component", "none".to_string()),
+                ("app.kubernetes.io/instance", "my-hbase".to_string()),
                 (
                     "app.kubernetes.io/managed-by",
-                    "hbase.stackable.com_hbasecluster",
+                    "hbase.stackable.com_hbasecluster".to_string(),
                 ),
-                ("app.kubernetes.io/name", "hbase"),
-                ("app.kubernetes.io/role-group", "none"),
-                ("app.kubernetes.io/version", "2.6.3-stackable0.0.0-dev"),
-                ("stackable.tech/vendor", "Stackable"),
+                ("app.kubernetes.io/name", "hbase".to_string()),
+                ("app.kubernetes.io/role-group", "none".to_string()),
+                ("app.kubernetes.io/version", app_version_label("2.6.3")),
+                ("stackable.tech/vendor", "Stackable".to_string()),
             ]
-            .map(|(key, value)| (key.to_string(), value.to_string())),
+            .map(|(key, value)| (key.to_string(), value)),
         );
         let service_account = resources
             .service_accounts
