@@ -11,11 +11,19 @@
 - Bump stackable-operator to 0.114.0 ([#786]).
 - The reconciler now applies resources and derives the cluster status in discrete
   apply and update_status steps ([#787]).
+- All product containers now run with `securityContext.runAsNonRoot` set to `true` to improve security ([#792]).
+
+### Fixed
+
+- Fix a longstanding problem of including empty `categories`, `shortNames` and `additionalPrinterColumns` in the CRDs,
+  which could cause problems with GitOps tools (e.g. ArgoCD) reporting a diff in the custom resources.
+  See [our internal issue](https://github.com/stackabletech/hdfs-operator/issues/626) and [the fix](https://github.com/kube-rs/kube/pull/2042) for details ([#792]).
 
 [#776]: https://github.com/stackabletech/hbase-operator/pull/776
 [#782]: https://github.com/stackabletech/hbase-operator/pull/782
 [#786]: https://github.com/stackabletech/hbase-operator/pull/786
 [#787]: https://github.com/stackabletech/hbase-operator/pull/787
+[#792]: https://github.com/stackabletech/hbase-operator/pull/792
 
 ## [26.7.0] - 2026-07-21
 

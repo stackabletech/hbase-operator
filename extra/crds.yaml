@@ -6,7 +6,6 @@ metadata:
 spec:
   group: hbase.stackable.tech
   names:
-    categories: []
     kind: HbaseCluster
     plural: hbaseclusters
     shortNames:
@@ -14,8 +13,7 @@ spec:
     singular: hbasecluster
   scope: Namespaced
   versions:
-  - additionalPrinterColumns: []
-    name: v1alpha1
+  - name: v1alpha1
     schema:
       openAPIV3Schema:
         description: An HBase cluster stacklet. This resource is managed by the Stackable operator for Apache HBase.
