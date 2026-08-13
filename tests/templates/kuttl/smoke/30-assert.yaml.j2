@@ -11,6 +11,7 @@ metadata:
   labels:
     app.kubernetes.io/component: master
     app.kubernetes.io/instance: test-hbase
+    app.kubernetes.io/managed-by: hbase.stackable.tech_hbasecluster
     app.kubernetes.io/name: hbase
     app.kubernetes.io/role-group: default
     stackable.tech/vendor: Stackable
@@ -45,6 +46,7 @@ metadata:
   labels:
     app.kubernetes.io/component: master
     app.kubernetes.io/instance: test-hbase
+    app.kubernetes.io/managed-by: hbase.stackable.tech_hbasecluster
     app.kubernetes.io/name: hbase
     app.kubernetes.io/role-group: default
     prometheus.io/scrape: "true"
@@ -71,6 +73,7 @@ metadata:
   labels:
     app.kubernetes.io/component: regionserver
     app.kubernetes.io/instance: test-hbase
+    app.kubernetes.io/managed-by: hbase.stackable.tech_hbasecluster
     app.kubernetes.io/name: hbase
     app.kubernetes.io/role-group: default
     stackable.tech/vendor: Stackable
@@ -105,6 +108,7 @@ metadata:
   labels:
     app.kubernetes.io/component: regionserver
     app.kubernetes.io/instance: test-hbase
+    app.kubernetes.io/managed-by: hbase.stackable.tech_hbasecluster
     app.kubernetes.io/name: hbase
     app.kubernetes.io/role-group: default
     prometheus.io/scrape: "true"
@@ -131,6 +135,7 @@ metadata:
   labels:
     app.kubernetes.io/component: restserver
     app.kubernetes.io/instance: test-hbase
+    app.kubernetes.io/managed-by: hbase.stackable.tech_hbasecluster
     app.kubernetes.io/name: hbase
     app.kubernetes.io/role-group: default
     stackable.tech/vendor: Stackable
@@ -165,6 +170,7 @@ metadata:
   labels:
     app.kubernetes.io/component: restserver
     app.kubernetes.io/instance: test-hbase
+    app.kubernetes.io/managed-by: hbase.stackable.tech_hbasecluster
     app.kubernetes.io/name: hbase
     app.kubernetes.io/role-group: default
     prometheus.io/scrape: "true"
@@ -193,6 +199,7 @@ metadata:
   labels:
     app.kubernetes.io/component: master
     app.kubernetes.io/instance: test-hbase
+    app.kubernetes.io/managed-by: hbase.stackable.tech_hbasecluster
     app.kubernetes.io/name: hbase
     app.kubernetes.io/role-group: default
     restarter.stackable.tech/enabled: "true"
@@ -217,6 +224,7 @@ spec:
       labels:
         app.kubernetes.io/component: master
         app.kubernetes.io/instance: test-hbase
+        app.kubernetes.io/managed-by: hbase.stackable.tech_hbasecluster
         app.kubernetes.io/name: hbase
         app.kubernetes.io/role-group: default
         stackable.tech/vendor: Stackable
@@ -398,6 +406,7 @@ spec:
               labels:
                 app.kubernetes.io/component: master
                 app.kubernetes.io/instance: test-hbase
+                app.kubernetes.io/managed-by: hbase.stackable.tech_hbasecluster
                 app.kubernetes.io/name: hbase
                 app.kubernetes.io/role-group: default
                 stackable.tech/vendor: Stackable
@@ -421,6 +430,7 @@ metadata:
   labels:
     app.kubernetes.io/component: regionserver
     app.kubernetes.io/instance: test-hbase
+    app.kubernetes.io/managed-by: hbase.stackable.tech_hbasecluster
     app.kubernetes.io/name: hbase
     app.kubernetes.io/role-group: default
     restarter.stackable.tech/enabled: "true"
@@ -440,6 +450,7 @@ spec:
       labels:
         app.kubernetes.io/component: regionserver
         app.kubernetes.io/instance: test-hbase
+        app.kubernetes.io/managed-by: hbase.stackable.tech_hbasecluster
         app.kubernetes.io/name: hbase
         app.kubernetes.io/role-group: default
         stackable.tech/vendor: Stackable
@@ -630,6 +641,7 @@ spec:
               labels:
                 app.kubernetes.io/component: regionserver
                 app.kubernetes.io/instance: test-hbase
+                app.kubernetes.io/managed-by: hbase.stackable.tech_hbasecluster
                 app.kubernetes.io/name: hbase
                 app.kubernetes.io/role-group: default
                 stackable.tech/vendor: Stackable
@@ -653,6 +665,7 @@ metadata:
   labels:
     app.kubernetes.io/component: restserver
     app.kubernetes.io/instance: test-hbase
+    app.kubernetes.io/managed-by: hbase.stackable.tech_hbasecluster
     app.kubernetes.io/name: hbase
     app.kubernetes.io/role-group: default
     restarter.stackable.tech/enabled: "true"
@@ -677,6 +690,7 @@ spec:
       labels:
         app.kubernetes.io/component: restserver
         app.kubernetes.io/instance: test-hbase
+        app.kubernetes.io/managed-by: hbase.stackable.tech_hbasecluster
         app.kubernetes.io/name: hbase
         app.kubernetes.io/role-group: default
         stackable.tech/vendor: Stackable
@@ -878,6 +892,7 @@ metadata:
   labels:
     app.kubernetes.io/component: regionserver
     app.kubernetes.io/instance: test-hbase
+    app.kubernetes.io/managed-by: hbase.stackable.tech_hbasecluster
     app.kubernetes.io/name: hbase
     app.kubernetes.io/role-group: discovery
     stackable.tech/vendor: Stackable
@@ -894,6 +909,7 @@ metadata:
   labels:
     app.kubernetes.io/component: master
     app.kubernetes.io/instance: test-hbase
+    app.kubernetes.io/managed-by: hbase.stackable.tech_hbasecluster
     app.kubernetes.io/name: hbase
     app.kubernetes.io/role-group: default
     stackable.tech/vendor: Stackable
@@ -910,6 +926,7 @@ metadata:
   labels:
     app.kubernetes.io/component: regionserver
     app.kubernetes.io/instance: test-hbase
+    app.kubernetes.io/managed-by: hbase.stackable.tech_hbasecluster
     app.kubernetes.io/name: hbase
     app.kubernetes.io/role-group: default
     stackable.tech/vendor: Stackable
@@ -926,6 +943,7 @@ metadata:
   labels:
     app.kubernetes.io/component: restserver
     app.kubernetes.io/instance: test-hbase
+    app.kubernetes.io/managed-by: hbase.stackable.tech_hbasecluster
     app.kubernetes.io/name: hbase
     app.kubernetes.io/role-group: default
     stackable.tech/vendor: Stackable
@@ -941,6 +959,7 @@ kind: ServiceAccount
 metadata:
   labels:
     app.kubernetes.io/instance: test-hbase
+    app.kubernetes.io/managed-by: hbase.stackable.tech_hbasecluster
     app.kubernetes.io/name: hbase
   name: test-hbase-serviceaccount
   ownerReferences:
@@ -954,6 +973,7 @@ kind: RoleBinding
 metadata:
   labels:
     app.kubernetes.io/instance: test-hbase
+    app.kubernetes.io/managed-by: hbase.stackable.tech_hbasecluster
     app.kubernetes.io/name: hbase
   name: test-hbase-rolebinding
   ownerReferences:
@@ -1002,6 +1022,7 @@ metadata:
   labels:
     app.kubernetes.io/component: master
     app.kubernetes.io/instance: test-hbase
+    app.kubernetes.io/managed-by: hbase.stackable.tech_hbasecluster
     app.kubernetes.io/name: hbase
     app.kubernetes.io/role-group: default
     stackable.tech/vendor: Stackable
@@ -1034,6 +1055,7 @@ metadata:
   labels:
     app.kubernetes.io/component: regionserver
     app.kubernetes.io/instance: test-hbase
+    app.kubernetes.io/managed-by: hbase.stackable.tech_hbasecluster
     app.kubernetes.io/name: hbase
     app.kubernetes.io/role-group: default
     stackable.tech/vendor: Stackable

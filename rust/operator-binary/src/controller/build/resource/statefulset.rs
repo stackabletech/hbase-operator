@@ -303,7 +303,8 @@ pub fn build_rolegroup_statefulset(
     // Listener PVC labels should stay stable across upgrades and so should not
     // include the version field (see HDFS for a similar pattern).
     let mut unversioned_labels = cluster.role_group_selector(hbase_role, role_group_name);
-    // Vendor is not included in role_group_selector labels, so add it.
+    // Neither vendor nor managed-by are included in role_group_selector
+    // labels: vendor is a required and so add it back.
     unversioned_labels.insert(Label::stackable_vendor());
 
     let listener_pvc =
