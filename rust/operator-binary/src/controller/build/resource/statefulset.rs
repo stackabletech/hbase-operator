@@ -19,6 +19,7 @@ use stackable_operator::{
         },
         apimachinery::pkg::{apis::meta::v1::LabelSelector, util::intstr::IntOrString},
     },
+    kvp::Label,
     product_logging,
     v2::{
         builder::pod::container::{EnvVarName, EnvVarSet, new_container_builder},
@@ -301,7 +302,9 @@ pub fn build_rolegroup_statefulset(
 
     // Listener PVC labels should stay stable across upgrades and so should not
     // include the version field (see HDFS for a similar pattern).
-    let unversioned_labels = cluster.role_group_selector(hbase_role, role_group_name);
+    let mut unversioned_labels = cluster.role_group_selector(hbase_role, role_group_name);
+    // Vendor is not included in role_group_selector labels, so add it.
+    unversioned_labels.insert(Label::stackable_vendor());
 
     let listener_pvc =
         super::listener::build_listener_pvc(hbase_role, merged_config, &unversioned_labels);
