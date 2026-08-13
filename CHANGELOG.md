@@ -18,12 +18,17 @@
 - Fix a longstanding problem of including empty `categories`, `shortNames` and `additionalPrinterColumns` in the CRDs,
   which could cause problems with GitOps tools (e.g. ArgoCD) reporting a diff in the custom resources.
   See [our internal issue](https://github.com/stackabletech/hdfs-operator/issues/626) and [the fix](https://github.com/kube-rs/kube/pull/2042) for details ([#792]).
+- BREAKING: The app.kubernetes.io/managed-by label value changed from hbase.stackable.com_hbasecluster to
+  hbase.stackable.tech_hbasecluster, aligning with all other operators.
+- BREAKING: The rest-server listener PVC template now carries only the unversioned selector labels.
+  Existing rest-server StatefulSets must be deleted once before the new operator can reconcile them ([#795]).
 
 [#776]: https://github.com/stackabletech/hbase-operator/pull/776
 [#782]: https://github.com/stackabletech/hbase-operator/pull/782
 [#786]: https://github.com/stackabletech/hbase-operator/pull/786
 [#787]: https://github.com/stackabletech/hbase-operator/pull/787
 [#792]: https://github.com/stackabletech/hbase-operator/pull/792
+[#795]: https://github.com/stackabletech/hbase-operator/pull/795
 
 ## [26.7.0] - 2026-07-21
 
