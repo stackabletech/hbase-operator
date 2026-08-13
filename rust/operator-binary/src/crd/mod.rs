@@ -44,7 +44,7 @@ pub mod security;
 
 pub const APP_NAME: &str = "hbase";
 pub const FIELD_MANAGER: &str = "hbase-operator";
-pub const OPERATOR_NAME: &str = "hbase.stackable.com";
+pub const OPERATOR_NAME: &str = "hbase.stackable.tech";
 
 // This constant is hard coded in hbase-entrypoint.sh
 // You need to change it there too.

@@ -245,7 +245,7 @@ mod tests {
                 ("app.kubernetes.io/instance", "my-hbase".to_string()),
                 (
                     "app.kubernetes.io/managed-by",
-                    "hbase.stackable.com_hbasecluster".to_string(),
+                    "hbase.stackable.tech_hbasecluster".to_string(),
                 ),
                 ("app.kubernetes.io/name", "hbase".to_string()),
                 ("app.kubernetes.io/role-group", "none".to_string()),

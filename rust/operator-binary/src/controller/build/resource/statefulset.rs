@@ -299,8 +299,12 @@ pub fn build_rolegroup_statefulset(
         ));
     }
 
+    // Listener PVC labels should stay stable across upgrades and so should not
+    // include the version field (see HDFS for a similar pattern).
+    let unversioned_labels = cluster.role_group_selector(hbase_role, role_group_name);
+
     let listener_pvc =
-        super::listener::build_listener_pvc(hbase_role, merged_config, &recommended_labels);
+        super::listener::build_listener_pvc(hbase_role, merged_config, &unversioned_labels);
 
     if let Some(listener_volume) =
         super::listener::build_listener_volume(hbase_role, merged_config, &recommended_labels)
