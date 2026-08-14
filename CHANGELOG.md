@@ -19,7 +19,7 @@
   which could cause problems with GitOps tools (e.g. ArgoCD) reporting a diff in the custom resources.
   See [our internal issue](https://github.com/stackabletech/hdfs-operator/issues/626) and [the fix](https://github.com/kube-rs/kube/pull/2042) for details ([#792]).
 - BREAKING: The app.kubernetes.io/managed-by label value changed from hbase.stackable.com_hbasecluster to
-  hbase.stackable.tech_hbasecluster, aligning with all other operators.
+  hbase.stackable.tech_hbasecluster, aligning with all other operators ([#795]).
 - BREAKING: The rest-server listener PVC template now carries only the unversioned selector labels.
   Existing rest-server StatefulSets must be deleted once before the new operator can reconcile them ([#795]).
 
