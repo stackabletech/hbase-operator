@@ -1,0 +1,57 @@
+---
+# The operator owns (`.owns()` in main.rs) every resource it applies. Deleting one must
+# trigger a reconcile that recreates it — this is the behavioural check for the watch
+# registrations and the `watch` RBAC verbs in the operator ClusterRole. It lives in this
+# test because deleting the StatefulSets forces a full pod-restart cycle, and this test
+# cycles the pods anyway.
+#
+# Recreation is proven by UID change: waiting for mere existence could pass without any
+# deletion having happened. TestStep commands run exactly once (no kuttl retry loop), so
+# the polling below stays quiet in the log.
+#
+# Owned resources deliberately NOT tested here: the role-group ConfigMaps
+# (test-hbase-{master,regionserver,restserver}-default). The same `.owns(ConfigMap)`
+# registration is already exercised by the discovery ConfigMap below, and they are
+# mounted into running pods, which a deletion window would disturb.
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+metadata:
+  name: delete-owned-resources
+timeout: 300
+commands:
+  - script: |
+      set -eu
+
+      delete_and_await_recreation() {
+        kind=$1
+        name=$2
+        old_uid=$(kubectl get -n "$NAMESPACE" "$kind" "$name" -o jsonpath='{.metadata.uid}')
+        kubectl delete -n "$NAMESPACE" "$kind" "$name" --wait=false
+        # Recreation is a single reconcile away, so this normally succeeds on the
+        # first iteration; 30s is a generous upper bound well below the step timeout.
+        for _ in $(seq 1 30); do
+          new_uid=$(kubectl get -n "$NAMESPACE" "$kind" "$name" -o jsonpath='{.metadata.uid}' 2>/dev/null || true)
+          if [ -n "$new_uid" ] && [ "$new_uid" != "$old_uid" ]; then
+            return 0
+          fi
+          sleep 1
+        done
+        echo "$kind/$name was not recreated (old uid: $old_uid, current: '${new_uid:-}')" >&2
+        return 1
+      }
+
+      delete_and_await_recreation serviceaccount       test-hbase-serviceaccount
+      delete_and_await_recreation rolebinding          test-hbase-rolebinding
+      delete_and_await_recreation poddisruptionbudget  test-hbase-master
+      delete_and_await_recreation poddisruptionbudget  test-hbase-regionserver
+      delete_and_await_recreation poddisruptionbudget  test-hbase-restserver
+      delete_and_await_recreation configmap            test-hbase
+      delete_and_await_recreation service              test-hbase-master-default-headless
+      delete_and_await_recreation service              test-hbase-master-default-metrics
+      delete_and_await_recreation service              test-hbase-regionserver-default-headless
+      delete_and_await_recreation service              test-hbase-regionserver-default-metrics
+      delete_and_await_recreation service              test-hbase-restserver-default-headless
+      delete_and_await_recreation service              test-hbase-restserver-default-metrics
+      delete_and_await_recreation statefulset          test-hbase-master-default
+      delete_and_await_recreation statefulset          test-hbase-regionserver-default
+      delete_and_await_recreation statefulset          test-hbase-restserver-default

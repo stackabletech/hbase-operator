@@ -3192,6 +3192,7 @@ dependencies = [
  "const_format",
  "fnv",
  "futures 0.3.33",
+ "http",
  "indoc",
  "rstest",
  "serde",
