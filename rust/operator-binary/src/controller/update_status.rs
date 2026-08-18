@@ -12,7 +12,7 @@ use strum::{EnumDiscriminants, IntoStaticStr};
 
 use crate::{
     controller::{Applied, KubernetesResources},
-    crd::{HbaseClusterStatus, OPERATOR_NAME, v1alpha1},
+    crd::{HBASE_OPERATOR_NAME, HbaseClusterStatus, v1alpha1},
 };
 
 #[derive(Snafu, Debug, EnumDiscriminants)]
@@ -47,7 +47,7 @@ pub async fn update_status(
     };
 
     client
-        .apply_patch_status(OPERATOR_NAME, hbase, &status)
+        .apply_patch_status(HBASE_OPERATOR_NAME, hbase, &status)
         .await
         .context(ApplyStatusSnafu)?;
 

@@ -1,19 +1,24 @@
 //! Builders that turn a [`ValidatedCluster`] into
 //! Kubernetes resources.
 
-use std::{marker::PhantomData, str::FromStr};
+use std::{marker::PhantomData, ops::Deref};
 
 use snafu::{ResultExt, Snafu};
 use stackable_operator::{
     builder::meta::ObjectMetaBuilder,
     kvp::Labels,
     utils::cluster_info::KubernetesClusterInfo,
-    v2::{builder::meta::ownerreference_from_resource, types::operator::RoleGroupName},
+    v2::{
+        builder::meta::ownerreference_from_resource,
+        kvp::label,
+        types::operator::{RoleGroupName, RoleName},
+    },
 };
 
 use crate::{
     controller::{
-        KubernetesResources, Prepared, ValidatedCluster,
+        CONTROLLER_NAME, KubernetesResources, OPERATOR_NAME, PRODUCT_NAME, Prepared,
+        ValidatedCluster,
         build::resource::{
             config_map::{self, build_rolegroup_config_map},
             discovery::{self, build_discovery_config_map},
@@ -25,10 +30,6 @@ use crate::{
     },
     crd::HbaseRole,
 };
-
-// Placeholder role-group name used for the recommended labels of the role-level discovery
-// `ConfigMap` (which is not tied to a single role group).
-stackable_operator::constant!(pub(crate) PLACEHOLDER_DISCOVERY_ROLE_GROUP: RoleGroupName = "discovery");
 
 /// Returns an [`ObjectMetaBuilder`] pre-filled with the cluster's namespace, an owner
 /// reference back to the cluster, the resource `name` and the given `recommended_labels`.
@@ -51,14 +52,14 @@ pub(crate) fn object_meta(
 
 #[derive(Snafu, Debug)]
 pub enum Error {
-    #[snafu(display("failed to build ConfigMap for role {hbase_role} role group {role_group}"))]
+    #[snafu(display("failed to build ConfigMap for role {role} role group {role_group}", role = hbase_role.deref()))]
     ConfigMap {
         source: config_map::Error,
         hbase_role: HbaseRole,
         role_group: RoleGroupName,
     },
 
-    #[snafu(display("failed to build StatefulSet for role {hbase_role} role group {role_group}"))]
+    #[snafu(display("failed to build StatefulSet for role {role} role group {role_group}", role = hbase_role.deref()))]
     StatefulSet {
         source: statefulset::Error,
         hbase_role: HbaseRole,
@@ -131,6 +132,70 @@ pub fn build(
         role_bindings: vec![build_role_binding(cluster)],
         status: PhantomData,
     })
+}
+
+pub(crate) fn recommended_labels_for_cluster_resources(cluster: &ValidatedCluster) -> Labels {
+    label::recommended_labels_for_cluster_resources(
+        &cluster.name,
+        &PRODUCT_NAME,
+        &cluster.product_version,
+        &OPERATOR_NAME,
+        &CONTROLLER_NAME,
+    )
+}
+
+pub(crate) fn recommended_labels_for_role_resources(
+    cluster: &ValidatedCluster,
+    role_name: &RoleName,
+) -> Labels {
+    label::recommended_labels_for_role_resources(
+        &cluster.name,
+        &PRODUCT_NAME,
+        &cluster.product_version,
+        &OPERATOR_NAME,
+        &CONTROLLER_NAME,
+        role_name,
+    )
+}
+
+pub(crate) fn recommended_labels_for_role_group_resources(
+    cluster: &ValidatedCluster,
+    role_name: &RoleName,
+    role_group_name: &RoleGroupName,
+) -> Labels {
+    label::recommended_labels_for_role_group_resources(
+        &cluster.name,
+        &PRODUCT_NAME,
+        &cluster.product_version,
+        &OPERATOR_NAME,
+        &CONTROLLER_NAME,
+        role_name,
+        role_group_name,
+    )
+}
+
+pub(crate) fn recommended_labels_for_unversioned_role_group_resources(
+    cluster: &ValidatedCluster,
+    role_name: &RoleName,
+    role_group_name: &RoleGroupName,
+) -> Labels {
+    label::recommended_labels_for_unversioned_role_group_resources(
+        &cluster.name,
+        &PRODUCT_NAME,
+        &OPERATOR_NAME,
+        &CONTROLLER_NAME,
+        role_name,
+        role_group_name,
+    )
+}
+
+/// Selector labels matching the pods of a role group.
+pub(crate) fn role_group_selector(
+    cluster: &ValidatedCluster,
+    role_name: &RoleName,
+    role_group_name: &RoleGroupName,
+) -> Labels {
+    label::role_group_selector(&cluster.name, &PRODUCT_NAME, role_name, role_group_name)
 }
 
 pub mod graceful_shutdown;
@@ -241,14 +306,12 @@ mod tests {
 
         let expected_labels = BTreeMap::from(
             [
-                ("app.kubernetes.io/component", "none".to_string()),
                 ("app.kubernetes.io/instance", "my-hbase".to_string()),
                 (
                     "app.kubernetes.io/managed-by",
                     "hbase.stackable.com_hbasecluster".to_string(),
                 ),
                 ("app.kubernetes.io/name", "hbase".to_string()),
-                ("app.kubernetes.io/role-group", "none".to_string()),
                 ("app.kubernetes.io/version", app_version_label("2.6.3")),
                 ("stackable.tech/vendor", "Stackable".to_string()),
             ]

@@ -1,4 +1,4 @@
-use std::str::FromStr;
+use std::{ops::Deref, str::FromStr};
 
 use security::AuthenticationConfig;
 use serde::{Deserialize, Serialize};
@@ -16,17 +16,18 @@ use stackable_operator::{
         fragment::Fragment,
         merge::{Atomic, Merge},
     },
+    constant,
     deep_merger::ObjectOverrides,
     k8s_openapi::apimachinery::pkg::api::resource::Quantity,
     kube::CustomResource,
     product_logging::{self, spec::Logging},
-    role_utils::{GenericRoleConfig, Role},
+    role_utils::GenericRoleConfig,
     schemars::{self, JsonSchema},
     shared::time::Duration,
     status::condition::{ClusterCondition, HasStatusCondition},
     v2::{
         config_overrides::KeyValueConfigOverrides,
-        role_utils::JavaCommonConfig,
+        role_utils::{JavaCommonConfig, Role},
         types::{
             common::Port,
             kubernetes::{ConfigMapName, ListenerClassName, SecretClassName, VolumeName},
@@ -35,7 +36,7 @@ use stackable_operator::{
     },
     versioned::versioned,
 };
-use strum::{Display, EnumIter, EnumString};
+use strum::{Display, EnumIter};
 
 use crate::crd::{affinity::get_affinity, security::AuthorizationConfig};
 
@@ -44,14 +45,14 @@ pub mod security;
 
 pub const APP_NAME: &str = "hbase";
 pub const FIELD_MANAGER: &str = "hbase-operator";
-pub const OPERATOR_NAME: &str = "hbase.stackable.com";
+pub const HBASE_OPERATOR_NAME: &str = "hbase.stackable.com";
 
 // This constant is hard coded in hbase-entrypoint.sh
 // You need to change it there too.
 pub const CONFIG_DIR_NAME: &str = "/stackable/conf";
 
 pub const TLS_STORE_DIR: &str = "/stackable/tls";
-stackable_operator::constant!(pub TLS_STORE_VOLUME_NAME: VolumeName = "tls");
+constant!(pub TLS_STORE_VOLUME_NAME: VolumeName = "tls");
 pub const TLS_STORE_PASSWORD: &str = "changeit";
 /// The key- and truststore type used for all HBase TLS stores.
 pub const TLS_STORE_TYPE: &str = "pkcs12";
@@ -234,44 +235,26 @@ impl v1alpha1::HbaseCluster {
     }
 }
 
-#[derive(
-    Clone,
-    Debug,
-    Deserialize,
-    Display,
-    EnumIter,
-    Eq,
-    Hash,
-    JsonSchema,
-    Ord,
-    PartialEq,
-    PartialOrd,
-    Serialize,
-    EnumString,
-)]
+constant!(MASTER_ROLE_NAME: RoleName = "master");
+constant!(REGIONSERVER_ROLE_NAME: RoleName = "regionserver");
+constant!(RESTSERVER_ROLE_NAME: RoleName = "restserver");
+
+#[derive(Clone, Debug, EnumIter, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum HbaseRole {
-    #[serde(rename = "master")]
-    #[strum(serialize = "master")]
     Master,
-
-    #[serde(rename = "regionserver")]
-    #[strum(serialize = "regionserver")]
     RegionServer,
-
-    #[serde(rename = "restserver")]
-    #[strum(serialize = "restserver")]
     RestServer,
 }
 
-impl From<HbaseRole> for RoleName {
-    fn from(value: HbaseRole) -> Self {
-        RoleName::from_str(&value.to_string()).expect("an HbaseRole name is a valid role name")
-    }
-}
+impl Deref for HbaseRole {
+    type Target = RoleName;
 
-impl From<&HbaseRole> for RoleName {
-    fn from(value: &HbaseRole) -> Self {
-        RoleName::from_str(&value.to_string()).expect("an HbaseRole name is a valid role name")
+    fn deref(&self) -> &Self::Target {
+        match self {
+            HbaseRole::Master => &MASTER_ROLE_NAME,
+            HbaseRole::RegionServer => &REGIONSERVER_ROLE_NAME,
+            HbaseRole::RestServer => &RESTSERVER_ROLE_NAME,
+        }
     }
 }
 
@@ -631,6 +614,14 @@ mod tests {
     use stackable_operator::versioned::test_utils::RoundtripTestData;
 
     use super::*;
+
+    #[test]
+    fn test_constants() {
+        // Test that dereferencing the constants does not panic.
+        let _ = *MASTER_ROLE_NAME;
+        let _ = *REGIONSERVER_ROLE_NAME;
+        let _ = *RESTSERVER_ROLE_NAME;
+    }
 
     #[rstest]
     #[case("default", false, 1, vec![])]
