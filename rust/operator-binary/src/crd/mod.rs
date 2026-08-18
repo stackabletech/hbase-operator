@@ -52,7 +52,7 @@ pub const HBASE_OPERATOR_NAME: &str = "hbase.stackable.com";
 pub const CONFIG_DIR_NAME: &str = "/stackable/conf";
 
 pub const TLS_STORE_DIR: &str = "/stackable/tls";
-stackable_operator::constant!(pub TLS_STORE_VOLUME_NAME: VolumeName = "tls");
+constant!(pub TLS_STORE_VOLUME_NAME: VolumeName = "tls");
 pub const TLS_STORE_PASSWORD: &str = "changeit";
 /// The key- and truststore type used for all HBase TLS stores.
 pub const TLS_STORE_TYPE: &str = "pkcs12";

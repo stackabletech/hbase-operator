@@ -53,11 +53,6 @@ pub enum Error {
     #[snafu(display("failed to merge and validate the role group config"))]
     ValidateRoleGroupConfig { source: fragment::ValidationError },
 
-    #[snafu(display("invalid environment variable override name"))]
-    ParseEnvVarName {
-        source: stackable_operator::v2::macros::attributed_string_type::Error,
-    },
-
     #[snafu(display("invalid role group name {role_group}"))]
     ParseRoleGroupName {
         source: stackable_operator::v2::macros::attributed_string_type::Error,
@@ -231,7 +226,7 @@ pub fn validate_cluster(
 /// `jvmArgumentOverrides` (role group wins) into a single merged
 /// [`RoleGroup`](stackable_operator::v2::role_utils::RoleGroup). The per-role validated config
 /// is wrapped into [`AnyServiceConfig`] via `wrap`; the merged `envOverrides` are converted
-/// into an `EnvVarSet` (validating each name eagerly). The merged `jvmArgumentOverrides` are
+/// into an `EnvVarSet` (validating at deserialize time). The merged `jvmArgumentOverrides` are
 /// kept in `product_specific_common_config` and applied at build time.
 ///
 /// Returns an empty map if the role is not configured.

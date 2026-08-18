@@ -1,7 +1,7 @@
 //! Builders that turn a [`ValidatedCluster`] into
 //! Kubernetes resources.
 
-use std::{marker::PhantomData, ops::Deref, str::FromStr};
+use std::{marker::PhantomData, ops::Deref};
 
 use snafu::{ResultExt, Snafu};
 use stackable_operator::{
@@ -30,10 +30,6 @@ use crate::{
     },
     crd::HbaseRole,
 };
-
-// Placeholder role-group name used for the recommended labels of the role-level discovery
-// `ConfigMap` (which is not tied to a single role group).
-stackable_operator::constant!(pub(crate) PLACEHOLDER_DISCOVERY_ROLE_GROUP: RoleGroupName = "discovery");
 
 /// Returns an [`ObjectMetaBuilder`] pre-filled with the cluster's namespace, an owner
 /// reference back to the cluster, the resource `name` and the given `recommended_labels`.

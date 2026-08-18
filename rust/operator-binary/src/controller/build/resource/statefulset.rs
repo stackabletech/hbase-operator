@@ -10,6 +10,7 @@ use stackable_operator::{
         meta::ObjectMetaBuilder,
         pod::{PodBuilder, security::PodSecurityContextBuilder},
     },
+    constant,
     constants::RESTART_CONTROLLER_ENABLED_LABEL,
     k8s_openapi::{
         DeepMerge,
@@ -47,24 +48,24 @@ use crate::{
     crd::{CONFIG_DIR_NAME, HbaseRole, LISTENER_VOLUME_DIR, LISTENER_VOLUME_NAME},
 };
 
-stackable_operator::constant!(HBASE_CONTAINER_NAME: ContainerName = "hbase");
-stackable_operator::constant!(VECTOR_CONTAINER_NAME: ContainerName = "vector");
+constant!(HBASE_CONTAINER_NAME: ContainerName = "hbase");
+constant!(VECTOR_CONTAINER_NAME: ContainerName = "vector");
 
 // Pod volume names. The Vector container reuses the `hbase-config` (rolegroup ConfigMap, which
 // carries `vector.yaml`) and `log` volumes, so the produced volume mounts match the rest of the
 // Pod.
-stackable_operator::constant!(HBASE_CONFIG_VOLUME_NAME: VolumeName = "hbase-config");
-stackable_operator::constant!(HDFS_DISCOVERY_VOLUME_NAME: VolumeName = "hdfs-discovery");
-stackable_operator::constant!(LOG_CONFIG_VOLUME_NAME: VolumeName = "log-config");
-stackable_operator::constant!(LOG_VOLUME_NAME: VolumeName = "log");
+constant!(HBASE_CONFIG_VOLUME_NAME: VolumeName = "hbase-config");
+constant!(HDFS_DISCOVERY_VOLUME_NAME: VolumeName = "hdfs-discovery");
+constant!(LOG_CONFIG_VOLUME_NAME: VolumeName = "log-config");
+constant!(LOG_VOLUME_NAME: VolumeName = "log");
 
 // Environment variable names set on the HBase container. Declared as typed constants (instead of
 // `EnvVarName::from_str_unsafe` at the use site) and validated by `env_var_names_are_valid`.
-stackable_operator::constant!(HBASE_CONF_DIR_ENV: EnvVarName = "HBASE_CONF_DIR");
-stackable_operator::constant!(HADOOP_CONF_DIR_ENV: EnvVarName = "HADOOP_CONF_DIR");
-stackable_operator::constant!(REGION_MOVER_OPTS_ENV: EnvVarName = "REGION_MOVER_OPTS");
-stackable_operator::constant!(RUN_REGION_MOVER_ENV: EnvVarName = "RUN_REGION_MOVER");
-stackable_operator::constant!(STACKABLE_LOG_DIR_ENV: EnvVarName = "STACKABLE_LOG_DIR");
+constant!(HBASE_CONF_DIR_ENV: EnvVarName = "HBASE_CONF_DIR");
+constant!(HADOOP_CONF_DIR_ENV: EnvVarName = "HADOOP_CONF_DIR");
+constant!(REGION_MOVER_OPTS_ENV: EnvVarName = "REGION_MOVER_OPTS");
+constant!(RUN_REGION_MOVER_ENV: EnvVarName = "RUN_REGION_MOVER");
+constant!(STACKABLE_LOG_DIR_ENV: EnvVarName = "STACKABLE_LOG_DIR");
 
 pub static CONTAINERDEBUG_LOG_DIRECTORY: std::sync::LazyLock<String> =
     std::sync::LazyLock::new(|| format!("{STACKABLE_LOG_DIR}/containerdebug"));

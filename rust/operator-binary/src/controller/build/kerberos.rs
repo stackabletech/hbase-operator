@@ -11,6 +11,7 @@ use stackable_operator::{
         },
     },
     commons::secret_class::SecretClassVolumeProvisionParts,
+    constant,
     shared::time::Duration,
     utils::cluster_info::KubernetesClusterInfo,
     v2::types::kubernetes::VolumeName,
@@ -27,7 +28,7 @@ pub const STACKABLE_KERBEROS_DIR: &str = "/stackable/kerberos";
 /// `KRB5_CONFIG` env var) and by the JVM args builder.
 pub const KRB5_CONFIG_PATH: &str = const_format::concatcp!(STACKABLE_KERBEROS_DIR, "/krb5.conf");
 // Name of the Kerberos secret volume.
-stackable_operator::constant!(KERBEROS_VOLUME_NAME: VolumeName = "kerberos");
+constant!(KERBEROS_VOLUME_NAME: VolumeName = "kerberos");
 /// The RPC/data-transfer quality-of-protection level used when Kerberos is enabled.
 const PROTECTION_PRIVACY: &str = "privacy";
 
