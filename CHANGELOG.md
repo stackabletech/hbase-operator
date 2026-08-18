@@ -8,7 +8,7 @@
   assembles all relevant Kubernetes resources before anything is applied ([#776]).
 - The RBAC ServiceAccount and RoleBinding are now built with the operator-rs `v2::rbac`
   functions and carry the full set of recommended labels ([#782]).
-- Bump stackable-operator to 0.116.0 ([#786]).
+- Bump stackable-operator to 0.116.0 ([#786], [#799]).
 - The reconciler now applies resources and derives the cluster status in discrete
   apply and update_status steps ([#787]).
 - All product containers now run with `securityContext.runAsNonRoot` set to `true` to improve security ([#792]).
