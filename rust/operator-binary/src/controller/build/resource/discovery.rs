@@ -10,7 +10,8 @@ use crate::{
     controller::{
         ValidatedCluster,
         build::{
-            PLACEHOLDER_DISCOVERY_ROLE_GROUP, kerberos, object_meta, properties::ConfigFileName,
+            kerberos, object_meta, properties::ConfigFileName,
+            recommended_labels_for_role_resources,
         },
     },
     crd::HbaseRole,
@@ -40,16 +41,13 @@ pub fn build_discovery_config_map(
 
     ConfigMapBuilder::new()
         .metadata(
-            // The discovery `ConfigMap` is a cluster-wide object (not tied to a single role
-            // group), so it is named after the cluster and labelled with the region-server role
-            // and a `discovery` placeholder role-group.
+            // The discovery `ConfigMap` is a cluster-wide object (not tied to
+            // a single role group), so it is named after the cluster and
+            // labelled with the region-server role.
             object_meta(
                 cluster,
                 cluster.name.to_string(),
-                cluster.recommended_labels(
-                    &HbaseRole::RegionServer,
-                    &PLACEHOLDER_DISCOVERY_ROLE_GROUP,
-                ),
+                recommended_labels_for_role_resources(cluster, &HbaseRole::RegionServer),
             )
             .build(),
         )

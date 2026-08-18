@@ -40,6 +40,8 @@ use crate::{
             kerberos::{self, add_kerberos_pod_config},
             object_meta,
             properties::product_logging::MAX_HBASE_LOG_FILES_SIZE,
+            recommended_labels_for_role_group_resources,
+            recommended_labels_for_unversioned_role_group_resources, role_group_selector,
         },
     },
     crd::{CONFIG_DIR_NAME, HbaseRole, LISTENER_VOLUME_DIR, LISTENER_VOLUME_NAME},
@@ -204,7 +206,8 @@ pub fn build_rolegroup_statefulset(
 
     let mut pod_builder = PodBuilder::new();
 
-    let recommended_labels = cluster.recommended_labels(hbase_role, role_group_name);
+    let recommended_labels =
+        recommended_labels_for_role_group_resources(cluster, hbase_role, role_group_name);
 
     let pb_metadata = ObjectMetaBuilder::new()
         .with_labels(recommended_labels.clone())
@@ -299,8 +302,17 @@ pub fn build_rolegroup_statefulset(
         ));
     }
 
+    // Used for PVC templates, which cannot be modified once they are deployed.
+    // The version label is omitted so the labels stay stable across version
+    // upgrades.
+    let unversioned_labels = recommended_labels_for_unversioned_role_group_resources(
+        cluster,
+        hbase_role,
+        role_group_name,
+    );
+
     let listener_pvc =
-        super::listener::build_listener_pvc(hbase_role, merged_config, &recommended_labels);
+        super::listener::build_listener_pvc(hbase_role, merged_config, &unversioned_labels);
 
     if let Some(listener_volume) =
         super::listener::build_listener_volume(hbase_role, merged_config, &recommended_labels)
@@ -318,12 +330,12 @@ pub fn build_rolegroup_statefulset(
     let metadata = object_meta(
         cluster,
         resource_names.stateful_set_name().to_string(),
-        cluster.recommended_labels(hbase_role, role_group_name),
+        recommended_labels_for_role_group_resources(cluster, hbase_role, role_group_name),
     )
     .with_label(RESTART_CONTROLLER_ENABLED_LABEL.to_owned())
     .build();
 
-    let statefulset_match_labels = cluster.role_group_selector(hbase_role, role_group_name);
+    let statefulset_match_labels = role_group_selector(cluster, hbase_role, role_group_name);
 
     let statefulset_spec = StatefulSetSpec {
         pod_management_policy: Some("Parallel".to_string()),
