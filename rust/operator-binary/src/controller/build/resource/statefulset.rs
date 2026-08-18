@@ -66,9 +66,7 @@ constant!(HADOOP_CONF_DIR_ENV: EnvVarName = "HADOOP_CONF_DIR");
 constant!(REGION_MOVER_OPTS_ENV: EnvVarName = "REGION_MOVER_OPTS");
 constant!(RUN_REGION_MOVER_ENV: EnvVarName = "RUN_REGION_MOVER");
 constant!(STACKABLE_LOG_DIR_ENV: EnvVarName = "STACKABLE_LOG_DIR");
-
-pub static CONTAINERDEBUG_LOG_DIRECTORY: std::sync::LazyLock<String> =
-    std::sync::LazyLock::new(|| format!("{STACKABLE_LOG_DIR}/containerdebug"));
+constant!(CONTAINERDEBUG_LOG_DIRECTORY_ENV: EnvVarName = "CONTAINERDEBUG_LOG_DIRECTORY");
 
 // These constants are hard coded in hbase-entrypoint.sh
 // You need to change them there too.
@@ -160,14 +158,21 @@ pub fn build_rolegroup_statefulset(
         .with_value(&HBASE_CONF_DIR_ENV, CONFIG_DIR_NAME)
         // required by phoenix (for cases where Kerberos is enabled): see https://issues.apache.org/jira/browse/PHOENIX-2369
         .with_value(&HADOOP_CONF_DIR_ENV, CONFIG_DIR_NAME)
-        .merge(validated_rg_config.env_overrides.clone())
         // These env vars are set for all roles to avoid bash's "unbound variable" errors.
         .with_value(&REGION_MOVER_OPTS_ENV, merged_config.region_mover_args())
         .with_value(
             &RUN_REGION_MOVER_ENV,
             merged_config.run_region_mover().to_string(),
         )
-        .with_value(&STACKABLE_LOG_DIR_ENV, STACKABLE_LOG_DIR);
+        .with_value(&STACKABLE_LOG_DIR_ENV, STACKABLE_LOG_DIR)
+        // Needed for the `containerdebug` process to log its tracing information to.
+        .with_value(
+            &CONTAINERDEBUG_LOG_DIRECTORY_ENV,
+            format!("{STACKABLE_LOG_DIR}/containerdebug"),
+        )
+        // apply overrides last of all; `EnvVarSet` is keyed by name, so iteration is already
+        // in a fixed (sorted-by-name) order
+        .merge(validated_rg_config.env_overrides.clone());
 
     let role_name = hbase_role.cli_role_name();
     let mut hbase_container = new_container_builder(&HBASE_CONTAINER_NAME);
@@ -184,11 +189,6 @@ pub fn build_rolegroup_statefulset(
             ui_port_name = HbaseRole::ui_port_name(https_enabled),
         }])
         .add_env_vars(merged_env)
-        // Needed for the `containerdebug` process to log it's tracing information to.
-        .add_env_var(
-            "CONTAINERDEBUG_LOG_DIRECTORY",
-            &*CONTAINERDEBUG_LOG_DIRECTORY,
-        )
         .add_volume_mount(&*HBASE_CONFIG_VOLUME_NAME, HBASE_CONFIG_TMP_DIR)
         .context(AddVolumeMountSnafu)?
         .add_volume_mount(&*HDFS_DISCOVERY_VOLUME_NAME, HDFS_DISCOVERY_TMP_DIR)
@@ -372,6 +372,62 @@ fn command() -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_utils;
+
+    /// `envOverrides` are applied after every operator-set environment variable, so users can
+    /// override any of them (previously the operator's value silently won for the variables set
+    /// after the merge, and `CONTAINERDEBUG_LOG_DIRECTORY` was appended separately, producing a
+    /// duplicate entry when overridden).
+    #[test]
+    fn env_overrides_take_precedence_over_operator_set_env_vars() {
+        let hbase = test_utils::hbase_from_yaml(&test_utils::MINIMAL_HBASE_YAML.replace(
+            "  masters:\n",
+            concat!(
+                "  masters:\n",
+                "    envOverrides:\n",
+                "      RUN_REGION_MOVER: \"overridden\"\n",
+                "      CONTAINERDEBUG_LOG_DIRECTORY: /debug-override\n",
+            ),
+        ));
+        let cluster = test_utils::validated_cluster_from(&hbase);
+        let role_group_name = test_utils::role_group_name("default");
+        let rg_config = &cluster.role_group_configs[&HbaseRole::Master][&role_group_name];
+
+        let stateful_set =
+            build_rolegroup_statefulset(&cluster, &HbaseRole::Master, &role_group_name, rg_config)
+                .expect("the StatefulSet builds");
+
+        let env: Vec<(String, String)> = stateful_set
+            .spec
+            .expect("the StatefulSet has a spec")
+            .template
+            .spec
+            .expect("the pod template has a spec")
+            .containers
+            .into_iter()
+            .find(|container| container.name == HBASE_CONTAINER_NAME.to_string())
+            .expect("the hbase container exists")
+            .env
+            .expect("the hbase container has env vars")
+            .into_iter()
+            .filter(|env_var| {
+                ["RUN_REGION_MOVER", "CONTAINERDEBUG_LOG_DIRECTORY"].contains(&&*env_var.name)
+            })
+            .map(|env_var| (env_var.name, env_var.value.unwrap_or_default()))
+            .collect();
+
+        // Exact comparison so a duplicate entry (operator value alongside the override) fails too.
+        assert_eq!(
+            env,
+            [
+                (
+                    "CONTAINERDEBUG_LOG_DIRECTORY".to_string(),
+                    "/debug-override".to_string()
+                ),
+                ("RUN_REGION_MOVER".to_string(), "overridden".to_string()),
+            ]
+        );
+    }
 
     /// The env-var-name constants are built with `EnvVarName::from_str`, which panics on an invalid
     /// name. This test forces every constant to be evaluated so a typo is caught at test time rather
@@ -383,5 +439,9 @@ mod tests {
         assert_eq!(REGION_MOVER_OPTS_ENV.to_string(), "REGION_MOVER_OPTS");
         assert_eq!(RUN_REGION_MOVER_ENV.to_string(), "RUN_REGION_MOVER");
         assert_eq!(STACKABLE_LOG_DIR_ENV.to_string(), "STACKABLE_LOG_DIR");
+        assert_eq!(
+            CONTAINERDEBUG_LOG_DIRECTORY_ENV.to_string(),
+            "CONTAINERDEBUG_LOG_DIRECTORY"
+        );
     }
 }

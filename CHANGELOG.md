@@ -8,10 +8,12 @@
   assembles all relevant Kubernetes resources before anything is applied ([#776]).
 - The RBAC ServiceAccount and RoleBinding are now built with the operator-rs `v2::rbac`
   functions and carry the full set of recommended labels ([#782]).
-- Bump stackable-operator to 0.114.0 ([#786]).
+- Bump stackable-operator to 0.116.0 ([#786], [#nnn]).
 - The reconciler now applies resources and derives the cluster status in discrete
   apply and update_status steps ([#787]).
 - All product containers now run with `securityContext.runAsNonRoot` set to `true` to improve security ([#792]).
+- `envOverrides` names are now validated by the shared `EnvVarName` type rather than by
+  operator-specific validation code ([#nnn]).
 - BREAKING: Remove the `app.kubernetes.io/component` and `app.kubernetes.io/role-group` labels
   from the resources they don't apply to (previously set to `none` or a placeholder value).
   StatefulSets created by older operator versions cannot be updated in place: after the
