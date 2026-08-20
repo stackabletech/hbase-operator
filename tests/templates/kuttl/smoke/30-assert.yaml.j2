@@ -259,6 +259,8 @@ spec:
         - pipefail
         - -c
         env:
+        - name: CONTAINERDEBUG_LOG_DIRECTORY
+          value: /stackable/log/containerdebug
         - name: HADOOP_CONF_DIR
           value: /stackable/conf
         - name: HBASE_CONF_DIR
@@ -268,8 +270,6 @@ spec:
           value: "false"
         - name: STACKABLE_LOG_DIR
           value: /stackable/log
-        - name: CONTAINERDEBUG_LOG_DIRECTORY
-          value: /stackable/log/containerdebug
         imagePullPolicy: IfNotPresent
         livenessProbe:
           failureThreshold: 3
@@ -494,6 +494,8 @@ spec:
         - pipefail
         - -c
         env:
+        - name: CONTAINERDEBUG_LOG_DIRECTORY
+          value: /stackable/log/containerdebug
         - name: HADOOP_CONF_DIR
           value: /stackable/conf
         - name: HBASE_CONF_DIR
@@ -503,8 +505,6 @@ spec:
           value: "false"
         - name: STACKABLE_LOG_DIR
           value: /stackable/log
-        - name: CONTAINERDEBUG_LOG_DIRECTORY
-          value: /stackable/log/containerdebug
         imagePullPolicy: IfNotPresent
         livenessProbe:
           failureThreshold: 3
@@ -725,6 +725,8 @@ spec:
         - pipefail
         - -c
         env:
+        - name: CONTAINERDEBUG_LOG_DIRECTORY
+          value: /stackable/log/containerdebug
         - name: HADOOP_CONF_DIR
           value: /stackable/conf
         - name: HBASE_CONF_DIR
@@ -734,8 +736,6 @@ spec:
           value: "false"
         - name: STACKABLE_LOG_DIR
           value: /stackable/log
-        - name: CONTAINERDEBUG_LOG_DIRECTORY
-          value: /stackable/log/containerdebug
         imagePullPolicy: IfNotPresent
         livenessProbe:
           failureThreshold: 3
