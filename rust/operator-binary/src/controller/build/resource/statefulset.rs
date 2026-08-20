@@ -170,6 +170,8 @@ pub fn build_rolegroup_statefulset(
             &CONTAINERDEBUG_LOG_DIRECTORY_ENV,
             format!("{STACKABLE_LOG_DIR}/containerdebug"),
         )
+        // Empty when Kerberos is disabled.
+        .merge(kerberos::kerberos_env_vars(cluster))
         // apply overrides last of all; `EnvVarSet` is keyed by name, so iteration is already
         // in a fixed (sorted-by-name) order
         .merge(validated_rg_config.env_overrides.clone());
@@ -426,6 +428,73 @@ mod tests {
                 ),
                 ("RUN_REGION_MOVER".to_string(), "overridden".to_string()),
             ]
+        );
+    }
+
+    /// The `KRB5_CONFIG` values of the hbase container of the master `default` role group built
+    /// from `yaml`.
+    fn krb5_config_values(yaml: &str) -> Vec<(String, String)> {
+        let hbase = test_utils::hbase_from_yaml(yaml);
+        let cluster = test_utils::validated_cluster_from(&hbase);
+        let role_group_name = test_utils::role_group_name("default");
+        let rg_config = &cluster.role_group_configs[&HbaseRole::Master][&role_group_name];
+
+        build_rolegroup_statefulset(&cluster, &HbaseRole::Master, &role_group_name, rg_config)
+            .expect("the StatefulSet builds")
+            .spec
+            .expect("the StatefulSet has a spec")
+            .template
+            .spec
+            .expect("the pod template has a spec")
+            .containers
+            .into_iter()
+            .find(|container| container.name == HBASE_CONTAINER_NAME.to_string())
+            .expect("the hbase container exists")
+            .env
+            .expect("the hbase container has env vars")
+            .into_iter()
+            .filter(|env_var| env_var.name == "KRB5_CONFIG")
+            .map(|env_var| (env_var.name, env_var.value.unwrap_or_default()))
+            .collect()
+    }
+
+    /// With Kerberos enabled, the operator sets `KRB5_CONFIG` — as part of the merged env set, so
+    /// an `envOverrides` entry replaces it instead of producing a duplicate whose precedence
+    /// depended on Kubernetes' duplicate-name handling (previously it was appended to the
+    /// container after the overrides and could not be overridden).
+    #[test]
+    fn env_overrides_take_precedence_over_kerberos_env_vars() {
+        let kerberos_yaml = test_utils::MINIMAL_HBASE_YAML.replace(
+            "  clusterConfig:\n",
+            concat!(
+                "  clusterConfig:\n",
+                "    authentication:\n",
+                "      kerberos:\n",
+                "        secretClass: kerberos\n",
+            ),
+        );
+
+        // Without an override, the operator's value is set (exactly once).
+        assert_eq!(
+            krb5_config_values(&kerberos_yaml),
+            [(
+                "KRB5_CONFIG".to_string(),
+                kerberos::KRB5_CONFIG_PATH.to_string()
+            )]
+        );
+
+        // An override replaces it; exact comparison so a duplicate entry fails too.
+        let override_yaml = kerberos_yaml.replace(
+            "  masters:\n",
+            concat!(
+                "  masters:\n",
+                "    envOverrides:\n",
+                "      KRB5_CONFIG: /custom/krb5.conf\n",
+            ),
+        );
+        assert_eq!(
+            krb5_config_values(&override_yaml),
+            [("KRB5_CONFIG".to_string(), "/custom/krb5.conf".to_string())]
         );
     }
 
