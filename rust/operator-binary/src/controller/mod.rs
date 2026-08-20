@@ -5,12 +5,13 @@ pub mod update_status;
 pub mod validate;
 pub mod zookeeper;
 
-use std::{collections::BTreeMap, marker::PhantomData, str::FromStr};
+use std::{collections::BTreeMap, marker::PhantomData, ops::Deref, str::FromStr};
 
 use const_format::concatcp;
 pub use stackable_operator::v2::types::operator::RoleGroupName;
 use stackable_operator::{
     commons::product_image_selection::ResolvedProductImage,
+    constant,
     k8s_openapi::{
         api::{
             apps::v1::StatefulSet,
@@ -21,44 +22,29 @@ use stackable_operator::{
         apimachinery::pkg::apis::meta::v1::ObjectMeta,
     },
     kube::Resource,
-    kvp::Labels,
     v2::{
         HasName, HasUid, NameIsValidLabelValue,
-        kvp::label::{recommended_labels, role_group_selector},
         role_group_utils::ResourceNames,
         role_utils,
         types::{
             kubernetes::{ConfigMapName, NamespaceName, SecretClassName, Uid},
-            operator::{
-                ClusterName, ControllerName, OperatorName, ProductName, ProductVersion, RoleName,
-            },
+            operator::{ClusterName, ControllerName, OperatorName, ProductName, ProductVersion},
         },
     },
 };
 
 use crate::{
     controller::{build::opa::HbaseOpaConfig, zookeeper::ZookeeperConnectionInformation},
-    crd::{APP_NAME, AnyServiceConfig, HbaseRole, OPERATOR_NAME, v1alpha1},
+    crd::{APP_NAME, AnyServiceConfig, HBASE_OPERATOR_NAME, HbaseRole, v1alpha1},
 };
 
 pub const HBASE_CONTROLLER_NAME: &str = "hbasecluster";
-pub const FULL_HBASE_CONTROLLER_NAME: &str = concatcp!(HBASE_CONTROLLER_NAME, '.', OPERATOR_NAME);
+pub const FULL_HBASE_CONTROLLER_NAME: &str =
+    concatcp!(HBASE_CONTROLLER_NAME, '.', HBASE_OPERATOR_NAME);
 
-/// The product name (`hbase`) as a type-safe label value.
-pub(crate) fn product_name() -> ProductName {
-    ProductName::from_str(APP_NAME).expect("'hbase' is a valid product name")
-}
-
-/// The operator name as a type-safe label value.
-pub(crate) fn operator_name() -> OperatorName {
-    OperatorName::from_str(OPERATOR_NAME).expect("the operator name is a valid label value")
-}
-
-/// The controller name as a type-safe label value.
-pub(crate) fn controller_name() -> ControllerName {
-    ControllerName::from_str(HBASE_CONTROLLER_NAME)
-        .expect("the controller name is a valid label value")
-}
+constant!(PRODUCT_NAME: ProductName = APP_NAME);
+constant!(OPERATOR_NAME: OperatorName = HBASE_OPERATOR_NAME);
+constant!(CONTROLLER_NAME: ControllerName = HBASE_CONTROLLER_NAME);
 
 /// Marker for prepared Kubernetes resources which are not applied yet.
 pub struct Prepared;
@@ -146,7 +132,7 @@ impl ValidatedCluster {
     pub fn cluster_resource_names(&self) -> role_utils::ResourceNames {
         role_utils::ResourceNames {
             cluster_name: self.name.clone(),
-            product_name: product_name(),
+            product_name: PRODUCT_NAME.clone(),
         }
     }
 
@@ -158,50 +144,9 @@ impl ValidatedCluster {
     ) -> ResourceNames {
         ResourceNames {
             cluster_name: self.name.clone(),
-            role_name: hbase_role.into(),
+            role_name: hbase_role.deref().clone(),
             role_group_name: role_group_name.clone(),
         }
-    }
-
-    /// Recommended labels for a role-group resource.
-    pub fn recommended_labels(&self, role: &HbaseRole, role_group_name: &RoleGroupName) -> Labels {
-        self.recommended_labels_for(&role.into(), role_group_name)
-    }
-
-    /// Recommended labels for a resource that is not tied to a concrete [`HbaseRole`] (e.g. the
-    /// Kubernetes executor pod template), using a free-form role/role-group label value.
-    pub fn recommended_labels_for(
-        &self,
-        role_name: &RoleName,
-        role_group_name: &RoleGroupName,
-    ) -> Labels {
-        self.recommended_labels_with(&self.product_version, role_name, role_group_name)
-    }
-
-    fn recommended_labels_with(
-        &self,
-        product_version: &ProductVersion,
-        role_name: &RoleName,
-        role_group_name: &RoleGroupName,
-    ) -> Labels {
-        recommended_labels(
-            self,
-            &product_name(),
-            product_version,
-            &operator_name(),
-            &controller_name(),
-            role_name,
-            role_group_name,
-        )
-    }
-
-    /// Selector labels matching the pods of a role group.
-    pub fn role_group_selector(
-        &self,
-        hbase_role: &HbaseRole,
-        role_group_name: &RoleGroupName,
-    ) -> Labels {
-        role_group_selector(self, &product_name(), &hbase_role.into(), role_group_name)
     }
 
     /// Whether Kerberos is enabled for this cluster.
@@ -306,18 +251,13 @@ pub type HbaseRoleGroupConfig = stackable_operator::v2::role_utils::RoleGroupCon
 
 #[cfg(test)]
 mod tests {
-    use stackable_operator::v2::types::operator::RoleName;
-    use strum::IntoEnumIterator;
+    use super::{CONTROLLER_NAME, OPERATOR_NAME, PRODUCT_NAME};
 
-    use crate::crd::HbaseRole;
-
-    /// Locks the invariant behind the `expect` in the `From<HbaseRole> for RoleName` impls:
-    /// every `HbaseRole` variant (present and future) must serialise to a valid `RoleName`.
     #[test]
-    fn every_hbase_role_serialises_to_a_valid_role_name() {
-        for role in HbaseRole::iter() {
-            let _: RoleName = (&role).into();
-            let _: RoleName = role.into();
-        }
+    fn test_constants() {
+        // Test that dereferencing the constants does not panic.
+        let _ = *PRODUCT_NAME;
+        let _ = *OPERATOR_NAME;
+        let _ = *CONTROLLER_NAME;
     }
 }

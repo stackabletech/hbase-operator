@@ -871,6 +871,7 @@ spec:
       labels:
         app.kubernetes.io/component: restserver
         app.kubernetes.io/instance: test-hbase
+        app.kubernetes.io/managed-by: hbase.stackable.tech_hbasecluster
         app.kubernetes.io/name: hbase
         app.kubernetes.io/role-group: default
         stackable.tech/vendor: Stackable
@@ -894,7 +895,6 @@ metadata:
     app.kubernetes.io/instance: test-hbase
     app.kubernetes.io/managed-by: hbase.stackable.tech_hbasecluster
     app.kubernetes.io/name: hbase
-    app.kubernetes.io/role-group: discovery
     stackable.tech/vendor: Stackable
   name: test-hbase
   ownerReferences:
