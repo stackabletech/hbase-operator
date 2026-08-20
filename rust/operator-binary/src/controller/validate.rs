@@ -9,15 +9,14 @@ use stackable_operator::{
     },
     kube::ResourceExt,
     product_logging::spec::Logging,
-    role_utils::{CommonConfiguration, GenericRoleConfig, Role},
+    role_utils::GenericRoleConfig,
     v2::{
-        builder::pod::container::{EnvVarName, EnvVarSet},
         controller_utils::{get_cluster_name, get_namespace, get_uid},
         product_logging::framework::{
             ValidatedContainerLogConfigChoice, VectorContainerLogConfig,
             validate_logging_configuration_for_container,
         },
-        role_utils::{JavaCommonConfig, with_validated_config},
+        role_utils::{CommonConfiguration, JavaCommonConfig, Role, with_validated_config},
         types::{kubernetes::ConfigMapName, operator::RoleGroupName},
     },
 };
@@ -53,11 +52,6 @@ pub enum Error {
 
     #[snafu(display("failed to merge and validate the role group config"))]
     ValidateRoleGroupConfig { source: fragment::ValidationError },
-
-    #[snafu(display("invalid environment variable override name"))]
-    ParseEnvVarName {
-        source: stackable_operator::v2::macros::attributed_string_type::Error,
-    },
 
     #[snafu(display("invalid role group name {role_group}"))]
     ParseRoleGroupName {
@@ -230,9 +224,9 @@ pub fn validate_cluster(
 /// which folds the CRD config fragment (default <- role <- role group) plus the
 /// `configOverrides`, `envOverrides`, `cliOverrides`, `podOverrides` and the
 /// `jvmArgumentOverrides` (role group wins) into a single merged
-/// [`RoleGroup`](stackable_operator::role_utils::RoleGroup). The per-role validated config
+/// [`RoleGroup`](stackable_operator::v2::role_utils::RoleGroup). The per-role validated config
 /// is wrapped into [`AnyServiceConfig`] via `wrap`; the merged `envOverrides` are converted
-/// into an [`EnvVarSet`] (validating each name eagerly). The merged `jvmArgumentOverrides` are
+/// into an `EnvVarSet` (validating at deserialize time). The merged `jvmArgumentOverrides` are
 /// kept in `product_specific_common_config` and applied at build time.
 ///
 /// Returns an empty map if the role is not configured.
@@ -278,16 +272,6 @@ where
                 product_specific_common_config,
             } = validated.config;
 
-            // Convert the merged env-override HashMap into an EnvVarSet, validating each name
-            // eagerly. Keys are unique (HashMap), so insertion order is irrelevant.
-            let mut env_overrides_set = EnvVarSet::new();
-            for (name, value) in env_overrides {
-                env_overrides_set = env_overrides_set.with_value(
-                    &EnvVarName::from_str(&name).context(ParseEnvVarNameSnafu)?,
-                    value,
-                );
-            }
-
             let config = wrap(config);
 
             // Validate the logging configuration up-front so an invalid custom log ConfigMap name
@@ -299,7 +283,7 @@ where
                 replicas: validated.replicas,
                 config: ValidatedHbaseConfig { config, logging },
                 config_overrides,
-                env_overrides: env_overrides_set,
+                env_overrides: env_overrides.into(),
                 cli_overrides,
                 pod_overrides,
                 product_specific_common_config,
@@ -384,7 +368,12 @@ spec:
         >(role_group, role, &default_config)
         .unwrap();
 
-        let env = validated.config.env_overrides;
+        let env: BTreeMap<String, String> = validated
+            .config
+            .env_overrides
+            .into_iter()
+            .map(|(k, v)| (k.to_string(), v))
+            .collect();
 
         assert_eq!(env.get("TEST_VAR"), Some(&"MASTER_RG".to_string()));
         assert_eq!(env.get("TEST_VAR_FROM_MASTER"), Some(&"MASTER".to_string()));

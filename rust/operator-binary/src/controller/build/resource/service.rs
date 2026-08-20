@@ -6,7 +6,10 @@ use stackable_operator::{
 };
 
 use crate::{
-    controller::{RoleGroupName, ValidatedCluster, build::object_meta},
+    controller::{
+        RoleGroupName, ValidatedCluster,
+        build::{object_meta, recommended_labels_for_role_group_resources, role_group_selector},
+    },
     crd::HbaseRole,
 };
 
@@ -38,7 +41,7 @@ pub fn build_rolegroup_service(
                 .role_group_resource_names(hbase_role, role_group_name)
                 .headless_service_name()
                 .to_string(),
-            cluster.recommended_labels(hbase_role, role_group_name),
+            recommended_labels_for_role_group_resources(cluster, hbase_role, role_group_name),
         )
         .build(),
         spec: Some(ServiceSpec {
@@ -46,11 +49,7 @@ pub fn build_rolegroup_service(
             type_: Some("ClusterIP".to_string()),
             cluster_ip: Some("None".to_string()),
             ports: Some(ports),
-            selector: Some(
-                cluster
-                    .role_group_selector(hbase_role, role_group_name)
-                    .into(),
-            ),
+            selector: Some(role_group_selector(cluster, hbase_role, role_group_name).into()),
             publish_not_ready_addresses: Some(true),
             ..ServiceSpec::default()
         }),
@@ -79,7 +78,7 @@ pub fn build_rolegroup_metrics_service(
                 .role_group_resource_names(hbase_role, role_group_name)
                 .metrics_service_name()
                 .to_string(),
-            cluster.recommended_labels(hbase_role, role_group_name),
+            recommended_labels_for_role_group_resources(cluster, hbase_role, role_group_name),
         )
         .with_labels(prometheus_labels(&Scraping::Enabled))
         .with_annotations(prometheus_annotations(
@@ -98,11 +97,7 @@ pub fn build_rolegroup_metrics_service(
             type_: Some("ClusterIP".to_owned()),
             cluster_ip: Some("None".to_owned()),
             ports: Some(ports),
-            selector: Some(
-                cluster
-                    .role_group_selector(hbase_role, role_group_name)
-                    .into(),
-            ),
+            selector: Some(role_group_selector(cluster, hbase_role, role_group_name).into()),
             publish_not_ready_addresses: Some(true),
             ..ServiceSpec::default()
         }),

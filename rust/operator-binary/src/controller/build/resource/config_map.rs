@@ -19,6 +19,7 @@ use crate::{
                 ConfigFileName, hbase_env, hbase_site, product_logging, security_properties,
                 ssl_client, ssl_server,
             },
+            recommended_labels_for_role_group_resources,
         },
     },
     crd::HbaseRole,
@@ -114,7 +115,7 @@ pub fn build_rolegroup_config_map(
             .role_group_resource_names(role, role_group_name)
             .role_group_config_map()
             .to_string(),
-        cluster.recommended_labels(role, role_group_name),
+        recommended_labels_for_role_group_resources(cluster, role, role_group_name),
     )
     .build();
 
