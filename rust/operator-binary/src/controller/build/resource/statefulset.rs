@@ -60,7 +60,7 @@ constant!(LOG_CONFIG_VOLUME_NAME: VolumeName = "log-config");
 constant!(LOG_VOLUME_NAME: VolumeName = "log");
 
 // Environment variable names set on the HBase container. Declared as typed constants (instead of
-// `EnvVarName::from_str_unsafe` at the use site) and validated by `env_var_names_are_valid`.
+// `EnvVarName::from_str_unsafe` at the use site) and validated by `test_constants`.
 constant!(HBASE_CONF_DIR_ENV: EnvVarName = "HBASE_CONF_DIR");
 constant!(HADOOP_CONF_DIR_ENV: EnvVarName = "HADOOP_CONF_DIR");
 constant!(REGION_MOVER_OPTS_ENV: EnvVarName = "REGION_MOVER_OPTS");
@@ -431,6 +431,72 @@ mod tests {
         );
     }
 
+    /// [`test_utils::MINIMAL_HBASE_YAML`] with Kerberos enabled.
+    const KERBEROS_HBASE_YAML: &str = r#"
+---
+apiVersion: hbase.stackable.tech/v1alpha1
+kind: HbaseCluster
+metadata:
+  name: hbase
+  namespace: default
+  uid: c2c8c5c0-0b5a-4b1e-9f3e-1a2b3c4d5e6f
+spec:
+  image:
+    productVersion: 2.6.3
+  clusterConfig:
+    hdfsConfigMapName: simple-hdfs
+    zookeeperConfigMapName: simple-znode
+    authentication:
+      kerberos:
+        secretClass: kerberos
+  masters:
+    roleGroups:
+      default:
+        replicas: 1
+  regionServers:
+    roleGroups:
+      default:
+        replicas: 1
+  restServers:
+    roleGroups:
+      default:
+        replicas: 1
+"#;
+
+    /// [`KERBEROS_HBASE_YAML`] with the operator-set `KRB5_CONFIG` overridden on the masters.
+    const KERBEROS_OVERRIDE_HBASE_YAML: &str = r#"
+---
+apiVersion: hbase.stackable.tech/v1alpha1
+kind: HbaseCluster
+metadata:
+  name: hbase
+  namespace: default
+  uid: c2c8c5c0-0b5a-4b1e-9f3e-1a2b3c4d5e6f
+spec:
+  image:
+    productVersion: 2.6.3
+  clusterConfig:
+    hdfsConfigMapName: simple-hdfs
+    zookeeperConfigMapName: simple-znode
+    authentication:
+      kerberos:
+        secretClass: kerberos
+  masters:
+    envOverrides:
+      KRB5_CONFIG: /custom/krb5.conf
+    roleGroups:
+      default:
+        replicas: 1
+  regionServers:
+    roleGroups:
+      default:
+        replicas: 1
+  restServers:
+    roleGroups:
+      default:
+        replicas: 1
+"#;
+
     /// The `KRB5_CONFIG` values of the hbase container of the master `default` role group built
     /// from `yaml`.
     fn krb5_config_values(yaml: &str) -> Vec<(String, String)> {
@@ -464,19 +530,9 @@ mod tests {
     /// container after the overrides and could not be overridden).
     #[test]
     fn env_overrides_take_precedence_over_kerberos_env_vars() {
-        let kerberos_yaml = test_utils::MINIMAL_HBASE_YAML.replace(
-            "  clusterConfig:\n",
-            concat!(
-                "  clusterConfig:\n",
-                "    authentication:\n",
-                "      kerberos:\n",
-                "        secretClass: kerberos\n",
-            ),
-        );
-
         // Without an override, the operator's value is set (exactly once).
         assert_eq!(
-            krb5_config_values(&kerberos_yaml),
+            krb5_config_values(KERBEROS_HBASE_YAML),
             [(
                 "KRB5_CONFIG".to_string(),
                 kerberos::KRB5_CONFIG_PATH.to_string()
@@ -484,33 +540,26 @@ mod tests {
         );
 
         // An override replaces it; exact comparison so a duplicate entry fails too.
-        let override_yaml = kerberos_yaml.replace(
-            "  masters:\n",
-            concat!(
-                "  masters:\n",
-                "    envOverrides:\n",
-                "      KRB5_CONFIG: /custom/krb5.conf\n",
-            ),
-        );
         assert_eq!(
-            krb5_config_values(&override_yaml),
+            krb5_config_values(KERBEROS_OVERRIDE_HBASE_YAML),
             [("KRB5_CONFIG".to_string(), "/custom/krb5.conf".to_string())]
         );
     }
 
-    /// The env-var-name constants are built with `EnvVarName::from_str`, which panics on an invalid
-    /// name. This test forces every constant to be evaluated so a typo is caught at test time rather
-    /// than during reconciliation.
     #[test]
-    fn env_var_names_are_valid() {
-        assert_eq!(HBASE_CONF_DIR_ENV.to_string(), "HBASE_CONF_DIR");
-        assert_eq!(HADOOP_CONF_DIR_ENV.to_string(), "HADOOP_CONF_DIR");
-        assert_eq!(REGION_MOVER_OPTS_ENV.to_string(), "REGION_MOVER_OPTS");
-        assert_eq!(RUN_REGION_MOVER_ENV.to_string(), "RUN_REGION_MOVER");
-        assert_eq!(STACKABLE_LOG_DIR_ENV.to_string(), "STACKABLE_LOG_DIR");
-        assert_eq!(
-            CONTAINERDEBUG_LOG_DIRECTORY_ENV.to_string(),
-            "CONTAINERDEBUG_LOG_DIRECTORY"
-        );
+    fn test_constants() {
+        // Test that dereferencing the constants does not panic.
+        let _ = *HBASE_CONTAINER_NAME;
+        let _ = *VECTOR_CONTAINER_NAME;
+        let _ = *HBASE_CONFIG_VOLUME_NAME;
+        let _ = *HDFS_DISCOVERY_VOLUME_NAME;
+        let _ = *LOG_CONFIG_VOLUME_NAME;
+        let _ = *LOG_VOLUME_NAME;
+        let _ = *HBASE_CONF_DIR_ENV;
+        let _ = *HADOOP_CONF_DIR_ENV;
+        let _ = *REGION_MOVER_OPTS_ENV;
+        let _ = *RUN_REGION_MOVER_ENV;
+        let _ = *STACKABLE_LOG_DIR_ENV;
+        let _ = *CONTAINERDEBUG_LOG_DIRECTORY_ENV;
     }
 }

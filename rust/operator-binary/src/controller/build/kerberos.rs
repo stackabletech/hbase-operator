@@ -367,11 +367,10 @@ fn kerberos_service_name() -> &'static str {
 mod tests {
     use super::*;
 
-    /// The env-var-name constants are built with `EnvVarName::from_str`, which panics on an invalid
-    /// name. This test forces every constant to be evaluated so a typo is caught at test time rather
-    /// than during reconciliation.
     #[test]
-    fn env_var_names_are_valid() {
-        assert_eq!(KRB5_CONFIG_ENV.to_string(), "KRB5_CONFIG");
+    fn test_constants() {
+        // Test that dereferencing the constants does not panic.
+        let _ = *KERBEROS_VOLUME_NAME;
+        let _ = *KRB5_CONFIG_ENV;
     }
 }
