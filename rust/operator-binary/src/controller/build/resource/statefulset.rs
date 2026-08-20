@@ -60,7 +60,7 @@ constant!(LOG_CONFIG_VOLUME_NAME: VolumeName = "log-config");
 constant!(LOG_VOLUME_NAME: VolumeName = "log");
 
 // Environment variable names set on the HBase container. Declared as typed constants (instead of
-// `EnvVarName::from_str_unsafe` at the use site) and validated by `env_var_names_are_valid`.
+// `EnvVarName::from_str_unsafe` at the use site) and validated by `test_constants`.
 constant!(HBASE_CONF_DIR_ENV: EnvVarName = "HBASE_CONF_DIR");
 constant!(HADOOP_CONF_DIR_ENV: EnvVarName = "HADOOP_CONF_DIR");
 constant!(REGION_MOVER_OPTS_ENV: EnvVarName = "REGION_MOVER_OPTS");
@@ -170,6 +170,8 @@ pub fn build_rolegroup_statefulset(
             &CONTAINERDEBUG_LOG_DIRECTORY_ENV,
             format!("{STACKABLE_LOG_DIR}/containerdebug"),
         )
+        // Empty when Kerberos is disabled.
+        .merge(kerberos::kerberos_env_vars(cluster))
         // apply overrides last of all; `EnvVarSet` is keyed by name, so iteration is already
         // in a fixed (sorted-by-name) order
         .merge(validated_rg_config.env_overrides.clone());
@@ -429,19 +431,135 @@ mod tests {
         );
     }
 
-    /// The env-var-name constants are built with `EnvVarName::from_str`, which panics on an invalid
-    /// name. This test forces every constant to be evaluated so a typo is caught at test time rather
-    /// than during reconciliation.
+    /// [`test_utils::MINIMAL_HBASE_YAML`] with Kerberos enabled.
+    const KERBEROS_HBASE_YAML: &str = r#"
+---
+apiVersion: hbase.stackable.tech/v1alpha1
+kind: HbaseCluster
+metadata:
+  name: hbase
+  namespace: default
+  uid: c2c8c5c0-0b5a-4b1e-9f3e-1a2b3c4d5e6f
+spec:
+  image:
+    productVersion: 2.6.3
+  clusterConfig:
+    hdfsConfigMapName: simple-hdfs
+    zookeeperConfigMapName: simple-znode
+    authentication:
+      kerberos:
+        secretClass: kerberos
+  masters:
+    roleGroups:
+      default:
+        replicas: 1
+  regionServers:
+    roleGroups:
+      default:
+        replicas: 1
+  restServers:
+    roleGroups:
+      default:
+        replicas: 1
+"#;
+
+    /// [`KERBEROS_HBASE_YAML`] with the operator-set `KRB5_CONFIG` overridden on the masters.
+    const KERBEROS_OVERRIDE_HBASE_YAML: &str = r#"
+---
+apiVersion: hbase.stackable.tech/v1alpha1
+kind: HbaseCluster
+metadata:
+  name: hbase
+  namespace: default
+  uid: c2c8c5c0-0b5a-4b1e-9f3e-1a2b3c4d5e6f
+spec:
+  image:
+    productVersion: 2.6.3
+  clusterConfig:
+    hdfsConfigMapName: simple-hdfs
+    zookeeperConfigMapName: simple-znode
+    authentication:
+      kerberos:
+        secretClass: kerberos
+  masters:
+    envOverrides:
+      KRB5_CONFIG: /custom/krb5.conf
+    roleGroups:
+      default:
+        replicas: 1
+  regionServers:
+    roleGroups:
+      default:
+        replicas: 1
+  restServers:
+    roleGroups:
+      default:
+        replicas: 1
+"#;
+
+    /// The `KRB5_CONFIG` values of the hbase container of the master `default` role group built
+    /// from `yaml`.
+    fn krb5_config_values(yaml: &str) -> Vec<(String, String)> {
+        let hbase = test_utils::hbase_from_yaml(yaml);
+        let cluster = test_utils::validated_cluster_from(&hbase);
+        let role_group_name = test_utils::role_group_name("default");
+        let rg_config = &cluster.role_group_configs[&HbaseRole::Master][&role_group_name];
+
+        build_rolegroup_statefulset(&cluster, &HbaseRole::Master, &role_group_name, rg_config)
+            .expect("the StatefulSet builds")
+            .spec
+            .expect("the StatefulSet has a spec")
+            .template
+            .spec
+            .expect("the pod template has a spec")
+            .containers
+            .into_iter()
+            .find(|container| container.name == HBASE_CONTAINER_NAME.to_string())
+            .expect("the hbase container exists")
+            .env
+            .expect("the hbase container has env vars")
+            .into_iter()
+            .filter(|env_var| env_var.name == "KRB5_CONFIG")
+            .map(|env_var| (env_var.name, env_var.value.unwrap_or_default()))
+            .collect()
+    }
+
+    /// With Kerberos enabled, the operator sets `KRB5_CONFIG` — as part of the merged env set, so
+    /// an `envOverrides` entry replaces it instead of producing a duplicate whose precedence
+    /// depended on Kubernetes' duplicate-name handling (previously it was appended to the
+    /// container after the overrides and could not be overridden).
     #[test]
-    fn env_var_names_are_valid() {
-        assert_eq!(HBASE_CONF_DIR_ENV.to_string(), "HBASE_CONF_DIR");
-        assert_eq!(HADOOP_CONF_DIR_ENV.to_string(), "HADOOP_CONF_DIR");
-        assert_eq!(REGION_MOVER_OPTS_ENV.to_string(), "REGION_MOVER_OPTS");
-        assert_eq!(RUN_REGION_MOVER_ENV.to_string(), "RUN_REGION_MOVER");
-        assert_eq!(STACKABLE_LOG_DIR_ENV.to_string(), "STACKABLE_LOG_DIR");
+    fn env_overrides_take_precedence_over_kerberos_env_vars() {
+        // Without an override, the operator's value is set (exactly once).
         assert_eq!(
-            CONTAINERDEBUG_LOG_DIRECTORY_ENV.to_string(),
-            "CONTAINERDEBUG_LOG_DIRECTORY"
+            krb5_config_values(KERBEROS_HBASE_YAML),
+            [(
+                "KRB5_CONFIG".to_string(),
+                kerberos::KRB5_CONFIG_PATH.to_string()
+            )]
         );
+
+        // An override replaces it; exact comparison so a duplicate entry fails too.
+        assert_eq!(
+            krb5_config_values(KERBEROS_OVERRIDE_HBASE_YAML),
+            [("KRB5_CONFIG".to_string(), "/custom/krb5.conf".to_string())]
+        );
+    }
+
+    #[test]
+    fn test_constants() {
+        // Test that dereferencing the constants does not panic.
+        let _ = *HBASE_CONTAINER_NAME;
+        let _ = *VECTOR_CONTAINER_NAME;
+        let _ = *HBASE_CONFIG_VOLUME_NAME;
+        let _ = *HDFS_DISCOVERY_VOLUME_NAME;
+        let _ = *LOG_CONFIG_VOLUME_NAME;
+        let _ = *LOG_VOLUME_NAME;
+        let _ = *HBASE_CONF_DIR_ENV;
+        let _ = *HADOOP_CONF_DIR_ENV;
+        let _ = *REGION_MOVER_OPTS_ENV;
+        let _ = *RUN_REGION_MOVER_ENV;
+        let _ = *STACKABLE_LOG_DIR_ENV;
+        let _ = *CONTAINERDEBUG_LOG_DIRECTORY_ENV;
     }
 }

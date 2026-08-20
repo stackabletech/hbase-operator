@@ -14,7 +14,10 @@ use stackable_operator::{
     constant,
     shared::time::Duration,
     utils::cluster_info::KubernetesClusterInfo,
-    v2::types::kubernetes::VolumeName,
+    v2::{
+        builder::pod::container::{EnvVarName, EnvVarSet},
+        types::kubernetes::VolumeName,
+    },
 };
 
 use crate::{
@@ -29,6 +32,8 @@ pub const STACKABLE_KERBEROS_DIR: &str = "/stackable/kerberos";
 pub const KRB5_CONFIG_PATH: &str = const_format::concatcp!(STACKABLE_KERBEROS_DIR, "/krb5.conf");
 // Name of the Kerberos secret volume.
 constant!(KERBEROS_VOLUME_NAME: VolumeName = "kerberos");
+// The env var pointing the Kerberos libraries at the rendered `krb5.conf`.
+constant!(KRB5_CONFIG_ENV: EnvVarName = "KRB5_CONFIG");
 /// The RPC/data-transfer quality-of-protection level used when Kerberos is enabled.
 const PROTECTION_PRIVACY: &str = "privacy";
 
@@ -251,9 +256,6 @@ pub fn add_kerberos_pod_config(
         .context(AddVolumeSnafu)?;
         cb.add_volume_mount(&*KERBEROS_VOLUME_NAME, STACKABLE_KERBEROS_DIR)
             .context(AddVolumeMountSnafu)?;
-
-        // Needed env vars
-        cb.add_env_var("KRB5_CONFIG", KRB5_CONFIG_PATH);
     }
 
     if let Some(https_secret_class) = &cluster.cluster_config.https_secret_class {
@@ -284,6 +286,18 @@ pub fn add_kerberos_pod_config(
             .context(AddVolumeMountSnafu)?;
     }
     Ok(())
+}
+
+/// The environment variables the Kerberos configuration requires on the HBase container, or an
+/// empty set when Kerberos is disabled.
+///
+/// Returned as an [`EnvVarSet`] (rather than added to the container directly) so the caller can
+/// merge the user's `envOverrides` on top, letting an override win on a name collision.
+pub fn kerberos_env_vars(cluster: &ValidatedCluster) -> EnvVarSet {
+    if !cluster.has_kerberos_enabled() {
+        return EnvVarSet::new();
+    }
+    EnvVarSet::new().with_value(&KRB5_CONFIG_ENV, KRB5_CONFIG_PATH)
 }
 
 /// The `hbase.{master,regionserver,rest}.kerberos.principal` entries shared by the main
@@ -347,4 +361,16 @@ fn principal_host_part(
 /// As a result we use "hbase" everywhere (which e.g. differs from the current hdfs implementation)
 fn kerberos_service_name() -> &'static str {
     "hbase"
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_constants() {
+        // Test that dereferencing the constants does not panic.
+        let _ = *KERBEROS_VOLUME_NAME;
+        let _ = *KRB5_CONFIG_ENV;
+    }
 }

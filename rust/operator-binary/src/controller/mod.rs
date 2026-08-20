@@ -248,3 +248,16 @@ pub type HbaseRoleGroupConfig = stackable_operator::v2::role_utils::RoleGroupCon
     stackable_operator::v2::role_utils::JavaCommonConfig,
     v1alpha1::HbaseConfigOverrides,
 >;
+
+#[cfg(test)]
+mod tests {
+    use super::{CONTROLLER_NAME, OPERATOR_NAME, PRODUCT_NAME};
+
+    #[test]
+    fn test_constants() {
+        // Test that dereferencing the constants does not panic.
+        let _ = *PRODUCT_NAME;
+        let _ = *OPERATOR_NAME;
+        let _ = *CONTROLLER_NAME;
+    }
+}

@@ -621,6 +621,7 @@ mod tests {
         let _ = *MASTER_ROLE_NAME;
         let _ = *REGIONSERVER_ROLE_NAME;
         let _ = *RESTSERVER_ROLE_NAME;
+        let _ = *TLS_STORE_VOLUME_NAME;
     }
 
     #[rstest]
