@@ -29,7 +29,7 @@
   hbase.stackable.tech_hbasecluster, aligning with all other operators ([#795]).
 - BREAKING: The rest-server listener PVC template now carries the recommended labels without the
   version label, so that the labels stay stable across upgrades.
-  Existing rest-server StatefulSets must be deleted once before the new operator can reconcile them ([#795]).
+  Existing rest-server StatefulSets must be deleted once before the new operator can reconcile them ([#799]).
 
 [#776]: https://github.com/stackabletech/hbase-operator/pull/776
 [#782]: https://github.com/stackabletech/hbase-operator/pull/782
