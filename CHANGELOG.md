@@ -27,6 +27,8 @@
   See [our internal issue](https://github.com/stackabletech/hdfs-operator/issues/626) and [the fix](https://github.com/kube-rs/kube/pull/2042) for details ([#792]).
 - BREAKING: The app.kubernetes.io/managed-by label value changed from hbase.stackable.com_hbasecluster to
   hbase.stackable.tech_hbasecluster, aligning with all other operators ([#795]).
+- The operator now watches all resources that it creates and early-exits the reconcile action when the
+  cluster is marked for deletion ([#797]).
 - BREAKING: The rest-server listener PVC template now carries the recommended labels without the
   version label, so that the labels stay stable across upgrades.
   Existing rest-server StatefulSets must be deleted once before the new operator can reconcile them ([#799]).
@@ -37,6 +39,7 @@
 [#787]: https://github.com/stackabletech/hbase-operator/pull/787
 [#792]: https://github.com/stackabletech/hbase-operator/pull/792
 [#795]: https://github.com/stackabletech/hbase-operator/pull/795
+[#797]: https://github.com/stackabletech/hbase-operator/pull/797
 [#799]: https://github.com/stackabletech/hbase-operator/pull/799
 
 ## [26.7.0] - 2026-07-21
