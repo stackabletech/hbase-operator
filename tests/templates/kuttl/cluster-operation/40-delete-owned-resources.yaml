@@ -1,18 +1,18 @@
 ---
-# The operator owns (`.owns()` in main.rs) every resource it applies. Deleting one must
-# trigger a reconcile that recreates it — this is the behavioural check for the watch
-# registrations and the `watch` RBAC verbs in the operator ClusterRole. It lives in this
-# test because deleting the StatefulSets forces a full pod-restart cycle, and this test
-# cycles the pods anyway.
+# Every resource the operator applies carries an ownerReference and a `.owns()` watch
+# (main.rs); deleting it must trigger a reconcile of the HbaseCluster, which re-applies
+# it. This step checks that chain — the ClusterRole's `watch` verbs plus the `.owns()`
+# routing — and lives here because this test already cycles the pods. The `.watches()`
+# registration (referenced-but-unowned ConfigMaps) can't be tested by deletion: the
+# operator never recreates what it didn't apply.
 #
-# Recreation is proven by UID change: waiting for mere existence could pass without any
-# deletion having happened. TestStep commands run exactly once (no kuttl retry loop), so
-# the polling below stays quiet in the log.
+# Recreation is proven by UID change: mere existence could pass without any deletion.
+# TestStep commands run exactly once (no kuttl retry loop), so the polling stays quiet.
 #
-# Owned resources deliberately NOT tested here: the role-group ConfigMaps
-# (test-hbase-{master,regionserver,restserver}-default). The same `.owns(ConfigMap)`
-# registration is already exercised by the discovery ConfigMap below, and they are
-# mounted into running pods, which a deletion window would disturb.
+# Deliberately skipped: the role-group ConfigMaps
+# (test-hbase-{master,regionserver,restserver}-default) — `.owns(ConfigMap)` is already
+# exercised via the discovery ConfigMap, and deleting ConfigMaps mounted into running
+# pods would disturb them.
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
 metadata:
