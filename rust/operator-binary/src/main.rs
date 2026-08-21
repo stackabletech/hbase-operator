@@ -129,19 +129,7 @@ async fn main() -> anyhow::Result<()> {
             let config_map_store = hbase_controller.store();
             let hbase_controller = hbase_controller
                 .owns(
-                    watch_namespace.get_api::<Service>(&client),
-                    watcher::Config::default(),
-                )
-                .owns(
-                    watch_namespace.get_api::<StatefulSet>(&client),
-                    watcher::Config::default(),
-                )
-                .owns(
-                    watch_namespace.get_api::<ServiceAccount>(&client),
-                    watcher::Config::default(),
-                )
-                .owns(
-                    watch_namespace.get_api::<RoleBinding>(&client),
+                    watch_namespace.get_api::<ConfigMap>(&client),
                     watcher::Config::default(),
                 )
                 .owns(
@@ -149,7 +137,19 @@ async fn main() -> anyhow::Result<()> {
                     watcher::Config::default(),
                 )
                 .owns(
-                    watch_namespace.get_api::<ConfigMap>(&client),
+                    watch_namespace.get_api::<RoleBinding>(&client),
+                    watcher::Config::default(),
+                )
+                .owns(
+                    watch_namespace.get_api::<Service>(&client),
+                    watcher::Config::default(),
+                )
+                .owns(
+                    watch_namespace.get_api::<ServiceAccount>(&client),
+                    watcher::Config::default(),
+                )
+                .owns(
+                    watch_namespace.get_api::<StatefulSet>(&client),
                     watcher::Config::default(),
                 )
                 .watches(
