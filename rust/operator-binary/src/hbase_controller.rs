@@ -206,9 +206,6 @@ spec:
 
     #[test]
     fn reconcile_exits_early_for_deleted_cluster_with_invalid_spec() {
-        // The spec is missing all required fields, so the DeserializeGuard captures a
-        // deserialization error. During deletion the spec is irrelevant and the reconciler must
-        // still exit quietly instead of erroring through the whole teardown.
         let hbase = serde_yaml::from_str(
             r#"
 apiVersion: hbase.stackable.tech/v1alpha1
@@ -230,8 +227,6 @@ spec: {}
 
     #[test]
     fn reconcile_proceeds_for_live_cluster() {
-        // Without a deletion timestamp the reconciler must not exit early: it proceeds to
-        // dereference, which fails against the unreachable test API server.
         let hbase = serde_yaml::from_str(
             r#"
 apiVersion: hbase.stackable.tech/v1alpha1
@@ -253,8 +248,7 @@ spec:
 
         assert!(
             matches!(result, Err(Error::Dereference { .. })),
-            "a live cluster must reach the API (and fail dereferencing against the unreachable \
-             test server), not exit early: {result:?}"
+            "a live cluster must reach the API but when dereferencing against the unreachable test server: {result:?}"
         );
     }
 }
