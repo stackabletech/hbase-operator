@@ -384,7 +384,7 @@ spec:
       securityContext:
         fsGroup: 1000
       serviceAccountName: test-hbase-serviceaccount
-      terminationGracePeriodSeconds: 1200
+      terminationGracePeriodSeconds: 60
       volumes:
       - configMap:
           name: test-hbase-master-default
@@ -619,7 +619,7 @@ spec:
       securityContext:
         fsGroup: 1000
       serviceAccountName: test-hbase-serviceaccount
-      terminationGracePeriodSeconds: 3600
+      terminationGracePeriodSeconds: 60
       volumes:
       - configMap:
           name: test-hbase-regionserver-default
@@ -850,7 +850,7 @@ spec:
       securityContext:
         fsGroup: 1000
       serviceAccountName: test-hbase-serviceaccount
-      terminationGracePeriodSeconds: 300
+      terminationGracePeriodSeconds: 60
       volumes:
       - configMap:
           name: test-hbase-restserver-default

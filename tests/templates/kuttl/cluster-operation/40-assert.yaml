@@ -1,0 +1,174 @@
+---
+# The recreated StatefulSets must bring the cluster back to ready, and the recreated
+# objects must carry an owner reference back to the HbaseCluster so that garbage
+# collection still works for them.
+#
+# The budget is generous on purpose: recreating the role-group ConfigMaps makes the
+# commons-operator restarter roll every pod once more on top of the StatefulSet
+# recreation, and on a node without a cached image a single pull can take minutes.
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+metadata:
+  name: recreate-owned-resources
+timeout: 600
+commands:
+  - script: kubectl -n $NAMESPACE wait --for=condition=available hbaseclusters.hbase.stackable.tech/test-hbase --timeout 601s
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: test-hbase-master-default
+  ownerReferences:
+    - apiVersion: hbase.stackable.tech/v1alpha1
+      controller: true
+      kind: HbaseCluster
+      name: test-hbase
+status:
+  readyReplicas: 1
+  replicas: 1
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: test-hbase-regionserver-default
+  ownerReferences:
+    - apiVersion: hbase.stackable.tech/v1alpha1
+      controller: true
+      kind: HbaseCluster
+      name: test-hbase
+status:
+  readyReplicas: 1
+  replicas: 1
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: test-hbase-restserver-default
+  ownerReferences:
+    - apiVersion: hbase.stackable.tech/v1alpha1
+      controller: true
+      kind: HbaseCluster
+      name: test-hbase
+status:
+  readyReplicas: 1
+  replicas: 1
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: test-hbase-serviceaccount
+  ownerReferences:
+    - apiVersion: hbase.stackable.tech/v1alpha1
+      controller: true
+      kind: HbaseCluster
+      name: test-hbase
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: test-hbase-rolebinding
+  ownerReferences:
+    - apiVersion: hbase.stackable.tech/v1alpha1
+      controller: true
+      kind: HbaseCluster
+      name: test-hbase
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: test-hbase-master
+  ownerReferences:
+    - apiVersion: hbase.stackable.tech/v1alpha1
+      controller: true
+      kind: HbaseCluster
+      name: test-hbase
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: test-hbase-regionserver
+  ownerReferences:
+    - apiVersion: hbase.stackable.tech/v1alpha1
+      controller: true
+      kind: HbaseCluster
+      name: test-hbase
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: test-hbase-restserver
+  ownerReferences:
+    - apiVersion: hbase.stackable.tech/v1alpha1
+      controller: true
+      kind: HbaseCluster
+      name: test-hbase
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: test-hbase
+  ownerReferences:
+    - apiVersion: hbase.stackable.tech/v1alpha1
+      controller: true
+      kind: HbaseCluster
+      name: test-hbase
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: test-hbase-master-default-headless
+  ownerReferences:
+    - apiVersion: hbase.stackable.tech/v1alpha1
+      controller: true
+      kind: HbaseCluster
+      name: test-hbase
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: test-hbase-master-default-metrics
+  ownerReferences:
+    - apiVersion: hbase.stackable.tech/v1alpha1
+      controller: true
+      kind: HbaseCluster
+      name: test-hbase
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: test-hbase-regionserver-default-headless
+  ownerReferences:
+    - apiVersion: hbase.stackable.tech/v1alpha1
+      controller: true
+      kind: HbaseCluster
+      name: test-hbase
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: test-hbase-regionserver-default-metrics
+  ownerReferences:
+    - apiVersion: hbase.stackable.tech/v1alpha1
+      controller: true
+      kind: HbaseCluster
+      name: test-hbase
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: test-hbase-restserver-default-headless
+  ownerReferences:
+    - apiVersion: hbase.stackable.tech/v1alpha1
+      controller: true
+      kind: HbaseCluster
+      name: test-hbase
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: test-hbase-restserver-default-metrics
+  ownerReferences:
+    - apiVersion: hbase.stackable.tech/v1alpha1
+      controller: true
+      kind: HbaseCluster
+      name: test-hbase

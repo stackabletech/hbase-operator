@@ -14,7 +14,9 @@ use stackable_operator::{
     eos::EndOfSupportChecker,
     k8s_openapi::api::{
         apps::v1::StatefulSet,
-        core::v1::{ConfigMap, Service},
+        core::v1::{ConfigMap, Service, ServiceAccount},
+        policy::v1::PodDisruptionBudget,
+        rbac::v1::RoleBinding,
     },
     kube::{
         CustomResourceExt, ResourceExt,
@@ -127,7 +129,23 @@ async fn main() -> anyhow::Result<()> {
             let config_map_store = hbase_controller.store();
             let hbase_controller = hbase_controller
                 .owns(
+                    watch_namespace.get_api::<ConfigMap>(&client),
+                    watcher::Config::default(),
+                )
+                .owns(
+                    watch_namespace.get_api::<PodDisruptionBudget>(&client),
+                    watcher::Config::default(),
+                )
+                .owns(
+                    watch_namespace.get_api::<RoleBinding>(&client),
+                    watcher::Config::default(),
+                )
+                .owns(
                     watch_namespace.get_api::<Service>(&client),
+                    watcher::Config::default(),
+                )
+                .owns(
+                    watch_namespace.get_api::<ServiceAccount>(&client),
                     watcher::Config::default(),
                 )
                 .owns(
