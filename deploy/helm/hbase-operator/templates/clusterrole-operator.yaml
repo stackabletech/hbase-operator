@@ -18,24 +18,14 @@ rules:
   # orphan cleanup (list + delete).
   # - configmaps: role group configuration and discovery configmap
   # - services: role group headless and metrics services
+  # - serviceaccounts created per HbaseCluster for workload pod identity.
+  #   Applied via SSA, tracked for orphan cleanup and watched by the controller.
   - apiGroups:
       - ""
     resources:
       - configmaps
-      - services
-    verbs:
-      - create
-      - delete
-      - get
-      - list
-      - patch
-      - watch
-  # ServiceAccount created per HbaseCluster for workload pod identity.
-  # Applied via SSA, tracked for orphan cleanup and watched by the controller.
-  - apiGroups:
-      - ""
-    resources:
       - serviceaccounts
+      - services
     verbs:
       - create
       - delete

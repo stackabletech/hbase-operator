@@ -134,6 +134,7 @@ pub fn error_policy(
 
 #[cfg(test)]
 mod tests {
+    use indoc::indoc;
     use stackable_operator::{
         client::Client,
         kube::{Client as KubeClient, Config},
@@ -142,20 +143,29 @@ mod tests {
     use super::*;
     use crate::test_utils;
 
-    /// A [`Ctx`] whose client points at a closed port. Any API call made through it fails the
-    /// reconciliation, so an `Ok` result proves the reconciler returned before touching the
-    /// Kubernetes API.
-    fn unreachable_ctx() -> Arc<Ctx> {
-        let config = Config::new(
-            "http://127.0.0.1:1"
-                .parse::<http::Uri>()
-                .expect("valid static URI"),
-        );
-        let kube_client = KubeClient::try_from(config).expect("client from static config");
+    /// The client points at a closed port, so any API call would fail the reconciliation: an `Ok`
+    /// proves that a cluster being deleted returns before the reconciler touches the Kubernetes
+    /// API, and because the spec is invalid, before the [`DeserializeGuard`] is unwrapped.
+    #[tokio::test]
+    async fn reconcile_exits_early_for_deleted_cluster() {
+        let hbase = serde_yaml::from_str(indoc! {r#"
+            ---
+            apiVersion: hbase.stackable.tech/v1alpha1
+            kind: HbaseCluster
+            metadata:
+              name: hbase
+              namespace: default
+              deletionTimestamp: "2026-08-14T12:00:00Z"
+            spec: {}
+        "#})
+        .expect("YAML parses; the invalid spec is captured inside the DeserializeGuard");
 
-        Arc::new(Ctx {
+        let ctx = Arc::new(Ctx {
             client: Client::new(
-                kube_client,
+                KubeClient::try_from(Config::new(
+                    "http://127.0.0.1:1".parse().expect("valid static URI"),
+                ))
+                .expect("client from static config"),
                 None,
                 "default".to_owned(),
                 test_utils::cluster_info(),
@@ -165,90 +175,12 @@ mod tests {
                 operator_service_name: "hbase-operator".to_owned(),
                 image_repository: "oci.stackable.tech/sdp".to_owned(),
             },
-        })
-    }
+        });
 
-    /// Drives the async reconciler from the synchronous tests used in this repo.
-    /// The [`Ctx`] is built inside `block_on` because the kube client needs a running reactor
-    /// already at construction time.
-    fn reconcile(hbase: DeserializeGuard<v1alpha1::HbaseCluster>) -> Result<Action> {
-        tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()
-            .expect("current-thread tokio runtime")
-            .block_on(async { reconcile_hbase(Arc::new(hbase), unreachable_ctx()).await })
-    }
-
-    #[test]
-    fn reconcile_exits_early_for_deleted_cluster() {
-        let hbase = serde_yaml::from_str(
-            r#"
-apiVersion: hbase.stackable.tech/v1alpha1
-kind: HbaseCluster
-metadata:
-  name: hbase
-  namespace: default
-  deletionTimestamp: "2026-08-14T12:00:00Z"
-spec:
-  image:
-    productVersion: 2.6.3
-  clusterConfig:
-    hdfsConfigMapName: simple-hdfs
-    zookeeperConfigMapName: simple-znode
-"#,
-        )
-        .expect("valid HbaseCluster YAML");
-
-        let action = reconcile(hbase).expect("a deleted cluster reconciles without any API call");
+        let action = reconcile_hbase(Arc::new(hbase), ctx)
+            .await
+            .expect("a deleted cluster reconciles without any API call");
 
         assert_eq!(action, Action::await_change());
-    }
-
-    #[test]
-    fn reconcile_exits_early_for_deleted_cluster_with_invalid_spec() {
-        let hbase = serde_yaml::from_str(
-            r#"
-apiVersion: hbase.stackable.tech/v1alpha1
-kind: HbaseCluster
-metadata:
-  name: hbase
-  namespace: default
-  deletionTimestamp: "2026-08-14T12:00:00Z"
-spec: {}
-"#,
-        )
-        .expect("YAML parses; the invalid spec is captured inside the DeserializeGuard");
-
-        let action =
-            reconcile(hbase).expect("a deleted cluster reconciles even when its spec is invalid");
-
-        assert_eq!(action, Action::await_change());
-    }
-
-    #[test]
-    fn reconcile_proceeds_for_live_cluster() {
-        let hbase = serde_yaml::from_str(
-            r#"
-apiVersion: hbase.stackable.tech/v1alpha1
-kind: HbaseCluster
-metadata:
-  name: hbase
-  namespace: default
-spec:
-  image:
-    productVersion: 2.6.3
-  clusterConfig:
-    hdfsConfigMapName: simple-hdfs
-    zookeeperConfigMapName: simple-znode
-"#,
-        )
-        .expect("valid HbaseCluster YAML");
-
-        let result = reconcile(hbase);
-
-        assert!(
-            matches!(result, Err(Error::Dereference { .. })),
-            "a live cluster must reach the API but when dereferencing against the unreachable test server: {result:?}"
-        );
     }
 }

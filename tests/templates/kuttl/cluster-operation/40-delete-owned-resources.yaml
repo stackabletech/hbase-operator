@@ -6,13 +6,25 @@
 # registration (referenced-but-unowned ConfigMaps) can't be tested by deletion: the
 # operator never recreates what it didn't apply.
 #
+# The resources are discovered by label rather than listed by name: everything the
+# operator applies is guaranteed to carry the `instance` and `managed-by` labels
+# (ClusterResources::add rejects resources without them), so a newly applied resource
+# or kind is swept automatically — including one whose `.owns()` watch or ClusterRole
+# `watch` verb was forgotten, which then fails the recreation check below.
+#
+# The labels alone over-match: derived objects inherit them (the listener-operator's
+# per-pod Listeners, for example, carry this operator's `managed-by`), so each match
+# is additionally gated on its controller ownerReference pointing at the HbaseCluster —
+# the authoritative marker for "applied by this operator", and the same relationship
+# the orphan cleanup in operator-rs filters on. Cheap bulk kinds that could never pass
+# that gate are excluded up front: Pods and ControllerRevisions (StatefulSet-derived),
+# Endpoints/EndpointSlices (Service-derived), PersistentVolumeClaims (bound claims
+# wedge in Terminating under a running pod), and Events.
+#
 # Recreation is proven by UID change: mere existence could pass without any deletion.
 # TestStep commands run exactly once (no kuttl retry loop), so the polling stays quiet.
-#
-# Deliberately skipped: the role-group ConfigMaps
-# (test-hbase-{master,regionserver,restserver}-default) — `.owns(ConfigMap)` is already
-# exercised via the discovery ConfigMap, and deleting ConfigMaps mounted into running
-# pods would disturb them.
+# Deleting the role-group ConfigMaps briefly leaves their mounts without a source, but
+# recreation is a single reconcile away and already-mounted volumes are unaffected.
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
 metadata:
@@ -23,35 +35,41 @@ commands:
       set -eu
 
       delete_and_await_recreation() {
-        kind=$1
-        name=$2
-        old_uid=$(kubectl get -n "$NAMESPACE" "$kind" "$name" -o jsonpath='{.metadata.uid}')
-        kubectl delete -n "$NAMESPACE" "$kind" "$name" --wait=false
+        resource=$1
+        old_uid=$(kubectl get -n "$NAMESPACE" "$resource" -o jsonpath='{.metadata.uid}')
+        kubectl delete -n "$NAMESPACE" "$resource" --wait=false
         # Recreation is a single reconcile away, so this normally succeeds on the
         # first iteration; 30s is a generous upper bound well below the step timeout.
         for _ in $(seq 1 30); do
-          new_uid=$(kubectl get -n "$NAMESPACE" "$kind" "$name" -o jsonpath='{.metadata.uid}' 2>/dev/null || true)
+          new_uid=$(kubectl get -n "$NAMESPACE" "$resource" -o jsonpath='{.metadata.uid}' 2>/dev/null || true)
           if [ -n "$new_uid" ] && [ "$new_uid" != "$old_uid" ]; then
             return 0
           fi
           sleep 1
         done
-        echo "$kind/$name was not recreated (old uid: $old_uid, current: '${new_uid:-}')" >&2
+        echo "$resource was not recreated (old uid: $old_uid, current: '${new_uid:-}')" >&2
         return 1
       }
 
-      delete_and_await_recreation serviceaccount       test-hbase-serviceaccount
-      delete_and_await_recreation rolebinding          test-hbase-rolebinding
-      delete_and_await_recreation poddisruptionbudget  test-hbase-master
-      delete_and_await_recreation poddisruptionbudget  test-hbase-regionserver
-      delete_and_await_recreation poddisruptionbudget  test-hbase-restserver
-      delete_and_await_recreation configmap            test-hbase
-      delete_and_await_recreation service              test-hbase-master-default-headless
-      delete_and_await_recreation service              test-hbase-master-default-metrics
-      delete_and_await_recreation service              test-hbase-regionserver-default-headless
-      delete_and_await_recreation service              test-hbase-regionserver-default-metrics
-      delete_and_await_recreation service              test-hbase-restserver-default-headless
-      delete_and_await_recreation service              test-hbase-restserver-default-metrics
-      delete_and_await_recreation statefulset          test-hbase-master-default
-      delete_and_await_recreation statefulset          test-hbase-regionserver-default
-      delete_and_await_recreation statefulset          test-hbase-restserver-default
+      selector="app.kubernetes.io/instance=test-hbase,app.kubernetes.io/managed-by=hbase.stackable.tech_hbasecluster"
+      excluded="^(pods|persistentvolumeclaims|endpoints|events)$|^endpointslices\.|^controllerrevisions\.|^events\."
+
+      deleted=0
+      for kind in $(kubectl api-resources --verbs=list --namespaced -o name | grep -Ev "$excluded" | sort); do
+        for resource in $(kubectl get -n "$NAMESPACE" "$kind" -l "$selector" -o name 2>/dev/null); do
+          owner=$(kubectl get -n "$NAMESPACE" "$resource" -o jsonpath='{.metadata.ownerReferences[?(@.controller==true)].kind}/{.metadata.ownerReferences[?(@.controller==true)].name}' 2>/dev/null || true)
+          if [ "$owner" != "HbaseCluster/test-hbase" ]; then
+            echo "skipping $resource: controller owner is '${owner:-none}', not the HbaseCluster"
+            continue
+          fi
+          delete_and_await_recreation "$resource"
+          deleted=$((deleted + 1))
+        done
+      done
+
+      # Guard against the sweep silently matching nothing (wrong selector, renamed
+      # labels): the fixture is known to produce well over this many owned resources.
+      if [ "$deleted" -lt 10 ]; then
+        echo "only $deleted labelled resources were swept - the label selector is broken" >&2
+        exit 1
+      fi
