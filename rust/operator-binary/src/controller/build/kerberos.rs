@@ -1,14 +1,10 @@
 use std::{collections::BTreeMap, str::FromStr};
 
-use snafu::{ResultExt, Snafu};
 use stackable_operator::{
-    builder::{
-        self,
-        pod::{
-            PodBuilder,
-            container::ContainerBuilder,
-            volume::{SecretFormat, SecretOperatorVolumeSourceBuilder, VolumeBuilder},
-        },
+    builder::pod::{
+        PodBuilder,
+        container::ContainerBuilder,
+        volume::{SecretFormat, SecretOperatorVolumeSourceBuilder, VolumeBuilder},
     },
     commons::secret_class::SecretClassVolumeProvisionParts,
     constant,
@@ -36,27 +32,6 @@ constant!(KERBEROS_VOLUME_NAME: VolumeName = "kerberos");
 constant!(KRB5_CONFIG_ENV: EnvVarName = "KRB5_CONFIG");
 /// The RPC/data-transfer quality-of-protection level used when Kerberos is enabled.
 const PROTECTION_PRIVACY: &str = "privacy";
-
-#[derive(Snafu, Debug)]
-pub enum Error {
-    #[snafu(display("failed to build Kerberos secret volume"))]
-    BuildKerberosSecretVolume {
-        source: stackable_operator::builder::pod::volume::SecretOperatorVolumeSourceBuilderError,
-    },
-
-    #[snafu(display("failed to build TLS secret volume"))]
-    BuildTlsSecretVolume {
-        source: stackable_operator::builder::pod::volume::SecretOperatorVolumeSourceBuilderError,
-    },
-
-    #[snafu(display("failed to add needed volume"))]
-    AddVolume { source: builder::pod::Error },
-
-    #[snafu(display("failed to add needed volumeMount"))]
-    AddVolumeMount {
-        source: builder::pod::container::Error,
-    },
-}
 
 /// The `hbase-site.xml` Kerberos properties for `cluster`, gated on Kerberos being enabled
 /// (empty when disabled). Derived in the build step from the validated cluster.
@@ -235,7 +210,7 @@ pub fn add_kerberos_pod_config(
     cb: &mut ContainerBuilder,
     pb: &mut PodBuilder,
     requested_secret_lifetime: Duration,
-) -> Result<(), Error> {
+) {
     if let Some(kerberos_secret_class) = &cluster.cluster_config.kerberos_secret_class {
         // Mount keytab
         let kerberos_secret_operator_volume = SecretOperatorVolumeSourceBuilder::new(
@@ -247,15 +222,15 @@ pub fn add_kerberos_pod_config(
         .with_kerberos_service_name(kerberos_service_name())
         .with_kerberos_service_name("HTTP")
         .build()
-        .context(BuildKerberosSecretVolumeSnafu)?;
+        .expect("The annotations are built from a validated secret class and static scopes.");
         pb.add_volume(
             VolumeBuilder::new(&*KERBEROS_VOLUME_NAME)
                 .ephemeral(kerberos_secret_operator_volume)
                 .build(),
         )
-        .context(AddVolumeSnafu)?;
+        .expect("The volume names are statically defined and there should be no duplicates.");
         cb.add_volume_mount(&*KERBEROS_VOLUME_NAME, STACKABLE_KERBEROS_DIR)
-            .context(AddVolumeMountSnafu)?;
+            .expect("The mount paths are statically defined and there should be no duplicates.");
     }
 
     if let Some(https_secret_class) = &cluster.cluster_config.https_secret_class {
@@ -277,15 +252,16 @@ pub fn add_kerberos_pod_config(
                     .with_tls_pkcs12_password(TLS_STORE_PASSWORD)
                     .with_auto_tls_cert_lifetime(requested_secret_lifetime)
                     .build()
-                    .context(BuildTlsSecretVolumeSnafu)?,
+                    .expect(
+                        "The annotations are built from a validated secret class and static scopes.",
+                    ),
                 )
                 .build(),
         )
-        .context(AddVolumeSnafu)?;
+        .expect("The volume names are statically defined and there should be no duplicates.");
         cb.add_volume_mount(&*TLS_STORE_VOLUME_NAME, TLS_STORE_DIR)
-            .context(AddVolumeMountSnafu)?;
+            .expect("The mount paths are statically defined and there should be no duplicates.");
     }
-    Ok(())
 }
 
 /// The environment variables the Kerberos configuration requires on the HBase container, or an

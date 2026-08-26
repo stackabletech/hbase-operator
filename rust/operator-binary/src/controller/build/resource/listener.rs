@@ -1,13 +1,10 @@
 //! Build the listener `Volume`/`PersistentVolumeClaim` exposing a rolegroup.
 
-use std::{str::FromStr, sync::LazyLock};
+use std::str::FromStr;
 
-use snafu::{ResultExt, Snafu};
 use stackable_operator::{
-    builder::pod::volume::{
-        ListenerOperatorVolumeSourceBuilder, ListenerOperatorVolumeSourceBuilderError,
-        ListenerReference, VolumeBuilder,
-    },
+    builder::pod::volume::{ListenerOperatorVolumeSourceBuilder, ListenerReference, VolumeBuilder},
+    constant,
     k8s_openapi::api::core::v1::{PersistentVolumeClaim, Volume},
     kvp::Labels,
     v2::{
@@ -21,22 +18,7 @@ use stackable_operator::{
 
 use crate::crd::{AnyServiceConfig, HbaseRole, LISTENER_VOLUME_NAME};
 
-/// The rest servers' listener `PersistentVolumeClaim` reuses the listener volume name
-/// ([`LISTENER_VOLUME_NAME`]); the claim and the volume must share a name.
-static LISTENER_PVC_NAME: LazyLock<PersistentVolumeClaimName> = LazyLock::new(|| {
-    PersistentVolumeClaimName::from_str(LISTENER_VOLUME_NAME)
-        .expect("LISTENER_VOLUME_NAME is a valid PersistentVolumeClaim name")
-});
-
-#[derive(Snafu, Debug)]
-pub enum Error {
-    #[snafu(display("failed to build listener volume"))]
-    BuildListenerVolume {
-        source: ListenerOperatorVolumeSourceBuilderError,
-    },
-}
-
-type Result<T, E = Error> = std::result::Result<T, E>;
+constant!(pub LISTENER_PVC_NAME: PersistentVolumeClaimName = LISTENER_VOLUME_NAME);
 
 /// The ephemeral listener [`Volume`] for the masters and region servers, or `None` for the rest
 /// servers (which use a [`PersistentVolumeClaim`] instead, see [`build_listener_pvc`]).
@@ -44,8 +26,8 @@ pub fn build_listener_volume(
     role: &HbaseRole,
     merged_config: &AnyServiceConfig,
     recommended_labels: &Labels,
-) -> Result<Option<Volume>> {
-    let volume = match role {
+) -> Option<Volume> {
+    match role {
         // Master and regionservers should use ephemeral listener volumes
         // since clients pull the latest address from ZooKeeper
         HbaseRole::Master | HbaseRole::RegionServer => Some(
@@ -64,13 +46,14 @@ pub fn build_listener_volume(
                         recommended_labels,
                     )
                     .build_ephemeral()
-                    .context(BuildListenerVolumeSnafu)?,
+                    .expect(
+                        "The annotations are built from a validated listener class and validated labels.",
+                    ),
                 )
                 .build(),
         ),
         HbaseRole::RestServer => None,
-    };
-    Ok(volume)
+    }
 }
 
 /// The listener [`PersistentVolumeClaim`] template for the rest servers, or `None` for the masters
