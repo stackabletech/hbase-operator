@@ -222,7 +222,7 @@ pub fn add_kerberos_pod_config(
         .with_kerberos_service_name(kerberos_service_name())
         .with_kerberos_service_name("HTTP")
         .build()
-        .expect("The annotations are built from a validated secret class and static scopes.");
+        .expect("The annotation keys are static and annotation values cannot be invalid.");
         pb.add_volume(
             VolumeBuilder::new(&*KERBEROS_VOLUME_NAME)
                 .ephemeral(kerberos_secret_operator_volume)
@@ -253,7 +253,7 @@ pub fn add_kerberos_pod_config(
                     .with_auto_tls_cert_lifetime(requested_secret_lifetime)
                     .build()
                     .expect(
-                        "The annotations are built from a validated secret class and static scopes.",
+                        "The annotation keys are static and annotation values cannot be invalid.",
                     ),
                 )
                 .build(),

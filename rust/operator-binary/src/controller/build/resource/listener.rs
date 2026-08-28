@@ -47,7 +47,7 @@ pub fn build_listener_volume(
                     )
                     .build_ephemeral()
                     .expect(
-                        "The annotations are built from a validated listener class and validated labels.",
+                        "The annotation keys are static and annotation values cannot be invalid.",
                     ),
                 )
                 .build(),
