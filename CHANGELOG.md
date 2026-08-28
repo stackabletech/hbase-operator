@@ -19,6 +19,7 @@
   the new labels ([#799]).
 - Environment variable overrides (`envOverrides`) are now applied after all environment
   variables set by the operator ([#799]).
+- Make operations infallible where appropriate ([#803]).
 
 ### Fixed
 
@@ -41,6 +42,7 @@
 [#795]: https://github.com/stackabletech/hbase-operator/pull/795
 [#797]: https://github.com/stackabletech/hbase-operator/pull/797
 [#799]: https://github.com/stackabletech/hbase-operator/pull/799
+[#803]: https://github.com/stackabletech/hbase-operator/pull/803
 
 ## [26.7.0] - 2026-07-21
 

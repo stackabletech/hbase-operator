@@ -6,7 +6,6 @@ use indoc::formatdoc;
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
     builder::{
-        self,
         meta::ObjectMetaBuilder,
         pod::{PodBuilder, security::PodSecurityContextBuilder},
     },
@@ -79,22 +78,8 @@ pub enum Error {
     #[snafu(display("missing secret lifetime"))]
     MissingSecretLifetime,
 
-    #[snafu(display("failed to add kerberos config"))]
-    AddKerberosConfig { source: kerberos::Error },
-
     #[snafu(display("failed to configure graceful shutdown"))]
     GracefulShutdown { source: graceful_shutdown::Error },
-
-    #[snafu(display("failed to add needed volume"))]
-    AddVolume { source: builder::pod::Error },
-
-    #[snafu(display("failed to add needed volumeMount"))]
-    AddVolumeMount {
-        source: builder::pod::container::Error,
-    },
-
-    #[snafu(display("failed to build listener volume"))]
-    ListenerVolume { source: super::listener::Error },
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -192,15 +177,15 @@ pub fn build_rolegroup_statefulset(
         }])
         .add_env_vars(merged_env)
         .add_volume_mount(&*HBASE_CONFIG_VOLUME_NAME, HBASE_CONFIG_TMP_DIR)
-        .context(AddVolumeMountSnafu)?
+        .expect("The mount paths are statically defined and there should be no duplicates.")
         .add_volume_mount(&*HDFS_DISCOVERY_VOLUME_NAME, HDFS_DISCOVERY_TMP_DIR)
-        .context(AddVolumeMountSnafu)?
+        .expect("The mount paths are statically defined and there should be no duplicates.")
         .add_volume_mount(&*LOG_CONFIG_VOLUME_NAME, HBASE_LOG_CONFIG_TMP_DIR)
-        .context(AddVolumeMountSnafu)?
+        .expect("The mount paths are statically defined and there should be no duplicates.")
         .add_volume_mount(&*LOG_VOLUME_NAME, STACKABLE_LOG_DIR)
-        .context(AddVolumeMountSnafu)?
+        .expect("The mount paths are statically defined and there should be no duplicates.")
         .add_volume_mount(LISTENER_VOLUME_NAME, LISTENER_VOLUME_DIR)
-        .context(AddVolumeMountSnafu)?
+        .expect("The mount paths are statically defined and there should be no duplicates.")
         .add_container_ports(ports)
         .resources(merged_config.resources().clone().into())
         .startup_probe(startup_probe)
@@ -228,7 +213,7 @@ pub fn build_rolegroup_statefulset(
             }),
             ..Default::default()
         })
-        .context(AddVolumeSnafu)?
+        .expect("The volume names are statically defined and there should be no duplicates.")
         .add_volume(Volume {
             name: HDFS_DISCOVERY_VOLUME_NAME.to_string(),
             config_map: Some(ConfigMapVolumeSource {
@@ -237,14 +222,14 @@ pub fn build_rolegroup_statefulset(
             }),
             ..Default::default()
         })
-        .context(AddVolumeSnafu)?
+        .expect("The volume names are statically defined and there should be no duplicates.")
         .add_empty_dir_volume(
             &*LOG_VOLUME_NAME,
             Some(product_logging::framework::calculate_log_volume_size_limit(
                 &[MAX_HBASE_LOG_FILES_SIZE],
             )),
         )
-        .context(AddVolumeSnafu)?
+        .expect("The volume names are statically defined and there should be no duplicates.")
         .service_account_name(
             cluster
                 .cluster_resource_names()
@@ -275,7 +260,7 @@ pub fn build_rolegroup_statefulset(
             }),
             ..Volume::default()
         })
-        .context(AddVolumeSnafu)?;
+        .expect("The volume names are statically defined and there should be no duplicates.");
 
     add_graceful_shutdown_config(merged_config, &mut pod_builder).context(GracefulShutdownSnafu)?;
     if cluster.has_kerberos_enabled() {
@@ -287,8 +272,7 @@ pub fn build_rolegroup_statefulset(
             merged_config
                 .requested_secret_lifetime()
                 .context(MissingSecretLifetimeSnafu)?,
-        )
-        .context(AddKerberosConfigSnafu)?;
+        );
     }
     pod_builder.add_container(hbase_container.build());
 
@@ -319,11 +303,10 @@ pub fn build_rolegroup_statefulset(
 
     if let Some(listener_volume) =
         super::listener::build_listener_volume(hbase_role, merged_config, &recommended_labels)
-            .context(ListenerVolumeSnafu)?
     {
         pod_builder
             .add_volume(listener_volume)
-            .context(AddVolumeSnafu)?;
+            .expect("The volume names are statically defined and there should be no duplicates.");
     };
 
     let mut pod_template = pod_builder.build_template();
@@ -374,7 +357,7 @@ fn command() -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_utils;
+    use crate::{controller::build::resource::listener::LISTENER_PVC_NAME, test_utils};
 
     /// `envOverrides` are applied after every operator-set environment variable, so users can
     /// override any of them (previously the operator's value silently won for the variables set
@@ -561,5 +544,6 @@ spec:
         let _ = *RUN_REGION_MOVER_ENV;
         let _ = *STACKABLE_LOG_DIR_ENV;
         let _ = *CONTAINERDEBUG_LOG_DIRECTORY_ENV;
+        let _ = *LISTENER_PVC_NAME;
     }
 }

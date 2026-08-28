@@ -21,7 +21,7 @@ use crate::{
         ValidatedCluster,
         build::resource::{
             config_map::{self, build_rolegroup_config_map},
-            discovery::{self, build_discovery_config_map},
+            discovery::build_discovery_config_map,
             pdb::build_pdb,
             rbac::{build_role_binding, build_service_account},
             service::{build_rolegroup_metrics_service, build_rolegroup_service},
@@ -65,9 +65,6 @@ pub enum Error {
         hbase_role: HbaseRole,
         role_group: RoleGroupName,
     },
-
-    #[snafu(display("failed to build discovery ConfigMap"))]
-    Discovery { source: discovery::Error },
 }
 
 /// Builds every Kubernetes resource for the given validated cluster.
@@ -121,7 +118,7 @@ pub fn build(
 
     // The role-level discovery ConfigMap advertises the cluster's connection information; it is
     // deterministic (derived only from the validated cluster and static cluster info).
-    config_maps.push(build_discovery_config_map(cluster, cluster_info).context(DiscoverySnafu)?);
+    config_maps.push(build_discovery_config_map(cluster, cluster_info));
 
     Ok(KubernetesResources {
         stateful_sets,
