@@ -22,6 +22,11 @@ constant!(pub LISTENER_PVC_NAME: PersistentVolumeClaimName = LISTENER_VOLUME_NAM
 
 /// The ephemeral listener [`Volume`] for the masters and region servers, or `None` for the rest
 /// servers (which use a [`PersistentVolumeClaim`] instead, see [`build_listener_pvc`]).
+///
+/// # Panics
+///
+/// Panics if the volume source cannot be built, which cannot happen because the annotation
+/// keys are static and annotation values cannot be invalid.
 pub fn build_listener_volume(
     role: &HbaseRole,
     merged_config: &AnyServiceConfig,

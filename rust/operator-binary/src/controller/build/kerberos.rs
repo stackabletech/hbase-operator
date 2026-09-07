@@ -204,6 +204,14 @@ pub fn kerberos_ssl_client_settings() -> BTreeMap<String, String> {
     truststore_settings("client")
 }
 
+/// Adds the Kerberos keytab and TLS keystore volumes to the [`PodBuilder`] and their mounts to the
+/// [`ContainerBuilder`], for whichever of the two secret classes are configured.
+///
+/// # Panics
+///
+/// Panics if the volumes or volume mounts cannot be added to the builders. Only call this
+/// on builders whose volume names and mount paths are still distinct from the ones added
+/// here.
 pub fn add_kerberos_pod_config(
     cluster: &ValidatedCluster,
     metrics_service_name: &str,
