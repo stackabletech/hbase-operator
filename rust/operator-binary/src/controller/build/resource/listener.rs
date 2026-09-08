@@ -18,7 +18,7 @@ use stackable_operator::{
 
 use crate::crd::{AnyServiceConfig, HbaseRole, LISTENER_VOLUME_NAME};
 
-constant!(pub LISTENER_PVC_NAME: PersistentVolumeClaimName = LISTENER_VOLUME_NAME);
+constant!(LISTENER_PVC_NAME: PersistentVolumeClaimName = LISTENER_VOLUME_NAME);
 
 /// The ephemeral listener [`Volume`] for the masters and region servers, or `None` for the rest
 /// servers (which use a [`PersistentVolumeClaim`] instead, see [`build_listener_pvc`]).
@@ -70,5 +70,16 @@ pub fn build_listener_pvc(
             recommended_labels,
             &LISTENER_PVC_NAME,
         )]),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_constants() {
+        // Test that dereferencing the constants does not panic.
+        let _ = *LISTENER_PVC_NAME;
     }
 }

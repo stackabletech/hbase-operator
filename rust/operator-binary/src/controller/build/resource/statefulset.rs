@@ -357,7 +357,7 @@ fn command() -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{controller::build::resource::listener::LISTENER_PVC_NAME, test_utils};
+    use crate::test_utils;
 
     /// `envOverrides` are applied after every operator-set environment variable, so users can
     /// override any of them (previously the operator's value silently won for the variables set
@@ -544,6 +544,5 @@ spec:
         let _ = *RUN_REGION_MOVER_ENV;
         let _ = *STACKABLE_LOG_DIR_ENV;
         let _ = *CONTAINERDEBUG_LOG_DIRECTORY_ENV;
-        let _ = *LISTENER_PVC_NAME;
     }
 }
