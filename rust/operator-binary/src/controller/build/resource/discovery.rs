@@ -1,5 +1,6 @@
 //! Build the discovery `ConfigMap` for the HbaseCluster.
 
+use snafu::{ResultExt, Snafu};
 use stackable_operator::{
     builder::configmap::ConfigMapBuilder, k8s_openapi::api::core::v1::ConfigMap,
     utils::cluster_info::KubernetesClusterInfo, v2::config_file_writer::to_hadoop_xml,
@@ -16,11 +17,21 @@ use crate::{
     crd::HbaseRole,
 };
 
+type Result<T, E = Error> = std::result::Result<T, E>;
+
+#[derive(Snafu, Debug)]
+pub enum Error {
+    #[snafu(display("failed to build ConfigMap"))]
+    BuildConfigMap {
+        source: stackable_operator::builder::configmap::Error,
+    },
+}
+
 /// Creates a discovery config map containing the `hbase-site.xml` for clients.
 pub fn build_discovery_config_map(
     cluster: &ValidatedCluster,
     cluster_info: &KubernetesClusterInfo,
-) -> ConfigMap {
+) -> Result<ConfigMap> {
     let cluster_config = &cluster.cluster_config;
 
     let mut hbase_site = cluster_config
@@ -45,5 +56,5 @@ pub fn build_discovery_config_map(
             to_hadoop_xml(hbase_site.iter()),
         )
         .build()
-        .expect("The ConfigMap metadata is set in this function.")
+        .context(BuildConfigMapSnafu)
 }

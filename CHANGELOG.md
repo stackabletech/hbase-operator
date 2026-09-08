@@ -19,7 +19,7 @@
   the new labels ([#799]).
 - Environment variable overrides (`envOverrides`) are now applied after all environment
   variables set by the operator ([#799]).
-- Make operations infallible where appropriate ([#803]).
+- Make operations infallible where dependent on static inputs ([#803]).
 
 ### Fixed
 
