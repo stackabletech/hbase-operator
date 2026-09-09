@@ -1,6 +1,6 @@
 //! Build the listener `Volume`/`PersistentVolumeClaim` exposing a rolegroup.
 
-use std::{str::FromStr, sync::LazyLock};
+use std::str::FromStr;
 
 use snafu::{ResultExt, Snafu};
 use stackable_operator::{
@@ -8,6 +8,7 @@ use stackable_operator::{
         ListenerOperatorVolumeSourceBuilder, ListenerOperatorVolumeSourceBuilderError,
         ListenerReference, VolumeBuilder,
     },
+    constant,
     k8s_openapi::api::core::v1::{PersistentVolumeClaim, Volume},
     kvp::Labels,
     v2::{
@@ -21,12 +22,7 @@ use stackable_operator::{
 
 use crate::crd::{AnyServiceConfig, HbaseRole, LISTENER_VOLUME_NAME};
 
-/// The rest servers' listener `PersistentVolumeClaim` reuses the listener volume name
-/// ([`LISTENER_VOLUME_NAME`]); the claim and the volume must share a name.
-static LISTENER_PVC_NAME: LazyLock<PersistentVolumeClaimName> = LazyLock::new(|| {
-    PersistentVolumeClaimName::from_str(LISTENER_VOLUME_NAME)
-        .expect("LISTENER_VOLUME_NAME is a valid PersistentVolumeClaim name")
-});
+constant!(LISTENER_PVC_NAME: PersistentVolumeClaimName = LISTENER_VOLUME_NAME);
 
 #[derive(Snafu, Debug)]
 pub enum Error {
@@ -87,5 +83,16 @@ pub fn build_listener_pvc(
             recommended_labels,
             &LISTENER_PVC_NAME,
         )]),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_constants() {
+        // Test that dereferencing the constants does not panic.
+        let _ = *LISTENER_PVC_NAME;
     }
 }

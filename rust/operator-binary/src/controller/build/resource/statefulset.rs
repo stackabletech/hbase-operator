@@ -88,11 +88,6 @@ pub enum Error {
     #[snafu(display("failed to add needed volume"))]
     AddVolume { source: builder::pod::Error },
 
-    #[snafu(display("failed to add needed volumeMount"))]
-    AddVolumeMount {
-        source: builder::pod::container::Error,
-    },
-
     #[snafu(display("failed to build listener volume"))]
     ListenerVolume { source: super::listener::Error },
 }
@@ -192,15 +187,15 @@ pub fn build_rolegroup_statefulset(
         }])
         .add_env_vars(merged_env)
         .add_volume_mount(&*HBASE_CONFIG_VOLUME_NAME, HBASE_CONFIG_TMP_DIR)
-        .context(AddVolumeMountSnafu)?
+        .expect("The mount paths are statically defined and there should be no duplicates.")
         .add_volume_mount(&*HDFS_DISCOVERY_VOLUME_NAME, HDFS_DISCOVERY_TMP_DIR)
-        .context(AddVolumeMountSnafu)?
+        .expect("The mount paths are statically defined and there should be no duplicates.")
         .add_volume_mount(&*LOG_CONFIG_VOLUME_NAME, HBASE_LOG_CONFIG_TMP_DIR)
-        .context(AddVolumeMountSnafu)?
+        .expect("The mount paths are statically defined and there should be no duplicates.")
         .add_volume_mount(&*LOG_VOLUME_NAME, STACKABLE_LOG_DIR)
-        .context(AddVolumeMountSnafu)?
+        .expect("The mount paths are statically defined and there should be no duplicates.")
         .add_volume_mount(LISTENER_VOLUME_NAME, LISTENER_VOLUME_DIR)
-        .context(AddVolumeMountSnafu)?
+        .expect("The mount paths are statically defined and there should be no duplicates.")
         .add_container_ports(ports)
         .resources(merged_config.resources().clone().into())
         .startup_probe(startup_probe)

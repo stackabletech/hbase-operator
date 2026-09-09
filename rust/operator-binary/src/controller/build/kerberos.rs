@@ -39,23 +39,18 @@ const PROTECTION_PRIVACY: &str = "privacy";
 
 #[derive(Snafu, Debug)]
 pub enum Error {
-    #[snafu(display("failed to build Kerberos secret volume"))]
-    BuildKerberosSecretVolume {
+    #[snafu(display("failed to build Kerberos secret volume source"))]
+    BuildKerberosSecretVolumeSource {
         source: stackable_operator::builder::pod::volume::SecretOperatorVolumeSourceBuilderError,
     },
 
-    #[snafu(display("failed to build TLS secret volume"))]
-    BuildTlsSecretVolume {
+    #[snafu(display("failed to build TLS secret volume source"))]
+    BuildTlsSecretVolumeSource {
         source: stackable_operator::builder::pod::volume::SecretOperatorVolumeSourceBuilderError,
     },
 
     #[snafu(display("failed to add needed volume"))]
     AddVolume { source: builder::pod::Error },
-
-    #[snafu(display("failed to add needed volumeMount"))]
-    AddVolumeMount {
-        source: builder::pod::container::Error,
-    },
 }
 
 /// The `hbase-site.xml` Kerberos properties for `cluster`, gated on Kerberos being enabled
@@ -229,6 +224,13 @@ pub fn kerberos_ssl_client_settings() -> BTreeMap<String, String> {
     truststore_settings("client")
 }
 
+/// Adds the Kerberos keytab and TLS keystore volumes to the [`PodBuilder`] and their mounts to the
+/// [`ContainerBuilder`], for whichever of the two secret classes are configured.
+///
+/// # Panics
+///
+/// Panics if the volume mounts cannot be added to the container builder. Only call this on a
+/// container builder whose mount paths are still distinct from the ones added here.
 pub fn add_kerberos_pod_config(
     cluster: &ValidatedCluster,
     metrics_service_name: &str,
@@ -247,7 +249,7 @@ pub fn add_kerberos_pod_config(
         .with_kerberos_service_name(kerberos_service_name())
         .with_kerberos_service_name("HTTP")
         .build()
-        .context(BuildKerberosSecretVolumeSnafu)?;
+        .context(BuildKerberosSecretVolumeSourceSnafu)?;
         pb.add_volume(
             VolumeBuilder::new(&*KERBEROS_VOLUME_NAME)
                 .ephemeral(kerberos_secret_operator_volume)
@@ -255,7 +257,7 @@ pub fn add_kerberos_pod_config(
         )
         .context(AddVolumeSnafu)?;
         cb.add_volume_mount(&*KERBEROS_VOLUME_NAME, STACKABLE_KERBEROS_DIR)
-            .context(AddVolumeMountSnafu)?;
+            .expect("The mount paths are statically defined and there should be no duplicates.");
     }
 
     if let Some(https_secret_class) = &cluster.cluster_config.https_secret_class {
@@ -277,13 +279,13 @@ pub fn add_kerberos_pod_config(
                     .with_tls_pkcs12_password(TLS_STORE_PASSWORD)
                     .with_auto_tls_cert_lifetime(requested_secret_lifetime)
                     .build()
-                    .context(BuildTlsSecretVolumeSnafu)?,
+                    .context(BuildTlsSecretVolumeSourceSnafu)?,
                 )
                 .build(),
         )
         .context(AddVolumeSnafu)?;
         cb.add_volume_mount(&*TLS_STORE_VOLUME_NAME, TLS_STORE_DIR)
-            .context(AddVolumeMountSnafu)?;
+            .expect("The mount paths are statically defined and there should be no duplicates.");
     }
     Ok(())
 }
