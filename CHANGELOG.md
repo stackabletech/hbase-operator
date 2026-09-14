@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- Support floating tag in product image selection ([#809]).
+
 ### Changed
 
 - Internal operator refactoring: introduce a build() step in the reconciler that
@@ -43,6 +47,7 @@
 [#797]: https://github.com/stackabletech/hbase-operator/pull/797
 [#799]: https://github.com/stackabletech/hbase-operator/pull/799
 [#803]: https://github.com/stackabletech/hbase-operator/pull/803
+[#809]: https://github.com/stackabletech/hbase-operator/pull/809
 
 ## [26.7.0] - 2026-07-21
 
