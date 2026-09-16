@@ -4,15 +4,20 @@
 
 ### Added
 
-- Support floating tag in product image selection ([#809]).
+- Support floating tags for product images via the new `spec.image.stackableVersionPolicy` field
+  ([#809]).
 
 ### Changed
 
+- BREAKING: `spec.image.stackableVersion` must now be a full, valid semver version, e.g. `26.7.1`.
+  Abbreviated values such as `26.7` are no longer accepted ([#809]).
+- BREAKING: `spec.image.pullPolicy` now defaults to `IfNotPresent` for non-floating tags instead of
+  always defaulting to `Always` ([#809]).
 - Internal operator refactoring: introduce a build() step in the reconciler that
   assembles all relevant Kubernetes resources before anything is applied ([#776]).
 - The RBAC ServiceAccount and RoleBinding are now built with the operator-rs `v2::rbac`
   functions and carry the full set of recommended labels ([#782]).
-- Bump stackable-operator to 0.116.0 ([#786], [#799]).
+- Bump stackable-operator to 0.118.0 ([#786], [#799], [#809]).
 - The reconciler now applies resources and derives the cluster status in discrete
   apply and update_status steps ([#787]).
 - All product containers now run with `securityContext.runAsNonRoot` set to `true` to improve security ([#792]).
