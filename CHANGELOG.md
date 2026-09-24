@@ -6,6 +6,7 @@
 
 - Support floating tags for product images via the new `spec.image.stackableVersionPolicy` field
   ([#809]).
+- Add `/ready` endpoint to the operator Deployment, which reports the CRD installation status ([#812]).
 
 ### Changed
 
@@ -29,6 +30,7 @@
 - Environment variable overrides (`envOverrides`) are now applied after all environment
   variables set by the operator ([#799]).
 - Make operations infallible where dependent on static inputs ([#803]).
+- Bump stackable-operator to 0.119.0 ([#812]).
 
 ### Fixed
 
@@ -53,6 +55,7 @@
 [#799]: https://github.com/stackabletech/hbase-operator/pull/799
 [#803]: https://github.com/stackabletech/hbase-operator/pull/803
 [#809]: https://github.com/stackabletech/hbase-operator/pull/809
+[#812]: https://github.com/stackabletech/hbase-operator/pull/812
 
 ## [26.7.0] - 2026-07-21
 
