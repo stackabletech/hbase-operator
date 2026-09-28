@@ -4,7 +4,7 @@
 
 ### Added
 
-- Masters and regionservers now have a default affinity to OPA server Pods when OPA authorization is configured ([#XXX]).
+- Masters and regionservers now have a default affinity to OPA server Pods when OPA authorization is configured ([#814]).
 - Support floating tags for product images via the new `spec.image.stackableVersionPolicy` field
   ([#809]).
 - Add `/ready` endpoint to the operator Deployment, which reports the CRD installation status ([#812]).
@@ -57,7 +57,7 @@
 [#803]: https://github.com/stackabletech/hbase-operator/pull/803
 [#809]: https://github.com/stackabletech/hbase-operator/pull/809
 [#812]: https://github.com/stackabletech/hbase-operator/pull/812
-[#XXX]: https://github.com/stackabletech/hbase-operator/pull/XXX
+[#814]: https://github.com/stackabletech/hbase-operator/pull/814
 
 ## [26.7.0] - 2026-07-21
 
