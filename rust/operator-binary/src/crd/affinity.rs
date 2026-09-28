@@ -2,6 +2,7 @@ use stackable_operator::{
     commons::affinity::{
         StackableAffinityFragment, affinity_between_cluster_pods, affinity_between_role_pods,
     },
+    commons::opa::OpaConfig,
     k8s_openapi::api::core::v1::{PodAffinity, PodAntiAffinity},
 };
 
@@ -11,67 +12,47 @@ pub fn get_affinity(
     cluster_name: &str,
     role: &HbaseRole,
     hdfs_discovery_cm_name: &str,
+    opa_config: Option<&OpaConfig>,
 ) -> StackableAffinityFragment {
-    let affinity_between_cluster_pods = affinity_between_cluster_pods(APP_NAME, cluster_name, 20);
-    match role {
-        HbaseRole::Master => StackableAffinityFragment {
-            pod_affinity: Some(PodAffinity {
-                preferred_during_scheduling_ignored_during_execution: Some(vec![
-                    affinity_between_cluster_pods,
-                    // We would like a affinity to the Zookeeper Pods, but the hbase CRD only contains a ZNode reference.
-                    // We could look up the ZNode and extract the zk cluster from it but that causes network calls
-                    // See https://github.com/stackabletech/zookeeper-operator/issues/644
-                    // Watch out: The zk can be in a different namespace, so the namespaceSelector must be used
-                ]),
-                required_during_scheduling_ignored_during_execution: None,
-            }),
-            pod_anti_affinity: Some(PodAntiAffinity {
-                preferred_during_scheduling_ignored_during_execution: Some(vec![
-                    affinity_between_role_pods(APP_NAME, cluster_name, &role.to_string(), 70),
-                ]),
-                required_during_scheduling_ignored_during_execution: None,
-            }),
-            node_affinity: None,
-            node_selector: None,
-        },
-        HbaseRole::RegionServer => StackableAffinityFragment {
-            pod_affinity: Some(PodAffinity {
-                preferred_during_scheduling_ignored_during_execution: Some(vec![
-                    affinity_between_cluster_pods,
-                    affinity_between_role_pods(
-                        "hdfs",
-                        hdfs_discovery_cm_name, // The discovery cm has the same name as the HdfsCluster itself
-                        "datanode",
-                        50,
-                    ),
-                ]),
-                required_during_scheduling_ignored_during_execution: None,
-            }),
-            pod_anti_affinity: Some(PodAntiAffinity {
-                preferred_during_scheduling_ignored_during_execution: Some(vec![
-                    affinity_between_role_pods(APP_NAME, cluster_name, &role.to_string(), 70),
-                ]),
-                required_during_scheduling_ignored_during_execution: None,
-            }),
-            node_affinity: None,
-            node_selector: None,
-        },
-        HbaseRole::RestServer => StackableAffinityFragment {
-            pod_affinity: Some(PodAffinity {
-                preferred_during_scheduling_ignored_during_execution: Some(vec![
-                    affinity_between_cluster_pods,
-                ]),
-                required_during_scheduling_ignored_during_execution: None,
-            }),
-            pod_anti_affinity: Some(PodAntiAffinity {
-                preferred_during_scheduling_ignored_during_execution: Some(vec![
-                    affinity_between_role_pods(APP_NAME, cluster_name, &role.to_string(), 70),
-                ]),
-                required_during_scheduling_ignored_during_execution: None,
-            }),
-            node_affinity: None,
-            node_selector: None,
-        },
+    let mut affinities = vec![affinity_between_cluster_pods(APP_NAME, cluster_name, 20)];
+    if role == &HbaseRole::RegionServer {
+        affinities.push(affinity_between_role_pods(
+            "hdfs",
+            hdfs_discovery_cm_name, // The discovery cm has the same name as the HdfsCluster itself
+            "datanode",
+            50,
+        ));
+    }
+    // We would like an affinity to the ZooKeeper Pods, but the HBase CRD only contains a ZNode
+    // reference. Looking up its cluster would require a network call, and it may be in another
+    // namespace (which would require namespaceSelector).
+    // See https://github.com/stackabletech/zookeeper-operator/issues/644
+
+    // The OPA coprocessors run in masters and regionservers, not in REST servers.
+    if let Some(opa_config) = opa_config
+        && role != &HbaseRole::RestServer
+    {
+        affinities.push(affinity_between_role_pods(
+            "opa",
+            &opa_config.config_map_name, // The discovery ConfigMap has the same name as the OpaCluster.
+            "server",
+            50,
+        ));
+    }
+
+    StackableAffinityFragment {
+        pod_affinity: Some(PodAffinity {
+            preferred_during_scheduling_ignored_during_execution: Some(affinities),
+            required_during_scheduling_ignored_during_execution: None,
+        }),
+        pod_anti_affinity: Some(PodAntiAffinity {
+            preferred_during_scheduling_ignored_during_execution: Some(vec![
+                affinity_between_role_pods(APP_NAME, cluster_name, &role.to_string(), 70),
+            ]),
+            required_during_scheduling_ignored_during_execution: None,
+        }),
+        node_affinity: None,
+        node_selector: None,
     }
 }
 
@@ -91,7 +72,7 @@ mod tests {
     };
 
     use super::*;
-    use crate::crd::v1alpha1;
+    use crate::crd::{security::AuthorizationConfig, v1alpha1};
 
     #[rstest]
     #[case(HbaseRole::Master)]
@@ -223,5 +204,63 @@ mod tests {
                 node_selector: None,
             }
         );
+    }
+
+    #[rstest]
+    #[case(HbaseRole::Master)]
+    #[case(HbaseRole::RegionServer)]
+    #[case(HbaseRole::RestServer)]
+    fn test_opa_affinity(#[case] role: HbaseRole) {
+        let mut hbase = crate::test_utils::minimal_hbase();
+        let without_opa = crate::test_utils::validated_cluster_from(&hbase);
+        let default_affinity = crate::test_utils::merged_config(&without_opa, &role)
+            .affinity()
+            .clone();
+
+        hbase.spec.cluster_config.authorization = Some(AuthorizationConfig {
+            opa: Some(
+                serde_yaml::from_str("configMapName: simple-opa\npackage: hbase")
+                    .expect("valid OPA configuration"),
+            ),
+        });
+        let with_opa = crate::test_utils::validated_cluster_from(&hbase);
+        let affinity = crate::test_utils::merged_config(&with_opa, &role)
+            .affinity()
+            .clone();
+
+        if role == HbaseRole::RestServer {
+            assert_eq!(affinity, default_affinity);
+        } else {
+            let mut expected = default_affinity;
+            expected
+                .pod_affinity
+                .as_mut()
+                .unwrap()
+                .preferred_during_scheduling_ignored_during_execution
+                .as_mut()
+                .unwrap()
+                .push(WeightedPodAffinityTerm {
+                    pod_affinity_term: PodAffinityTerm {
+                        label_selector: Some(LabelSelector {
+                            match_labels: Some(BTreeMap::from([
+                                ("app.kubernetes.io/name".to_string(), "opa".to_string()),
+                                (
+                                    "app.kubernetes.io/instance".to_string(),
+                                    "simple-opa".to_string(),
+                                ),
+                                (
+                                    "app.kubernetes.io/component".to_string(),
+                                    "server".to_string(),
+                                ),
+                            ])),
+                            ..LabelSelector::default()
+                        }),
+                        topology_key: "kubernetes.io/hostname".to_string(),
+                        ..PodAffinityTerm::default()
+                    },
+                    weight: 50,
+                });
+            assert_eq!(affinity, expected);
+        }
     }
 }

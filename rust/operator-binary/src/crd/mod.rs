@@ -315,6 +315,7 @@ impl HbaseConfigFragment {
         role: &HbaseRole,
         cluster_name: &str,
         hdfs_discovery_cm_name: &str,
+        opa_config: Option<&stackable_operator::commons::opa::OpaConfig>,
     ) -> Self {
         let graceful_shutdown_timeout = match role {
             HbaseRole::Master => HbaseRole::DEFAULT_MASTER_GRACEFUL_SHUTDOWN_TIMEOUT,
@@ -330,7 +331,7 @@ impl HbaseConfigFragment {
             hbase_rootdir: Some(default_hbase_rootdir()),
             resources: default_resources(role),
             logging: product_logging::spec::default_logging(),
-            affinity: get_affinity(cluster_name, role, hdfs_discovery_cm_name),
+            affinity: get_affinity(cluster_name, role, hdfs_discovery_cm_name, opa_config),
             graceful_shutdown_timeout: Some(graceful_shutdown_timeout),
             requested_secret_lifetime: Some(requested_secret_lifetime),
             listener_class: Some(
@@ -347,12 +348,13 @@ impl RegionServerConfigFragment {
         role: &HbaseRole,
         cluster_name: &str,
         hdfs_discovery_cm_name: &str,
+        opa_config: Option<&stackable_operator::commons::opa::OpaConfig>,
     ) -> Self {
         RegionServerConfigFragment {
             hbase_rootdir: Some(default_hbase_rootdir()),
             resources: default_resources(role),
             logging: product_logging::spec::default_logging(),
-            affinity: get_affinity(cluster_name, role, hdfs_discovery_cm_name),
+            affinity: get_affinity(cluster_name, role, hdfs_discovery_cm_name, opa_config),
             graceful_shutdown_timeout: Some(
                 HbaseRole::DEFAULT_REGION_SERVER_GRACEFUL_SHUTDOWN_TIMEOUT,
             ),

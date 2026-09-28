@@ -129,6 +129,12 @@ pub fn validate_cluster(
 
     let hdfs_discovery_cm_name = hbase.spec.cluster_config.hdfs_config_map_name.as_ref();
     let cluster_name = hbase.name_any();
+    let opa_config = hbase
+        .spec
+        .cluster_config
+        .authorization
+        .as_ref()
+        .and_then(|authorization| authorization.opa.as_ref());
 
     // The Vector aggregator discovery ConfigMap name. It is validated already at deserialize time
     // (it is a `ConfigMapName`), and only required when the Vector agent is enabled for a role
@@ -147,6 +153,7 @@ pub fn validate_cluster(
                     &hbase_role,
                     &cluster_name,
                     hdfs_discovery_cm_name,
+                    opa_config,
                 ),
                 AnyServiceConfig::Master,
                 &vector_aggregator_config_map_name,
@@ -157,6 +164,7 @@ pub fn validate_cluster(
                     &hbase_role,
                     &cluster_name,
                     hdfs_discovery_cm_name,
+                    opa_config,
                 ),
                 AnyServiceConfig::RegionServer,
                 &vector_aggregator_config_map_name,
@@ -167,6 +175,7 @@ pub fn validate_cluster(
                     &hbase_role,
                     &cluster_name,
                     hdfs_discovery_cm_name,
+                    opa_config,
                 ),
                 AnyServiceConfig::RestServer,
                 &vector_aggregator_config_map_name,
@@ -357,6 +366,7 @@ spec:
             &HbaseRole::Master,
             &hbase.name_any(),
             hbase.spec.cluster_config.hdfs_config_map_name.as_ref(),
+            None,
         );
 
         let validated = with_validated_config::<
