@@ -1,3 +1,5 @@
+{# Phoenix is only shipped in the HBase 2.x images (it does not support HBase 3.x yet) #}
+{% set with_phoenix = test_scenario['values']['hbase'].split(',')[0].startswith('2.') %}
 ---
 apiVersion: hbase.stackable.tech/v1alpha1
 kind: HbaseCluster
@@ -28,10 +30,12 @@ spec:
       listenerClass: {{ test_scenario['values']['listener-class'] }}
     roleGroups:
       default:
+{% if with_phoenix %}
         configOverrides:
           hbase-site.xml:
             phoenix.log.saltBuckets: "2"
             hbase.regionserver.wal.codec: "org.apache.hadoop.hbase.regionserver.wal.IndexedWALEditCodec"
+{% endif %}
         replicas: 2
   regionServers:
     config:
@@ -41,10 +45,12 @@ spec:
       listenerClass: {{ test_scenario['values']['listener-class'] }}
     roleGroups:
       default:
+{% if with_phoenix %}
         configOverrides:
           hbase-site.xml:
             phoenix.log.saltBuckets: "2"
             hbase.regionserver.wal.codec: "org.apache.hadoop.hbase.regionserver.wal.IndexedWALEditCodec"
+{% endif %}
         replicas: 2
   restServers:
     config:
@@ -57,8 +63,10 @@ spec:
           limit: 1Gi
     roleGroups:
       default:
+{% if with_phoenix %}
         configOverrides:
           hbase-site.xml:
             phoenix.log.saltBuckets: "2"
             hbase.regionserver.wal.codec: "org.apache.hadoop.hbase.regionserver.wal.IndexedWALEditCodec"
+{% endif %}
         replicas: 2

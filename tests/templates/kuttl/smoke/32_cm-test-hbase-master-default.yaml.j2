@@ -1,3 +1,5 @@
+{# Phoenix is only shipped in the HBase 2.x images (it does not support HBase 3.x yet) #}
+{% set with_phoenix = test_scenario['values']['hbase'].split(',')[0].startswith('2.') %}
 hbase-env.sh: |
   export HBASE_HEAPSIZE="819m"
   export HBASE_MANAGES_ZK="false"
@@ -6,6 +8,10 @@ hbase-env.sh: |
 hbase-site.xml: |-
   <?xml version="1.0"?>
   <configuration>
+    <property>
+      <name>hbase.client.bootstrap.servers</name>
+      <value>test-hbase-master-default-0.test-hbase-master-default-headless.__NAMESPACE__.svc.cluster.local:16000,test-hbase-master-default-1.test-hbase-master-default-headless.__NAMESPACE__.svc.cluster.local:16000</value>
+    </property>
     <property>
       <name>hbase.client.rpc.bind.address</name>
       <value>false</value>
@@ -38,10 +44,12 @@ hbase-site.xml: |-
       <name>hbase.master.port</name>
       <value>${env:HBASE_SERVICE_PORT}</value>
     </property>
+{% if with_phoenix %}
     <property>
       <name>hbase.regionserver.wal.codec</name>
       <value>org.apache.hadoop.hbase.regionserver.wal.IndexedWALEditCodec</value>
     </property>
+{% endif %}
     <property>
       <name>hbase.rootdir</name>
       <value>/hbase</value>
@@ -54,10 +62,12 @@ hbase-site.xml: |-
       <name>hbase.zookeeper.quorum</name>
       <value>test-zk-server.__NAMESPACE__.svc.cluster.local:2282</value>
     </property>
+{% if with_phoenix %}
     <property>
       <name>phoenix.log.saltBuckets</name>
       <value>2</value>
     </property>
+{% endif %}
     <property>
       <name>zookeeper.znode.parent</name>
       <value>/znode-__ZNODE__/hbase</value>

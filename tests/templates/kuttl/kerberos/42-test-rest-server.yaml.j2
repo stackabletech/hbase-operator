@@ -20,7 +20,7 @@ commands:
                   - /bin/bash
                   - -c
                   - |
-                    status_code=\$(curl --write-out '%{http_code}' --silent --insecure --output /dev/null "https://hbase-restserver-default-headless:8080")
+                    status_code=\$(curl --write-out '%{http_code}' --silent --insecure --output /dev/null "https://hbase-restserver-default-headless.$NAMESPACE.svc.cluster.local:8080")
 
                     if [[ "\$status_code" -eq 401 ]] ; then
                       echo "[PASS] Successfully got 401 as we did not authenticate"
@@ -31,7 +31,7 @@ commands:
 
                     kinit -kt /stackable/kerberos/keytab testuser/test-rest-server.$NAMESPACE.svc.cluster.local@{{ test_scenario['values']['kerberos-realm'] }}
 
-                    status_code=\$(curl --write-out '%{http_code}' --silent --insecure --output /dev/null --negotiate --user : "https://hbase-restserver-default-headless:8080")
+                    status_code=\$(curl --write-out '%{http_code}' --silent --insecure --output /dev/null --negotiate --user : "https://hbase-restserver-default-headless.$NAMESPACE.svc.cluster.local:8080")
 
                     if [[ "\$status_code" -eq 200 ]] ; then
                       echo "[PASS] Successfully got 200 as we did authenticate"

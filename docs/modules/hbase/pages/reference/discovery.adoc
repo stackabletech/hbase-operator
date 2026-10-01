@@ -37,6 +37,8 @@ The ConfigMap data values are formatted as Hadoop XML files which allows simple 
 
 `hbase-site.xml`::
 Contains the needed information to connect to Zookeeper and use that to establish a connection to HBase.
+It also lists the master Pods in `hbase.client.bootstrap.servers`, which HBase 3.x clients use by default to connect (RPC-based connection registry).
+These addresses are cluster-internal DNS names, so they only resolve for clients running inside the Kubernetes cluster.
 
 === Kerberos
 In case Kerberos is enabled according to the xref:usage-guide/security.adoc[security documentation], the discovery ConfigMap also includes the information that clients must authenticate themselves using Kerberos.
