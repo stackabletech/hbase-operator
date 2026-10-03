@@ -20,7 +20,7 @@
 *** xref:hbase:usage-guide/operations/graceful-shutdown.adoc[]
 * xref:hbase:reference/index.adoc[]
 ** xref:hbase:reference/crds.adoc[]
-*** {crd-docs}/hbase.stackable.tech/hbasecluster/v1alpha1/[HbaseCluster {external-link-icon}^]
+*** {crd-ref}/hbase.stackable.tech/v1alpha1/hbasecluster{crd-ref-release}[HbaseCluster {external-link-icon}^]
 ** xref:hbase:reference/discovery.adoc[]
 ** xref:hbase:reference/commandline-parameters.adoc[]
 ** xref:hbase:reference/environment-variables.adoc[]
