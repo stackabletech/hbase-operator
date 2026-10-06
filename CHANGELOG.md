@@ -7,6 +7,7 @@
 - Support floating tags for product images via the new `spec.image.stackableVersionPolicy` field
   ([#809]).
 - Add `/ready` endpoint to the operator Deployment, which reports the CRD installation status ([#812]).
+- Masters and region servers now have a default affinity to the OPA Pods when OPA authorization is configured ([#XXX]).
 
 ### Changed
 
