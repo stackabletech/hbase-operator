@@ -7,6 +7,7 @@
 - Support floating tags for product images via the new `spec.image.stackableVersionPolicy` field
   ([#809]).
 - Add `/ready` endpoint to the operator Deployment, which reports the CRD installation status ([#812]).
+- Masters and region servers now have a default affinity to the OPA Pods when OPA authorization is configured ([#816]).
 
 ### Changed
 
@@ -56,6 +57,7 @@
 [#803]: https://github.com/stackabletech/hbase-operator/pull/803
 [#809]: https://github.com/stackabletech/hbase-operator/pull/809
 [#812]: https://github.com/stackabletech/hbase-operator/pull/812
+[#816]: https://github.com/stackabletech/hbase-operator/pull/816
 
 ## [26.7.0] - 2026-07-21
 
