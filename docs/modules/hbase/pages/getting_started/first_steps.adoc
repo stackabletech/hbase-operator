@@ -75,7 +75,7 @@ include::example$getting_started/hbase.yaml[]
 
 To test the cluster, use the REST API to check its version and status, and to create and inspect a new table.
 Use Phoenix to create, populate and query a second new table, before listing all non-system tables in HBase.
-These actions wil be carried out from one of the HBase components, the REST server.
+These actions will be carried out from one of the HBase components, the REST server.
 
 First, check the cluster version with this callout:
 
