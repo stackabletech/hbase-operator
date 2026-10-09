@@ -32,6 +32,7 @@
   variables set by the operator ([#799]).
 - Make operations infallible where dependent on static inputs ([#803]).
 - Bump stackable-operator to 0.119.0 ([#812]).
+- test: Bump vector-aggregator to 0.58.0 ([#821]).
 
 ### Fixed
 
@@ -58,6 +59,7 @@
 [#809]: https://github.com/stackabletech/hbase-operator/pull/809
 [#812]: https://github.com/stackabletech/hbase-operator/pull/812
 [#816]: https://github.com/stackabletech/hbase-operator/pull/816
+[#821]: https://github.com/stackabletech/hbase-operator/pull/821
 
 ## [26.7.0] - 2026-07-21
 
