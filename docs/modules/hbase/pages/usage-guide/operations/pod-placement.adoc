@@ -9,7 +9,8 @@ The default affinities created by the operator are:
 
 1. Co-locate all the HBase Pods (weight 20)
 2. Co-locate HBase regionservers with the underlying HDFS datanodes (weight 50)
-3. Distribute all Pods within the same role across nodes so multiple instances don't end up on the same Kubernetes node (masters, regionservers, rest servers) (weight 70)
+3. If OPA authorization is configured: co-locate HBase masters and regionservers with the OPA Pods (weight 50)
+4. Distribute all Pods within the same role across nodes so multiple instances don't end up on the same Kubernetes node (masters, regionservers, rest servers) (weight 70)
 
 NOTE: All default affinities are only preferred and not enforced, as we can not expect all setups to have multiple Kubernetes nodes.
 If you want to have them enforced, you need to specify you own `requiredDuringSchedulingIgnoredDuringExecution` affinities.
@@ -107,6 +108,26 @@ The `hdfs-cluster-name` is the name of the HDFS cluster that was configured in t
 
 NOTE: It is important that the `hdfsConfigMapName` property contains the name the HDFS cluster.
 You could instead configure ConfigMaps of specific name or data roles, but for the purpose of Pod placement, this leads to faulty behavior.
+
+If OPA authorization is configured, masters and region servers additionally get the following affinity.
+Rest servers do not get it, as they do not load the OPA access controller coprocessor.
+
+[source,yaml]
+----
+affinity:
+  podAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+    - podAffinityTerm:
+        labelSelector:
+          matchLabels:
+            app.kubernetes.io/component: server
+            app.kubernetes.io/instance: opa-cluster-name
+            app.kubernetes.io/name: opa
+        topologyKey: kubernetes.io/hostname
+      weight: 50
+----
+
+`opa-cluster-name` is the `configMapName` from `spec.clusterConfig.authorization.opa`, which by convention is the name of the OpaCluster.
 
 == Use custom pod placement
 For general configuration of Pod placement, see the xref:concepts:operations/pod_placement.adoc[Pod placement concepts] page.

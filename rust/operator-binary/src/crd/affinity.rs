@@ -1,6 +1,9 @@
 use stackable_operator::{
-    commons::affinity::{
-        StackableAffinityFragment, affinity_between_cluster_pods, affinity_between_role_pods,
+    commons::{
+        affinity::{
+            StackableAffinityFragment, affinity_between_cluster_pods, affinity_between_role_pods,
+        },
+        opa::OpaConfig,
     },
     k8s_openapi::api::core::v1::{PodAffinity, PodAntiAffinity},
 };
@@ -11,18 +14,34 @@ pub fn get_affinity(
     cluster_name: &str,
     role: &HbaseRole,
     hdfs_discovery_cm_name: &str,
+    opa_config: Option<&OpaConfig>,
 ) -> StackableAffinityFragment {
+    // Masters and region servers load the OPA access controller coprocessor, so they are co-located
+    // with the OPA Pods.
+    let affinity_to_opa_pods = opa_config.map(|opa_config| {
+        affinity_between_role_pods(
+            "opa",
+            &opa_config.config_map_name, // The discovery cm has the same name as the OpaCluster itself
+            "server",
+            50,
+        )
+    });
     let affinity_between_cluster_pods = affinity_between_cluster_pods(APP_NAME, cluster_name, 20);
     match role {
         HbaseRole::Master => StackableAffinityFragment {
             pod_affinity: Some(PodAffinity {
-                preferred_during_scheduling_ignored_during_execution: Some(vec![
-                    affinity_between_cluster_pods,
-                    // We would like a affinity to the Zookeeper Pods, but the hbase CRD only contains a ZNode reference.
-                    // We could look up the ZNode and extract the zk cluster from it but that causes network calls
-                    // See https://github.com/stackabletech/zookeeper-operator/issues/644
-                    // Watch out: The zk can be in a different namespace, so the namespaceSelector must be used
-                ]),
+                preferred_during_scheduling_ignored_during_execution: Some(
+                    vec![
+                        affinity_between_cluster_pods,
+                        // We would like a affinity to the Zookeeper Pods, but the hbase CRD only contains a ZNode reference.
+                        // We could look up the ZNode and extract the zk cluster from it but that causes network calls
+                        // See https://github.com/stackabletech/zookeeper-operator/issues/644
+                        // Watch out: The zk can be in a different namespace, so the namespaceSelector must be used
+                    ]
+                    .into_iter()
+                    .chain(affinity_to_opa_pods)
+                    .collect(),
+                ),
                 required_during_scheduling_ignored_during_execution: None,
             }),
             pod_anti_affinity: Some(PodAntiAffinity {
@@ -36,15 +55,20 @@ pub fn get_affinity(
         },
         HbaseRole::RegionServer => StackableAffinityFragment {
             pod_affinity: Some(PodAffinity {
-                preferred_during_scheduling_ignored_during_execution: Some(vec![
-                    affinity_between_cluster_pods,
-                    affinity_between_role_pods(
-                        "hdfs",
-                        hdfs_discovery_cm_name, // The discovery cm has the same name as the HdfsCluster itself
-                        "datanode",
-                        50,
-                    ),
-                ]),
+                preferred_during_scheduling_ignored_during_execution: Some(
+                    vec![
+                        affinity_between_cluster_pods,
+                        affinity_between_role_pods(
+                            "hdfs",
+                            hdfs_discovery_cm_name, // The discovery cm has the same name as the HdfsCluster itself
+                            "datanode",
+                            50,
+                        ),
+                    ]
+                    .into_iter()
+                    .chain(affinity_to_opa_pods)
+                    .collect(),
+                ),
                 required_during_scheduling_ignored_during_execution: None,
             }),
             pod_anti_affinity: Some(PodAntiAffinity {
@@ -56,6 +80,8 @@ pub fn get_affinity(
             node_affinity: None,
             node_selector: None,
         },
+        // The REST server does not load the OPA access controller coprocessor, so it gets no
+        // affinity to the OPA Pods.
         HbaseRole::RestServer => StackableAffinityFragment {
             pod_affinity: Some(PodAffinity {
                 preferred_during_scheduling_ignored_during_execution: Some(vec![
@@ -111,6 +137,10 @@ mod tests {
           clusterConfig:
             hdfsConfigMapName: simple-hdfs
             zookeeperConfigMapName: simple-znode
+            authorization:
+              opa:
+                configMapName: simple-opa
+                package: hbase
           masters:
             roleGroups:
               default:
@@ -168,6 +198,37 @@ mod tests {
                                 (
                                     "app.kubernetes.io/component".to_string(),
                                     "datanode".to_string(),
+                                ),
+                            ])),
+                        }),
+                        match_label_keys: None,
+                        mismatch_label_keys: None,
+                        namespace_selector: None,
+                        namespaces: None,
+                        topology_key: "kubernetes.io/hostname".to_string(),
+                    },
+                    weight: 50,
+                });
+            }
+            HbaseRole::RestServer => (),
+        };
+
+        // Masters and region servers load the OPA access controller coprocessor.
+        match role {
+            HbaseRole::Master | HbaseRole::RegionServer => {
+                expected_affinities.push(WeightedPodAffinityTerm {
+                    pod_affinity_term: PodAffinityTerm {
+                        label_selector: Some(LabelSelector {
+                            match_expressions: None,
+                            match_labels: Some(BTreeMap::from([
+                                ("app.kubernetes.io/name".to_string(), "opa".to_string()),
+                                (
+                                    "app.kubernetes.io/instance".to_string(),
+                                    "simple-opa".to_string(),
+                                ),
+                                (
+                                    "app.kubernetes.io/component".to_string(),
+                                    "server".to_string(),
                                 ),
                             ])),
                         }),

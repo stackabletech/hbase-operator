@@ -139,6 +139,13 @@ pub fn validate_cluster(
         .vector_aggregator_config_map_name
         .clone();
 
+    let opa_config = hbase
+        .spec
+        .cluster_config
+        .authorization
+        .as_ref()
+        .and_then(|authorization| authorization.opa.as_ref());
+
     for hbase_role in HbaseRole::iter() {
         let group_configs = match hbase_role {
             HbaseRole::Master => validate_role_group_configs(
@@ -147,6 +154,7 @@ pub fn validate_cluster(
                     &hbase_role,
                     &cluster_name,
                     hdfs_discovery_cm_name,
+                    opa_config,
                 ),
                 AnyServiceConfig::Master,
                 &vector_aggregator_config_map_name,
@@ -157,6 +165,7 @@ pub fn validate_cluster(
                     &hbase_role,
                     &cluster_name,
                     hdfs_discovery_cm_name,
+                    opa_config,
                 ),
                 AnyServiceConfig::RegionServer,
                 &vector_aggregator_config_map_name,
@@ -167,6 +176,7 @@ pub fn validate_cluster(
                     &hbase_role,
                     &cluster_name,
                     hdfs_discovery_cm_name,
+                    opa_config,
                 ),
                 AnyServiceConfig::RestServer,
                 &vector_aggregator_config_map_name,
@@ -357,6 +367,7 @@ spec:
             &HbaseRole::Master,
             &hbase.name_any(),
             hbase.spec.cluster_config.hdfs_config_map_name.as_ref(),
+            None,
         );
 
         let validated = with_validated_config::<
