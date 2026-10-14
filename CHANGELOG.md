@@ -33,6 +33,7 @@
 - Make operations infallible where dependent on static inputs ([#803]).
 - Bump stackable-operator to 0.119.0 ([#812]).
 - test: Bump vector-aggregator to 0.58.0 ([#821]).
+- test: Update OPA to 1.20.2 in integration tests ([#823]).
 
 ### Fixed
 
@@ -60,6 +61,7 @@
 [#812]: https://github.com/stackabletech/hbase-operator/pull/812
 [#816]: https://github.com/stackabletech/hbase-operator/pull/816
 [#821]: https://github.com/stackabletech/hbase-operator/pull/821
+[#823]: https://github.com/stackabletech/hbase-operator/pull/823
 
 ## [26.7.0] - 2026-07-21
 
