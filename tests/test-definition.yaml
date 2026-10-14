@@ -3,6 +3,7 @@ dimensions:
   - name: hbase
     values:
       - 2.6.6
+      - 2.6.7
       - 3.0.0
       # To use a custom image, add a comma and the full name after the product version
       # - x.x.x,oci.stackable.tech/sandbox/hbase:x.x.x-stackable0.0.0-dev
