@@ -10,11 +10,18 @@ spec:
       containers:
         - name: test-rest-server
           image: oci.stackable.tech/sdp/testing-tools:0.3.0-stackable0.0.0-dev
+          env:
+            # Jetty 12 (HBase 3.x) rejects HTTPS requests whose host is not in the server
+            # certificate with a 400, and the certificate only contains fully qualified names.
+            - name: NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
           command:
             - /bin/bash
             - -c
             - |
-              status_code=$(curl --write-out '%{http_code}' --silent --insecure --output /dev/null "https://hbase-restserver-default-headless:8080")
+              status_code=$(curl --write-out '%{http_code}' --silent --insecure --output /dev/null "https://hbase-restserver-default-headless.${NAMESPACE}.svc.cluster.local:8080")
 
               if [[ "$status_code" -eq 401 ]] ; then
                 echo "[PASS] Successfully got 401 as we did not authenticate"

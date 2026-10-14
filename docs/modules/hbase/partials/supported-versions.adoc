@@ -2,5 +2,7 @@
 // This is a separate file, since it is used by both the direct HBase-Operator documentation, and the overarching
 // Stackable Platform documentation.
 
-- 2.6.4 (DEPRECATED)
-- 2.6.6 (LTS)
+* 3.0.0 (experimental)
+** Phoenix does not yet support HBase 3.x and has been omitted from the product image.
+* 2.6.7 (LTS)
+* 2.6.6 (deprecated)

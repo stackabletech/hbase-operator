@@ -81,6 +81,7 @@ pub fn build_rolegroup_config_map(
             .as_hbase_settings(),
         kerberos::hbase_site_kerberos_config(cluster, cluster_info),
         cluster_config.hbase_opa_config.as_ref(),
+        hbase_site::client_bootstrap_servers(cluster, cluster_info),
         overrides.hbase_site_xml.clone(),
     );
 
