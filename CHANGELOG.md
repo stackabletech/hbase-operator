@@ -20,7 +20,7 @@
   assembles all relevant Kubernetes resources before anything is applied ([#776]).
 - The RBAC ServiceAccount and RoleBinding are now built with the operator-rs `v2::rbac`
   functions and carry the full set of recommended labels ([#782]).
-- Bump stackable-operator to 0.118.0 ([#786], [#799], [#809]).
+- Bump stackable-operator to 0.121.0 ([#786], [#799], [#809], [#812], [#824]).
 - The reconciler now applies resources and derives the cluster status in discrete
   apply and update_status steps ([#787]).
 - All product containers now run with `securityContext.runAsNonRoot` set to `true` to improve security ([#792]).
@@ -32,9 +32,10 @@
 - Environment variable overrides (`envOverrides`) are now applied after all environment
   variables set by the operator ([#799]).
 - Make operations infallible where dependent on static inputs ([#803]).
-- Bump stackable-operator to 0.119.0 ([#812]).
 - test: Bump vector-aggregator to 0.58.0 ([#821]).
 - test: Update OPA to 1.20.2 in integration tests ([#823]).
+- All pods now set `securityContext.seccompProfile.type` to `RuntimeDefault` ([#824]).
+- Replace the unmaintained `serde_yaml` with `yaml_serde` ([#824]).
 
 ### Fixed
 
@@ -64,6 +65,7 @@
 [#816]: https://github.com/stackabletech/hbase-operator/pull/816
 [#821]: https://github.com/stackabletech/hbase-operator/pull/821
 [#823]: https://github.com/stackabletech/hbase-operator/pull/823
+[#824]: https://github.com/stackabletech/hbase-operator/pull/824
 
 ## [26.7.0] - 2026-07-21
 
