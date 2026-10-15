@@ -51,7 +51,7 @@ spec:
 
 /// Parses an `HbaseCluster` from YAML, panicking on invalid input.
 pub fn hbase_from_yaml(yaml: &str) -> v1alpha1::HbaseCluster {
-    serde_yaml::from_str(yaml).expect("invalid test HbaseCluster YAML")
+    yaml_serde::from_str(yaml).expect("invalid test HbaseCluster YAML")
 }
 
 /// The [`MINIMAL_HBASE_YAML`] cluster.
