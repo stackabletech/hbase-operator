@@ -674,9 +674,8 @@ spec:
             additionalMoverOptions: ["--some", "extra"]
         "#};
 
-        let deserializer = serde_yaml::Deserializer::from_str(input);
         let hbase: v1alpha1::HbaseCluster =
-            serde_yaml::with::singleton_map_recursive::deserialize(deserializer).unwrap();
+            stackable_operator::utils::yaml_from_str_singleton_map(input).unwrap();
 
         let validated_cluster = crate::test_utils::validated_cluster_from(&hbase);
         let merged_config = crate::test_utils::merged_config_for(
