@@ -16,11 +16,11 @@ use stackable_operator::{
             ListenerReference as TypedListenerReference,
             listener_operator_volume_source_builder_build_pvc,
         },
-        types::kubernetes::PersistentVolumeClaimName,
+        types::kubernetes::{ListenerClassName, PersistentVolumeClaimName},
     },
 };
 
-use crate::crd::{AnyServiceConfig, HbaseRole, LISTENER_VOLUME_NAME};
+use crate::crd::{HbaseRole, LISTENER_VOLUME_NAME};
 
 constant!(pub(crate) LISTENER_PVC_NAME: PersistentVolumeClaimName = LISTENER_VOLUME_NAME);
 
@@ -38,7 +38,7 @@ type Result<T, E = Error> = std::result::Result<T, E>;
 /// servers (which use a [`PersistentVolumeClaim`] instead, see [`build_listener_pvc`]).
 pub fn build_listener_volume(
     role: &HbaseRole,
-    merged_config: &AnyServiceConfig,
+    listener_class: &ListenerClassName,
     recommended_labels: &Labels,
 ) -> Result<Option<Volume>> {
     let volume = match role {
@@ -51,12 +51,10 @@ pub fn build_listener_volume(
                     // (`listener_operator_volume_source_builder_build_pvc`, used by
                     // `build_listener_pvc`), so the ephemeral case still uses the legacy
                     // `ListenerOperatorVolumeSourceBuilder` and its stringly-typed
-                    // `ListenerReference`. We keep the typed `listener_class()` and convert to a
+                    // `ListenerReference`. We keep the typed `listener_class` and convert to a
                     // `String` only at this boundary; switch to a v2 helper once one exists.
                     ListenerOperatorVolumeSourceBuilder::new(
-                        &ListenerReference::ListenerClass(
-                            merged_config.listener_class().to_string(),
-                        ),
+                        &ListenerReference::ListenerClass(listener_class.to_string()),
                         recommended_labels,
                     )
                     .build_ephemeral()
@@ -73,13 +71,13 @@ pub fn build_listener_volume(
 /// and region servers (which use an ephemeral [`Volume`] instead, see [`build_listener_volume`]).
 pub fn build_listener_pvc(
     role: &HbaseRole,
-    merged_config: &AnyServiceConfig,
+    listener_class: &ListenerClassName,
     recommended_labels: &Labels,
 ) -> Option<Vec<PersistentVolumeClaim>> {
     match role {
         HbaseRole::Master | HbaseRole::RegionServer => None,
         HbaseRole::RestServer => Some(vec![listener_operator_volume_source_builder_build_pvc(
-            &TypedListenerReference::ListenerClass(merged_config.listener_class()),
+            &TypedListenerReference::ListenerClass(listener_class.clone()),
             recommended_labels,
             &LISTENER_PVC_NAME,
         )]),

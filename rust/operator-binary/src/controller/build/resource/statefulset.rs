@@ -26,24 +26,20 @@ use stackable_operator::{
         product_logging::framework::{
             STACKABLE_LOG_DIR, ValidatedContainerLogConfigChoice, vector_container,
         },
-        types::{
-            kubernetes::{ContainerName, VolumeName},
-            operator::RoleGroupName,
-        },
+        types::kubernetes::{ContainerName, VolumeName},
     },
 };
 
 use crate::{
-    controller::{
-        HbaseRoleGroupConfig, ValidatedCluster,
-        build::{
-            graceful_shutdown::{self, add_graceful_shutdown_config},
-            kerberos::{self, add_kerberos_pod_config},
-            object_meta,
-            properties::product_logging::MAX_HBASE_LOG_FILES_SIZE,
-            recommended_labels_for_role_group_resources,
-            recommended_labels_for_unversioned_role_group_resources, role_group_selector,
-        },
+    controller::build::{
+        graceful_shutdown::{self, add_graceful_shutdown_config},
+        kerberos::{self, add_kerberos_pod_config},
+        object_meta,
+        properties::product_logging::MAX_HBASE_LOG_FILES_SIZE,
+        recommended_labels_for_role_group_resources,
+        recommended_labels_for_unversioned_role_group_resources,
+        role_group::RoleGroupInputs,
+        role_group_selector,
     },
     crd::{CONFIG_DIR_NAME, HbaseRole, LISTENER_VOLUME_DIR, LISTENER_VOLUME_NAME},
 };
@@ -98,15 +94,13 @@ type Result<T, E = Error> = std::result::Result<T, E>;
 ///
 /// The [`Pod`](stackable_operator::k8s_openapi::api::core::v1::Pod)s are accessible through the
 /// corresponding headless [`Service`](stackable_operator::k8s_openapi::api::core::v1::Service).
-pub fn build_rolegroup_statefulset(
-    cluster: &ValidatedCluster,
-    hbase_role: &HbaseRole,
-    role_group_name: &RoleGroupName,
-    validated_rg_config: &HbaseRoleGroupConfig,
-) -> Result<StatefulSet> {
+pub fn build_rolegroup_statefulset(inputs: &RoleGroupInputs) -> Result<StatefulSet> {
+    let cluster = inputs.cluster;
+    let hbase_role = &inputs.role;
+    let role_group_name = &inputs.role_group_name;
+
     let resolved_product_image = &cluster.image;
-    let merged_config = &validated_rg_config.config.config;
-    let logging = &validated_rg_config.config.logging;
+    let logging = &inputs.logging;
     let resource_names = cluster.role_group_resource_names(hbase_role, role_group_name);
     let https_enabled = cluster.has_https_enabled();
 
@@ -154,11 +148,8 @@ pub fn build_rolegroup_statefulset(
         // required by phoenix (for cases where Kerberos is enabled): see https://issues.apache.org/jira/browse/PHOENIX-2369
         .with_value(&HADOOP_CONF_DIR_ENV, CONFIG_DIR_NAME)
         // These env vars are set for all roles to avoid bash's "unbound variable" errors.
-        .with_value(&REGION_MOVER_OPTS_ENV, merged_config.region_mover_args())
-        .with_value(
-            &RUN_REGION_MOVER_ENV,
-            merged_config.run_region_mover().to_string(),
-        )
+        .with_value(&REGION_MOVER_OPTS_ENV, inputs.region_mover_opts.clone())
+        .with_value(&RUN_REGION_MOVER_ENV, inputs.run_region_mover.to_string())
         .with_value(&STACKABLE_LOG_DIR_ENV, STACKABLE_LOG_DIR)
         // Needed for the `containerdebug` process to log its tracing information to.
         .with_value(
@@ -169,7 +160,7 @@ pub fn build_rolegroup_statefulset(
         .merge(kerberos::kerberos_env_vars(cluster))
         // apply overrides last of all; `EnvVarSet` is keyed by name, so iteration is already
         // in a fixed (sorted-by-name) order
-        .merge(validated_rg_config.env_overrides.clone());
+        .merge(inputs.env_overrides.clone());
 
     let role_name = hbase_role.cli_role_name();
     let mut hbase_container = new_container_builder(&HBASE_CONTAINER_NAME);
@@ -197,7 +188,7 @@ pub fn build_rolegroup_statefulset(
         .add_volume_mount(LISTENER_VOLUME_NAME, LISTENER_VOLUME_DIR)
         .expect("The mount paths are statically defined and there should be no duplicates.")
         .add_container_ports(ports)
-        .resources(merged_config.resources().clone().into())
+        .resources(inputs.resources.clone().into())
         .startup_probe(startup_probe)
         .liveness_probe(liveness_probe)
         .readiness_probe(readiness_probe);
@@ -214,7 +205,7 @@ pub fn build_rolegroup_statefulset(
     pod_builder
         .metadata(pb_metadata)
         .image_pull_secrets_from_product_image(resolved_product_image)
-        .affinity(merged_config.affinity())
+        .affinity(&inputs.affinity)
         .add_volume(Volume {
             name: HBASE_CONFIG_VOLUME_NAME.to_string(),
             config_map: Some(ConfigMapVolumeSource {
@@ -272,15 +263,16 @@ pub fn build_rolegroup_statefulset(
         })
         .context(AddVolumeSnafu)?;
 
-    add_graceful_shutdown_config(merged_config, &mut pod_builder).context(GracefulShutdownSnafu)?;
+    add_graceful_shutdown_config(inputs.graceful_shutdown_timeout, &mut pod_builder)
+        .context(GracefulShutdownSnafu)?;
     if cluster.has_kerberos_enabled() {
         add_kerberos_pod_config(
             cluster,
             resource_names.metrics_service_name().as_ref(),
             &mut hbase_container,
             &mut pod_builder,
-            merged_config
-                .requested_secret_lifetime()
+            inputs
+                .requested_secret_lifetime
                 .context(MissingSecretLifetimeSnafu)?,
         )
         .context(AddKerberosConfigSnafu)?;
@@ -309,12 +301,18 @@ pub fn build_rolegroup_statefulset(
         role_group_name,
     );
 
-    let listener_pvc =
-        super::listener::build_listener_pvc(hbase_role, merged_config, &unversioned_labels);
+    let listener_pvc = super::listener::build_listener_pvc(
+        hbase_role,
+        &inputs.listener_class,
+        &unversioned_labels,
+    );
 
-    if let Some(listener_volume) =
-        super::listener::build_listener_volume(hbase_role, merged_config, &recommended_labels)
-            .context(ListenerVolumeSnafu)?
+    if let Some(listener_volume) = super::listener::build_listener_volume(
+        hbase_role,
+        &inputs.listener_class,
+        &recommended_labels,
+    )
+    .context(ListenerVolumeSnafu)?
     {
         pod_builder
             .add_volume(listener_volume)
@@ -323,7 +321,7 @@ pub fn build_rolegroup_statefulset(
 
     let mut pod_template = pod_builder.build_template();
 
-    pod_template.merge_from(validated_rg_config.pod_overrides.clone());
+    pod_template.merge_from(inputs.pod_overrides.clone());
 
     let metadata = object_meta(
         cluster,
@@ -337,7 +335,7 @@ pub fn build_rolegroup_statefulset(
 
     let statefulset_spec = StatefulSetSpec {
         pod_management_policy: Some("Parallel".to_string()),
-        replicas: validated_rg_config.replicas.map(i32::from),
+        replicas: inputs.replicas.map(i32::from),
         selector: LabelSelector {
             match_labels: Some(statefulset_match_labels.into()),
             ..LabelSelector::default()
@@ -369,7 +367,7 @@ fn command() -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_utils;
+    use crate::{controller::build::role_group::master, test_utils};
 
     /// `envOverrides` are applied after every operator-set environment variable, so users can
     /// override any of them (previously the operator's value silently won for the variables set
@@ -388,11 +386,15 @@ mod tests {
         ));
         let cluster = test_utils::validated_cluster_from(&hbase);
         let role_group_name = test_utils::role_group_name("default");
-        let rg_config = &cluster.role_group_configs[&HbaseRole::Master][&role_group_name];
+        let cluster_info = &test_utils::cluster_info();
+        let inputs = master::inputs(
+            &cluster,
+            cluster_info,
+            &role_group_name,
+            test_utils::master_role_group_config(&cluster, "default"),
+        );
 
-        let stateful_set =
-            build_rolegroup_statefulset(&cluster, &HbaseRole::Master, &role_group_name, rg_config)
-                .expect("the StatefulSet builds");
+        let stateful_set = build_rolegroup_statefulset(&inputs).expect("the StatefulSet builds");
 
         let env: Vec<(String, String)> = stateful_set
             .spec
@@ -498,9 +500,15 @@ spec:
         let hbase = test_utils::hbase_from_yaml(yaml);
         let cluster = test_utils::validated_cluster_from(&hbase);
         let role_group_name = test_utils::role_group_name("default");
-        let rg_config = &cluster.role_group_configs[&HbaseRole::Master][&role_group_name];
+        let cluster_info = &test_utils::cluster_info();
+        let inputs = master::inputs(
+            &cluster,
+            cluster_info,
+            &role_group_name,
+            test_utils::master_role_group_config(&cluster, "default"),
+        );
 
-        build_rolegroup_statefulset(&cluster, &HbaseRole::Master, &role_group_name, rg_config)
+        build_rolegroup_statefulset(&inputs)
             .expect("the StatefulSet builds")
             .spec
             .expect("the StatefulSet has a spec")

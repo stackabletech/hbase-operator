@@ -1,28 +1,20 @@
 //! Build the per-rolegroup `ConfigMap` for the HbaseCluster.
 
-use snafu::{OptionExt, ResultExt, Snafu};
+use snafu::{ResultExt, Snafu};
 use stackable_operator::{
-    builder::configmap::ConfigMapBuilder,
-    k8s_openapi::api::core::v1::ConfigMap,
-    product_logging::framework::VECTOR_CONFIG_FILE,
-    utils::cluster_info::KubernetesClusterInfo,
-    v2::{config_file_writer::PropertiesWriterError, types::operator::RoleGroupName},
+    builder::configmap::ConfigMapBuilder, k8s_openapi::api::core::v1::ConfigMap,
+    product_logging::framework::VECTOR_CONFIG_FILE, v2::config_file_writer::PropertiesWriterError,
 };
 
-use crate::{
-    controller::{
-        ValidatedCluster,
-        build::{
-            jvm::construct_role_specific_non_heap_jvm_args,
-            kerberos, object_meta,
-            properties::{
-                ConfigFileName, hbase_env, hbase_site, product_logging, security_properties,
-                ssl_client, ssl_server,
-            },
-            recommended_labels_for_role_group_resources,
-        },
+use crate::controller::build::{
+    jvm::construct_role_specific_non_heap_jvm_args,
+    kerberos, object_meta,
+    properties::{
+        ConfigFileName, hbase_env, hbase_site, product_logging, security_properties, ssl_client,
+        ssl_server,
     },
-    crd::HbaseRole,
+    recommended_labels_for_role_group_resources,
+    role_group::RoleGroupInputs,
 };
 
 #[derive(Snafu, Debug)]
@@ -49,66 +41,53 @@ pub enum Error {
 
 type Result<T, E = Error> = std::result::Result<T, E>;
 
-pub fn build_rolegroup_config_map(
-    cluster: &ValidatedCluster,
-    cluster_info: &KubernetesClusterInfo,
-    role: &HbaseRole,
-    role_group_name: &RoleGroupName,
-) -> Result<ConfigMap> {
+pub fn build_rolegroup_config_map(inputs: &RoleGroupInputs) -> Result<ConfigMap> {
+    let cluster = inputs.cluster;
+    let role = &inputs.role;
+    let role_group_name = &inputs.role_group_name;
+
     tracing::info!(
         "Setting up ConfigMap for {role}/{role_group_name}",
         role = role.to_string()
     );
 
-    let rg = cluster
-        .role_group_configs
-        .get(role)
-        .and_then(|groups| groups.get(role_group_name))
-        .with_context(|| MissingRoleGroupSnafu {
-            role: role.to_string(),
-            role_group: role_group_name.to_string(),
-        })?;
-
     let cluster_config = &cluster.cluster_config;
-    let merged_config = &rg.config.config;
-    let overrides = &rg.config_overrides;
 
     let hbase_site_xml = hbase_site::build(
         role,
-        merged_config,
+        &inputs.hbase_rootdir,
         cluster_config
             .zookeeper_connection_information
             .as_hbase_settings(),
-        kerberos::hbase_site_kerberos_config(cluster, cluster_info),
+        kerberos::hbase_site_kerberos_config(cluster, inputs.cluster_info),
         cluster_config.hbase_opa_config.as_ref(),
-        hbase_site::client_bootstrap_servers(cluster, cluster_info),
-        overrides.hbase_site_xml.clone(),
+        hbase_site::client_bootstrap_servers(cluster, inputs.cluster_info),
+        inputs.config_overrides.hbase_site_xml.clone(),
     );
 
     let hbase_env_sh = hbase_env::build(
-        merged_config,
+        &inputs.resources,
         role,
         cluster.has_kerberos_enabled(),
-        construct_role_specific_non_heap_jvm_args(cluster, rg),
-        overrides.hbase_env_sh.clone(),
+        construct_role_specific_non_heap_jvm_args(cluster, &inputs.jvm_argument_overrides),
+        inputs.config_overrides.hbase_env_sh.clone(),
     )
     .context(BuildHbaseEnvSnafu)?;
 
     let ssl_server_xml = ssl_server::build(
         kerberos::ssl_server_settings(cluster),
-        overrides.ssl_server_xml.clone(),
+        inputs.config_overrides.ssl_server_xml.clone(),
     );
     let ssl_client_xml = ssl_client::build(
         kerberos::ssl_client_settings(cluster),
-        overrides.ssl_client_xml.clone(),
+        inputs.config_overrides.ssl_client_xml.clone(),
     );
 
     let security_properties =
-        security_properties::build(role, overrides.security_properties.clone()).with_context(
-            |_| JvmSecurityPropertiesSnafu {
+        security_properties::build(role, inputs.config_overrides.security_properties.clone())
+            .with_context(|_| JvmSecurityPropertiesSnafu {
                 role_group: role_group_name.to_string(),
-            },
-        )?;
+            })?;
 
     let cm_metadata = object_meta(
         cluster,
@@ -137,12 +116,11 @@ pub fn build_rolegroup_config_map(
         builder.add_data(ConfigFileName::SslClient.to_string(), ssl_client_xml);
     }
 
-    if let Some(log4j2_properties) =
-        product_logging::build_log4j2(&rg.config.logging.hbase_container)
+    if let Some(log4j2_properties) = product_logging::build_log4j2(&inputs.logging.hbase_container)
     {
         builder.add_data(ConfigFileName::Log4j2.to_string(), log4j2_properties);
     }
-    if rg.config.logging.enable_vector_agent {
+    if inputs.logging.enable_vector_agent {
         builder.add_data(
             VECTOR_CONFIG_FILE,
             product_logging::vector_config_file_content(),

@@ -1,3 +1,4 @@
+use core::fmt;
 use std::{ops::Deref, str::FromStr};
 
 use security::AuthenticationConfig;
@@ -210,14 +211,6 @@ impl HasStatusCondition for v1alpha1::HbaseCluster {
 }
 
 impl v1alpha1::HbaseCluster {
-    pub fn role_config(&self, role: &HbaseRole) -> Option<&GenericRoleConfig> {
-        match role {
-            HbaseRole::Master => self.spec.masters.as_ref().map(|m| &m.role_config),
-            HbaseRole::RegionServer => self.spec.region_servers.as_ref().map(|rs| &rs.role_config),
-            HbaseRole::RestServer => self.spec.rest_servers.as_ref().map(|rs| &rs.role_config),
-        }
-    }
-
     pub fn kerberos_secret_class(&self) -> Option<SecretClassName> {
         self.spec
             .cluster_config
@@ -245,6 +238,16 @@ pub enum HbaseRole {
     Master,
     RegionServer,
     RestServer,
+}
+
+impl fmt::Display for HbaseRole {
+    /// The role's name, e.g. `master`.
+    ///
+    /// `to_string()` already worked through the [`Deref`] to [`RoleName`]; this impl exists so a
+    /// role can be a `{role}` field in snafu `display` strings, which require `Display` itself.
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.deref().fmt(f)
+    }
 }
 
 impl Deref for HbaseRole {
@@ -544,72 +547,6 @@ pub struct HbaseClusterStatus {
     pub conditions: Vec<ClusterCondition>,
 }
 
-#[derive(Clone, Debug)]
-pub enum AnyServiceConfig {
-    Master(HbaseConfig),
-    RegionServer(RegionServerConfig),
-    RestServer(HbaseConfig),
-}
-
-impl AnyServiceConfig {
-    pub fn resources(&self) -> &Resources<HbaseStorageConfig, NoRuntimeLimits> {
-        match self {
-            AnyServiceConfig::Master(config) => &config.resources,
-            AnyServiceConfig::RegionServer(config) => &config.resources,
-            AnyServiceConfig::RestServer(config) => &config.resources,
-        }
-    }
-
-    pub fn logging(&self) -> &Logging<Container> {
-        match self {
-            AnyServiceConfig::Master(config) => &config.logging,
-            AnyServiceConfig::RegionServer(config) => &config.logging,
-            AnyServiceConfig::RestServer(config) => &config.logging,
-        }
-    }
-
-    pub fn affinity(&self) -> &StackableAffinity {
-        match self {
-            AnyServiceConfig::Master(config) => &config.affinity,
-            AnyServiceConfig::RegionServer(config) => &config.affinity,
-            AnyServiceConfig::RestServer(config) => &config.affinity,
-        }
-    }
-
-    pub fn graceful_shutdown_timeout(&self) -> &Option<Duration> {
-        match self {
-            AnyServiceConfig::Master(config) => &config.graceful_shutdown_timeout,
-            AnyServiceConfig::RegionServer(config) => &config.graceful_shutdown_timeout,
-            AnyServiceConfig::RestServer(config) => &config.graceful_shutdown_timeout,
-        }
-    }
-
-    pub fn requested_secret_lifetime(&self) -> Option<Duration> {
-        match self {
-            AnyServiceConfig::Master(config) => config.requested_secret_lifetime,
-            AnyServiceConfig::RegionServer(config) => config.requested_secret_lifetime,
-            AnyServiceConfig::RestServer(config) => config.requested_secret_lifetime,
-        }
-    }
-
-    pub fn listener_class(&self) -> ListenerClassName {
-        match self {
-            AnyServiceConfig::Master(config) => config.listener_class.clone(),
-            AnyServiceConfig::RegionServer(config) => config.listener_class.clone(),
-            AnyServiceConfig::RestServer(config) => config.listener_class.clone(),
-        }
-    }
-
-    /// The configured `hbase.rootdir`.
-    pub fn hbase_rootdir(&self) -> String {
-        match self {
-            AnyServiceConfig::Master(config) => config.hbase_rootdir.clone(),
-            AnyServiceConfig::RegionServer(config) => config.hbase_rootdir.clone(),
-            AnyServiceConfig::RestServer(config) => config.hbase_rootdir.clone(),
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use indoc::indoc;
@@ -617,6 +554,7 @@ mod tests {
     use stackable_operator::versioned::test_utils::RoundtripTestData;
 
     use super::*;
+    use crate::test_utils;
 
     #[test]
     fn test_constants() {
@@ -679,23 +617,19 @@ spec:
             serde_yaml::with::singleton_map_recursive::deserialize(deserializer).unwrap();
 
         let validated_cluster = crate::test_utils::validated_cluster_from(&hbase);
-        let merged_config = crate::test_utils::merged_config_for(
-            &validated_cluster,
-            &HbaseRole::RegionServer,
-            role_group_name,
+
+        let config =
+            &test_utils::region_server_role_group_config(&validated_cluster, role_group_name)
+                .config
+                .config;
+        assert_eq!(run_before_shutdown, config.region_mover.run_before_shutdown);
+        assert_eq!(max_threads, config.region_mover.max_threads);
+        assert_eq!(
+            Some(RegionMoverExtraCliOpts {
+                additional_mover_options
+            }),
+            config.region_mover.cli_opts
         );
-        if let AnyServiceConfig::RegionServer(config) = merged_config {
-            assert_eq!(run_before_shutdown, config.region_mover.run_before_shutdown);
-            assert_eq!(max_threads, config.region_mover.max_threads);
-            assert_eq!(
-                Some(RegionMoverExtraCliOpts {
-                    additional_mover_options
-                }),
-                config.region_mover.cli_opts
-            );
-        } else {
-            panic!("this shouldn't happen");
-        };
     }
 
     impl RoundtripTestData for v1alpha1::HbaseClusterSpec {

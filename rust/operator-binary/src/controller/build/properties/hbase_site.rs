@@ -12,9 +12,10 @@ use crate::{
     controller::{
         ValidatedCluster,
         build::{opa::HbaseOpaConfig, properties::build_xml_config},
+        replicas_or_default,
     },
     crd::{
-        AnyServiceConfig, HBASE_CLUSTER_DISTRIBUTED, HBASE_MASTER_PORT, HBASE_MASTER_UI_PORT,
+        HBASE_CLUSTER_DISTRIBUTED, HBASE_MASTER_PORT, HBASE_MASTER_UI_PORT,
         HBASE_REGIONSERVER_PORT, HBASE_REGIONSERVER_UI_PORT, HBASE_ROOTDIR, HbaseRole,
     },
 };
@@ -59,17 +60,13 @@ pub fn client_bootstrap_servers(
     let namespace = cluster.namespace.as_ref();
     let cluster_domain = &cluster_info.cluster_domain;
     cluster
-        .role_group_configs
-        .get(&HbaseRole::Master)
-        .into_iter()
-        .flatten()
+        .master_role_group_configs.iter()
         .flat_map(|(role_group_name, role_group)| {
             let resource_names =
                 cluster.role_group_resource_names(&HbaseRole::Master, role_group_name);
             let stateful_set = resource_names.stateful_set_name();
             let headless_service = resource_names.headless_service_name();
-            // `None` leaves `replicas` unset on the StatefulSet, which Kubernetes defaults to 1
-            (0..role_group.replicas.unwrap_or(1)).map(move |ordinal| {
+            (0..replicas_or_default(role_group.replicas)).map(move |ordinal| {
                 format!(
                     "{stateful_set}-{ordinal}.{headless_service}.{namespace}.svc.{cluster_domain}:{HBASE_MASTER_PORT}"
                 )
@@ -82,7 +79,7 @@ pub fn client_bootstrap_servers(
 /// Renders `hbase-site.xml`.
 pub fn build(
     role: &HbaseRole,
-    merged_config: &AnyServiceConfig,
+    hbase_rootdir: &str,
     zookeeper_config: BTreeMap<String, String>,
     kerberos_config: BTreeMap<String, String>,
     opa_config: Option<&HbaseOpaConfig>,
@@ -93,7 +90,7 @@ pub fn build(
 
     // Defaults
     config.insert(HBASE_CLUSTER_DISTRIBUTED.to_string(), "true".to_string());
-    config.insert(HBASE_ROOTDIR.to_string(), merged_config.hbase_rootdir());
+    config.insert(HBASE_ROOTDIR.to_string(), hbase_rootdir.to_owned());
     config.insert(
         HBASE_CLIENT_BOOTSTRAP_SERVERS.to_string(),
         client_bootstrap_servers,
@@ -187,7 +184,7 @@ mod tests {
 
     use super::*;
     use crate::test_utils::{
-        cluster_info, hbase_from_yaml, merged_config, validated_cluster, validated_cluster_from,
+        self, cluster_info, hbase_from_yaml, validated_cluster, validated_cluster_from,
     };
 
     fn bootstrap_servers_for(masters_yaml: &str) -> String {
@@ -255,10 +252,12 @@ spec:
     #[test]
     fn renders_operator_defaults() {
         let validated_cluster = validated_cluster();
-        let merged = merged_config(&validated_cluster, &HbaseRole::Master);
+        let config = &test_utils::master_role_group_config(&validated_cluster, "default")
+            .config
+            .config;
         let xml = build(
             &HbaseRole::Master,
-            merged,
+            &config.hbase_rootdir,
             BTreeMap::new(),
             BTreeMap::new(),
             None,
@@ -282,10 +281,12 @@ spec:
     #[test]
     fn renders_region_server_bind_settings() {
         let validated_cluster = validated_cluster();
-        let merged = merged_config(&validated_cluster, &HbaseRole::RegionServer);
+        let config = &test_utils::region_server_role_group_config(&validated_cluster, "default")
+            .config
+            .config;
         let xml = build(
             &HbaseRole::RegionServer,
-            merged,
+            &config.hbase_rootdir,
             BTreeMap::new(),
             BTreeMap::new(),
             None,
@@ -309,10 +310,12 @@ spec:
     #[test]
     fn renders_rest_server_endpoint() {
         let validated_cluster = validated_cluster();
-        let merged = merged_config(&validated_cluster, &HbaseRole::RestServer);
+        let config = &test_utils::rest_server_role_group_config(&validated_cluster, "default")
+            .config
+            .config;
         let xml = build(
             &HbaseRole::RestServer,
-            merged,
+            &config.hbase_rootdir,
             BTreeMap::new(),
             BTreeMap::new(),
             None,
@@ -330,10 +333,12 @@ spec:
     #[test]
     fn renders_client_bootstrap_servers() {
         let validated_cluster = validated_cluster();
-        let merged = merged_config(&validated_cluster, &HbaseRole::RestServer);
+        let config = &test_utils::rest_server_role_group_config(&validated_cluster, "default")
+            .config
+            .config;
         let xml = build(
             &HbaseRole::RestServer,
-            merged,
+            &config.hbase_rootdir,
             BTreeMap::new(),
             BTreeMap::new(),
             None,
@@ -351,10 +356,12 @@ spec:
     #[test]
     fn user_override_wins_for_client_bootstrap_servers() {
         let validated_cluster = validated_cluster();
-        let merged = merged_config(&validated_cluster, &HbaseRole::RestServer);
+        let config = &test_utils::rest_server_role_group_config(&validated_cluster, "default")
+            .config
+            .config;
         let xml = build(
             &HbaseRole::RestServer,
-            merged,
+            &config.hbase_rootdir,
             BTreeMap::new(),
             BTreeMap::new(),
             None,
@@ -372,10 +379,12 @@ spec:
     #[test]
     fn user_override_wins() {
         let validated_cluster = validated_cluster();
-        let merged = merged_config(&validated_cluster, &HbaseRole::Master);
+        let config = &test_utils::rest_server_role_group_config(&validated_cluster, "default")
+            .config
+            .config;
         let xml = build(
             &HbaseRole::Master,
-            merged,
+            &config.hbase_rootdir,
             BTreeMap::new(),
             BTreeMap::new(),
             None,

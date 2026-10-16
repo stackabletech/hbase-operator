@@ -3,11 +3,14 @@
 use std::{collections::BTreeMap, fmt::Write};
 
 use snafu::{ResultExt, Snafu};
-use stackable_operator::v2::config_overrides::KeyValueConfigOverrides;
+use stackable_operator::{
+    commons::resources::{NoRuntimeLimits, Resources},
+    v2::config_overrides::KeyValueConfigOverrides,
+};
 
 use crate::{
     controller::build::jvm::{self, construct_global_jvm_args, construct_hbase_heapsize_env},
-    crd::{AnyServiceConfig, HbaseRole},
+    crd::{HbaseRole, HbaseStorageConfig},
 };
 
 /// The `hbase-env.sh` variable that carries a role's own JVM options; `bin/hbase` reads the one
@@ -24,7 +27,7 @@ pub enum Error {
 
 /// Renders `hbase-env.sh` as `export VAR="VALUE"` lines.
 pub fn build(
-    merged_config: &AnyServiceConfig,
+    resources: &Resources<HbaseStorageConfig, NoRuntimeLimits>,
     role: &HbaseRole,
     kerberos_enabled: bool,
     non_heap_jvm_args: String,
@@ -35,7 +38,7 @@ pub fn build(
     env.insert("HBASE_MANAGES_ZK".to_string(), "false".to_string());
     env.insert(
         "HBASE_HEAPSIZE".to_string(),
-        construct_hbase_heapsize_env(merged_config).context(ConstructHbaseHeapsizeEnvSnafu)?,
+        construct_hbase_heapsize_env(resources).context(ConstructHbaseHeapsizeEnvSnafu)?,
     );
     env.insert(
         "HBASE_OPTS".to_string(),
@@ -68,12 +71,15 @@ pub fn build(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_utils::{merged_config, validated_cluster};
+    use crate::test_utils::{self, validated_cluster};
 
     #[test]
     fn renders_operator_defaults() {
         let validated_cluster = validated_cluster();
-        let merged = merged_config(&validated_cluster, &HbaseRole::Master);
+        let merged = &test_utils::master_role_group_config(&validated_cluster, "default")
+            .config
+            .config
+            .resources;
         let env = build(
             merged,
             &HbaseRole::Master,
@@ -89,7 +95,10 @@ mod tests {
     #[test]
     fn renders_region_server_opts() {
         let validated_cluster = validated_cluster();
-        let merged = merged_config(&validated_cluster, &HbaseRole::RegionServer);
+        let merged = &test_utils::region_server_role_group_config(&validated_cluster, "default")
+            .config
+            .config
+            .resources;
         let env = build(
             merged,
             &HbaseRole::RegionServer,
@@ -104,7 +113,10 @@ mod tests {
     #[test]
     fn user_override_appears() {
         let validated_cluster = validated_cluster();
-        let merged = merged_config(&validated_cluster, &HbaseRole::Master);
+        let merged = &test_utils::master_role_group_config(&validated_cluster, "default")
+            .config
+            .config
+            .resources;
         let env = build(
             merged,
             &HbaseRole::Master,

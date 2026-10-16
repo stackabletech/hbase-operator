@@ -14,10 +14,11 @@ use stackable_operator::{
 
 use crate::{
     controller::{
+        MasterRoleGroupConfig, RegionServerRoleGroupConfig, RestServerRoleGroupConfig,
         ValidatedCluster, dereference::DereferencedObjects, validate::validate_cluster,
         zookeeper::ZookeeperConnectionInformation,
     },
-    crd::{AnyServiceConfig, HbaseRole, v1alpha1},
+    crd::v1alpha1,
 };
 
 /// A minimal three-role `HbaseCluster` used to drive the builder/property tests.
@@ -99,21 +100,23 @@ pub fn cluster_info() -> KubernetesClusterInfo {
     }
 }
 
-/// The merged [`AnyServiceConfig`] for the given `role` and `role_group`.
-pub fn merged_config_for<'a>(
-    validated_cluster: &'a ValidatedCluster,
-    role: &HbaseRole,
+pub fn master_role_group_config<'a>(
+    cluster: &'a ValidatedCluster,
     role_group: &str,
-) -> &'a AnyServiceConfig {
-    &validated_cluster.role_group_configs[role][&role_group_name(role_group)]
-        .config
-        .config
+) -> &'a MasterRoleGroupConfig {
+    &cluster.master_role_group_configs[&role_group_name(role_group)]
 }
 
-/// The merged [`AnyServiceConfig`] for the `default` role group of `role`.
-pub fn merged_config<'a>(
-    validated_cluster: &'a ValidatedCluster,
-    role: &HbaseRole,
-) -> &'a AnyServiceConfig {
-    merged_config_for(validated_cluster, role, "default")
+pub fn region_server_role_group_config<'a>(
+    cluster: &'a ValidatedCluster,
+    role_group: &str,
+) -> &'a RegionServerRoleGroupConfig {
+    &cluster.region_server_role_group_configs[&role_group_name(role_group)]
+}
+
+pub fn rest_server_role_group_config<'a>(
+    cluster: &'a ValidatedCluster,
+    role_group: &str,
+) -> &'a RestServerRoleGroupConfig {
+    &cluster.rest_server_role_group_configs[&role_group_name(role_group)]
 }

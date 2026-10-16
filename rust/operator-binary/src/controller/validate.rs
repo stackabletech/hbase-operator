@@ -1,6 +1,6 @@
 use std::{collections::BTreeMap, str::FromStr};
 
-use snafu::{OptionExt, ResultExt, Snafu};
+use snafu::{OptionExt, ResultExt, Snafu, ensure};
 use stackable_operator::{
     commons::product_image_selection::{self},
     config::{
@@ -16,20 +16,24 @@ use stackable_operator::{
             ValidatedContainerLogConfigChoice, VectorContainerLogConfig,
             validate_logging_configuration_for_container,
         },
-        role_utils::{CommonConfiguration, JavaCommonConfig, Role, with_validated_config},
+        role_utils::{
+            CommonConfiguration, JavaCommonConfig, Role, RoleGroup, RoleGroupConfig,
+            with_validated_config,
+        },
         types::{kubernetes::ConfigMapName, operator::RoleGroupName},
     },
 };
-use strum::IntoEnumIterator;
 
 use crate::{
     controller::{
-        HbaseRoleGroupConfig, ValidatedCluster, ValidatedClusterConfig, ValidatedHbaseConfig,
-        ValidatedRoleConfig, dereference::DereferencedObjects,
+        MasterRoleGroupConfig, RegionServerRoleGroupConfig, RestServerRoleGroupConfig,
+        ValidatedCluster, ValidatedClusterConfig, ValidatedMasterConfig,
+        ValidatedRegionServerConfig, ValidatedRestServerConfig, ValidatedRoleConfig,
+        dereference::DereferencedObjects,
     },
     crd::{
-        AnyServiceConfig, Container, HbaseConfigFragment, HbaseRole, RegionServerConfigFragment,
-        v1alpha1,
+        Container, HbaseConfig, HbaseConfigFragment, HbaseRole, RegionServerConfig,
+        RegionServerConfigFragment, v1alpha1,
     },
 };
 
@@ -48,14 +52,18 @@ pub enum Error {
     },
 
     #[snafu(display("the HbaseCluster has no {role} role defined"))]
-    MissingRequiredRole { role: String },
+    MissingRequiredRole { role: HbaseRole },
 
-    #[snafu(display("failed to merge and validate the role group config"))]
-    ValidateRoleGroupConfig { source: fragment::ValidationError },
+    #[snafu(display("failed to merge and validate the {role} role group config"))]
+    ValidateRoleGroupConfig {
+        source: fragment::ValidationError,
+        role: HbaseRole,
+    },
 
-    #[snafu(display("invalid role group name {role_group}"))]
+    #[snafu(display("invalid role group name {role_group} for role {role}"))]
     ParseRoleGroupName {
         source: stackable_operator::v2::macros::attributed_string_type::Error,
+        role: HbaseRole,
         role_group: String,
     },
 
@@ -124,9 +132,6 @@ pub fn validate_cluster(
         )
         .context(ResolveProductImageSnafu)?;
 
-    let mut role_groups = BTreeMap::new();
-    let mut role_configs = BTreeMap::new();
-
     let hdfs_discovery_cm_name = hbase.spec.cluster_config.hdfs_config_map_name.as_ref();
     let cluster_name = hbase.name_any();
 
@@ -146,85 +151,118 @@ pub fn validate_cluster(
         .as_ref()
         .and_then(|authorization| authorization.opa.as_ref());
 
-    for hbase_role in HbaseRole::iter() {
-        let group_configs = match hbase_role {
-            HbaseRole::Master => validate_role_group_configs(
-                hbase.spec.masters.as_ref(),
-                HbaseConfigFragment::default_config(
-                    &hbase_role,
-                    &cluster_name,
-                    hdfs_discovery_cm_name,
-                    opa_config,
-                ),
-                AnyServiceConfig::Master,
-                &vector_aggregator_config_map_name,
-            )?,
-            HbaseRole::RegionServer => validate_role_group_configs(
-                hbase.spec.region_servers.as_ref(),
-                RegionServerConfigFragment::default_config(
-                    &hbase_role,
-                    &cluster_name,
-                    hdfs_discovery_cm_name,
-                    opa_config,
-                ),
-                AnyServiceConfig::RegionServer,
-                &vector_aggregator_config_map_name,
-            )?,
-            HbaseRole::RestServer => validate_role_group_configs(
-                hbase.spec.rest_servers.as_ref(),
-                HbaseConfigFragment::default_config(
-                    &hbase_role,
-                    &cluster_name,
-                    hdfs_discovery_cm_name,
-                    opa_config,
-                ),
-                AnyServiceConfig::RestServer,
-                &vector_aggregator_config_map_name,
-            )?,
-        };
-
-        // masters and region servers are required; rest servers are optional.
-        if group_configs.is_empty() {
-            match hbase_role {
-                HbaseRole::Master | HbaseRole::RegionServer => {
-                    return MissingRequiredRoleSnafu {
-                        role: hbase_role.to_string(),
-                    }
-                    .fail();
-                }
-                HbaseRole::RestServer => continue,
-            }
+    // The first failure propagates, so this order decides which misconfiguration the user is told
+    // about when more than one role is wrong. It is `HbaseRole`'s variant order.
+    let masters = hbase
+        .spec
+        .masters
+        .as_ref()
+        .context(MissingRequiredRoleSnafu {
+            role: HbaseRole::Master,
+        })?;
+    let master_role_group_configs = validate_master_role_group_configs(
+        masters,
+        &HbaseConfigFragment::default_config(
+            &HbaseRole::Master,
+            &cluster_name,
+            hdfs_discovery_cm_name,
+            opa_config,
+        ),
+        &vector_aggregator_config_map_name,
+    )?;
+    ensure!(
+        !master_role_group_configs.is_empty(),
+        MissingRequiredRoleSnafu {
+            role: HbaseRole::Master
         }
+    );
 
-        if let Some(GenericRoleConfig {
-            pod_disruption_budget: pdb,
-        }) = hbase.role_config(&hbase_role)
-        {
-            role_configs.insert(hbase_role.clone(), ValidatedRoleConfig { pdb: pdb.clone() });
+    let GenericRoleConfig {
+        pod_disruption_budget: master_pdb,
+    } = &masters.role_config;
+
+    let region_servers = hbase
+        .spec
+        .region_servers
+        .as_ref()
+        .context(MissingRequiredRoleSnafu {
+            role: HbaseRole::RegionServer,
+        })?;
+    let region_server_role_group_configs = validate_region_server_role_group_configs(
+        region_servers,
+        &RegionServerConfigFragment::default_config(
+            &HbaseRole::RegionServer,
+            &cluster_name,
+            hdfs_discovery_cm_name,
+            opa_config,
+        ),
+        &vector_aggregator_config_map_name,
+    )?;
+    ensure!(
+        !region_server_role_group_configs.is_empty(),
+        MissingRequiredRoleSnafu {
+            role: HbaseRole::RegionServer
         }
+    );
 
-        role_groups.insert(hbase_role, group_configs);
-    }
+    let GenericRoleConfig {
+        pod_disruption_budget: region_server_pdb,
+    } = &region_servers.role_config;
+
+    let rest_server_role_group_configs = match &hbase.spec.rest_servers {
+        Some(rest_servers) => validate_rest_server_role_group_configs(
+            rest_servers,
+            &HbaseConfigFragment::default_config(
+                &HbaseRole::RestServer,
+                &cluster_name,
+                hdfs_discovery_cm_name,
+                opa_config,
+            ),
+            &vector_aggregator_config_map_name,
+        )?,
+        None => BTreeMap::new(),
+    };
+    let rest_server_config = match &hbase.spec.rest_servers {
+        Some(rest_servers) if !rest_server_role_group_configs.is_empty() => {
+            let GenericRoleConfig {
+                pod_disruption_budget,
+            } = &rest_servers.role_config;
+            Some(ValidatedRoleConfig {
+                pdb: pod_disruption_budget.clone(),
+            })
+        }
+        _ => None,
+    };
 
     let name = get_cluster_name(hbase).context(GetClusterIdentitySnafu)?;
     let namespace = get_namespace(hbase).context(GetClusterIdentitySnafu)?;
     let uid = get_uid(hbase).context(GetClusterIdentitySnafu)?;
 
-    Ok(ValidatedCluster::new(
+    Ok(ValidatedCluster {
+        metadata: ValidatedCluster::object_meta(&name, &namespace, &uid),
         name,
         namespace,
         uid,
-        resolved_product_image,
-        ValidatedClusterConfig {
+        product_version: ValidatedCluster::product_version(&resolved_product_image),
+        image: resolved_product_image,
+        cluster_config: ValidatedClusterConfig {
             zookeeper_connection_information: dereferenced_objects.zookeeper_connection_information,
             hbase_opa_config: dereferenced_objects.hbase_opa_config,
             kerberos_secret_class: hbase.kerberos_secret_class(),
             https_secret_class: hbase.https_secret_class(),
             hdfs_config_map_name: hbase.spec.cluster_config.hdfs_config_map_name.clone(),
         },
-        role_groups,
-        role_configs,
-    ))
+        master_config: ValidatedRoleConfig {
+            pdb: master_pdb.clone(),
+        },
+        master_role_group_configs,
+        region_server_config: ValidatedRoleConfig {
+            pdb: region_server_pdb.clone(),
+        },
+        region_server_role_group_configs,
+        rest_server_config,
+        rest_server_role_group_configs,
+    })
 }
 
 /// Validates every role group of a role into a map keyed by role group name.
@@ -234,71 +272,179 @@ pub fn validate_cluster(
 /// which folds the CRD config fragment (default <- role <- role group) plus the
 /// `configOverrides`, `envOverrides`, `cliOverrides`, `podOverrides` and the
 /// `jvmArgumentOverrides` (role group wins) into a single merged
-/// [`RoleGroup`](stackable_operator::v2::role_utils::RoleGroup). The per-role validated config
-/// is wrapped into [`AnyServiceConfig`] via `wrap`; the merged `envOverrides` are converted
-/// into an `EnvVarSet` (validating at deserialize time). The merged `jvmArgumentOverrides` are
-/// kept in `product_specific_common_config` and applied at build time.
+/// `RoleGroup`.
 ///
 /// Returns an empty map if the role is not configured.
-fn validate_role_group_configs<Config, ValidatedConfig>(
-    role: Option<
-        &Role<Config, v1alpha1::HbaseConfigOverrides, GenericRoleConfig, JavaCommonConfig>,
-    >,
-    default_config: Config,
-    wrap: fn(ValidatedConfig) -> AnyServiceConfig,
-    vector_aggregator_config_map_name: &Option<ConfigMapName>,
-) -> Result<BTreeMap<RoleGroupName, HbaseRoleGroupConfig>, Error>
+fn validate_role_group_config<Config, ValidatedConfig>(
+    hbase_role: &HbaseRole,
+    role: &Role<Config, v1alpha1::HbaseConfigOverrides, GenericRoleConfig, JavaCommonConfig>,
+    role_group: &RoleGroup<Config, JavaCommonConfig, v1alpha1::HbaseConfigOverrides>,
+    default_config: &Config,
+) -> Result<RoleGroupConfig<ValidatedConfig, JavaCommonConfig, v1alpha1::HbaseConfigOverrides>, Error>
 where
     Config: Clone + Merge,
     ValidatedConfig: FromFragment<Fragment = Config>,
 {
-    let Some(role) = role else {
-        return Ok(BTreeMap::new());
-    };
+    let validated = with_validated_config::<
+        ValidatedConfig,
+        JavaCommonConfig,
+        Config,
+        GenericRoleConfig,
+        v1alpha1::HbaseConfigOverrides,
+    >(role_group, role, default_config)
+    .context(ValidateRoleGroupConfigSnafu {
+        role: hbase_role.clone(),
+    })?;
 
+    let CommonConfiguration {
+        config,
+        config_overrides,
+        env_overrides,
+        cli_overrides,
+        pod_overrides,
+        product_specific_common_config,
+    } = validated.config;
+
+    let validated = RoleGroupConfig {
+        replicas: validated.replicas,
+        config,
+        config_overrides,
+        env_overrides: env_overrides.into(),
+        cli_overrides,
+        pod_overrides,
+        product_specific_common_config,
+    };
+    Ok(validated)
+}
+
+fn validate_master_role_group_configs(
+    role: &Role<
+        HbaseConfigFragment,
+        v1alpha1::HbaseConfigOverrides,
+        GenericRoleConfig,
+        JavaCommonConfig,
+    >,
+    default_config: &HbaseConfigFragment,
+    vector_aggregator_config_map_name: &Option<ConfigMapName>,
+) -> Result<BTreeMap<RoleGroupName, MasterRoleGroupConfig>, Error> {
     role.role_groups
         .iter()
         .map(|(role_group_name, role_group)| {
+            let merged = validate_role_group_config::<_, HbaseConfig>(
+                &HbaseRole::Master,
+                role,
+                role_group,
+                default_config,
+            )?;
+            let logging =
+                validate_logging(&merged.config.logging, vector_aggregator_config_map_name)?;
+            let validated = MasterRoleGroupConfig {
+                replicas: merged.replicas,
+                config: ValidatedMasterConfig {
+                    config: merged.config,
+                    logging,
+                },
+                config_overrides: merged.config_overrides,
+                env_overrides: merged.env_overrides,
+                cli_overrides: merged.cli_overrides,
+                pod_overrides: merged.pod_overrides,
+                product_specific_common_config: merged.product_specific_common_config,
+            };
             let role_group_name = RoleGroupName::from_str(role_group_name).with_context(|_| {
                 ParseRoleGroupNameSnafu {
+                    role: HbaseRole::Master,
                     role_group: role_group_name.clone(),
                 }
             })?;
-            let validated = with_validated_config::<
-                ValidatedConfig,
-                JavaCommonConfig,
-                Config,
-                GenericRoleConfig,
-                v1alpha1::HbaseConfigOverrides,
-            >(role_group, role, &default_config)
-            .context(ValidateRoleGroupConfigSnafu)?;
+            Ok((role_group_name, validated))
+        })
+        .collect()
+}
 
-            let CommonConfiguration {
-                config,
-                config_overrides,
-                env_overrides,
-                cli_overrides,
-                pod_overrides,
-                product_specific_common_config,
-            } = validated.config;
-
-            let config = wrap(config);
-
-            // Validate the logging configuration up-front so an invalid custom log ConfigMap name
-            // or a missing Vector aggregator discovery ConfigMap fails here rather than at build
-            // time. The build step then consumes the validated logging instead of the raw config.
-            let logging = validate_logging(config.logging(), vector_aggregator_config_map_name)?;
-
-            let validated = HbaseRoleGroupConfig {
-                replicas: validated.replicas,
-                config: ValidatedHbaseConfig { config, logging },
-                config_overrides,
-                env_overrides: env_overrides.into(),
-                cli_overrides,
-                pod_overrides,
-                product_specific_common_config,
+fn validate_region_server_role_group_configs(
+    role: &Role<
+        RegionServerConfigFragment,
+        v1alpha1::HbaseConfigOverrides,
+        GenericRoleConfig,
+        JavaCommonConfig,
+    >,
+    default_config: &RegionServerConfigFragment,
+    vector_aggregator_config_map_name: &Option<ConfigMapName>,
+) -> Result<BTreeMap<RoleGroupName, RegionServerRoleGroupConfig>, Error> {
+    role.role_groups
+        .iter()
+        .map(|(role_group_name, role_group)| {
+            let merged = validate_role_group_config::<_, RegionServerConfig>(
+                &HbaseRole::RegionServer,
+                role,
+                role_group,
+                default_config,
+            )?;
+            let logging =
+                validate_logging(&merged.config.logging, vector_aggregator_config_map_name)?;
+            let validated = RegionServerRoleGroupConfig {
+                replicas: merged.replicas,
+                config: ValidatedRegionServerConfig {
+                    config: merged.config,
+                    logging,
+                },
+                config_overrides: merged.config_overrides,
+                env_overrides: merged.env_overrides,
+                cli_overrides: merged.cli_overrides,
+                pod_overrides: merged.pod_overrides,
+                product_specific_common_config: merged.product_specific_common_config,
             };
-            Ok((role_group_name.clone(), validated))
+            let role_group_name = RoleGroupName::from_str(role_group_name).with_context(|_| {
+                ParseRoleGroupNameSnafu {
+                    role: HbaseRole::RegionServer,
+                    role_group: role_group_name.clone(),
+                }
+            })?;
+            Ok((role_group_name, validated))
+        })
+        .collect()
+}
+
+fn validate_rest_server_role_group_configs(
+    role: &Role<
+        HbaseConfigFragment,
+        v1alpha1::HbaseConfigOverrides,
+        GenericRoleConfig,
+        JavaCommonConfig,
+    >,
+    default_config: &HbaseConfigFragment,
+    vector_aggregator_config_map_name: &Option<ConfigMapName>,
+) -> Result<BTreeMap<RoleGroupName, RestServerRoleGroupConfig>, Error> {
+    role.role_groups
+        .iter()
+        .map(|(role_group_name, role_group)| {
+            let merged = validate_role_group_config::<_, HbaseConfig>(
+                &HbaseRole::RestServer,
+                role,
+                role_group,
+                default_config,
+            )?;
+            let logging =
+                validate_logging(&merged.config.logging, vector_aggregator_config_map_name)?;
+            let validated = RestServerRoleGroupConfig {
+                replicas: merged.replicas,
+                config: ValidatedRestServerConfig {
+                    config: merged.config,
+                    logging,
+                },
+                config_overrides: merged.config_overrides,
+                env_overrides: merged.env_overrides,
+                cli_overrides: merged.cli_overrides,
+                pod_overrides: merged.pod_overrides,
+                product_specific_common_config: merged.product_specific_common_config,
+            };
+            let role_group_name = RoleGroupName::from_str(role_group_name).with_context(|_| {
+                ParseRoleGroupNameSnafu {
+                    role: HbaseRole::RestServer,
+                    role_group: role_group_name.clone(),
+                }
+            })?;
+            Ok((role_group_name, validated))
         })
         .collect()
 }

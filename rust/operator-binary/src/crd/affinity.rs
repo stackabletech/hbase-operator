@@ -157,9 +157,30 @@ mod tests {
         let hbase: v1alpha1::HbaseCluster =
             serde_yaml::from_str(input).expect("illegal test input");
         let validated_cluster = crate::test_utils::validated_cluster_from(&hbase);
-        let affinity = crate::test_utils::merged_config(&validated_cluster, &role)
-            .affinity()
-            .clone();
+
+        let affinity = match role {
+            HbaseRole::Master => {
+                crate::test_utils::master_role_group_config(&validated_cluster, "default")
+                    .config
+                    .config
+                    .affinity
+                    .clone()
+            }
+            HbaseRole::RegionServer => {
+                crate::test_utils::region_server_role_group_config(&validated_cluster, "default")
+                    .config
+                    .config
+                    .affinity
+                    .clone()
+            }
+            HbaseRole::RestServer => {
+                crate::test_utils::rest_server_role_group_config(&validated_cluster, "default")
+                    .config
+                    .config
+                    .affinity
+                    .clone()
+            }
+        };
 
         let mut expected_affinities = vec![WeightedPodAffinityTerm {
             pod_affinity_term: PodAffinityTerm {

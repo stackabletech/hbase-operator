@@ -1,7 +1,7 @@
 //! Builders that turn a [`ValidatedCluster`] into
 //! Kubernetes resources.
 
-use std::{marker::PhantomData, ops::Deref};
+use std::marker::PhantomData;
 
 use snafu::{ResultExt, Snafu};
 use stackable_operator::{
@@ -19,13 +19,16 @@ use crate::{
     controller::{
         CONTROLLER_NAME, KubernetesResources, OPERATOR_NAME, PRODUCT_NAME, Prepared,
         ValidatedCluster,
-        build::resource::{
-            config_map::{self, build_rolegroup_config_map},
-            discovery::{self, build_discovery_config_map},
-            pdb::build_pdb,
-            rbac::{build_role_binding, build_service_account},
-            service::{build_rolegroup_metrics_service, build_rolegroup_service},
-            statefulset::{self, build_rolegroup_statefulset},
+        build::{
+            resource::{
+                config_map::{self, build_rolegroup_config_map},
+                discovery::{self, build_discovery_config_map},
+                pdb::build_pdb,
+                rbac::{build_role_binding, build_service_account},
+                service::{build_rolegroup_metrics_service, build_rolegroup_service},
+                statefulset::{self, build_rolegroup_statefulset},
+            },
+            role_group::{master, region_server, rest_server},
         },
     },
     crd::HbaseRole,
@@ -52,17 +55,17 @@ pub(crate) fn object_meta(
 
 #[derive(Snafu, Debug)]
 pub enum Error {
-    #[snafu(display("failed to build ConfigMap for role {role} role group {role_group}", role = hbase_role.deref()))]
+    #[snafu(display("failed to build ConfigMap for role {role} role group {role_group}"))]
     ConfigMap {
         source: config_map::Error,
-        hbase_role: HbaseRole,
+        role: HbaseRole,
         role_group: RoleGroupName,
     },
 
-    #[snafu(display("failed to build StatefulSet for role {role} role group {role_group}", role = hbase_role.deref()))]
+    #[snafu(display("failed to build StatefulSet for role {role} role group {role_group}"))]
     StatefulSet {
         source: statefulset::Error,
-        hbase_role: HbaseRole,
+        role: HbaseRole,
         role_group: RoleGroupName,
     },
 
@@ -84,39 +87,100 @@ pub fn build(
     let mut config_maps = vec![];
     let mut pod_disruption_budgets = vec![];
 
-    for (hbase_role, role_group_configs) in &cluster.role_group_configs {
-        for (role_group_name, rg_config) in role_group_configs {
-            services.push(build_rolegroup_service(
-                cluster,
-                hbase_role,
-                role_group_name,
-            ));
-            services.push(build_rolegroup_metrics_service(
-                cluster,
-                hbase_role,
-                role_group_name,
-            ));
-            config_maps.push(
-                build_rolegroup_config_map(cluster, cluster_info, hbase_role, role_group_name)
-                    .with_context(|_| ConfigMapSnafu {
-                        hbase_role: hbase_role.clone(),
-                        role_group: role_group_name.clone(),
-                    })?,
-            );
-            stateful_sets.push(
-                build_rolegroup_statefulset(cluster, hbase_role, role_group_name, rg_config)
-                    .with_context(|_| StatefulSetSnafu {
-                        hbase_role: hbase_role.clone(),
-                        role_group: role_group_name.clone(),
-                    })?,
-            );
-        }
+    for (role_group_name, rg_config) in &cluster.master_role_group_configs {
+        let inputs = master::inputs(cluster, cluster_info, role_group_name, rg_config);
+        services.push(build_rolegroup_service(
+            cluster,
+            &master::ROLE,
+            role_group_name,
+        ));
+        services.push(build_rolegroup_metrics_service(
+            cluster,
+            &master::ROLE,
+            role_group_name,
+        ));
+        config_maps.push(
+            build_rolegroup_config_map(&inputs).with_context(|_| ConfigMapSnafu {
+                role: master::ROLE,
+                role_group: role_group_name.clone(),
+            })?,
+        );
+        stateful_sets.push(build_rolegroup_statefulset(&inputs).with_context(|_| {
+            StatefulSetSnafu {
+                role: master::ROLE,
+                role_group: role_group_name.clone(),
+            }
+        })?);
+    }
 
-        if let Some(role_config) = cluster.role_configs.get(hbase_role)
-            && let Some(pdb) = build_pdb(&role_config.pdb, cluster, hbase_role)
-        {
-            pod_disruption_budgets.push(pdb);
-        }
+    if let Some(pdb) = build_pdb(&cluster.master_config.pdb, cluster, &master::ROLE) {
+        pod_disruption_budgets.push(pdb);
+    }
+
+    for (role_group_name, rg_config) in &cluster.region_server_role_group_configs {
+        let inputs = region_server::inputs(cluster, cluster_info, role_group_name, rg_config);
+        services.push(build_rolegroup_service(
+            cluster,
+            &region_server::ROLE,
+            role_group_name,
+        ));
+        services.push(build_rolegroup_metrics_service(
+            cluster,
+            &region_server::ROLE,
+            role_group_name,
+        ));
+        config_maps.push(
+            build_rolegroup_config_map(&inputs).with_context(|_| ConfigMapSnafu {
+                role: region_server::ROLE,
+                role_group: role_group_name.clone(),
+            })?,
+        );
+        stateful_sets.push(build_rolegroup_statefulset(&inputs).with_context(|_| {
+            StatefulSetSnafu {
+                role: region_server::ROLE,
+                role_group: role_group_name.clone(),
+            }
+        })?);
+    }
+
+    if let Some(pdb) = build_pdb(
+        &cluster.region_server_config.pdb,
+        cluster,
+        &region_server::ROLE,
+    ) {
+        pod_disruption_budgets.push(pdb);
+    }
+
+    for (role_group_name, rg_config) in &cluster.rest_server_role_group_configs {
+        let inputs = rest_server::inputs(cluster, cluster_info, role_group_name, rg_config);
+        services.push(build_rolegroup_service(
+            cluster,
+            &rest_server::ROLE,
+            role_group_name,
+        ));
+        services.push(build_rolegroup_metrics_service(
+            cluster,
+            &rest_server::ROLE,
+            role_group_name,
+        ));
+        config_maps.push(
+            build_rolegroup_config_map(&inputs).with_context(|_| ConfigMapSnafu {
+                role: rest_server::ROLE,
+                role_group: role_group_name.clone(),
+            })?,
+        );
+        stateful_sets.push(build_rolegroup_statefulset(&inputs).with_context(|_| {
+            StatefulSetSnafu {
+                role: rest_server::ROLE,
+                role_group: role_group_name.clone(),
+            }
+        })?);
+    }
+
+    if let Some(rest_server_config) = &cluster.rest_server_config
+        && let Some(pdb) = build_pdb(&rest_server_config.pdb, cluster, &rest_server::ROLE)
+    {
+        pod_disruption_budgets.push(pdb);
     }
 
     // The role-level discovery ConfigMap advertises the cluster's connection information; it is
@@ -206,6 +270,7 @@ pub mod properties;
 pub mod region_mover;
 pub mod resource;
 pub mod role;
+pub mod role_group;
 
 #[cfg(test)]
 mod tests {
