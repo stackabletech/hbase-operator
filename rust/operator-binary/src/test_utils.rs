@@ -62,15 +62,23 @@ pub fn minimal_hbase() -> v1alpha1::HbaseCluster {
 /// Runs the real validation pipeline over `hbase`, with a fixed dereferenced ZooKeeper connection
 /// and no OPA.
 pub fn validated_cluster_from(hbase: &v1alpha1::HbaseCluster) -> ValidatedCluster {
-    validate_cluster(
+    validated_cluster_with(
         hbase,
-        "oci.example.org",
         DereferencedObjects {
             zookeeper_connection_information: ZookeeperConnectionInformation::for_tests(),
             hbase_opa_config: None,
         },
     )
-    .expect("validate should succeed for the test fixture")
+}
+
+/// Runs the real validation pipeline over `hbase` with the given dereferenced objects, for
+/// fixtures that need OPA.
+pub fn validated_cluster_with(
+    hbase: &v1alpha1::HbaseCluster,
+    dereferenced_objects: DereferencedObjects,
+) -> ValidatedCluster {
+    validate_cluster(hbase, "oci.example.org", dereferenced_objects)
+        .expect("validate should succeed for the test fixture")
 }
 
 /// Runs the real validation pipeline over [`minimal_hbase`].

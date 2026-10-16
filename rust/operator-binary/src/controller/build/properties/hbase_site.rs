@@ -22,19 +22,19 @@ use crate::{
 // `hbase-site.xml` property keys (the `port` keys carry a `_KEY` suffix to avoid clashing with the
 // `Port`-typed `HBASE_*_PORT` constants imported from the `crd` module).
 const HBASE_CLIENT_RPC_BIND_ADDRESS: &str = "hbase.client.rpc.bind.address";
-const HBASE_MASTER_IPC_ADDRESS: &str = "hbase.master.ipc.address";
+pub(crate) const HBASE_MASTER_IPC_ADDRESS: &str = "hbase.master.ipc.address";
 const HBASE_MASTER_IPC_PORT: &str = "hbase.master.ipc.port";
 const HBASE_MASTER_HOSTNAME: &str = "hbase.master.hostname";
 const HBASE_MASTER_PORT_KEY: &str = "hbase.master.port";
 const HBASE_MASTER_INFO_PORT: &str = "hbase.master.info.port";
 const HBASE_MASTER_BOUND_INFO_PORT: &str = "hbase.master.bound.info.port";
-const HBASE_REGIONSERVER_IPC_ADDRESS: &str = "hbase.regionserver.ipc.address";
+pub(crate) const HBASE_REGIONSERVER_IPC_ADDRESS: &str = "hbase.regionserver.ipc.address";
 const HBASE_REGIONSERVER_IPC_PORT: &str = "hbase.regionserver.ipc.port";
 const HBASE_UNSAFE_REGIONSERVER_HOSTNAME: &str = "hbase.unsafe.regionserver.hostname";
 const HBASE_REGIONSERVER_PORT_KEY: &str = "hbase.regionserver.port";
 const HBASE_REGIONSERVER_INFO_PORT: &str = "hbase.regionserver.info.port";
 const HBASE_REGIONSERVER_BOUND_INFO_PORT: &str = "hbase.regionserver.bound.info.port";
-const HBASE_REST_ENDPOINT: &str = "hbase.rest.endpoint";
+pub(crate) const HBASE_REST_ENDPOINT: &str = "hbase.rest.endpoint";
 
 // `hbase-site.xml` property values that recur across roles. The `${env:...}` placeholders are
 // resolved by HBase at runtime from the Pod's environment.

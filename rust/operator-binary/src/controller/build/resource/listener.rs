@@ -22,7 +22,7 @@ use stackable_operator::{
 
 use crate::crd::{AnyServiceConfig, HbaseRole, LISTENER_VOLUME_NAME};
 
-constant!(LISTENER_PVC_NAME: PersistentVolumeClaimName = LISTENER_VOLUME_NAME);
+constant!(pub(crate) LISTENER_PVC_NAME: PersistentVolumeClaimName = LISTENER_VOLUME_NAME);
 
 #[derive(Snafu, Debug)]
 pub enum Error {

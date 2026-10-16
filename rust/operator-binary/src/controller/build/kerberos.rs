@@ -31,7 +31,7 @@ pub const STACKABLE_KERBEROS_DIR: &str = "/stackable/kerberos";
 /// `KRB5_CONFIG` env var) and by the JVM args builder.
 pub const KRB5_CONFIG_PATH: &str = const_format::concatcp!(STACKABLE_KERBEROS_DIR, "/krb5.conf");
 // Name of the Kerberos secret volume.
-constant!(KERBEROS_VOLUME_NAME: VolumeName = "kerberos");
+constant!(pub(crate) KERBEROS_VOLUME_NAME: VolumeName = "kerberos");
 // The env var pointing the Kerberos libraries at the rendered `krb5.conf`.
 constant!(KRB5_CONFIG_ENV: EnvVarName = "KRB5_CONFIG");
 /// The RPC/data-transfer quality-of-protection level used when Kerberos is enabled.

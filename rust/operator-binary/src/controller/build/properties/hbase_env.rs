@@ -10,6 +10,12 @@ use crate::{
     crd::{AnyServiceConfig, HbaseRole},
 };
 
+/// The `hbase-env.sh` variable that carries a role's own JVM options; `bin/hbase` reads the one
+/// matching the process it starts.
+pub(crate) const HBASE_MASTER_OPTS: &str = "HBASE_MASTER_OPTS";
+pub(crate) const HBASE_REGIONSERVER_OPTS: &str = "HBASE_REGIONSERVER_OPTS";
+pub(crate) const HBASE_REST_OPTS: &str = "HBASE_REST_OPTS";
+
 #[derive(Snafu, Debug)]
 pub enum Error {
     #[snafu(display("failed to construct the HBASE_HEAPSIZE env variable"))]
@@ -38,13 +44,13 @@ pub fn build(
 
     match role {
         HbaseRole::Master => {
-            env.insert("HBASE_MASTER_OPTS".to_string(), non_heap_jvm_args);
+            env.insert(HBASE_MASTER_OPTS.to_string(), non_heap_jvm_args);
         }
         HbaseRole::RegionServer => {
-            env.insert("HBASE_REGIONSERVER_OPTS".to_string(), non_heap_jvm_args);
+            env.insert(HBASE_REGIONSERVER_OPTS.to_string(), non_heap_jvm_args);
         }
         HbaseRole::RestServer => {
-            env.insert("HBASE_REST_OPTS".to_string(), non_heap_jvm_args);
+            env.insert(HBASE_REST_OPTS.to_string(), non_heap_jvm_args);
         }
     }
 
