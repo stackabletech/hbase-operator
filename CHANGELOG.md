@@ -32,7 +32,7 @@
 - Environment variable overrides (`envOverrides`) are now applied after all environment
   variables set by the operator ([#799]).
 - Make operations infallible where dependent on static inputs ([#803]).
-- test: Bump vector-aggregator to 0.58.0 ([#821]).
+- Support Vector 0.58.0 ([#821], [#825]).
 - test: Update OPA to 1.20.2 in integration tests ([#823]).
 - All pods now set `securityContext.seccompProfile.type` to `RuntimeDefault` ([#824]).
 - Replace the unmaintained `serde_yaml` with `yaml_serde` ([#824]).
@@ -66,6 +66,7 @@
 [#821]: https://github.com/stackabletech/hbase-operator/pull/821
 [#823]: https://github.com/stackabletech/hbase-operator/pull/823
 [#824]: https://github.com/stackabletech/hbase-operator/pull/824
+[#825]: https://github.com/stackabletech/hbase-operator/pull/825
 
 ## [26.7.0] - 2026-07-21
 

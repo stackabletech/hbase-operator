@@ -14,4 +14,4 @@ kind: ConfigMap
 metadata:
   name: hbase-vector-aggregator-discovery
 data:
-  ADDRESS: hbase-vector-aggregator:6123
+  ADDRESS: http://hbase-vector-aggregator:6123

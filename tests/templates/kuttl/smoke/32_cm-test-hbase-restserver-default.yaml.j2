@@ -317,5 +317,7 @@ vector.yaml: |
       inputs:
         - extended_logs
       type: vector
-      address: ${VECTOR_AGGREGATOR_ADDRESS}
+      routing:
+        endpoints:
+          - ${VECTOR_AGGREGATOR_ADDRESS}
 {%- endif %}
