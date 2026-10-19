@@ -3,7 +3,13 @@ use stackable_operator::{
 };
 
 use crate::{
-    controller::{RestServerRoleGroupConfig, ValidatedCluster, build::role_group::RoleGroupInputs},
+    controller::{
+        RestServerRoleGroupConfig, ValidatedCluster,
+        build::{
+            properties::{hbase_env::HBASE_REST_OPTS, hbase_site},
+            role_group::RoleGroupInputs,
+        },
+    },
     crd::{HbaseConfig, HbaseRole},
 };
 
@@ -49,5 +55,8 @@ pub(crate) fn inputs<'a>(
             .product_specific_common_config
             .jvm_argument_overrides
             .clone(),
+        dns_cache_ttl_seconds: "30",
+        hbase_env_opts_variable: HBASE_REST_OPTS,
+        role_hbase_site: hbase_site::rest_server_entries(),
     }
 }

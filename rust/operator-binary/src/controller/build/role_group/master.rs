@@ -3,7 +3,13 @@ use stackable_operator::{
 };
 
 use crate::{
-    controller::{MasterRoleGroupConfig, ValidatedCluster, build::role_group::RoleGroupInputs},
+    controller::{
+        MasterRoleGroupConfig, ValidatedCluster,
+        build::{
+            properties::{hbase_env::HBASE_MASTER_OPTS, hbase_site},
+            role_group::RoleGroupInputs,
+        },
+    },
     crd::{HbaseConfig, HbaseRole},
 };
 
@@ -49,5 +55,8 @@ pub(crate) fn inputs<'a>(
             .product_specific_common_config
             .jvm_argument_overrides
             .clone(),
+        dns_cache_ttl_seconds: "5",
+        hbase_env_opts_variable: HBASE_MASTER_OPTS,
+        role_hbase_site: hbase_site::master_entries(),
     }
 }

@@ -54,8 +54,8 @@ pub fn build_rolegroup_config_map(inputs: &RoleGroupInputs) -> Result<ConfigMap>
     let cluster_config = &cluster.cluster_config;
 
     let hbase_site_xml = hbase_site::build(
-        role,
         &inputs.hbase_rootdir,
+        inputs.role_hbase_site.clone(),
         cluster_config
             .zookeeper_connection_information
             .as_hbase_settings(),
@@ -67,7 +67,7 @@ pub fn build_rolegroup_config_map(inputs: &RoleGroupInputs) -> Result<ConfigMap>
 
     let hbase_env_sh = hbase_env::build(
         &inputs.resources,
-        role,
+        inputs.hbase_env_opts_variable,
         cluster.has_kerberos_enabled(),
         construct_role_specific_non_heap_jvm_args(cluster, &inputs.jvm_argument_overrides),
         inputs.config_overrides.hbase_env_sh.clone(),
@@ -83,11 +83,13 @@ pub fn build_rolegroup_config_map(inputs: &RoleGroupInputs) -> Result<ConfigMap>
         inputs.config_overrides.ssl_client_xml.clone(),
     );
 
-    let security_properties =
-        security_properties::build(role, inputs.config_overrides.security_properties.clone())
-            .with_context(|_| JvmSecurityPropertiesSnafu {
-                role_group: role_group_name.to_string(),
-            })?;
+    let security_properties = security_properties::build(
+        inputs.dns_cache_ttl_seconds,
+        inputs.config_overrides.security_properties.clone(),
+    )
+    .with_context(|_| JvmSecurityPropertiesSnafu {
+        role_group: role_group_name.to_string(),
+    })?;
 
     let cm_metadata = object_meta(
         cluster,

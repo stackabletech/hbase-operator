@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use stackable_operator::{
     commons::{
         affinity::StackableAffinity,
@@ -46,4 +48,10 @@ pub(crate) struct RoleGroupInputs<'a> {
     pub(crate) env_overrides: EnvVarSet,
     pub(crate) pod_overrides: PodTemplateSpec,
     pub(crate) jvm_argument_overrides: JvmArgumentOverrides,
+    /// The JVM's positive DNS cache TTL in seconds, written to `security.properties`.
+    pub(crate) dns_cache_ttl_seconds: &'static str,
+    /// The `hbase-env.sh` variable `bin/hbase` reads for this role's process.
+    pub(crate) hbase_env_opts_variable: &'static str,
+    /// The role's own `hbase-site.xml` entries (bind addresses and ports, or the REST endpoint).
+    pub(crate) role_hbase_site: BTreeMap<String, String>,
 }

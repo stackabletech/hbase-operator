@@ -78,8 +78,8 @@ pub fn client_bootstrap_servers(
 
 /// Renders `hbase-site.xml`.
 pub fn build(
-    role: &HbaseRole,
     hbase_rootdir: &str,
+    role_hbase_site: BTreeMap<String, String>,
     zookeeper_config: BTreeMap<String, String>,
     kerberos_config: BTreeMap<String, String>,
     opa_config: Option<&HbaseOpaConfig>,
@@ -111,71 +111,79 @@ pub fn build(
         "false".to_string(),
     );
 
-    match role {
-        HbaseRole::Master => {
-            config.insert(
-                HBASE_MASTER_IPC_ADDRESS.to_string(),
-                BIND_ALL_ADDRESSES.to_string(),
-            );
-            config.insert(
-                HBASE_MASTER_IPC_PORT.to_string(),
-                HBASE_MASTER_PORT.to_string(),
-            );
-            config.insert(
-                HBASE_MASTER_HOSTNAME.to_string(),
-                ENV_HBASE_SERVICE_HOST.to_string(),
-            );
-            config.insert(
-                HBASE_MASTER_PORT_KEY.to_string(),
-                ENV_HBASE_SERVICE_PORT.to_string(),
-            );
-            config.insert(
-                HBASE_MASTER_INFO_PORT.to_string(),
-                ENV_HBASE_INFO_PORT.to_string(),
-            );
-            config.insert(
-                HBASE_MASTER_BOUND_INFO_PORT.to_string(),
-                HBASE_MASTER_UI_PORT.to_string(),
-            );
-        }
-        HbaseRole::RegionServer => {
-            config.insert(
-                HBASE_REGIONSERVER_IPC_ADDRESS.to_string(),
-                BIND_ALL_ADDRESSES.to_string(),
-            );
-            config.insert(
-                HBASE_REGIONSERVER_IPC_PORT.to_string(),
-                HBASE_REGIONSERVER_PORT.to_string(),
-            );
-            config.insert(
-                HBASE_UNSAFE_REGIONSERVER_HOSTNAME.to_string(),
-                ENV_HBASE_SERVICE_HOST.to_string(),
-            );
-            config.insert(
-                HBASE_REGIONSERVER_PORT_KEY.to_string(),
-                ENV_HBASE_SERVICE_PORT.to_string(),
-            );
-            config.insert(
-                HBASE_REGIONSERVER_INFO_PORT.to_string(),
-                ENV_HBASE_INFO_PORT.to_string(),
-            );
-            config.insert(
-                HBASE_REGIONSERVER_BOUND_INFO_PORT.to_string(),
-                HBASE_REGIONSERVER_UI_PORT.to_string(),
-            );
-        }
-        HbaseRole::RestServer => {
-            config.insert(
-                // N.B. a custom tag, so as not to interfere with HBase internals.
-                // The other roles use a patch to correctly resolve host/port.
-                HBASE_REST_ENDPOINT.to_string(),
-                format!("{ENV_HBASE_SERVICE_HOST}:{ENV_HBASE_SERVICE_PORT}"),
-            );
-        }
-    };
+    config.extend(role_hbase_site);
 
     // configOverride come last
     build_xml_config(config, overrides)
+}
+
+pub(crate) fn master_entries() -> BTreeMap<String, String> {
+    BTreeMap::from([
+        (
+            HBASE_MASTER_IPC_ADDRESS.to_string(),
+            BIND_ALL_ADDRESSES.to_string(),
+        ),
+        (
+            HBASE_MASTER_IPC_PORT.to_string(),
+            HBASE_MASTER_PORT.to_string(),
+        ),
+        (
+            HBASE_MASTER_HOSTNAME.to_string(),
+            ENV_HBASE_SERVICE_HOST.to_string(),
+        ),
+        (
+            HBASE_MASTER_PORT_KEY.to_string(),
+            ENV_HBASE_SERVICE_PORT.to_string(),
+        ),
+        (
+            HBASE_MASTER_INFO_PORT.to_string(),
+            ENV_HBASE_INFO_PORT.to_string(),
+        ),
+        (
+            HBASE_MASTER_BOUND_INFO_PORT.to_string(),
+            HBASE_MASTER_UI_PORT.to_string(),
+        ),
+    ])
+}
+
+pub(crate) fn region_server_entries() -> BTreeMap<String, String> {
+    BTreeMap::from([
+        (
+            HBASE_REGIONSERVER_IPC_ADDRESS.to_string(),
+            BIND_ALL_ADDRESSES.to_string(),
+        ),
+        (
+            HBASE_REGIONSERVER_IPC_PORT.to_string(),
+            HBASE_REGIONSERVER_PORT.to_string(),
+        ),
+        (
+            HBASE_UNSAFE_REGIONSERVER_HOSTNAME.to_string(),
+            ENV_HBASE_SERVICE_HOST.to_string(),
+        ),
+        (
+            HBASE_REGIONSERVER_PORT_KEY.to_string(),
+            ENV_HBASE_SERVICE_PORT.to_string(),
+        ),
+        (
+            HBASE_REGIONSERVER_INFO_PORT.to_string(),
+            ENV_HBASE_INFO_PORT.to_string(),
+        ),
+        (
+            HBASE_REGIONSERVER_BOUND_INFO_PORT.to_string(),
+            HBASE_REGIONSERVER_UI_PORT.to_string(),
+        ),
+    ])
+}
+
+pub(crate) fn rest_server_entries() -> BTreeMap<String, String> {
+    BTreeMap::from([
+        // N.B. a custom tag, so as not to interfere with HBase internals.
+        // The other roles use a patch to correctly resolve host/port.
+        (
+            HBASE_REST_ENDPOINT.to_string(),
+            format!("{ENV_HBASE_SERVICE_HOST}:{ENV_HBASE_SERVICE_PORT}"),
+        ),
+    ])
 }
 
 #[cfg(test)]
@@ -183,8 +191,11 @@ mod tests {
     use indoc::indoc;
 
     use super::*;
-    use crate::test_utils::{
-        self, cluster_info, hbase_from_yaml, validated_cluster, validated_cluster_from,
+    use crate::{
+        controller::build::properties::hbase_site,
+        test_utils::{
+            self, cluster_info, hbase_from_yaml, validated_cluster, validated_cluster_from,
+        },
     };
 
     fn bootstrap_servers_for(masters_yaml: &str) -> String {
@@ -256,8 +267,8 @@ spec:
             .config
             .config;
         let xml = build(
-            &HbaseRole::Master,
             &config.hbase_rootdir,
+            hbase_site::master_entries(),
             BTreeMap::new(),
             BTreeMap::new(),
             None,
@@ -285,8 +296,8 @@ spec:
             .config
             .config;
         let xml = build(
-            &HbaseRole::RegionServer,
             &config.hbase_rootdir,
+            hbase_site::region_server_entries(),
             BTreeMap::new(),
             BTreeMap::new(),
             None,
@@ -314,8 +325,8 @@ spec:
             .config
             .config;
         let xml = build(
-            &HbaseRole::RestServer,
             &config.hbase_rootdir,
+            hbase_site::rest_server_entries(),
             BTreeMap::new(),
             BTreeMap::new(),
             None,
@@ -337,8 +348,8 @@ spec:
             .config
             .config;
         let xml = build(
-            &HbaseRole::RestServer,
             &config.hbase_rootdir,
+            hbase_site::rest_server_entries(),
             BTreeMap::new(),
             BTreeMap::new(),
             None,
@@ -360,8 +371,8 @@ spec:
             .config
             .config;
         let xml = build(
-            &HbaseRole::RestServer,
             &config.hbase_rootdir,
+            hbase_site::rest_server_entries(),
             BTreeMap::new(),
             BTreeMap::new(),
             None,
@@ -383,8 +394,8 @@ spec:
             .config
             .config;
         let xml = build(
-            &HbaseRole::Master,
             &config.hbase_rootdir,
+            hbase_site::master_entries(),
             BTreeMap::new(),
             BTreeMap::new(),
             None,

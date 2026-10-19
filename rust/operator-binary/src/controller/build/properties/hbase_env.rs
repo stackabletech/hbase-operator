@@ -10,7 +10,7 @@ use stackable_operator::{
 
 use crate::{
     controller::build::jvm::{self, construct_global_jvm_args, construct_hbase_heapsize_env},
-    crd::{HbaseRole, HbaseStorageConfig},
+    crd::HbaseStorageConfig,
 };
 
 /// The `hbase-env.sh` variable that carries a role's own JVM options; `bin/hbase` reads the one
@@ -28,7 +28,7 @@ pub enum Error {
 /// Renders `hbase-env.sh` as `export VAR="VALUE"` lines.
 pub fn build(
     resources: &Resources<HbaseStorageConfig, NoRuntimeLimits>,
-    role: &HbaseRole,
+    opts_variable: &str,
     kerberos_enabled: bool,
     non_heap_jvm_args: String,
     overrides: KeyValueConfigOverrides,
@@ -44,18 +44,7 @@ pub fn build(
         "HBASE_OPTS".to_string(),
         construct_global_jvm_args(kerberos_enabled),
     );
-
-    match role {
-        HbaseRole::Master => {
-            env.insert(HBASE_MASTER_OPTS.to_string(), non_heap_jvm_args);
-        }
-        HbaseRole::RegionServer => {
-            env.insert(HBASE_REGIONSERVER_OPTS.to_string(), non_heap_jvm_args);
-        }
-        HbaseRole::RestServer => {
-            env.insert(HBASE_REST_OPTS.to_string(), non_heap_jvm_args);
-        }
-    }
+    env.insert(opts_variable.to_string(), non_heap_jvm_args);
 
     // configOverride come last
     env.extend(overrides);
@@ -82,7 +71,7 @@ mod tests {
             .resources;
         let env = build(
             merged,
-            &HbaseRole::Master,
+            HBASE_MASTER_OPTS,
             false,
             "-Xtest".to_string(),
             KeyValueConfigOverrides::default(),
@@ -101,7 +90,7 @@ mod tests {
             .resources;
         let env = build(
             merged,
-            &HbaseRole::RegionServer,
+            HBASE_REGIONSERVER_OPTS,
             false,
             "-Xtest".to_string(),
             KeyValueConfigOverrides::default(),
@@ -119,7 +108,7 @@ mod tests {
             .resources;
         let env = build(
             merged,
-            &HbaseRole::Master,
+            HBASE_MASTER_OPTS,
             false,
             "-Xtest".to_string(),
             [("CUSTOM_VAR", "custom_value")].into(),
