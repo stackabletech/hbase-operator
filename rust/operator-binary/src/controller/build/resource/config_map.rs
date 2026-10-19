@@ -1,5 +1,7 @@
 //! Build the per-rolegroup `ConfigMap` for the HbaseCluster.
 
+use std::collections::BTreeMap;
+
 use snafu::{ResultExt, Snafu};
 use stackable_operator::{
     builder::configmap::ConfigMapBuilder, k8s_openapi::api::core::v1::ConfigMap,
@@ -43,6 +45,31 @@ pub fn build_rolegroup_config_map(inputs: &RoleGroupInputs) -> Result<ConfigMap>
         role = role.to_string()
     );
 
+    let data = config_map_data(inputs)?;
+
+    let cm_metadata = object_meta(
+        cluster,
+        cluster
+            .role_group_resource_names(role, role_group_name)
+            .role_group_config_map()
+            .to_string(),
+        recommended_labels_for_role_group_resources(cluster, role, role_group_name),
+    )
+    .build();
+
+    ConfigMapBuilder::new()
+        .metadata(cm_metadata)
+        .data(data)
+        .build()
+        .context(AssembleSnafu)
+}
+
+/// Renders the role group's config files, keyed by file name.
+///
+/// The `ssl-*.xml` files are present only when they carry settings and `log4j2.properties` only
+/// for the automatic log config, so the set of keys is part of what this renders.
+pub(crate) fn config_map_data(inputs: &RoleGroupInputs) -> Result<BTreeMap<String, String>> {
+    let cluster = inputs.cluster;
     let cluster_config = &cluster.cluster_config;
 
     let hbase_site_xml = hbase_site::build(
@@ -81,43 +108,33 @@ pub fn build_rolegroup_config_map(inputs: &RoleGroupInputs) -> Result<ConfigMap>
     )
     .context(JvmSecurityPropertiesSnafu)?;
 
-    let cm_metadata = object_meta(
-        cluster,
-        cluster
-            .role_group_resource_names(role, role_group_name)
-            .role_group_config_map()
-            .to_string(),
-        recommended_labels_for_role_group_resources(cluster, role, role_group_name),
-    )
-    .build();
-
-    let mut builder = ConfigMapBuilder::new();
-    builder
-        .metadata(cm_metadata)
-        .add_data(ConfigFileName::HbaseSite.to_string(), hbase_site_xml)
-        .add_data(ConfigFileName::HbaseEnv.to_string(), hbase_env_sh)
-        .add_data(ConfigFileName::Security.to_string(), security_properties);
+    let mut data = BTreeMap::from([
+        (ConfigFileName::HbaseSite.to_string(), hbase_site_xml),
+        (ConfigFileName::HbaseEnv.to_string(), hbase_env_sh),
+        (ConfigFileName::Security.to_string(), security_properties),
+    ]);
 
     // HBase does not like empty config files, so the ssl-*.xml files are only
     // written when they actually carry settings (see `ssl_server::build`):
-    // Caused by: com.ctc.wstx.exc.WstxEOFException: Unexpected EOF in prolog at [row,col,system-id]: [1,0,"file:/stackable/conf/ssl-server.xml"]
+    // Caused by: com.ctc.wstx.exc.WstxEOFException: Unexpected EOF in prolog
+    // at [row,col,system-id]: [1,0,"file:/stackable/conf/ssl-server.xml"]
     if let Some(ssl_server_xml) = ssl_server_xml {
-        builder.add_data(ConfigFileName::SslServer.to_string(), ssl_server_xml);
+        data.insert(ConfigFileName::SslServer.to_string(), ssl_server_xml);
     }
     if let Some(ssl_client_xml) = ssl_client_xml {
-        builder.add_data(ConfigFileName::SslClient.to_string(), ssl_client_xml);
+        data.insert(ConfigFileName::SslClient.to_string(), ssl_client_xml);
     }
 
     if let Some(log4j2_properties) = product_logging::build_log4j2(&inputs.logging.hbase_container)
     {
-        builder.add_data(ConfigFileName::Log4j2.to_string(), log4j2_properties);
+        data.insert(ConfigFileName::Log4j2.to_string(), log4j2_properties);
     }
     if inputs.logging.enable_vector_agent {
-        builder.add_data(
-            VECTOR_CONFIG_FILE,
+        data.insert(
+            VECTOR_CONFIG_FILE.to_string(),
             product_logging::vector_config_file_content(),
         );
     }
 
-    builder.build().context(AssembleSnafu)
+    Ok(data)
 }
