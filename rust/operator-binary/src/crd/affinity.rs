@@ -155,7 +155,7 @@ mod tests {
                 replicas: 1
         "#;
         let hbase: v1alpha1::HbaseCluster =
-            serde_yaml::from_str(input).expect("illegal test input");
+            yaml_serde::from_str(input).expect("illegal test input");
         let validated_cluster = crate::test_utils::validated_cluster_from(&hbase);
 
         let affinity = match role {

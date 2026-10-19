@@ -45,7 +45,7 @@ mod tests {
     #[test]
     fn authorization_without_opa_is_valid() {
         // `opa` is optional (matching the hive template), so an empty `authorization` deserializes.
-        let config: AuthorizationConfig = serde_yaml::from_str("{}").expect("empty authorization");
+        let config: AuthorizationConfig = yaml_serde::from_str("{}").expect("empty authorization");
         assert!(config.opa.is_none());
     }
 
@@ -57,7 +57,7 @@ mod tests {
               package: hbase
         "};
         let config: AuthorizationConfig =
-            serde_yaml::from_str(yaml).expect("authorization with opa");
+            yaml_serde::from_str(yaml).expect("authorization with opa");
         assert!(config.opa.is_some());
     }
 }

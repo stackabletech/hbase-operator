@@ -503,9 +503,8 @@ spec:
         replicas: 1
         "#};
 
-        let deserializer = serde_yaml::Deserializer::from_str(input);
         let hbase: v1alpha1::HbaseCluster =
-            serde_yaml::with::singleton_map_recursive::deserialize(deserializer).unwrap();
+            stackable_operator::utils::yaml_from_str_singleton_map(input).unwrap();
 
         let role = hbase.spec.masters.as_ref().unwrap();
         let role_group = role.role_groups.get("default").unwrap();
