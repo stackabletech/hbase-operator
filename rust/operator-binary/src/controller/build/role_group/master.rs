@@ -1,3 +1,4 @@
+use snafu::ResultExt;
 use stackable_operator::{
     utils::cluster_info::KubernetesClusterInfo, v2::types::operator::RoleGroupName,
 };
@@ -7,7 +8,9 @@ use crate::{
         MasterRoleGroupConfig, ValidatedCluster,
         build::{
             properties::{hbase_env::HBASE_MASTER_OPTS, hbase_site},
-            role_group::RoleGroupInputs,
+            recommended_labels_for_role_group_resources,
+            resource::listener::build_listener_volume,
+            role_group::{Error, ListenerPlacement, ListenerSnafu, RoleGroupInputs},
         },
     },
     crd::{HbaseConfig, HbaseRole},
@@ -21,7 +24,7 @@ pub(crate) fn inputs<'a>(
     cluster_info: &'a KubernetesClusterInfo,
     role_group_name: &RoleGroupName,
     rg_config: &MasterRoleGroupConfig,
-) -> RoleGroupInputs<'a> {
+) -> Result<RoleGroupInputs<'a>, Error> {
     let HbaseConfig {
         hbase_rootdir,
         resources,
@@ -33,7 +36,15 @@ pub(crate) fn inputs<'a>(
         listener_class,
     } = &rg_config.config.config;
 
-    RoleGroupInputs {
+    // Masters get their listener from an ephemeral pod volume: clients pull the latest address
+    // from ZooKeeper, so the pods need no stable identity.
+    let recommended_labels =
+        recommended_labels_for_role_group_resources(cluster, &ROLE, role_group_name);
+    let listener = ListenerPlacement::PodVolume(
+        build_listener_volume(listener_class, &recommended_labels).context(ListenerSnafu)?,
+    );
+
+    Ok(RoleGroupInputs {
         cluster,
         cluster_info,
         role: ROLE,
@@ -44,7 +55,7 @@ pub(crate) fn inputs<'a>(
         resources: resources.clone(),
         hbase_rootdir: hbase_rootdir.clone(),
         logging: rg_config.config.logging.clone(),
-        listener_class: listener_class.clone(),
+        listener,
         region_mover_opts: String::new(),
         run_region_mover: false,
         replicas: rg_config.replicas,
@@ -58,5 +69,5 @@ pub(crate) fn inputs<'a>(
         dns_cache_ttl_seconds: "5",
         hbase_env_opts_variable: HBASE_MASTER_OPTS,
         role_hbase_site: hbase_site::master_entries(),
-    }
+    })
 }

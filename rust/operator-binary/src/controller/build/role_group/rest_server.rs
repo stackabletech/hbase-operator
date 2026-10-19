@@ -7,7 +7,9 @@ use crate::{
         RestServerRoleGroupConfig, ValidatedCluster,
         build::{
             properties::{hbase_env::HBASE_REST_OPTS, hbase_site},
-            role_group::RoleGroupInputs,
+            recommended_labels_for_unversioned_role_group_resources,
+            resource::listener::build_listener_pvc,
+            role_group::{Error, ListenerPlacement, RoleGroupInputs},
         },
     },
     crd::{HbaseConfig, HbaseRole},
@@ -21,7 +23,7 @@ pub(crate) fn inputs<'a>(
     cluster_info: &'a KubernetesClusterInfo,
     role_group_name: &RoleGroupName,
     rg_config: &RestServerRoleGroupConfig,
-) -> RoleGroupInputs<'a> {
+) -> Result<RoleGroupInputs<'a>, Error> {
     let HbaseConfig {
         hbase_rootdir,
         resources,
@@ -33,7 +35,14 @@ pub(crate) fn inputs<'a>(
         listener_class,
     } = &rg_config.config.config;
 
-    RoleGroupInputs {
+    // Rest servers get their listener from a claim template, for a stable per-pod address. The
+    // template cannot be modified once deployed, so its labels omit the version.
+    let unversioned_labels =
+        recommended_labels_for_unversioned_role_group_resources(cluster, &ROLE, role_group_name);
+    let listener =
+        ListenerPlacement::ClaimTemplate(build_listener_pvc(listener_class, &unversioned_labels));
+
+    Ok(RoleGroupInputs {
         cluster,
         cluster_info,
         role: ROLE,
@@ -44,7 +53,7 @@ pub(crate) fn inputs<'a>(
         resources: resources.clone(),
         hbase_rootdir: hbase_rootdir.clone(),
         logging: rg_config.config.logging.clone(),
-        listener_class: listener_class.clone(),
+        listener,
         region_mover_opts: String::new(),
         run_region_mover: false,
         replicas: rg_config.replicas,
@@ -58,5 +67,5 @@ pub(crate) fn inputs<'a>(
         dns_cache_ttl_seconds: "30",
         hbase_env_opts_variable: HBASE_REST_OPTS,
         role_hbase_site: hbase_site::rest_server_entries(),
-    }
+    })
 }

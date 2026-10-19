@@ -1,28 +1,57 @@
 use std::collections::BTreeMap;
 
+use snafu::Snafu;
 use stackable_operator::{
     commons::{
         affinity::StackableAffinity,
         resources::{NoRuntimeLimits, Resources},
     },
-    k8s_openapi::api::core::v1::PodTemplateSpec,
+    k8s_openapi::api::core::v1::{PersistentVolumeClaim, PodTemplateSpec, Volume},
     shared::time::Duration,
     utils::cluster_info::KubernetesClusterInfo,
     v2::{
-        builder::pod::container::EnvVarSet,
-        jvm_argument_overrides::JvmArgumentOverrides,
-        types::{kubernetes::ListenerClassName, operator::RoleGroupName},
+        builder::pod::container::EnvVarSet, jvm_argument_overrides::JvmArgumentOverrides,
+        types::operator::RoleGroupName,
     },
 };
 
 use crate::{
-    controller::{ValidatedCluster, validate::ValidatedLogging},
+    controller::{ValidatedCluster, build::resource, validate::ValidatedLogging},
     crd::{HbaseRole, HbaseStorageConfig, v1alpha1},
 };
 
 pub(crate) mod master;
 pub(crate) mod region_server;
 pub(crate) mod rest_server;
+
+/// Why building one role group failed. The caller adds which role and role group it was.
+#[derive(Snafu, Debug)]
+#[snafu(visibility(pub(crate)))]
+pub enum Error {
+    #[snafu(display("failed to build the listener volume"))]
+    Listener { source: resource::listener::Error },
+
+    #[snafu(display("failed to build ConfigMap"))]
+    ConfigMap { source: resource::config_map::Error },
+
+    #[snafu(display("failed to build StatefulSet"))]
+    StatefulSet {
+        source: resource::statefulset::Error,
+    },
+}
+
+/// Where a role group's listener comes from.
+#[allow(
+    clippy::large_enum_variant,
+    reason = "one value per role group; its size does not matter"
+)]
+pub(crate) enum ListenerPlacement {
+    /// An ephemeral pod volume (Masters and RegionServers): clients pull the latest address from
+    /// ZooKeeper, so the pods need no stable identity.
+    PodVolume(Volume),
+    /// A persistent volume claim template (RestServers), for a stable per-pod address.
+    ClaimTemplate(PersistentVolumeClaim),
+}
 
 /// What one role group's resources are built from: the values every role has, resolved from
 /// its typed role-group config by that role's module.
@@ -38,7 +67,7 @@ pub(crate) struct RoleGroupInputs<'a> {
     pub(crate) resources: Resources<HbaseStorageConfig, NoRuntimeLimits>,
     pub(crate) hbase_rootdir: String,
     pub(crate) logging: ValidatedLogging,
-    pub(crate) listener_class: ListenerClassName,
+    pub(crate) listener: ListenerPlacement,
     /// Set on every role because the entrypoint runs under `set -u`; only RegionServers run the
     /// mover, so only they have a non-empty value.
     pub(crate) region_mover_opts: String,

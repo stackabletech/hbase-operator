@@ -21,12 +21,12 @@ use crate::{
         ValidatedCluster,
         build::{
             resource::{
-                config_map::{self, build_rolegroup_config_map},
+                config_map::build_rolegroup_config_map,
                 discovery::{self, build_discovery_config_map},
                 pdb::build_pdb,
                 rbac::{build_role_binding, build_service_account},
                 service::{build_rolegroup_metrics_service, build_rolegroup_service},
-                statefulset::{self, build_rolegroup_statefulset},
+                statefulset::build_rolegroup_statefulset,
             },
             role_group::{master, region_server, rest_server},
         },
@@ -55,16 +55,9 @@ pub(crate) fn object_meta(
 
 #[derive(Snafu, Debug)]
 pub enum Error {
-    #[snafu(display("failed to build ConfigMap for role {role} role group {role_group}"))]
-    ConfigMap {
-        source: config_map::Error,
-        role: HbaseRole,
-        role_group: RoleGroupName,
-    },
-
-    #[snafu(display("failed to build StatefulSet for role {role} role group {role_group}"))]
-    StatefulSet {
-        source: statefulset::Error,
+    #[snafu(display("failed to build the resources of {role} role group {role_group}"))]
+    RoleGroup {
+        source: role_group::Error,
         role: HbaseRole,
         role_group: RoleGroupName,
     },
@@ -88,7 +81,12 @@ pub fn build(
     let mut pod_disruption_budgets = vec![];
 
     for (role_group_name, rg_config) in &cluster.master_role_group_configs {
-        let inputs = master::inputs(cluster, cluster_info, role_group_name, rg_config);
+        let inputs = master::inputs(cluster, cluster_info, role_group_name, rg_config)
+            .with_context(|_| RoleGroupSnafu {
+                role: master::ROLE,
+                role_group: role_group_name.clone(),
+            })?;
+
         services.push(build_rolegroup_service(
             cluster,
             &master::ROLE,
@@ -100,17 +98,21 @@ pub fn build(
             role_group_name,
         ));
         config_maps.push(
-            build_rolegroup_config_map(&inputs).with_context(|_| ConfigMapSnafu {
-                role: master::ROLE,
-                role_group: role_group_name.clone(),
-            })?,
+            build_rolegroup_config_map(&inputs)
+                .context(role_group::ConfigMapSnafu)
+                .with_context(|_| RoleGroupSnafu {
+                    role: master::ROLE,
+                    role_group: role_group_name.clone(),
+                })?,
         );
-        stateful_sets.push(build_rolegroup_statefulset(&inputs).with_context(|_| {
-            StatefulSetSnafu {
-                role: master::ROLE,
-                role_group: role_group_name.clone(),
-            }
-        })?);
+        stateful_sets.push(
+            build_rolegroup_statefulset(&inputs)
+                .context(role_group::StatefulSetSnafu)
+                .with_context(|_| RoleGroupSnafu {
+                    role: master::ROLE,
+                    role_group: role_group_name.clone(),
+                })?,
+        );
     }
 
     if let Some(pdb) = build_pdb(&cluster.master_config.pdb, cluster, &master::ROLE) {
@@ -118,7 +120,12 @@ pub fn build(
     }
 
     for (role_group_name, rg_config) in &cluster.region_server_role_group_configs {
-        let inputs = region_server::inputs(cluster, cluster_info, role_group_name, rg_config);
+        let inputs = region_server::inputs(cluster, cluster_info, role_group_name, rg_config)
+            .with_context(|_| RoleGroupSnafu {
+                role: region_server::ROLE,
+                role_group: role_group_name.clone(),
+            })?;
+
         services.push(build_rolegroup_service(
             cluster,
             &region_server::ROLE,
@@ -130,17 +137,21 @@ pub fn build(
             role_group_name,
         ));
         config_maps.push(
-            build_rolegroup_config_map(&inputs).with_context(|_| ConfigMapSnafu {
-                role: region_server::ROLE,
-                role_group: role_group_name.clone(),
-            })?,
+            build_rolegroup_config_map(&inputs)
+                .context(role_group::ConfigMapSnafu)
+                .with_context(|_| RoleGroupSnafu {
+                    role: region_server::ROLE,
+                    role_group: role_group_name.clone(),
+                })?,
         );
-        stateful_sets.push(build_rolegroup_statefulset(&inputs).with_context(|_| {
-            StatefulSetSnafu {
-                role: region_server::ROLE,
-                role_group: role_group_name.clone(),
-            }
-        })?);
+        stateful_sets.push(
+            build_rolegroup_statefulset(&inputs)
+                .context(role_group::StatefulSetSnafu)
+                .with_context(|_| RoleGroupSnafu {
+                    role: region_server::ROLE,
+                    role_group: role_group_name.clone(),
+                })?,
+        );
     }
 
     if let Some(pdb) = build_pdb(
@@ -152,7 +163,12 @@ pub fn build(
     }
 
     for (role_group_name, rg_config) in &cluster.rest_server_role_group_configs {
-        let inputs = rest_server::inputs(cluster, cluster_info, role_group_name, rg_config);
+        let inputs = rest_server::inputs(cluster, cluster_info, role_group_name, rg_config)
+            .with_context(|_| RoleGroupSnafu {
+                role: rest_server::ROLE,
+                role_group: role_group_name.clone(),
+            })?;
+
         services.push(build_rolegroup_service(
             cluster,
             &rest_server::ROLE,
@@ -164,17 +180,21 @@ pub fn build(
             role_group_name,
         ));
         config_maps.push(
-            build_rolegroup_config_map(&inputs).with_context(|_| ConfigMapSnafu {
-                role: rest_server::ROLE,
-                role_group: role_group_name.clone(),
-            })?,
+            build_rolegroup_config_map(&inputs)
+                .context(role_group::ConfigMapSnafu)
+                .with_context(|_| RoleGroupSnafu {
+                    role: rest_server::ROLE,
+                    role_group: role_group_name.clone(),
+                })?,
         );
-        stateful_sets.push(build_rolegroup_statefulset(&inputs).with_context(|_| {
-            StatefulSetSnafu {
-                role: rest_server::ROLE,
-                role_group: role_group_name.clone(),
-            }
-        })?);
+        stateful_sets.push(
+            build_rolegroup_statefulset(&inputs)
+                .context(role_group::StatefulSetSnafu)
+                .with_context(|_| RoleGroupSnafu {
+                    role: rest_server::ROLE,
+                    role_group: role_group_name.clone(),
+                })?,
+        );
     }
 
     if let Some(rest_server_config) = &cluster.rest_server_config

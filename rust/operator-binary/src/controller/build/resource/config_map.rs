@@ -19,23 +19,15 @@ use crate::controller::build::{
 
 #[derive(Snafu, Debug)]
 pub enum Error {
-    #[snafu(display("the validated cluster has no role group {role_group:?} for role {role:?}"))]
-    MissingRoleGroup { role: String, role_group: String },
-
     #[snafu(display("failed to build hbase-env.sh"))]
     BuildHbaseEnv { source: hbase_env::Error },
 
-    #[snafu(display("failed to serialize {} for {role_group}", ConfigFileName::Security))]
-    JvmSecurityProperties {
-        source: PropertiesWriterError,
-        role_group: String,
-    },
+    #[snafu(display("failed to serialize {}", ConfigFileName::Security))]
+    JvmSecurityProperties { source: PropertiesWriterError },
 
-    #[snafu(display("cannot build config map for role {role:?} and role group {role_group:?}"))]
+    #[snafu(display("failed to assemble the ConfigMap"))]
     Assemble {
         source: stackable_operator::builder::configmap::Error,
-        role: String,
-        role_group: String,
     },
 }
 
@@ -87,9 +79,7 @@ pub fn build_rolegroup_config_map(inputs: &RoleGroupInputs) -> Result<ConfigMap>
         inputs.dns_cache_ttl_seconds,
         inputs.config_overrides.security_properties.clone(),
     )
-    .with_context(|_| JvmSecurityPropertiesSnafu {
-        role_group: role_group_name.to_string(),
-    })?;
+    .context(JvmSecurityPropertiesSnafu)?;
 
     let cm_metadata = object_meta(
         cluster,
@@ -129,8 +119,5 @@ pub fn build_rolegroup_config_map(inputs: &RoleGroupInputs) -> Result<ConfigMap>
         );
     }
 
-    builder.build().with_context(|_| AssembleSnafu {
-        role: role.to_string(),
-        role_group: role_group_name.to_string(),
-    })
+    builder.build().context(AssembleSnafu)
 }

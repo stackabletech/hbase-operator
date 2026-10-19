@@ -37,8 +37,7 @@ use crate::{
         object_meta,
         properties::product_logging::MAX_HBASE_LOG_FILES_SIZE,
         recommended_labels_for_role_group_resources,
-        recommended_labels_for_unversioned_role_group_resources,
-        role_group::RoleGroupInputs,
+        role_group::{ListenerPlacement, RoleGroupInputs},
         role_group_selector,
     },
     crd::{CONFIG_DIR_NAME, HbaseRole, LISTENER_VOLUME_DIR, LISTENER_VOLUME_NAME},
@@ -83,9 +82,6 @@ pub enum Error {
 
     #[snafu(display("failed to add needed volume"))]
     AddVolume { source: builder::pod::Error },
-
-    #[snafu(display("failed to build listener volume"))]
-    ListenerVolume { source: super::listener::Error },
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -292,32 +288,15 @@ pub fn build_rolegroup_statefulset(inputs: &RoleGroupInputs) -> Result<StatefulS
         ));
     }
 
-    // Used for PVC templates, which cannot be modified once they are deployed.
-    // The version label is omitted so the labels stay stable across version
-    // upgrades.
-    let unversioned_labels = recommended_labels_for_unversioned_role_group_resources(
-        cluster,
-        hbase_role,
-        role_group_name,
-    );
-
-    let listener_pvc = super::listener::build_listener_pvc(
-        hbase_role,
-        &inputs.listener_class,
-        &unversioned_labels,
-    );
-
-    if let Some(listener_volume) = super::listener::build_listener_volume(
-        hbase_role,
-        &inputs.listener_class,
-        &recommended_labels,
-    )
-    .context(ListenerVolumeSnafu)?
-    {
+    let (listener_volume, listener_pvc) = match &inputs.listener {
+        ListenerPlacement::PodVolume(volume) => (Some(volume.clone()), None),
+        ListenerPlacement::ClaimTemplate(claim) => (None, Some(vec![claim.clone()])),
+    };
+    if let Some(listener_volume) = listener_volume {
         pod_builder
             .add_volume(listener_volume)
             .context(AddVolumeSnafu)?;
-    };
+    }
 
     let mut pod_template = pod_builder.build_template();
 
@@ -392,7 +371,8 @@ mod tests {
             cluster_info,
             &role_group_name,
             test_utils::master_role_group_config(&cluster, "default"),
-        );
+        )
+        .expect("inputs are valid");
 
         let stateful_set = build_rolegroup_statefulset(&inputs).expect("the StatefulSet builds");
 
@@ -506,7 +486,8 @@ spec:
             cluster_info,
             &role_group_name,
             test_utils::master_role_group_config(&cluster, "default"),
-        );
+        )
+        .expect("inputs are valid");
 
         build_rolegroup_statefulset(&inputs)
             .expect("the StatefulSet builds")
