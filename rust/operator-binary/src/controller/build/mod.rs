@@ -34,6 +34,17 @@ use crate::{
     crd::HbaseRole,
 };
 
+pub mod container;
+pub mod graceful_shutdown;
+pub mod jvm;
+pub mod kerberos;
+pub mod opa;
+pub mod properties;
+pub mod region_mover;
+pub mod resource;
+pub mod role;
+pub mod role_group;
+
 /// Returns an [`ObjectMetaBuilder`] pre-filled with the cluster's namespace, an owner
 /// reference back to the cluster, the resource `name` and the given `recommended_labels`.
 ///
@@ -282,16 +293,6 @@ pub(crate) fn role_group_selector(
     label::role_group_selector(&cluster.name, &PRODUCT_NAME, role_name, role_group_name)
 }
 
-pub mod graceful_shutdown;
-pub mod jvm;
-pub mod kerberos;
-pub mod opa;
-pub mod properties;
-pub mod region_mover;
-pub mod resource;
-pub mod role;
-pub mod role_group;
-
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeMap;
@@ -304,6 +305,10 @@ mod tests {
 
     use super::{
         build,
+        container::{
+            HBASE_CONFIG_VOLUME_NAME, HBASE_CONTAINER_NAME, HDFS_DISCOVERY_VOLUME_NAME,
+            LOG_CONFIG_VOLUME_NAME, LOG_VOLUME_NAME, REGION_MOVER_OPTS_ENV, RUN_REGION_MOVER_ENV,
+        },
         kerberos::KERBEROS_VOLUME_NAME,
         opa::HbaseOpaConfig,
         properties::{
@@ -313,14 +318,7 @@ mod tests {
                 HBASE_MASTER_IPC_ADDRESS, HBASE_REGIONSERVER_IPC_ADDRESS, HBASE_REST_ENDPOINT,
             },
         },
-        resource::{
-            listener::LISTENER_PVC_NAME,
-            statefulset::{
-                HBASE_CONFIG_VOLUME_NAME, HBASE_CONTAINER_NAME, HDFS_DISCOVERY_VOLUME_NAME,
-                LOG_CONFIG_VOLUME_NAME, LOG_VOLUME_NAME, REGION_MOVER_OPTS_ENV,
-                RUN_REGION_MOVER_ENV,
-            },
-        },
+        resource::listener::LISTENER_PVC_NAME,
     };
     use crate::{
         controller::{
