@@ -28,6 +28,9 @@ pub(crate) mod rest_server;
 #[derive(Snafu, Debug)]
 #[snafu(visibility(pub(crate)))]
 pub enum Error {
+    #[snafu(display("missing secret lifetime"))]
+    MissingSecretLifetime,
+
     #[snafu(display("failed to build the listener volume"))]
     Listener { source: resource::listener::Error },
 
@@ -62,7 +65,7 @@ pub(crate) struct RoleGroupInputs<'a> {
     pub(crate) role_group_name: RoleGroupName,
     pub(crate) affinity: StackableAffinity,
     pub(crate) graceful_shutdown_timeout: Option<Duration>,
-    pub(crate) requested_secret_lifetime: Option<Duration>,
+    pub(crate) requested_secret_lifetime: Duration,
     /// Container resources and the `HBASE_HEAPSIZE` derivation both read this.
     pub(crate) resources: Resources<HbaseStorageConfig, NoRuntimeLimits>,
     pub(crate) hbase_rootdir: String,

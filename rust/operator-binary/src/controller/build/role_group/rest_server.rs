@@ -1,3 +1,4 @@
+use snafu::OptionExt;
 use stackable_operator::{
     utils::cluster_info::KubernetesClusterInfo, v2::types::operator::RoleGroupName,
 };
@@ -9,7 +10,7 @@ use crate::{
             properties::{hbase_env::HBASE_REST_OPTS, hbase_site},
             recommended_labels_for_unversioned_role_group_resources,
             resource::listener::build_listener_pvc,
-            role_group::{Error, ListenerPlacement, RoleGroupInputs},
+            role_group::{Error, ListenerPlacement, MissingSecretLifetimeSnafu, RoleGroupInputs},
         },
     },
     crd::{HbaseConfig, HbaseRole},
@@ -49,7 +50,8 @@ pub(crate) fn inputs<'a>(
         role_group_name: role_group_name.clone(),
         affinity: affinity.clone(),
         graceful_shutdown_timeout: *graceful_shutdown_timeout,
-        requested_secret_lifetime: *requested_secret_lifetime,
+        requested_secret_lifetime: (*requested_secret_lifetime)
+            .context(MissingSecretLifetimeSnafu)?,
         resources: resources.clone(),
         hbase_rootdir: hbase_rootdir.clone(),
         logging: rg_config.config.logging.clone(),

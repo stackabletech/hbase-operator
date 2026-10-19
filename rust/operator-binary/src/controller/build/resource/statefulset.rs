@@ -3,7 +3,7 @@
 use std::str::FromStr;
 
 use indoc::formatdoc;
-use snafu::{OptionExt, ResultExt, Snafu};
+use snafu::{ResultExt, Snafu};
 use stackable_operator::{
     builder::{
         self,
@@ -71,9 +71,6 @@ const HBASE_LOG_CONFIG_TMP_DIR: &str = "/stackable/tmp/log_config";
 
 #[derive(Snafu, Debug)]
 pub enum Error {
-    #[snafu(display("missing secret lifetime"))]
-    MissingSecretLifetime,
-
     #[snafu(display("failed to add kerberos config"))]
     AddKerberosConfig { source: kerberos::Error },
 
@@ -267,9 +264,7 @@ pub fn build_rolegroup_statefulset(inputs: &RoleGroupInputs) -> Result<StatefulS
             resource_names.metrics_service_name().as_ref(),
             &mut hbase_container,
             &mut pod_builder,
-            inputs
-                .requested_secret_lifetime
-                .context(MissingSecretLifetimeSnafu)?,
+            inputs.requested_secret_lifetime,
         )
         .context(AddKerberosConfigSnafu)?;
     }
