@@ -20,6 +20,8 @@ use crate::{
 };
 
 pub(crate) const ROLE: HbaseRole = HbaseRole::RestServer;
+/// The JVM's positive DNS cache TTL for this role, written to `security.properties`.
+const DNS_CACHE_TTL_SECONDS: u32 = 30;
 
 /// The inputs of one rest server role group.
 pub(crate) fn build<'a>(
@@ -69,7 +71,7 @@ pub(crate) fn build<'a>(
             .product_specific_common_config
             .jvm_argument_overrides
             .clone(),
-        dns_cache_ttl_seconds: "30",
+        dns_cache_ttl_seconds: DNS_CACHE_TTL_SECONDS,
         hbase_env_opts_variable: HBASE_REST_OPTS.clone(),
         role_hbase_site: hbase_site::rest_server_entries(),
     })

@@ -12,7 +12,7 @@ use stackable_operator::v2::{
 
 /// Renders `security.properties`: role-specific DNS cache TTLs plus user overrides.
 pub fn build(
-    dns_cache_ttl_seconds: &str,
+    dns_cache_ttl_seconds: u32,
     overrides: KeyValueConfigOverrides,
 ) -> Result<String, PropertiesWriterError> {
     // Caching forever (the JVM default for successful lookups)
@@ -40,7 +40,8 @@ mod tests {
     #[test]
     fn injects_master_dns_cache_ttl() {
         assert_eq!(
-            build("5", KeyValueConfigOverrides::default()).unwrap(),
+            build(5, KeyValueConfigOverrides::default())
+                .expect("the default security.properties should render"),
             "networkaddress.cache.negative.ttl=0\nnetworkaddress.cache.ttl=5\n"
         );
     }
@@ -48,7 +49,8 @@ mod tests {
     #[test]
     fn injects_regionserver_dns_cache_ttl() {
         assert_eq!(
-            build("10", KeyValueConfigOverrides::default()).unwrap(),
+            build(10, KeyValueConfigOverrides::default())
+                .expect("the default security.properties should render"),
             "networkaddress.cache.negative.ttl=0\nnetworkaddress.cache.ttl=10\n"
         );
     }
@@ -56,7 +58,8 @@ mod tests {
     #[test]
     fn injects_restserver_dns_cache_ttl() {
         assert_eq!(
-            build("30", KeyValueConfigOverrides::default()).unwrap(),
+            build(30, KeyValueConfigOverrides::default())
+                .expect("the default security.properties should render"),
             "networkaddress.cache.negative.ttl=0\nnetworkaddress.cache.ttl=30\n"
         );
     }
@@ -64,7 +67,8 @@ mod tests {
     #[test]
     fn user_overrides_win_over_injected_defaults() {
         assert_eq!(
-            build("5", [("networkaddress.cache.ttl", "60")].into()).unwrap(),
+            build(5, [("networkaddress.cache.ttl", "60")].into())
+                .expect("security.properties with an override should render"),
             "networkaddress.cache.negative.ttl=0\nnetworkaddress.cache.ttl=60\n"
         );
     }

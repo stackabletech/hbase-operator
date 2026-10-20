@@ -100,7 +100,7 @@ pub(crate) struct RoleGroupInputs<'a> {
     pub(crate) pod_overrides: PodTemplateSpec,
     pub(crate) jvm_argument_overrides: JvmArgumentOverrides,
     /// The JVM's positive DNS cache TTL in seconds, written to `security.properties`.
-    pub(crate) dns_cache_ttl_seconds: &'static str,
+    pub(crate) dns_cache_ttl_seconds: u32,
     /// The `hbase-env.sh` variable `bin/hbase` reads for this role's process.
     pub(crate) hbase_env_opts_variable: EnvVarName,
     /// The role's own `hbase-site.xml` entries (bind addresses and ports, or the REST endpoint).
