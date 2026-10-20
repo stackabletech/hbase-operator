@@ -1,11 +1,12 @@
 //! Builds the `hbase-env.sh` config file: JVM heap/options env vars + overrides.
 
-use std::{collections::BTreeMap, fmt::Write};
+use std::{collections::BTreeMap, fmt::Write, str::FromStr};
 
 use snafu::{ResultExt, Snafu};
 use stackable_operator::{
     commons::resources::{NoRuntimeLimits, Resources},
-    v2::config_overrides::KeyValueConfigOverrides,
+    constant,
+    v2::builder::pod::container::EnvVarName,
 };
 
 use crate::{
@@ -13,11 +14,13 @@ use crate::{
     crd::HbaseStorageConfig,
 };
 
-/// The `hbase-env.sh` variable that carries a role's own JVM options; `bin/hbase` reads the one
-/// matching the process it starts.
-pub(crate) const HBASE_MASTER_OPTS: &str = "HBASE_MASTER_OPTS";
-pub(crate) const HBASE_REGIONSERVER_OPTS: &str = "HBASE_REGIONSERVER_OPTS";
-pub(crate) const HBASE_REST_OPTS: &str = "HBASE_REST_OPTS";
+constant!(pub(crate) HBASE_MASTER_OPTS: EnvVarName = "HBASE_MASTER_OPTS");
+constant!(pub(crate) HBASE_REGIONSERVER_OPTS: EnvVarName = "HBASE_REGIONSERVER_OPTS");
+constant!(pub(crate) HBASE_REST_OPTS: EnvVarName = "HBASE_REST_OPTS");
+
+constant!(HBASE_MANAGES_ZK: EnvVarName = "HBASE_MANAGES_ZK");
+constant!(HBASE_HEAPSIZE: EnvVarName = "HBASE_HEAPSIZE");
+constant!(HBASE_OPTS: EnvVarName = "HBASE_OPTS");
 
 #[derive(Snafu, Debug)]
 pub enum Error {
@@ -28,23 +31,23 @@ pub enum Error {
 /// Renders `hbase-env.sh` as `export VAR="VALUE"` lines.
 pub fn build(
     resources: &Resources<HbaseStorageConfig, NoRuntimeLimits>,
-    opts_variable: &str,
+    opts_variable: &EnvVarName,
     kerberos_enabled: bool,
     non_heap_jvm_args: String,
-    overrides: KeyValueConfigOverrides,
+    overrides: BTreeMap<EnvVarName, String>,
 ) -> Result<String, Error> {
-    let mut env: BTreeMap<String, String> = BTreeMap::new();
+    let mut env: BTreeMap<EnvVarName, String> = BTreeMap::new();
 
-    env.insert("HBASE_MANAGES_ZK".to_string(), "false".to_string());
+    env.insert(HBASE_MANAGES_ZK.clone(), "false".to_string());
     env.insert(
-        "HBASE_HEAPSIZE".to_string(),
+        HBASE_HEAPSIZE.clone(),
         construct_hbase_heapsize_env(resources).context(ConstructHbaseHeapsizeEnvSnafu)?,
     );
     env.insert(
-        "HBASE_OPTS".to_string(),
+        HBASE_OPTS.clone(),
         construct_global_jvm_args(kerberos_enabled),
     );
-    env.insert(opts_variable.to_string(), non_heap_jvm_args);
+    env.insert(opts_variable.clone(), non_heap_jvm_args);
 
     // configOverride come last
     env.extend(overrides);
@@ -71,10 +74,10 @@ mod tests {
             .resources;
         let env = build(
             merged,
-            HBASE_MASTER_OPTS,
+            &HBASE_MASTER_OPTS,
             false,
             "-Xtest".to_string(),
-            KeyValueConfigOverrides::default(),
+            BTreeMap::new(),
         )
         .unwrap();
         assert!(env.contains("export HBASE_MANAGES_ZK=\"false\""), "{env}");
@@ -90,10 +93,10 @@ mod tests {
             .resources;
         let env = build(
             merged,
-            HBASE_REGIONSERVER_OPTS,
+            &HBASE_REGIONSERVER_OPTS,
             false,
             "-Xtest".to_string(),
-            KeyValueConfigOverrides::default(),
+            BTreeMap::new(),
         )
         .unwrap();
         assert!(env.contains("export HBASE_REGIONSERVER_OPTS="), "{env}");
@@ -108,10 +111,13 @@ mod tests {
             .resources;
         let env = build(
             merged,
-            HBASE_MASTER_OPTS,
+            &HBASE_MASTER_OPTS,
             false,
             "-Xtest".to_string(),
-            [("CUSTOM_VAR", "custom_value")].into(),
+            BTreeMap::from([(
+                EnvVarName::from_str("CUSTOM_VAR").expect("valid variable name"),
+                "custom_value".to_string(),
+            )]),
         )
         .unwrap();
         assert!(env.contains("export CUSTOM_VAR=\"custom_value\""), "{env}");

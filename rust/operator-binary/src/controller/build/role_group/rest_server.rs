@@ -70,7 +70,7 @@ pub(crate) fn build<'a>(
             .jvm_argument_overrides
             .clone(),
         dns_cache_ttl_seconds: "30",
-        hbase_env_opts_variable: HBASE_REST_OPTS,
+        hbase_env_opts_variable: HBASE_REST_OPTS.clone(),
         role_hbase_site: hbase_site::rest_server_entries(),
     })
 }

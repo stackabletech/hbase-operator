@@ -63,13 +63,16 @@ pub fn minimal_hbase() -> v1alpha1::HbaseCluster {
 /// Runs the real validation pipeline over `hbase`, with a fixed dereferenced ZooKeeper connection
 /// and no OPA.
 pub fn validated_cluster_from(hbase: &v1alpha1::HbaseCluster) -> ValidatedCluster {
-    validated_cluster_with(
-        hbase,
-        DereferencedObjects {
-            zookeeper_connection_information: ZookeeperConnectionInformation::for_tests(),
-            hbase_opa_config: None,
-        },
-    )
+    validated_cluster_with(hbase, dereferenced_objects())
+}
+
+/// A fixed dereferenced ZooKeeper connection and no OPA, for tests that call `validate_cluster`
+/// directly to inspect its error.
+pub fn dereferenced_objects() -> DereferencedObjects {
+    DereferencedObjects {
+        zookeeper_connection_information: ZookeeperConnectionInformation::for_tests(),
+        hbase_opa_config: None,
+    }
 }
 
 /// Runs the real validation pipeline over `hbase` with the given dereferenced objects, for

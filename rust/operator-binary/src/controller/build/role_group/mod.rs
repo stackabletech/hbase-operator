@@ -19,18 +19,19 @@ use stackable_operator::{
     shared::time::Duration,
     utils::cluster_info::KubernetesClusterInfo,
     v2::{
-        builder::pod::container::EnvVarSet, jvm_argument_overrides::JvmArgumentOverrides,
+        builder::pod::container::{EnvVarName, EnvVarSet},
+        jvm_argument_overrides::JvmArgumentOverrides,
         types::operator::RoleGroupName,
     },
 };
 
 use crate::{
     controller::{
-        ValidatedCluster,
+        ValidatedCluster, ValidatedHbaseConfigOverrides,
         build::{container, resource},
         validate::ValidatedLogging,
     },
-    crd::{HbaseRole, HbaseStorageConfig, v1alpha1},
+    crd::{HbaseRole, HbaseStorageConfig},
 };
 
 pub(crate) mod master;
@@ -94,14 +95,14 @@ pub(crate) struct RoleGroupInputs<'a> {
     pub(crate) region_mover_opts: String,
     pub(crate) run_region_mover: bool,
     pub(crate) replicas: Option<u16>,
-    pub(crate) config_overrides: v1alpha1::HbaseConfigOverrides,
+    pub(crate) config_overrides: ValidatedHbaseConfigOverrides,
     pub(crate) env_overrides: EnvVarSet,
     pub(crate) pod_overrides: PodTemplateSpec,
     pub(crate) jvm_argument_overrides: JvmArgumentOverrides,
     /// The JVM's positive DNS cache TTL in seconds, written to `security.properties`.
     pub(crate) dns_cache_ttl_seconds: &'static str,
     /// The `hbase-env.sh` variable `bin/hbase` reads for this role's process.
-    pub(crate) hbase_env_opts_variable: &'static str,
+    pub(crate) hbase_env_opts_variable: EnvVarName,
     /// The role's own `hbase-site.xml` entries (bind addresses and ports, or the REST endpoint).
     pub(crate) role_hbase_site: BTreeMap<String, String>,
 }

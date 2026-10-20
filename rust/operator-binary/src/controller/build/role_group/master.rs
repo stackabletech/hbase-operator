@@ -74,7 +74,7 @@ pub(crate) fn build<'a>(
             .jvm_argument_overrides
             .clone(),
         dns_cache_ttl_seconds: "5",
-        hbase_env_opts_variable: HBASE_MASTER_OPTS,
+        hbase_env_opts_variable: HBASE_MASTER_OPTS.clone(),
         role_hbase_site: hbase_site::master_entries(),
     })
 }

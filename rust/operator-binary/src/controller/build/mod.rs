@@ -532,9 +532,9 @@ spec:
 
         // The hbase-site key that identifies each role's own section, and its OPTS variable.
         let own = |role: &HbaseRole| match role {
-            HbaseRole::Master => (HBASE_MASTER_IPC_ADDRESS, HBASE_MASTER_OPTS),
-            HbaseRole::RegionServer => (HBASE_REGIONSERVER_IPC_ADDRESS, HBASE_REGIONSERVER_OPTS),
-            HbaseRole::RestServer => (HBASE_REST_ENDPOINT, HBASE_REST_OPTS),
+            HbaseRole::Master => (HBASE_MASTER_IPC_ADDRESS, &*HBASE_MASTER_OPTS),
+            HbaseRole::RegionServer => (HBASE_REGIONSERVER_IPC_ADDRESS, &*HBASE_REGIONSERVER_OPTS),
+            HbaseRole::RestServer => (HBASE_REST_ENDPOINT, &*HBASE_REST_OPTS),
         };
         for role in HbaseRole::iter() {
             let data = config_map_data(&resources, &cluster, &role);

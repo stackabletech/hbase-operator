@@ -11,6 +11,7 @@ use stackable_operator::{
     product_logging::spec::Logging,
     role_utils::GenericRoleConfig,
     v2::{
+        builder::pod::container::EnvVarName,
         controller_utils::{get_cluster_name, get_namespace, get_uid},
         product_logging::framework::{
             ValidatedContainerLogConfigChoice, VectorContainerLogConfig,
@@ -27,9 +28,9 @@ use stackable_operator::{
 use crate::{
     controller::{
         MasterRoleGroupConfig, RegionServerRoleGroupConfig, RestServerRoleGroupConfig,
-        ValidatedCluster, ValidatedClusterConfig, ValidatedMasterConfig,
-        ValidatedRegionServerConfig, ValidatedRestServerConfig, ValidatedRoleConfig,
-        dereference::DereferencedObjects,
+        ValidatedCluster, ValidatedClusterConfig, ValidatedHbaseConfigOverrides,
+        ValidatedMasterConfig, ValidatedRegionServerConfig, ValidatedRestServerConfig,
+        ValidatedRoleConfig, dereference::DereferencedObjects,
     },
     crd::{
         Container, HbaseConfig, HbaseConfigFragment, HbaseRole, RegionServerConfig,
@@ -76,6 +77,16 @@ pub enum Error {
         "the Vector aggregator discovery ConfigMap name is required when the Vector agent is enabled"
     ))]
     MissingVectorAggregatorConfigMapName,
+
+    #[snafu(display(
+        "invalid hbase-env.sh variable name {variable:?} in the configOverrides of {role} role group {role_group}"
+    ))]
+    ParseHbaseEnvVariableName {
+        source: stackable_operator::v2::macros::attributed_string_type::Error,
+        role: HbaseRole,
+        role_group: String,
+        variable: String,
+    },
 }
 
 /// Validated logging configuration for the HBase and (optional) Vector container.
@@ -317,6 +328,43 @@ where
     Ok(validated)
 }
 
+/// Validates the merged `configOverrides` of one role group: the `hbase-env.sh` keys become
+/// `EnvVarName`s, the other files' overrides are passed through.
+fn validate_config_overrides(
+    hbase_role: &HbaseRole,
+    role_group_name: &str,
+    overrides: v1alpha1::HbaseConfigOverrides,
+) -> Result<ValidatedHbaseConfigOverrides, Error> {
+    let v1alpha1::HbaseConfigOverrides {
+        hbase_site_xml,
+        hbase_env_sh,
+        ssl_server_xml,
+        ssl_client_xml,
+        security_properties,
+    } = overrides;
+    let hbase_env_sh = hbase_env_sh
+        .overrides
+        .into_iter()
+        .map(|(variable, value)| {
+            let name = EnvVarName::from_str(&variable).with_context(|_| {
+                ParseHbaseEnvVariableNameSnafu {
+                    role: hbase_role.clone(),
+                    role_group: role_group_name.to_owned(),
+                    variable: variable.clone(),
+                }
+            })?;
+            Ok((name, value))
+        })
+        .collect::<Result<BTreeMap<_, _>, Error>>()?;
+    Ok(ValidatedHbaseConfigOverrides {
+        hbase_site_xml,
+        hbase_env_sh,
+        ssl_server_xml,
+        ssl_client_xml,
+        security_properties,
+    })
+}
+
 fn validate_master_role_group_configs(
     role: &Role<
         HbaseConfigFragment,
@@ -344,7 +392,11 @@ fn validate_master_role_group_configs(
                     config: merged.config,
                     logging,
                 },
-                config_overrides: merged.config_overrides,
+                config_overrides: validate_config_overrides(
+                    &HbaseRole::Master,
+                    role_group_name,
+                    merged.config_overrides,
+                )?,
                 env_overrides: merged.env_overrides,
                 cli_overrides: merged.cli_overrides,
                 pod_overrides: merged.pod_overrides,
@@ -388,7 +440,11 @@ fn validate_region_server_role_group_configs(
                     config: merged.config,
                     logging,
                 },
-                config_overrides: merged.config_overrides,
+                config_overrides: validate_config_overrides(
+                    &HbaseRole::RegionServer,
+                    role_group_name,
+                    merged.config_overrides,
+                )?,
                 env_overrides: merged.env_overrides,
                 cli_overrides: merged.cli_overrides,
                 pod_overrides: merged.pod_overrides,
@@ -432,7 +488,11 @@ fn validate_rest_server_role_group_configs(
                     config: merged.config,
                     logging,
                 },
-                config_overrides: merged.config_overrides,
+                config_overrides: validate_config_overrides(
+                    &HbaseRole::RestServer,
+                    role_group_name,
+                    merged.config_overrides,
+                )?,
                 env_overrides: merged.env_overrides,
                 cli_overrides: merged.cli_overrides,
                 pod_overrides: merged.pod_overrides,
@@ -454,7 +514,7 @@ mod tests {
     use indoc::indoc;
 
     use super::*;
-    use crate::crd::HbaseConfig;
+    use crate::{crd::HbaseConfig, test_utils};
 
     /// Role-level `envOverrides` are merged with role-group-level ones, with the role
     /// group winning on key collisions.
@@ -588,5 +648,60 @@ spec:
 
         let aggregator = ConfigMapName::from_str("vector-aggregator").expect("valid name");
         assert!(validate_logging(&logging, &Some(aggregator)).is_ok());
+    }
+
+    /// An `hbase-env.sh` override whose variable name cannot be an environment variable name
+    /// (here: it contains `=`) is rejected when the cluster is validated, naming the role, the
+    /// role group and the key, instead of being written into the file.
+    #[test]
+    fn hbase_env_override_with_invalid_variable_name_is_rejected() {
+        let hbase = test_utils::hbase_from_yaml(
+            r#"
+---
+apiVersion: hbase.stackable.tech/v1alpha1
+kind: HbaseCluster
+metadata:
+  name: hbase
+  namespace: default
+  uid: c2c8c5c0-0b5a-4b1e-9f3e-1a2b3c4d5e6f
+spec:
+  image:
+    productVersion: 2.6.3
+  clusterConfig:
+    hdfsConfigMapName: simple-hdfs
+    zookeeperConfigMapName: simple-znode
+  masters:
+    roleGroups:
+      default:
+        replicas: 1
+  regionServers:
+    configOverrides:
+      hbase-env.sh:
+        "BAD=NAME": value
+    roleGroups:
+      default:
+        replicas: 1
+"#,
+        );
+
+        let error = validate_cluster(
+            &hbase,
+            "oci.example.org",
+            test_utils::dereferenced_objects(),
+        )
+        .expect_err("an hbase-env.sh variable name containing '=' should be rejected");
+
+        assert!(
+            matches!(
+                &error,
+                Error::ParseHbaseEnvVariableName {
+                    role: HbaseRole::RegionServer,
+                    role_group,
+                    variable,
+                    ..
+                } if role_group == "default" && variable == "BAD=NAME"
+            ),
+            "{error:?}"
+        );
     }
 }

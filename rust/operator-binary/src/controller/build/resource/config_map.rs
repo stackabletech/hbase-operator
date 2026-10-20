@@ -86,7 +86,7 @@ pub(crate) fn config_map_data(inputs: &RoleGroupInputs) -> Result<BTreeMap<Strin
 
     let hbase_env_sh = hbase_env::build(
         &inputs.resources,
-        inputs.hbase_env_opts_variable,
+        &inputs.hbase_env_opts_variable,
         cluster.has_kerberos_enabled(),
         construct_role_specific_non_heap_jvm_args(cluster, &inputs.jvm_argument_overrides),
         inputs.config_overrides.hbase_env_sh.clone(),

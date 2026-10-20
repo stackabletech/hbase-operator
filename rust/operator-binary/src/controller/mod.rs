@@ -24,6 +24,8 @@ use stackable_operator::{
     kube::Resource,
     v2::{
         HasName, HasUid, NameIsValidLabelValue,
+        builder::pod::container::EnvVarName,
+        config_overrides::KeyValueConfigOverrides,
         role_group_utils::ResourceNames,
         role_utils::{self, JavaCommonConfig, RoleGroupConfig},
         types::{
@@ -96,12 +98,24 @@ pub struct ValidatedRestServerConfig {
     pub logging: ValidatedLogging,
 }
 
+/// The merged `configOverrides` of a role group, with the `hbase-env.sh` variable names
+/// validated. `EnvVarName` is Kubernetes' rule (non-empty, printable ASCII, no `=`), not the
+/// shell's: it rejects a name that would corrupt the `export` line, nothing stricter.
+#[derive(Clone, Debug)]
+pub struct ValidatedHbaseConfigOverrides {
+    pub hbase_site_xml: KeyValueConfigOverrides,
+    pub hbase_env_sh: BTreeMap<EnvVarName, String>,
+    pub ssl_server_xml: KeyValueConfigOverrides,
+    pub ssl_client_xml: KeyValueConfigOverrides,
+    pub security_properties: KeyValueConfigOverrides,
+}
+
 pub type MasterRoleGroupConfig =
-    RoleGroupConfig<ValidatedMasterConfig, JavaCommonConfig, v1alpha1::HbaseConfigOverrides>;
+    RoleGroupConfig<ValidatedMasterConfig, JavaCommonConfig, ValidatedHbaseConfigOverrides>;
 pub type RegionServerRoleGroupConfig =
-    RoleGroupConfig<ValidatedRegionServerConfig, JavaCommonConfig, v1alpha1::HbaseConfigOverrides>;
+    RoleGroupConfig<ValidatedRegionServerConfig, JavaCommonConfig, ValidatedHbaseConfigOverrides>;
 pub type RestServerRoleGroupConfig =
-    RoleGroupConfig<ValidatedRestServerConfig, JavaCommonConfig, v1alpha1::HbaseConfigOverrides>;
+    RoleGroupConfig<ValidatedRestServerConfig, JavaCommonConfig, ValidatedHbaseConfigOverrides>;
 
 /// The validated cluster: proves that config merging and validation succeeded for
 /// every role and role group before any resources are created.

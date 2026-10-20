@@ -71,7 +71,7 @@ pub(crate) fn build<'a>(
             .jvm_argument_overrides
             .clone(),
         dns_cache_ttl_seconds: "10",
-        hbase_env_opts_variable: HBASE_REGIONSERVER_OPTS,
+        hbase_env_opts_variable: HBASE_REGIONSERVER_OPTS.clone(),
         role_hbase_site: hbase_site::region_server_entries(),
     })
 }
