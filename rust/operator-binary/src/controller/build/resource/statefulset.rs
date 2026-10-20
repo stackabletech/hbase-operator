@@ -16,20 +16,14 @@ use stackable_operator::{
 };
 
 use crate::controller::build::{
-    container::{self, ContainersAndVolumes, containers_and_volumes},
-    graceful_shutdown::{self, add_graceful_shutdown_config},
-    object_meta, recommended_labels_for_role_group_resources,
-    role_group::RoleGroupInputs,
+    object_meta, recommended_labels_for_role_group_resources, role_group::RoleGroupBuilder,
     role_group_selector,
 };
 
 #[derive(Snafu, Debug)]
 pub enum Error {
-    #[snafu(display("failed to build the containers and volumes"))]
-    ContainersAndVolumes { source: container::Error },
-
-    #[snafu(display("failed to configure graceful shutdown"))]
-    GracefulShutdown { source: graceful_shutdown::Error },
+    #[snafu(display("failed to configure termination grace period"))]
+    TerminationGracePeriod { source: builder::pod::Error },
 
     #[snafu(display("failed to add needed volume"))]
     AddVolume { source: builder::pod::Error },
@@ -41,17 +35,11 @@ type Result<T, E = Error> = std::result::Result<T, E>;
 ///
 /// The [`Pod`](stackable_operator::k8s_openapi::api::core::v1::Pod)s are accessible through the
 /// corresponding headless [`Service`](stackable_operator::k8s_openapi::api::core::v1::Service).
-pub fn build_rolegroup_statefulset(inputs: &RoleGroupInputs) -> Result<StatefulSet> {
-    let cluster = inputs.cluster;
-    let hbase_role = &inputs.role;
-    let role_group_name = &inputs.role_group_name;
+pub fn build_statefulset(builder: &RoleGroupBuilder) -> Result<StatefulSet> {
+    let cluster = builder.cluster;
+    let hbase_role = &builder.role;
+    let role_group_name = &builder.role_group_name;
     let resource_names = cluster.role_group_resource_names(hbase_role, role_group_name);
-
-    let ContainersAndVolumes {
-        containers,
-        pod_volumes,
-        volume_claim_templates,
-    } = containers_and_volumes(inputs).context(ContainersAndVolumesSnafu)?;
 
     let mut pod_builder = PodBuilder::new();
 
@@ -65,11 +53,11 @@ pub fn build_rolegroup_statefulset(inputs: &RoleGroupInputs) -> Result<StatefulS
     pod_builder
         .metadata(pb_metadata)
         .image_pull_secrets_from_product_image(&cluster.image)
-        .affinity(&inputs.affinity)
+        .affinity(&builder.affinity)
         // The volumes in the order the containers mount them, which is part of the pod template
         // (pinned by `pod_volumes_keep_their_order` in `build/mod.rs`). A volume whose name
         // collides with another's is rejected here.
-        .add_volumes(pod_volumes)
+        .add_volumes(builder.pod_volumes.clone())
         .context(AddVolumeSnafu)?
         .service_account_name(
             cluster
@@ -83,16 +71,21 @@ pub fn build_rolegroup_statefulset(inputs: &RoleGroupInputs) -> Result<StatefulS
                 .build(),
         );
 
-    add_graceful_shutdown_config(inputs.graceful_shutdown_timeout, &mut pod_builder)
-        .context(GracefulShutdownSnafu)?;
+    // This must be always set by the merge mechanism, as we provide a default value,
+    // users can not disable graceful shutdown.
+    if let Some(graceful_shutdown_timeout) = builder.graceful_shutdown_timeout {
+        pod_builder
+            .termination_grace_period(&graceful_shutdown_timeout)
+            .context(TerminationGracePeriodSnafu)?;
+    }
 
-    for container in containers {
+    for container in builder.containers.clone() {
         pod_builder.add_container(container);
     }
 
     let mut pod_template = pod_builder.build_template();
 
-    pod_template.merge_from(inputs.pod_overrides.clone());
+    pod_template.merge_from(builder.pod_overrides.clone());
 
     let metadata = object_meta(
         cluster,
@@ -106,14 +99,14 @@ pub fn build_rolegroup_statefulset(inputs: &RoleGroupInputs) -> Result<StatefulS
 
     let statefulset_spec = StatefulSetSpec {
         pod_management_policy: Some("Parallel".to_string()),
-        replicas: inputs.replicas.map(i32::from),
+        replicas: builder.replicas.map(i32::from),
         selector: LabelSelector {
             match_labels: Some(statefulset_match_labels.into()),
             ..LabelSelector::default()
         },
         service_name: Some(resource_names.headless_service_name().to_string()),
         template: pod_template,
-        volume_claim_templates,
+        volume_claim_templates: builder.volume_claim_templates.clone(),
         ..StatefulSetSpec::default()
     };
 
@@ -158,7 +151,9 @@ mod tests {
         )
         .expect("inputs are valid");
 
-        let stateful_set = build_rolegroup_statefulset(&inputs).expect("the StatefulSet builds");
+        let stateful_set =
+            build_statefulset(&RoleGroupBuilder::new(inputs).expect("the role group resolves"))
+                .expect("the StatefulSet builds");
 
         let env: Vec<(String, String)> = stateful_set
             .spec
@@ -273,7 +268,7 @@ spec:
         )
         .expect("inputs are valid");
 
-        build_rolegroup_statefulset(&inputs)
+        build_statefulset(&RoleGroupBuilder::new(inputs).expect("the role group resolves"))
             .expect("the StatefulSet builds")
             .spec
             .expect("the StatefulSet has a spec")

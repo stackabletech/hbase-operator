@@ -16,7 +16,7 @@ use crate::controller::build::{
         ssl_server,
     },
     recommended_labels_for_role_group_resources,
-    role_group::RoleGroupInputs,
+    role_group::{RoleGroupBuilder, RoleGroupInputs},
 };
 
 #[derive(Snafu, Debug)]
@@ -35,17 +35,17 @@ pub enum Error {
 
 type Result<T, E = Error> = std::result::Result<T, E>;
 
-pub fn build_rolegroup_config_map(inputs: &RoleGroupInputs) -> Result<ConfigMap> {
-    let cluster = inputs.cluster;
-    let role = &inputs.role;
-    let role_group_name = &inputs.role_group_name;
+pub fn build_config_map(builder: &RoleGroupBuilder) -> Result<ConfigMap> {
+    let cluster = builder.cluster;
+    let role = &builder.role;
+    let role_group_name = &builder.role_group_name;
 
     tracing::info!(
         "Setting up ConfigMap for {role}/{role_group_name}",
         role = role.to_string()
     );
 
-    let data = config_map_data(inputs)?;
+    let data = builder.config_map_data.clone();
 
     let cm_metadata = object_meta(
         cluster,

@@ -21,21 +21,17 @@ use crate::{
         ValidatedCluster,
         build::{
             resource::{
-                config_map::build_rolegroup_config_map,
                 discovery::{self, build_discovery_config_map},
                 pdb::build_pdb,
                 rbac::{build_role_binding, build_service_account},
-                service::{build_rolegroup_metrics_service, build_rolegroup_service},
-                statefulset::build_rolegroup_statefulset,
             },
-            role_group::{master, region_server, rest_server},
+            role_group::{RoleGroupBuilder, master, region_server, rest_server},
         },
     },
     crd::HbaseRole,
 };
 
 pub mod container;
-pub mod graceful_shutdown;
 pub mod jvm;
 pub mod kerberos;
 pub mod opa;
@@ -92,33 +88,24 @@ pub fn build(
     let mut pod_disruption_budgets = vec![];
 
     for (role_group_name, rg_config) in &cluster.master_role_group_configs {
-        let inputs = master::inputs(cluster, cluster_info, role_group_name, rg_config)
+        let builder = master::inputs(cluster, cluster_info, role_group_name, rg_config)
+            .and_then(RoleGroupBuilder::new)
             .with_context(|_| RoleGroupSnafu {
                 role: master::ROLE,
                 role_group: role_group_name.clone(),
             })?;
-
-        services.push(build_rolegroup_service(
-            cluster,
-            &master::ROLE,
-            role_group_name,
-        ));
-        services.push(build_rolegroup_metrics_service(
-            cluster,
-            &master::ROLE,
-            role_group_name,
-        ));
+        services.extend(builder.build_services());
         config_maps.push(
-            build_rolegroup_config_map(&inputs)
-                .context(role_group::ConfigMapSnafu)
+            builder
+                .build_config_map()
                 .with_context(|_| RoleGroupSnafu {
                     role: master::ROLE,
                     role_group: role_group_name.clone(),
                 })?,
         );
         stateful_sets.push(
-            build_rolegroup_statefulset(&inputs)
-                .context(role_group::StatefulSetSnafu)
+            builder
+                .build_statefulset()
                 .with_context(|_| RoleGroupSnafu {
                     role: master::ROLE,
                     role_group: role_group_name.clone(),
@@ -131,33 +118,25 @@ pub fn build(
     }
 
     for (role_group_name, rg_config) in &cluster.region_server_role_group_configs {
-        let inputs = region_server::inputs(cluster, cluster_info, role_group_name, rg_config)
+        let builder = region_server::inputs(cluster, cluster_info, role_group_name, rg_config)
+            .and_then(RoleGroupBuilder::new)
             .with_context(|_| RoleGroupSnafu {
                 role: region_server::ROLE,
                 role_group: role_group_name.clone(),
             })?;
 
-        services.push(build_rolegroup_service(
-            cluster,
-            &region_server::ROLE,
-            role_group_name,
-        ));
-        services.push(build_rolegroup_metrics_service(
-            cluster,
-            &region_server::ROLE,
-            role_group_name,
-        ));
+        services.extend(builder.build_services());
         config_maps.push(
-            build_rolegroup_config_map(&inputs)
-                .context(role_group::ConfigMapSnafu)
+            builder
+                .build_config_map()
                 .with_context(|_| RoleGroupSnafu {
                     role: region_server::ROLE,
                     role_group: role_group_name.clone(),
                 })?,
         );
         stateful_sets.push(
-            build_rolegroup_statefulset(&inputs)
-                .context(role_group::StatefulSetSnafu)
+            builder
+                .build_statefulset()
                 .with_context(|_| RoleGroupSnafu {
                     role: region_server::ROLE,
                     role_group: role_group_name.clone(),
@@ -174,33 +153,25 @@ pub fn build(
     }
 
     for (role_group_name, rg_config) in &cluster.rest_server_role_group_configs {
-        let inputs = rest_server::inputs(cluster, cluster_info, role_group_name, rg_config)
+        let builder = rest_server::inputs(cluster, cluster_info, role_group_name, rg_config)
+            .and_then(RoleGroupBuilder::new)
             .with_context(|_| RoleGroupSnafu {
                 role: rest_server::ROLE,
                 role_group: role_group_name.clone(),
             })?;
 
-        services.push(build_rolegroup_service(
-            cluster,
-            &rest_server::ROLE,
-            role_group_name,
-        ));
-        services.push(build_rolegroup_metrics_service(
-            cluster,
-            &rest_server::ROLE,
-            role_group_name,
-        ));
+        services.extend(builder.build_services());
         config_maps.push(
-            build_rolegroup_config_map(&inputs)
-                .context(role_group::ConfigMapSnafu)
+            builder
+                .build_config_map()
                 .with_context(|_| RoleGroupSnafu {
                     role: rest_server::ROLE,
                     role_group: role_group_name.clone(),
                 })?,
         );
         stateful_sets.push(
-            build_rolegroup_statefulset(&inputs)
-                .context(role_group::StatefulSetSnafu)
+            builder
+                .build_statefulset()
                 .with_context(|_| RoleGroupSnafu {
                     role: rest_server::ROLE,
                     role_group: role_group_name.clone(),
