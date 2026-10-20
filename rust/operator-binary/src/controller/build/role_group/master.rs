@@ -1,3 +1,6 @@
+//! Resolves one master role group into its RoleGroupBuilder. Masters get their
+//! listener from an ephemeral pod volume and do not run the region mover.
+
 use snafu::{OptionExt, ResultExt};
 use stackable_operator::{
     utils::cluster_info::KubernetesClusterInfo, v2::types::operator::RoleGroupName,
@@ -12,7 +15,7 @@ use crate::{
             resource::listener::build_listener_volume,
             role_group::{
                 Error, ListenerPlacement, ListenerSnafu, MissingSecretLifetimeSnafu,
-                RoleGroupInputs,
+                RoleGroupBuilder, RoleGroupInputs,
             },
         },
     },
@@ -22,12 +25,12 @@ use crate::{
 pub(crate) const ROLE: HbaseRole = HbaseRole::Master;
 
 /// The inputs of one master role group.
-pub(crate) fn inputs<'a>(
+pub(crate) fn build<'a>(
     cluster: &'a ValidatedCluster,
     cluster_info: &'a KubernetesClusterInfo,
     role_group_name: &RoleGroupName,
     rg_config: &MasterRoleGroupConfig,
-) -> Result<RoleGroupInputs<'a>, Error> {
+) -> Result<RoleGroupBuilder<'a>, Error> {
     let HbaseConfig {
         hbase_rootdir,
         resources,
@@ -47,7 +50,7 @@ pub(crate) fn inputs<'a>(
         build_listener_volume(listener_class, &recommended_labels).context(ListenerSnafu)?,
     );
 
-    Ok(RoleGroupInputs {
+    RoleGroupBuilder::new(RoleGroupInputs {
         cluster,
         cluster_info,
         role: ROLE,

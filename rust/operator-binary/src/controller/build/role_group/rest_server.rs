@@ -10,7 +10,10 @@ use crate::{
             properties::{hbase_env::HBASE_REST_OPTS, hbase_site},
             recommended_labels_for_unversioned_role_group_resources,
             resource::listener::build_listener_pvc,
-            role_group::{Error, ListenerPlacement, MissingSecretLifetimeSnafu, RoleGroupInputs},
+            role_group::{
+                Error, ListenerPlacement, MissingSecretLifetimeSnafu, RoleGroupBuilder,
+                RoleGroupInputs,
+            },
         },
     },
     crd::{HbaseConfig, HbaseRole},
@@ -19,12 +22,12 @@ use crate::{
 pub(crate) const ROLE: HbaseRole = HbaseRole::RestServer;
 
 /// The inputs of one rest server role group.
-pub(crate) fn inputs<'a>(
+pub(crate) fn build<'a>(
     cluster: &'a ValidatedCluster,
     cluster_info: &'a KubernetesClusterInfo,
     role_group_name: &RoleGroupName,
     rg_config: &RestServerRoleGroupConfig,
-) -> Result<RoleGroupInputs<'a>, Error> {
+) -> Result<RoleGroupBuilder<'a>, Error> {
     let HbaseConfig {
         hbase_rootdir,
         resources,
@@ -43,7 +46,7 @@ pub(crate) fn inputs<'a>(
     let listener =
         ListenerPlacement::ClaimTemplate(build_listener_pvc(listener_class, &unversioned_labels));
 
-    Ok(RoleGroupInputs {
+    RoleGroupBuilder::new(RoleGroupInputs {
         cluster,
         cluster_info,
         role: ROLE,

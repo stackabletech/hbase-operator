@@ -6,6 +6,10 @@ use std::marker::PhantomData;
 use snafu::{ResultExt, Snafu};
 use stackable_operator::{
     builder::meta::ObjectMetaBuilder,
+    k8s_openapi::api::{
+        apps::v1::StatefulSet,
+        core::v1::{ConfigMap, Service},
+    },
     kvp::Labels,
     utils::cluster_info::KubernetesClusterInfo,
     v2::{
@@ -73,6 +77,25 @@ pub enum Error {
     Discovery { source: discovery::Error },
 }
 
+/// The resources of the role groups, in the order the role-group loops of [`build`] add them.
+#[derive(Default)]
+struct RoleGroupResources {
+    services: Vec<Service>,
+    config_maps: Vec<ConfigMap>,
+    stateful_sets: Vec<StatefulSet>,
+}
+
+impl RoleGroupResources {
+    /// Adds the headless and metrics Services, the ConfigMap and the StatefulSet of one role
+    /// group.
+    fn add(&mut self, builder: &RoleGroupBuilder) -> Result<(), role_group::Error> {
+        self.services.extend(builder.build_services());
+        self.config_maps.push(builder.build_config_map()?);
+        self.stateful_sets.push(builder.build_statefulset()?);
+        Ok(())
+    }
+}
+
 /// Builds every Kubernetes resource for the given validated cluster.
 ///
 /// Does not need a Kubernetes client: every reference to another Kubernetes resource is already
@@ -82,35 +105,16 @@ pub fn build(
     cluster: &ValidatedCluster,
     cluster_info: &KubernetesClusterInfo,
 ) -> Result<KubernetesResources<Prepared>, Error> {
-    let mut stateful_sets = vec![];
-    let mut services = vec![];
-    let mut config_maps = vec![];
+    let mut built = RoleGroupResources::default();
     let mut pod_disruption_budgets = vec![];
 
     for (role_group_name, rg_config) in &cluster.master_role_group_configs {
-        let builder = master::inputs(cluster, cluster_info, role_group_name, rg_config)
-            .and_then(RoleGroupBuilder::new)
+        master::build(cluster, cluster_info, role_group_name, rg_config)
+            .and_then(|builder| built.add(&builder))
             .with_context(|_| RoleGroupSnafu {
                 role: master::ROLE,
                 role_group: role_group_name.clone(),
             })?;
-        services.extend(builder.build_services());
-        config_maps.push(
-            builder
-                .build_config_map()
-                .with_context(|_| RoleGroupSnafu {
-                    role: master::ROLE,
-                    role_group: role_group_name.clone(),
-                })?,
-        );
-        stateful_sets.push(
-            builder
-                .build_statefulset()
-                .with_context(|_| RoleGroupSnafu {
-                    role: master::ROLE,
-                    role_group: role_group_name.clone(),
-                })?,
-        );
     }
 
     if let Some(pdb) = build_pdb(&cluster.master_config.pdb, cluster, &master::ROLE) {
@@ -118,30 +122,12 @@ pub fn build(
     }
 
     for (role_group_name, rg_config) in &cluster.region_server_role_group_configs {
-        let builder = region_server::inputs(cluster, cluster_info, role_group_name, rg_config)
-            .and_then(RoleGroupBuilder::new)
+        region_server::build(cluster, cluster_info, role_group_name, rg_config)
+            .and_then(|builder| built.add(&builder))
             .with_context(|_| RoleGroupSnafu {
                 role: region_server::ROLE,
                 role_group: role_group_name.clone(),
             })?;
-
-        services.extend(builder.build_services());
-        config_maps.push(
-            builder
-                .build_config_map()
-                .with_context(|_| RoleGroupSnafu {
-                    role: region_server::ROLE,
-                    role_group: role_group_name.clone(),
-                })?,
-        );
-        stateful_sets.push(
-            builder
-                .build_statefulset()
-                .with_context(|_| RoleGroupSnafu {
-                    role: region_server::ROLE,
-                    role_group: role_group_name.clone(),
-                })?,
-        );
     }
 
     if let Some(pdb) = build_pdb(
@@ -153,30 +139,12 @@ pub fn build(
     }
 
     for (role_group_name, rg_config) in &cluster.rest_server_role_group_configs {
-        let builder = rest_server::inputs(cluster, cluster_info, role_group_name, rg_config)
-            .and_then(RoleGroupBuilder::new)
+        rest_server::build(cluster, cluster_info, role_group_name, rg_config)
+            .and_then(|builder| built.add(&builder))
             .with_context(|_| RoleGroupSnafu {
                 role: rest_server::ROLE,
                 role_group: role_group_name.clone(),
             })?;
-
-        services.extend(builder.build_services());
-        config_maps.push(
-            builder
-                .build_config_map()
-                .with_context(|_| RoleGroupSnafu {
-                    role: rest_server::ROLE,
-                    role_group: role_group_name.clone(),
-                })?,
-        );
-        stateful_sets.push(
-            builder
-                .build_statefulset()
-                .with_context(|_| RoleGroupSnafu {
-                    role: rest_server::ROLE,
-                    role_group: role_group_name.clone(),
-                })?,
-        );
     }
 
     if let Some(rest_server_config) = &cluster.rest_server_config
@@ -184,6 +152,12 @@ pub fn build(
     {
         pod_disruption_budgets.push(pdb);
     }
+
+    let RoleGroupResources {
+        services,
+        mut config_maps,
+        stateful_sets,
+    } = built;
 
     // The role-level discovery ConfigMap advertises the cluster's connection information; it is
     // deterministic (derived only from the validated cluster and static cluster info).

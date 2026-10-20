@@ -143,7 +143,7 @@ mod tests {
         let cluster = test_utils::validated_cluster_from(&hbase);
         let role_group_name = test_utils::role_group_name("default");
         let cluster_info = &test_utils::cluster_info();
-        let inputs = master::inputs(
+        let builder = master::build(
             &cluster,
             cluster_info,
             &role_group_name,
@@ -151,9 +151,7 @@ mod tests {
         )
         .expect("inputs are valid");
 
-        let stateful_set =
-            build_statefulset(&RoleGroupBuilder::new(inputs).expect("the role group resolves"))
-                .expect("the StatefulSet builds");
+        let stateful_set = build_statefulset(&builder).expect("the StatefulSet builds");
 
         let env: Vec<(String, String)> = stateful_set
             .spec
@@ -260,7 +258,7 @@ spec:
         let cluster = test_utils::validated_cluster_from(&hbase);
         let role_group_name = test_utils::role_group_name("default");
         let cluster_info = &test_utils::cluster_info();
-        let inputs = master::inputs(
+        let builder = master::build(
             &cluster,
             cluster_info,
             &role_group_name,
@@ -268,7 +266,7 @@ spec:
         )
         .expect("inputs are valid");
 
-        build_statefulset(&RoleGroupBuilder::new(inputs).expect("the role group resolves"))
+        build_statefulset(&builder)
             .expect("the StatefulSet builds")
             .spec
             .expect("the StatefulSet has a spec")

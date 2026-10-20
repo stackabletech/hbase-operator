@@ -12,7 +12,7 @@ use crate::{
             resource::listener::build_listener_volume,
             role_group::{
                 Error, ListenerPlacement, ListenerSnafu, MissingSecretLifetimeSnafu,
-                RoleGroupInputs,
+                RoleGroupBuilder, RoleGroupInputs,
             },
         },
     },
@@ -22,12 +22,12 @@ use crate::{
 pub(crate) const ROLE: HbaseRole = HbaseRole::RegionServer;
 
 /// The inputs of one region server role group.
-pub(crate) fn inputs<'a>(
+pub(crate) fn build<'a>(
     cluster: &'a ValidatedCluster,
     cluster_info: &'a KubernetesClusterInfo,
     role_group_name: &RoleGroupName,
     rg_config: &RegionServerRoleGroupConfig,
-) -> Result<RoleGroupInputs<'a>, Error> {
+) -> Result<RoleGroupBuilder<'a>, Error> {
     let RegionServerConfig {
         hbase_rootdir,
         resources,
@@ -47,7 +47,7 @@ pub(crate) fn inputs<'a>(
         build_listener_volume(listener_class, &recommended_labels).context(ListenerSnafu)?,
     );
 
-    Ok(RoleGroupInputs {
+    RoleGroupBuilder::new(RoleGroupInputs {
         cluster,
         cluster_info,
         role: ROLE,
