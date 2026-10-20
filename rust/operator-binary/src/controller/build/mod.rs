@@ -367,29 +367,6 @@ spec:
         )
     }
 
-    /// Not a test: dumps every built resource as JSON to `$RENDER_DUMP`, so the refactoring can be
-    /// diffed against the baseline. Run with `cargo test dump_rendered_resources -- --ignored`.
-    #[test]
-    #[ignore = "not a test: writes the rendered resources to $RENDER_DUMP for the render diff"]
-    fn dump_rendered_resources() {
-        let path = std::env::var("RENDER_DUMP").expect("RENDER_DUMP should be set");
-        let resources =
-            build(&rich_validated_cluster(), &test_utils::cluster_info()).expect("build succeeds");
-        let dump = serde_json::json!({
-            "services": resources.services,
-            "config_maps": resources.config_maps,
-            "pod_disruption_budgets": resources.pod_disruption_budgets,
-            "stateful_sets": resources.stateful_sets,
-            "service_accounts": resources.service_accounts,
-            "role_bindings": resources.role_bindings,
-        });
-        std::fs::write(
-            path,
-            serde_json::to_string_pretty(&dump).expect("the resources should serialise"),
-        )
-        .expect("the dump should be written");
-    }
-
     /// The `default` role group's StatefulSet spec for `role`, found by the name the builder
     /// derives from the cluster.
     fn stateful_set_spec<'a>(
