@@ -263,15 +263,14 @@ impl Deref for HbaseRole {
 }
 
 impl HbaseRole {
-    const DEFAULT_MASTER_GRACEFUL_SHUTDOWN_TIMEOUT: Duration = Duration::from_minutes_unchecked(20);
-    // Auto TLS certificate lifetime
-    const DEFAULT_MASTER_SECRET_LIFETIME: Duration = Duration::from_days_unchecked(1);
-    const DEFAULT_REGION_SECRET_LIFETIME: Duration = Duration::from_days_unchecked(1);
-    const DEFAULT_REGION_SERVER_GRACEFUL_SHUTDOWN_TIMEOUT: Duration =
+    pub(crate) const DEFAULT_MASTER_GRACEFUL_SHUTDOWN_TIMEOUT: Duration =
+        Duration::from_minutes_unchecked(20);
+    pub(crate) const DEFAULT_REGION_SERVER_GRACEFUL_SHUTDOWN_TIMEOUT: Duration =
         Duration::from_minutes_unchecked(60);
-    const DEFAULT_REST_SECRET_LIFETIME: Duration = Duration::from_days_unchecked(1);
-    const DEFAULT_REST_SERVER_GRACEFUL_SHUTDOWN_TIMEOUT: Duration =
+    pub(crate) const DEFAULT_REST_SERVER_GRACEFUL_SHUTDOWN_TIMEOUT: Duration =
         Duration::from_minutes_unchecked(5);
+    /// The lifetime requested for auto-TLS certificates, the same for every role.
+    const DEFAULT_SECRET_LIFETIME: Duration = Duration::from_days_unchecked(1);
 }
 
 fn default_resources(role: &HbaseRole) -> ResourcesFragment<HbaseStorageConfig, NoRuntimeLimits> {
@@ -314,30 +313,22 @@ fn default_resources(role: &HbaseRole) -> ResourcesFragment<HbaseStorageConfig, 
 
 impl HbaseConfigFragment {
     /// The operator defaults for the `masters` and `restServers` roles, which share this config
-    /// fragment (`regionServers` use [`RegionServerConfigFragment::default_config`]).
+    /// fragment (`regionServers` use [`RegionServerConfigFragment::default_config`]). The caller
+    /// passes the role's graceful shutdown timeout; `role` selects the resources and affinity.
     pub fn default_config(
         role: &HbaseRole,
+        graceful_shutdown_timeout: Duration,
         cluster_name: &str,
         hdfs_discovery_cm_name: &str,
         opa_config: Option<&OpaConfig>,
     ) -> Self {
-        let graceful_shutdown_timeout = match role {
-            HbaseRole::Master => HbaseRole::DEFAULT_MASTER_GRACEFUL_SHUTDOWN_TIMEOUT,
-            HbaseRole::RegionServer => HbaseRole::DEFAULT_REGION_SERVER_GRACEFUL_SHUTDOWN_TIMEOUT,
-            HbaseRole::RestServer => HbaseRole::DEFAULT_REST_SERVER_GRACEFUL_SHUTDOWN_TIMEOUT,
-        };
-        let requested_secret_lifetime = match role {
-            HbaseRole::Master => HbaseRole::DEFAULT_MASTER_SECRET_LIFETIME,
-            HbaseRole::RegionServer => HbaseRole::DEFAULT_REGION_SECRET_LIFETIME,
-            HbaseRole::RestServer => HbaseRole::DEFAULT_REST_SECRET_LIFETIME,
-        };
         HbaseConfigFragment {
             hbase_rootdir: Some(default_hbase_rootdir()),
             resources: default_resources(role),
             logging: product_logging::spec::default_logging(),
             affinity: get_affinity(cluster_name, role, hdfs_discovery_cm_name, opa_config),
             graceful_shutdown_timeout: Some(graceful_shutdown_timeout),
-            requested_secret_lifetime: Some(requested_secret_lifetime),
+            requested_secret_lifetime: Some(HbaseRole::DEFAULT_SECRET_LIFETIME),
             listener_class: Some(
                 ListenerClassName::from_str(DEFAULT_LISTENER_CLASS)
                     .expect("DEFAULT_LISTENER_CLASS is a valid listener class name"),
@@ -368,7 +359,7 @@ impl RegionServerConfigFragment {
                 ack: Some(true),
                 cli_opts: None,
             },
-            requested_secret_lifetime: Some(HbaseRole::DEFAULT_REGION_SECRET_LIFETIME),
+            requested_secret_lifetime: Some(HbaseRole::DEFAULT_SECRET_LIFETIME),
             listener_class: Some(
                 ListenerClassName::from_str(DEFAULT_LISTENER_CLASS)
                     .expect("DEFAULT_LISTENER_CLASS is a valid listener class name"),

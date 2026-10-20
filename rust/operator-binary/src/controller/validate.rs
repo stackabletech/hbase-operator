@@ -175,6 +175,7 @@ pub fn validate_cluster(
         masters,
         &HbaseConfigFragment::default_config(
             &HbaseRole::Master,
+            HbaseRole::DEFAULT_MASTER_GRACEFUL_SHUTDOWN_TIMEOUT,
             &cluster_name,
             hdfs_discovery_cm_name,
             opa_config,
@@ -225,6 +226,7 @@ pub fn validate_cluster(
             rest_servers,
             &HbaseConfigFragment::default_config(
                 &HbaseRole::RestServer,
+                HbaseRole::DEFAULT_REST_SERVER_GRACEFUL_SHUTDOWN_TIMEOUT,
                 &cluster_name,
                 hdfs_discovery_cm_name,
                 opa_config,
@@ -570,6 +572,7 @@ spec:
         let role_group = role.role_groups.get("default").unwrap();
         let default_config = HbaseConfigFragment::default_config(
             &HbaseRole::Master,
+            HbaseRole::DEFAULT_MASTER_GRACEFUL_SHUTDOWN_TIMEOUT,
             &hbase.name_any(),
             hbase.spec.cluster_config.hdfs_config_map_name.as_ref(),
             None,
