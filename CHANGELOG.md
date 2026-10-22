@@ -36,6 +36,7 @@
 - test: Update OPA to 1.20.2 in integration tests ([#823]).
 - All pods now set `securityContext.seccompProfile.type` to `RuntimeDefault` ([#824]).
 - Replace the unmaintained `serde_yaml` with `yaml_serde` ([#824]).
+- The operator Deployment runs with a restricted security context and a read-only root filesystem, so it can be deployed into namespaces that enforce the `restricted` Pod Security Standard ([#829]).
 
 ### Fixed
 
@@ -67,6 +68,7 @@
 [#823]: https://github.com/stackabletech/hbase-operator/pull/823
 [#824]: https://github.com/stackabletech/hbase-operator/pull/824
 [#825]: https://github.com/stackabletech/hbase-operator/pull/825
+[#829]: https://github.com/stackabletech/hbase-operator/pull/829
 
 ## [26.7.0] - 2026-07-21
 
