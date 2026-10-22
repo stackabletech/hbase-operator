@@ -24,8 +24,10 @@ use stackable_operator::{
     kube::Resource,
     v2::{
         HasName, HasUid, NameIsValidLabelValue,
+        builder::pod::container::EnvVarName,
+        config_overrides::KeyValueConfigOverrides,
         role_group_utils::ResourceNames,
-        role_utils,
+        role_utils::{self, JavaCommonConfig, RoleGroupConfig},
         types::{
             kubernetes::{ConfigMapName, NamespaceName, SecretClassName, Uid},
             operator::{ClusterName, ControllerName, OperatorName, ProductName, ProductVersion},
@@ -34,8 +36,11 @@ use stackable_operator::{
 };
 
 use crate::{
-    controller::{build::opa::HbaseOpaConfig, zookeeper::ZookeeperConnectionInformation},
-    crd::{APP_NAME, AnyServiceConfig, HBASE_OPERATOR_NAME, HbaseRole, v1alpha1},
+    controller::{
+        build::opa::HbaseOpaConfig, validate::ValidatedLogging,
+        zookeeper::ZookeeperConnectionInformation,
+    },
+    crd::{APP_NAME, HBASE_OPERATOR_NAME, HbaseConfig, HbaseRole, RegionServerConfig, v1alpha1},
 };
 
 pub const HBASE_CONTROLLER_NAME: &str = "hbasecluster";
@@ -46,11 +51,17 @@ constant!(PRODUCT_NAME: ProductName = APP_NAME);
 constant!(OPERATOR_NAME: OperatorName = HBASE_OPERATOR_NAME);
 constant!(CONTROLLER_NAME: ControllerName = HBASE_CONTROLLER_NAME);
 
+pub(crate) const DEFAULT_REPLICAS: u16 = 1;
+
 /// Marker for prepared Kubernetes resources which are not applied yet.
 pub struct Prepared;
 
 /// Marker for applied Kubernetes resources.
 pub struct Applied;
+
+pub(crate) fn replicas_or_default(replicas: Option<u16>) -> u16 {
+    replicas.unwrap_or(DEFAULT_REPLICAS)
+}
 
 /// The complete set of Kubernetes resources built for a [`ValidatedCluster`], ready to be applied.
 ///
@@ -69,6 +80,42 @@ pub struct KubernetesResources<T> {
     pub role_bindings: Vec<RoleBinding>,
     pub status: PhantomData<T>,
 }
+
+/// A master role group's validated config together with its validated logging.
+#[derive(Clone, Debug)]
+pub struct ValidatedMasterConfig {
+    pub config: HbaseConfig,
+    pub logging: ValidatedLogging,
+}
+#[derive(Clone, Debug)]
+pub struct ValidatedRegionServerConfig {
+    pub config: RegionServerConfig,
+    pub logging: ValidatedLogging,
+}
+#[derive(Clone, Debug)]
+pub struct ValidatedRestServerConfig {
+    pub config: HbaseConfig,
+    pub logging: ValidatedLogging,
+}
+
+/// The merged `configOverrides` of a role group, with the `hbase-env.sh` variable names
+/// validated. `EnvVarName` is Kubernetes' rule (non-empty, printable ASCII, no `=`), not the
+/// shell's: it rejects a name that would corrupt the `export` line, nothing stricter.
+#[derive(Clone, Debug)]
+pub struct ValidatedHbaseConfigOverrides {
+    pub hbase_site_xml: KeyValueConfigOverrides,
+    pub hbase_env_sh: BTreeMap<EnvVarName, String>,
+    pub ssl_server_xml: KeyValueConfigOverrides,
+    pub ssl_client_xml: KeyValueConfigOverrides,
+    pub security_properties: KeyValueConfigOverrides,
+}
+
+pub type MasterRoleGroupConfig =
+    RoleGroupConfig<ValidatedMasterConfig, JavaCommonConfig, ValidatedHbaseConfigOverrides>;
+pub type RegionServerRoleGroupConfig =
+    RoleGroupConfig<ValidatedRegionServerConfig, JavaCommonConfig, ValidatedHbaseConfigOverrides>;
+pub type RestServerRoleGroupConfig =
+    RoleGroupConfig<ValidatedRestServerConfig, JavaCommonConfig, ValidatedHbaseConfigOverrides>;
 
 /// The validated cluster: proves that config merging and validation succeeded for
 /// every role and role group before any resources are created.
@@ -90,41 +137,37 @@ pub struct ValidatedCluster {
     /// value.
     pub product_version: ProductVersion,
     pub cluster_config: ValidatedClusterConfig,
-    pub role_group_configs: BTreeMap<HbaseRole, BTreeMap<RoleGroupName, HbaseRoleGroupConfig>>,
-    pub role_configs: BTreeMap<HbaseRole, ValidatedRoleConfig>,
+    /// The masters' role-level config. Masters are required.
+    pub master_config: ValidatedRoleConfig,
+    /// The validated config of every master role group, keyed by role group name.
+    pub master_role_group_configs: BTreeMap<RoleGroupName, MasterRoleGroupConfig>,
+    pub region_server_config: ValidatedRoleConfig,
+    pub region_server_role_group_configs: BTreeMap<RoleGroupName, RegionServerRoleGroupConfig>,
+    /// The rest servers' role-level config, or `None` if the role is absent.
+    pub rest_server_config: Option<ValidatedRoleConfig>,
+    /// Empty if the role is absent.
+    pub rest_server_role_group_configs: BTreeMap<RoleGroupName, RestServerRoleGroupConfig>,
 }
 
 impl ValidatedCluster {
-    #[allow(clippy::too_many_arguments)]
-    pub fn new(
-        name: ClusterName,
-        namespace: NamespaceName,
-        uid: Uid,
-        image: ResolvedProductImage,
-        cluster_config: ValidatedClusterConfig,
-        role_group_configs: BTreeMap<HbaseRole, BTreeMap<RoleGroupName, HbaseRoleGroupConfig>>,
-        role_configs: BTreeMap<HbaseRole, ValidatedRoleConfig>,
-    ) -> Self {
+    pub(crate) fn object_meta(
+        name: &ClusterName,
+        namespace: &NamespaceName,
+        uid: &Uid,
+    ) -> ObjectMeta {
+        ObjectMeta {
+            name: Some(name.to_string()),
+            namespace: Some(namespace.to_string()),
+            uid: Some(uid.to_string()),
+            ..ObjectMeta::default()
+        }
+    }
+
+    pub(crate) fn product_version(image: &ResolvedProductImage) -> ProductVersion {
         // `app_version_label_value` is constructed to be a valid label value, so it is also a
         // valid `ProductVersion`.
-        let product_version = ProductVersion::from_str(&image.app_version_label_value)
-            .expect("the app version label value is a valid product version");
-        Self {
-            metadata: ObjectMeta {
-                name: Some(name.to_string()),
-                namespace: Some(namespace.to_string()),
-                uid: Some(uid.to_string()),
-                ..ObjectMeta::default()
-            },
-            name,
-            namespace,
-            uid,
-            image,
-            product_version,
-            cluster_config,
-            role_group_configs,
-            role_configs,
-        }
+        ProductVersion::from_str(&image.app_version_label_value)
+            .expect("the app version label value is a valid product version")
     }
 
     /// Type-safe names for the per-cluster RBAC resources: the ServiceAccount shared by all
@@ -229,25 +272,6 @@ pub struct ValidatedClusterConfig {
 pub struct ValidatedRoleConfig {
     pub pdb: stackable_operator::commons::pdb::PdbConfig,
 }
-
-/// The validated per-rolegroup product configuration: the merged CRD config and the resolved
-/// logging settings. The merged (role <- role group) `configOverrides`, `envOverrides` and
-/// `podOverrides` live on the enclosing [`HbaseRoleGroupConfig`] (the `RoleGroupConfig` wrapper),
-/// not here.
-#[derive(Clone, Debug)]
-pub struct ValidatedHbaseConfig {
-    /// The merged, role-specific product config.
-    pub config: AnyServiceConfig,
-    /// The validated logging configuration (HBase + optional Vector container), resolved up-front
-    /// during validation.
-    pub logging: validate::ValidatedLogging,
-}
-
-pub type HbaseRoleGroupConfig = stackable_operator::v2::role_utils::RoleGroupConfig<
-    ValidatedHbaseConfig,
-    stackable_operator::v2::role_utils::JavaCommonConfig,
-    v1alpha1::HbaseConfigOverrides,
->;
 
 #[cfg(test)]
 mod tests {

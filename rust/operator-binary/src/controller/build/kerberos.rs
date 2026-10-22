@@ -2,16 +2,13 @@ use std::{collections::BTreeMap, str::FromStr};
 
 use snafu::{ResultExt, Snafu};
 use stackable_operator::{
-    builder::{
-        self,
-        pod::{
-            PodBuilder,
-            container::ContainerBuilder,
-            volume::{SecretFormat, SecretOperatorVolumeSourceBuilder, VolumeBuilder},
-        },
+    builder::pod::{
+        container::ContainerBuilder,
+        volume::{SecretFormat, SecretOperatorVolumeSourceBuilder, VolumeBuilder},
     },
     commons::secret_class::SecretClassVolumeProvisionParts,
     constant,
+    k8s_openapi::api::core::v1::Volume,
     shared::time::Duration,
     utils::cluster_info::KubernetesClusterInfo,
     v2::{
@@ -31,7 +28,7 @@ pub const STACKABLE_KERBEROS_DIR: &str = "/stackable/kerberos";
 /// `KRB5_CONFIG` env var) and by the JVM args builder.
 pub const KRB5_CONFIG_PATH: &str = const_format::concatcp!(STACKABLE_KERBEROS_DIR, "/krb5.conf");
 // Name of the Kerberos secret volume.
-constant!(KERBEROS_VOLUME_NAME: VolumeName = "kerberos");
+constant!(pub(crate) KERBEROS_VOLUME_NAME: VolumeName = "kerberos");
 // The env var pointing the Kerberos libraries at the rendered `krb5.conf`.
 constant!(KRB5_CONFIG_ENV: EnvVarName = "KRB5_CONFIG");
 /// The RPC/data-transfer quality-of-protection level used when Kerberos is enabled.
@@ -48,9 +45,6 @@ pub enum Error {
     BuildTlsSecretVolumeSource {
         source: stackable_operator::builder::pod::volume::SecretOperatorVolumeSourceBuilderError,
     },
-
-    #[snafu(display("failed to add needed volume"))]
-    AddVolume { source: builder::pod::Error },
 }
 
 /// The `hbase-site.xml` Kerberos properties for `cluster`, gated on Kerberos being enabled
@@ -224,22 +218,23 @@ pub fn kerberos_ssl_client_settings() -> BTreeMap<String, String> {
     truststore_settings("client")
 }
 
-/// Adds the Kerberos keytab and TLS keystore volumes to the [`PodBuilder`] and their mounts to the
+/// Adds the Kerberos keytab and TLS keystore volumes to the volume collection and their mounts to the
 /// [`ContainerBuilder`], for whichever of the two secret classes are configured.
 ///
 /// # Panics
 ///
 /// Panics if the volume mounts cannot be added to the container builder. Only call this on a
 /// container builder whose mount paths are still distinct from the ones added here.
-pub fn add_kerberos_pod_config(
+pub fn mount_kerberos_volumes(
     cluster: &ValidatedCluster,
     metrics_service_name: &str,
     cb: &mut ContainerBuilder,
-    pb: &mut PodBuilder,
     requested_secret_lifetime: Duration,
-) -> Result<(), Error> {
+) -> Result<Vec<Volume>, Error> {
+    let mut volumes = Vec::new();
+
     if let Some(kerberos_secret_class) = &cluster.cluster_config.kerberos_secret_class {
-        // Mount keytab
+        // Add keytab
         let kerberos_secret_operator_volume = SecretOperatorVolumeSourceBuilder::new(
             kerberos_secret_class.clone(),
             // We need both public (krb5.conf) and private (keytab) parts.
@@ -250,19 +245,18 @@ pub fn add_kerberos_pod_config(
         .with_kerberos_service_name("HTTP")
         .build()
         .context(BuildKerberosSecretVolumeSourceSnafu)?;
-        pb.add_volume(
+        volumes.push(
             VolumeBuilder::new(&*KERBEROS_VOLUME_NAME)
                 .ephemeral(kerberos_secret_operator_volume)
                 .build(),
-        )
-        .context(AddVolumeSnafu)?;
+        );
         cb.add_volume_mount(&*KERBEROS_VOLUME_NAME, STACKABLE_KERBEROS_DIR)
             .expect("The mount paths are statically defined and there should be no duplicates.");
     }
 
     if let Some(https_secret_class) = &cluster.cluster_config.https_secret_class {
-        // Mount TLS keystore
-        pb.add_volume(
+        // Add TLS keystore
+        volumes.push(
             VolumeBuilder::new(&*TLS_STORE_VOLUME_NAME)
                 .ephemeral(
                     SecretOperatorVolumeSourceBuilder::new(
@@ -282,12 +276,11 @@ pub fn add_kerberos_pod_config(
                     .context(BuildTlsSecretVolumeSourceSnafu)?,
                 )
                 .build(),
-        )
-        .context(AddVolumeSnafu)?;
+        );
         cb.add_volume_mount(&*TLS_STORE_VOLUME_NAME, TLS_STORE_DIR)
             .expect("The mount paths are statically defined and there should be no duplicates.");
     }
-    Ok(())
+    Ok(volumes)
 }
 
 /// The environment variables the Kerberos configuration requires on the HBase container, or an

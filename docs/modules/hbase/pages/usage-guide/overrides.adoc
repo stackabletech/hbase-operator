@@ -16,6 +16,8 @@ For a role or role group, at the same level of `config`, you can specify: `confi
 * `ssl-client.xml`
 * `security.properties`
 
+Variable names in `hbase-env.sh` overrides must be valid environment variable names (non-empty, printable ASCII, no `=`); an invalid name is rejected when the HbaseCluster is validated.
+
 NOTE: `hdfs-site.xml` is not listed here, the file is always taken from the referenced HDFS cluster.
 If you want to modify it, take a look at xref:hdfs:usage-guide/configuration-environment-overrides.adoc[HDFS configuration overrides].
 
@@ -52,7 +54,7 @@ restServers:
 ----
 
 All override property values must be strings.
-The properties are formatted and escaped correctly into the XML file, respectively inserted as is into the `hbase-env.sh` file.
+The properties are formatted and escaped correctly into the XML file, respectively inserted as is into the `hbase-env.sh` file after the variable names have been validated.
 
 For a full list of configuration options we refer to the HBase https://hbase.apache.org/book.html#config.files[configuration documentation].
 
