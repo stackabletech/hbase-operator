@@ -50,6 +50,86 @@ spec:
         replicas: 1
 "#;
 
+/// A cluster that takes every role-specific build path at once: Kerberos with TLS (the
+/// `kerberos` and `tls` pod volumes), OPA authorization, the Vector agent on every role, a
+/// custom log ConfigMap on one master role group, overrides for the three rendered config
+/// files, the environment, the pod template and the JVM arguments, the region mover enabled
+/// on the region servers, rest servers, and two master role groups (so
+/// `hbase.client.bootstrap.servers` lists more than one group).
+pub const RICH_HBASE_YAML: &str = r#"
+---
+apiVersion: hbase.stackable.tech/v1alpha1
+kind: HbaseCluster
+metadata:
+  name: hbase
+  namespace: default
+  uid: c2c8c5c0-0b5a-4b1e-9f3e-1a2b3c4d5e6f
+spec:
+  image:
+    productVersion: 2.6.3
+  clusterConfig:
+    hdfsConfigMapName: simple-hdfs
+    zookeeperConfigMapName: simple-znode
+    vectorAggregatorConfigMapName: vector-aggregator-discovery
+    authentication:
+      tlsSecretClass: tls
+      kerberos:
+        secretClass: kerberos
+    authorization:
+      opa:
+        configMapName: opa
+        package: hbase
+  masters:
+    config:
+      logging:
+        enableVectorAgent: true
+    configOverrides:
+      hbase-site.xml:
+        hbase.master.custom.setting: from-role-override
+    roleGroups:
+      default:
+        replicas: 2
+        configOverrides:
+          hbase-env.sh:
+            HBASE_CUSTOM_ENV: from-role-group-override
+          security.properties:
+            networkaddress.cache.negative.ttl: "1"
+        envOverrides:
+          CUSTOM_ENV: custom-value
+        podOverrides:
+          metadata:
+            labels:
+              custom-label: custom-value
+        jvmArgumentOverrides:
+          add:
+            - -Dcustom.jvm.argument=true
+      other:
+        replicas: 1
+        config:
+          logging:
+            enableVectorAgent: true
+            containers:
+              hbase:
+                custom:
+                  configMap: hbase-log-config
+  regionServers:
+    config:
+      logging:
+        enableVectorAgent: true
+      regionMover:
+        runBeforeShutdown: true
+    roleGroups:
+      default:
+        replicas: 2
+  restServers:
+    config:
+      logging:
+        enableVectorAgent: true
+    roleGroups:
+      default:
+        replicas: 1
+"#;
+
 /// Parses an `HbaseCluster` from YAML, panicking on invalid input.
 pub fn hbase_from_yaml(yaml: &str) -> v1alpha1::HbaseCluster {
     yaml_serde::from_str(yaml).expect("invalid test HbaseCluster YAML")

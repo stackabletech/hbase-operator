@@ -658,34 +658,32 @@ spec:
     /// role group and the key, instead of being written into the file.
     #[test]
     fn hbase_env_override_with_invalid_variable_name_is_rejected() {
-        let hbase = test_utils::hbase_from_yaml(
-            r#"
----
-apiVersion: hbase.stackable.tech/v1alpha1
-kind: HbaseCluster
-metadata:
-  name: hbase
-  namespace: default
-  uid: c2c8c5c0-0b5a-4b1e-9f3e-1a2b3c4d5e6f
-spec:
-  image:
-    productVersion: 2.6.3
-  clusterConfig:
-    hdfsConfigMapName: simple-hdfs
-    zookeeperConfigMapName: simple-znode
-  masters:
-    roleGroups:
-      default:
-        replicas: 1
-  regionServers:
-    configOverrides:
-      hbase-env.sh:
-        "BAD=NAME": value
-    roleGroups:
-      default:
-        replicas: 1
-"#,
-        );
+        let hbase = test_utils::hbase_from_yaml(indoc! {r#"
+            ---
+            apiVersion: hbase.stackable.tech/v1alpha1
+            kind: HbaseCluster
+            metadata:
+              name: hbase
+              namespace: default
+              uid: c2c8c5c0-0b5a-4b1e-9f3e-1a2b3c4d5e6f
+            spec:
+              image:
+                productVersion: 2.6.3
+              clusterConfig:
+                hdfsConfigMapName: simple-hdfs
+                zookeeperConfigMapName: simple-znode
+              masters:
+                roleGroups:
+                  default:
+                    replicas: 1
+              regionServers:
+                configOverrides:
+                  hbase-env.sh:
+                    "BAD=NAME": value
+                roleGroups:
+                  default:
+                    replicas: 1
+        "#});
 
         let error = validate_cluster(
             &hbase,
