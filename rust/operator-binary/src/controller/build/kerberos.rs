@@ -254,7 +254,6 @@ pub fn mount_kerberos_volumes(
     }
 
     if let Some(https_secret_class) = &cluster.cluster_config.https_secret_class {
-        // Add TLS keystore
         volumes.push(
             VolumeBuilder::new(&*TLS_STORE_VOLUME_NAME)
                 .ephemeral(
