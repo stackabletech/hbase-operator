@@ -3,6 +3,10 @@
 //! methods emit the Kubernetes objects. Every HBase role runs the same containers, so the
 //! resolve and emit phases live here once; everything that differs between roles happens in the
 //! three role modules.
+//!
+//! The role modules return the inputs rather than calling [`RoleGroupBuilder::new`] themselves,
+//! so that each module's `Error` covers only gathering its inputs and the resolve and emit
+//! failures stay in this module's [`Error`], with no nesting of one in the other.
 
 use std::collections::BTreeMap;
 
@@ -38,15 +42,11 @@ pub(crate) mod master;
 pub(crate) mod region_server;
 pub(crate) mod rest_server;
 
-/// Why building one role group failed. The caller adds which role and role group it was.
+/// Why resolving or emitting one role group failed. The caller adds which role and role group it
+/// was. Errors from gathering a role's inputs are the role module's own ([`master::Error`],
+/// [`region_server::Error`], [`rest_server::Error`]).
 #[derive(Snafu, Debug)]
 pub enum Error {
-    #[snafu(display("missing secret lifetime"))]
-    MissingSecretLifetime,
-
-    #[snafu(display("failed to build the listener volume"))]
-    Listener { source: resource::listener::Error },
-
     #[snafu(display("failed to build ConfigMap"))]
     ConfigMap { source: resource::config_map::Error },
 

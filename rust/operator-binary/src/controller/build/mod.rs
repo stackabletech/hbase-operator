@@ -66,6 +66,24 @@ pub(crate) fn object_meta(
 
 #[derive(Snafu, Debug)]
 pub enum Error {
+    #[snafu(display("failed to gather the inputs of master role group {role_group}"))]
+    Master {
+        source: master::Error,
+        role_group: RoleGroupName,
+    },
+
+    #[snafu(display("failed to gather the inputs of region server role group {role_group}"))]
+    RegionServer {
+        source: region_server::Error,
+        role_group: RoleGroupName,
+    },
+
+    #[snafu(display("failed to gather the inputs of rest server role group {role_group}"))]
+    RestServer {
+        source: rest_server::Error,
+        role_group: RoleGroupName,
+    },
+
     #[snafu(display("failed to build the resources of {role} role group {role_group}"))]
     RoleGroup {
         source: role_group::Error,
@@ -109,7 +127,11 @@ pub fn build(
     let mut pod_disruption_budgets = vec![];
 
     for (role_group_name, rg_config) in &cluster.master_role_group_configs {
-        master::build(cluster, cluster_info, role_group_name, rg_config)
+        let inputs = master::inputs(cluster, cluster_info, role_group_name, rg_config)
+            .with_context(|_| MasterSnafu {
+                role_group: role_group_name.clone(),
+            })?;
+        RoleGroupBuilder::new(inputs)
             .and_then(|builder| built.add(&builder))
             .with_context(|_| RoleGroupSnafu {
                 role: master::ROLE,
@@ -122,7 +144,11 @@ pub fn build(
     }
 
     for (role_group_name, rg_config) in &cluster.region_server_role_group_configs {
-        region_server::build(cluster, cluster_info, role_group_name, rg_config)
+        let inputs = region_server::inputs(cluster, cluster_info, role_group_name, rg_config)
+            .with_context(|_| RegionServerSnafu {
+                role_group: role_group_name.clone(),
+            })?;
+        RoleGroupBuilder::new(inputs)
             .and_then(|builder| built.add(&builder))
             .with_context(|_| RoleGroupSnafu {
                 role: region_server::ROLE,
@@ -139,7 +165,11 @@ pub fn build(
     }
 
     for (role_group_name, rg_config) in &cluster.rest_server_role_group_configs {
-        rest_server::build(cluster, cluster_info, role_group_name, rg_config)
+        let inputs = rest_server::inputs(cluster, cluster_info, role_group_name, rg_config)
+            .with_context(|_| RestServerSnafu {
+                role_group: role_group_name.clone(),
+            })?;
+        RoleGroupBuilder::new(inputs)
             .and_then(|builder| built.add(&builder))
             .with_context(|_| RoleGroupSnafu {
                 role: rest_server::ROLE,

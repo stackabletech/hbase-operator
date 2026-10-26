@@ -1,4 +1,7 @@
-use snafu::OptionExt;
+//! Gathers the inputs of one rest server role group. Rest servers get their listener from a
+//! persistent claim template and do not run the region mover.
+
+use snafu::{OptionExt, Snafu};
 use stackable_operator::{
     utils::cluster_info::KubernetesClusterInfo, v2::types::operator::RoleGroupName,
 };
@@ -10,10 +13,7 @@ use crate::{
             properties::{hbase_env::HBASE_REST_OPTS, hbase_site},
             recommended_labels_for_unversioned_role_group_resources,
             resource::listener::build_listener_pvc,
-            role_group::{
-                Error, ListenerPlacement, MissingSecretLifetimeSnafu, RoleGroupBuilder,
-                RoleGroupInputs,
-            },
+            role_group::{ListenerPlacement, RoleGroupInputs},
         },
     },
     crd::{HbaseConfig, HbaseRole},
@@ -23,13 +23,21 @@ pub(crate) const ROLE: HbaseRole = HbaseRole::RestServer;
 /// The JVM's positive DNS cache TTL for this role, written to `security.properties`.
 const DNS_CACHE_TTL_SECONDS: u32 = 30;
 
+/// Why gathering one rest server role group's inputs failed. The caller adds which role group it
+/// was.
+#[derive(Snafu, Debug)]
+pub enum Error {
+    #[snafu(display("missing secret lifetime"))]
+    MissingSecretLifetime,
+}
+
 /// The inputs of one rest server role group.
-pub(crate) fn build<'a>(
+pub(crate) fn inputs<'a>(
     cluster: &'a ValidatedCluster,
     cluster_info: &'a KubernetesClusterInfo,
     role_group_name: &RoleGroupName,
     rg_config: &RestServerRoleGroupConfig,
-) -> Result<RoleGroupBuilder<'a>, Error> {
+) -> Result<RoleGroupInputs<'a>, Error> {
     let HbaseConfig {
         hbase_rootdir,
         resources,
@@ -48,7 +56,7 @@ pub(crate) fn build<'a>(
     let listener =
         ListenerPlacement::ClaimTemplate(build_listener_pvc(listener_class, &unversioned_labels));
 
-    RoleGroupBuilder::new(RoleGroupInputs {
+    Ok(RoleGroupInputs {
         cluster,
         cluster_info,
         role: ROLE,

@@ -143,13 +143,14 @@ mod tests {
         let cluster = test_utils::validated_cluster_from(&hbase);
         let role_group_name = test_utils::role_group_name("default");
         let cluster_info = &test_utils::cluster_info();
-        let builder = master::build(
+        let inputs = master::inputs(
             &cluster,
             cluster_info,
             &role_group_name,
             test_utils::master_role_group_config(&cluster, "default"),
         )
         .expect("inputs are valid");
+        let builder = RoleGroupBuilder::new(inputs).expect("the role group resolves");
 
         let stateful_set = build_statefulset(&builder).expect("the StatefulSet builds");
 
@@ -258,13 +259,14 @@ spec:
         let cluster = test_utils::validated_cluster_from(&hbase);
         let role_group_name = test_utils::role_group_name("default");
         let cluster_info = &test_utils::cluster_info();
-        let builder = master::build(
+        let inputs = master::inputs(
             &cluster,
             cluster_info,
             &role_group_name,
             test_utils::master_role_group_config(&cluster, "default"),
         )
         .expect("inputs are valid");
+        let builder = RoleGroupBuilder::new(inputs).expect("the role group resolves");
 
         build_statefulset(&builder)
             .expect("the StatefulSet builds")

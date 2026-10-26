@@ -1,4 +1,7 @@
-use snafu::{OptionExt, ResultExt};
+//! Gathers the inputs of one region server role group. Region servers get their listener from
+//! an ephemeral pod volume and are the only role that runs the region mover.
+
+use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
     utils::cluster_info::KubernetesClusterInfo, v2::types::operator::RoleGroupName,
 };
@@ -9,11 +12,8 @@ use crate::{
         build::{
             properties::{hbase_env::HBASE_REGIONSERVER_OPTS, hbase_site},
             recommended_labels_for_role_group_resources, region_mover,
-            resource::listener::build_listener_volume,
-            role_group::{
-                Error, ListenerPlacement, ListenerSnafu, MissingSecretLifetimeSnafu,
-                RoleGroupBuilder, RoleGroupInputs,
-            },
+            resource::listener::{self, build_listener_volume},
+            role_group::{ListenerPlacement, RoleGroupInputs},
         },
     },
     crd::{HbaseRole, RegionServerConfig},
@@ -23,13 +23,24 @@ pub(crate) const ROLE: HbaseRole = HbaseRole::RegionServer;
 /// The JVM's positive DNS cache TTL for this role, written to `security.properties`.
 const DNS_CACHE_TTL_SECONDS: u32 = 10;
 
+/// Why gathering one region server role group's inputs failed. The caller adds which role group
+/// it was.
+#[derive(Snafu, Debug)]
+pub enum Error {
+    #[snafu(display("missing secret lifetime"))]
+    MissingSecretLifetime,
+
+    #[snafu(display("failed to build the listener volume"))]
+    Listener { source: listener::Error },
+}
+
 /// The inputs of one region server role group.
-pub(crate) fn build<'a>(
+pub(crate) fn inputs<'a>(
     cluster: &'a ValidatedCluster,
     cluster_info: &'a KubernetesClusterInfo,
     role_group_name: &RoleGroupName,
     rg_config: &RegionServerRoleGroupConfig,
-) -> Result<RoleGroupBuilder<'a>, Error> {
+) -> Result<RoleGroupInputs<'a>, Error> {
     let RegionServerConfig {
         hbase_rootdir,
         resources,
@@ -49,7 +60,7 @@ pub(crate) fn build<'a>(
         build_listener_volume(listener_class, &recommended_labels).context(ListenerSnafu)?,
     );
 
-    RoleGroupBuilder::new(RoleGroupInputs {
+    Ok(RoleGroupInputs {
         cluster,
         cluster_info,
         role: ROLE,

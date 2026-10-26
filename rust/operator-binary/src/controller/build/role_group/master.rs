@@ -1,7 +1,7 @@
-//! Resolves one master role group into its RoleGroupBuilder. Masters get their
-//! listener from an ephemeral pod volume and do not run the region mover.
+//! Gathers the inputs of one master role group. Masters get their listener from an ephemeral
+//! pod volume and do not run the region mover.
 
-use snafu::{OptionExt, ResultExt};
+use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
     utils::cluster_info::KubernetesClusterInfo, v2::types::operator::RoleGroupName,
 };
@@ -12,11 +12,8 @@ use crate::{
         build::{
             properties::{hbase_env::HBASE_MASTER_OPTS, hbase_site},
             recommended_labels_for_role_group_resources,
-            resource::listener::build_listener_volume,
-            role_group::{
-                Error, ListenerPlacement, ListenerSnafu, MissingSecretLifetimeSnafu,
-                RoleGroupBuilder, RoleGroupInputs,
-            },
+            resource::listener::{self, build_listener_volume},
+            role_group::{ListenerPlacement, RoleGroupInputs},
         },
     },
     crd::{HbaseConfig, HbaseRole},
@@ -26,13 +23,23 @@ pub(crate) const ROLE: HbaseRole = HbaseRole::Master;
 /// The JVM's positive DNS cache TTL for this role, written to `security.properties`.
 const DNS_CACHE_TTL_SECONDS: u32 = 5;
 
+/// Why gathering one master role group's inputs failed. The caller adds which role group it was.
+#[derive(Snafu, Debug)]
+pub enum Error {
+    #[snafu(display("missing secret lifetime"))]
+    MissingSecretLifetime,
+
+    #[snafu(display("failed to build the listener volume"))]
+    Listener { source: listener::Error },
+}
+
 /// The inputs of one master role group.
-pub(crate) fn build<'a>(
+pub(crate) fn inputs<'a>(
     cluster: &'a ValidatedCluster,
     cluster_info: &'a KubernetesClusterInfo,
     role_group_name: &RoleGroupName,
     rg_config: &MasterRoleGroupConfig,
-) -> Result<RoleGroupBuilder<'a>, Error> {
+) -> Result<RoleGroupInputs<'a>, Error> {
     let HbaseConfig {
         hbase_rootdir,
         resources,
@@ -52,7 +59,7 @@ pub(crate) fn build<'a>(
         build_listener_volume(listener_class, &recommended_labels).context(ListenerSnafu)?,
     );
 
-    RoleGroupBuilder::new(RoleGroupInputs {
+    Ok(RoleGroupInputs {
         cluster,
         cluster_info,
         role: ROLE,
