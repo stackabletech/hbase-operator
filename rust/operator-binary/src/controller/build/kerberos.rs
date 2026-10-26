@@ -234,7 +234,6 @@ pub fn mount_kerberos_volumes(
     let mut volumes = Vec::new();
 
     if let Some(kerberos_secret_class) = &cluster.cluster_config.kerberos_secret_class {
-        // Add keytab
         let kerberos_secret_operator_volume = SecretOperatorVolumeSourceBuilder::new(
             kerberos_secret_class.clone(),
             // We need both public (krb5.conf) and private (keytab) parts.
