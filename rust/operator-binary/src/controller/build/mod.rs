@@ -483,19 +483,20 @@ spec:
         for role in HbaseRole::iter() {
             let runs_the_mover = matches!(role, HbaseRole::RegionServer);
             let env = hbase_container_env(stateful_set_spec(&resources, &cluster, &role));
+
+            let region_mover_opts_env = REGION_MOVER_OPTS_ENV.to_string();
             assert_eq!(
-                env.get(&REGION_MOVER_OPTS_ENV.to_string())
-                    .map(|options| !options.is_empty()),
+                env.get(&region_mover_opts_env).map(|s| !s.is_empty()),
                 Some(runs_the_mover),
-                "{role:?} {} is set, and non-empty only for region servers",
-                *REGION_MOVER_OPTS_ENV
+                "{role:?} {region_mover_opts_env} is set, and non-empty only for region servers",
             );
+
+            let run_region_mover_env = RUN_REGION_MOVER_ENV.to_string();
+            let expected_run = String::from(if runs_the_mover { "true" } else { "false" });
             assert_eq!(
-                env.get(&RUN_REGION_MOVER_ENV.to_string())
-                    .map(String::as_str),
-                Some(if runs_the_mover { "true" } else { "false" }),
-                "{role:?} {}",
-                *RUN_REGION_MOVER_ENV
+                env.get(&run_region_mover_env),
+                Some(&expected_run),
+                "{role:?} {run_region_mover_env}",
             );
         }
     }
