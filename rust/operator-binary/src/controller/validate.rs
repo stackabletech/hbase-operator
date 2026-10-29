@@ -92,7 +92,6 @@ pub enum Error {
 pub struct ValidatedLogging {
     pub hbase_container: ValidatedContainerLogConfigChoice,
     pub vector_container: Option<VectorContainerLogConfig>,
-    pub enable_vector_agent: bool,
 }
 
 /// Validates the logging configuration for the HBase (and optional Vector) container.
@@ -122,7 +121,6 @@ fn validate_logging(
     Ok(ValidatedLogging {
         hbase_container,
         vector_container,
-        enable_vector_agent: logging.enable_vector_agent,
     })
 }
 

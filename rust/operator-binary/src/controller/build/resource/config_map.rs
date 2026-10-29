@@ -129,7 +129,7 @@ pub(crate) fn config_map_data(inputs: &RoleGroupInputs) -> Result<BTreeMap<Strin
     {
         data.insert(ConfigFileName::Log4j2.to_string(), log4j2_properties);
     }
-    if inputs.logging.enable_vector_agent {
+    if inputs.logging.vector_container.is_some() {
         data.insert(
             VECTOR_CONFIG_FILE.to_string(),
             product_logging::vector_config_file_content(),
