@@ -590,7 +590,33 @@ mod tests {
     #[test]
     fn build_produces_rbac() {
         let hbase = test_utils::hbase_from_yaml(
-            &test_utils::MINIMAL_HBASE_YAML.replace("name: hbase", "name: my-hbase"),
+            r#"
+---
+apiVersion: hbase.stackable.tech/v1alpha1
+kind: HbaseCluster
+metadata:
+  name: my-hbase
+  namespace: default
+  uid: c2c8c5c0-0b5a-4b1e-9f3e-1a2b3c4d5e6f
+spec:
+  image:
+    productVersion: 2.6.3
+  clusterConfig:
+    hdfsConfigMapName: simple-hdfs
+    zookeeperConfigMapName: simple-znode
+  masters:
+    roleGroups:
+      default:
+        replicas: 1
+  regionServers:
+    roleGroups:
+      default:
+        replicas: 1
+  restServers:
+    roleGroups:
+      default:
+        replicas: 1
+"#,
         );
         let cluster = test_utils::validated_cluster_from(&hbase);
         let cluster_info = test_utils::cluster_info();

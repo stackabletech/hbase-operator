@@ -131,15 +131,38 @@ mod tests {
     /// duplicate entry when overridden).
     #[test]
     fn env_overrides_take_precedence_over_operator_set_env_vars() {
-        let hbase = test_utils::hbase_from_yaml(&test_utils::MINIMAL_HBASE_YAML.replace(
-            "  masters:\n",
-            concat!(
-                "  masters:\n",
-                "    envOverrides:\n",
-                "      RUN_REGION_MOVER: \"overridden\"\n",
-                "      CONTAINERDEBUG_LOG_DIRECTORY: /debug-override\n",
-            ),
-        ));
+        let hbase = test_utils::hbase_from_yaml(
+            r#"
+---
+apiVersion: hbase.stackable.tech/v1alpha1
+kind: HbaseCluster
+metadata:
+  name: hbase
+  namespace: default
+  uid: c2c8c5c0-0b5a-4b1e-9f3e-1a2b3c4d5e6f
+spec:
+  image:
+    productVersion: 2.6.3
+  clusterConfig:
+    hdfsConfigMapName: simple-hdfs
+    zookeeperConfigMapName: simple-znode
+  masters:
+    envOverrides:
+      RUN_REGION_MOVER: "overridden"
+      CONTAINERDEBUG_LOG_DIRECTORY: /debug-override
+    roleGroups:
+      default:
+        replicas: 1
+  regionServers:
+    roleGroups:
+      default:
+        replicas: 1
+  restServers:
+    roleGroups:
+      default:
+        replicas: 1
+"#,
+        );
         let cluster = test_utils::validated_cluster_from(&hbase);
         let role_group_name = test_utils::role_group_name("default");
         let cluster_info = &test_utils::cluster_info();
