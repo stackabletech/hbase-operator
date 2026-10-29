@@ -70,7 +70,6 @@ mod tests {
         let validated_cluster = validated_cluster();
         let merged = &test_utils::master_role_group_config(&validated_cluster, "default")
             .config
-            .config
             .resources;
         let env = build(
             merged,
@@ -89,7 +88,6 @@ mod tests {
         let validated_cluster = validated_cluster();
         let merged = &test_utils::region_server_role_group_config(&validated_cluster, "default")
             .config
-            .config
             .resources;
         let env = build(
             merged,
@@ -106,7 +104,6 @@ mod tests {
     fn user_override_appears() {
         let validated_cluster = validated_cluster();
         let merged = &test_utils::master_role_group_config(&validated_cluster, "default")
-            .config
             .config
             .resources;
         let env = build(

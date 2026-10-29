@@ -78,12 +78,6 @@ pub enum Error {
         role_group: RoleGroupName,
     },
 
-    #[snafu(display("failed to gather the inputs of rest server role group {role_group}"))]
-    RestServer {
-        source: rest_server::Error,
-        role_group: RoleGroupName,
-    },
-
     #[snafu(display("failed to build the resources of {role} role group {role_group}"))]
     RoleGroup {
         source: role_group::Error,
@@ -165,16 +159,17 @@ pub fn build(
     }
 
     for (role_group_name, rg_config) in &cluster.rest_server_role_group_configs {
-        let inputs = rest_server::inputs(cluster, cluster_info, role_group_name, rg_config)
-            .with_context(|_| RestServerSnafu {
-                role_group: role_group_name.clone(),
-            })?;
-        RoleGroupBuilder::new(inputs)
-            .and_then(|builder| built.add(&builder))
-            .with_context(|_| RoleGroupSnafu {
-                role: rest_server::ROLE,
-                role_group: role_group_name.clone(),
-            })?;
+        RoleGroupBuilder::new(rest_server::inputs(
+            cluster,
+            cluster_info,
+            role_group_name,
+            rg_config,
+        ))
+        .and_then(|builder| built.add(&builder))
+        .with_context(|_| RoleGroupSnafu {
+            role: rest_server::ROLE,
+            role_group: role_group_name.clone(),
+        })?;
     }
 
     if let Some(rest_server_config) = &cluster.rest_server_config

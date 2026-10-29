@@ -1,14 +1,13 @@
 //! Gathers the inputs of one rest server role group. Rest servers get their listener from a
 //! persistent claim template and do not run the region mover.
 
-use snafu::{OptionExt, Snafu};
 use stackable_operator::{
     utils::cluster_info::KubernetesClusterInfo, v2::types::operator::RoleGroupName,
 };
 
 use crate::{
     controller::{
-        RestServerRoleGroupConfig, ValidatedCluster,
+        RestServerRoleGroupConfig, ValidatedCluster, ValidatedRestServerConfig,
         build::{
             properties::{hbase_env::HBASE_REST_OPTS, hbase_site},
             recommended_labels_for_unversioned_role_group_resources,
@@ -16,20 +15,12 @@ use crate::{
             role_group::{ListenerPlacement, RoleGroupInputs},
         },
     },
-    crd::{HbaseConfig, HbaseRole},
+    crd::HbaseRole,
 };
 
 pub(crate) const ROLE: HbaseRole = HbaseRole::RestServer;
 /// The JVM's positive DNS cache TTL for this role, written to `security.properties`.
 const DNS_CACHE_TTL_SECONDS: u32 = 30;
-
-/// Why gathering one rest server role group's inputs failed. The caller adds which role group it
-/// was.
-#[derive(Snafu, Debug)]
-pub enum Error {
-    #[snafu(display("missing secret lifetime"))]
-    MissingSecretLifetime,
-}
 
 /// The inputs of one rest server role group.
 pub(crate) fn inputs<'a>(
@@ -37,17 +28,16 @@ pub(crate) fn inputs<'a>(
     cluster_info: &'a KubernetesClusterInfo,
     role_group_name: &RoleGroupName,
     rg_config: &RestServerRoleGroupConfig,
-) -> Result<RoleGroupInputs<'a>, Error> {
-    let HbaseConfig {
+) -> RoleGroupInputs<'a> {
+    let ValidatedRestServerConfig {
         hbase_rootdir,
         resources,
-        // Validated up front into `rg_config.config.logging`.
-        logging: _,
+        logging,
         affinity,
         graceful_shutdown_timeout,
         requested_secret_lifetime,
         listener_class,
-    } = &rg_config.config.config;
+    } = &rg_config.config;
 
     // Rest servers get their listener from a claim template, for a stable per-pod address. The
     // template cannot be modified once deployed, so its labels omit the version.
@@ -56,18 +46,17 @@ pub(crate) fn inputs<'a>(
     let listener =
         ListenerPlacement::ClaimTemplate(build_listener_pvc(listener_class, &unversioned_labels));
 
-    Ok(RoleGroupInputs {
+    RoleGroupInputs {
         cluster,
         cluster_info,
         role: ROLE,
         role_group_name: role_group_name.clone(),
         affinity: affinity.clone(),
         graceful_shutdown_timeout: *graceful_shutdown_timeout,
-        requested_secret_lifetime: (*requested_secret_lifetime)
-            .context(MissingSecretLifetimeSnafu)?,
+        requested_secret_lifetime: *requested_secret_lifetime,
         resources: resources.clone(),
         hbase_rootdir: hbase_rootdir.clone(),
-        logging: rg_config.config.logging.clone(),
+        logging: logging.clone(),
         listener,
         region_mover_opts: String::new(),
         run_region_mover: false,
@@ -82,5 +71,5 @@ pub(crate) fn inputs<'a>(
         dns_cache_ttl_seconds: DNS_CACHE_TTL_SECONDS,
         hbase_env_opts_variable: HBASE_REST_OPTS.clone(),
         role_hbase_site: hbase_site::rest_server_entries(),
-    })
+    }
 }

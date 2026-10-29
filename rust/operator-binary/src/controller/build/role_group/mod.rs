@@ -44,7 +44,7 @@ pub(crate) mod rest_server;
 
 /// Why resolving or emitting one role group failed. The caller adds which role and role group it
 /// was. Errors from gathering a role's inputs are the role module's own ([`master::Error`],
-/// [`region_server::Error`], [`rest_server::Error`]).
+/// [`region_server::Error`]).
 #[derive(Snafu, Debug)]
 pub enum Error {
     #[snafu(display("failed to build ConfigMap"))]
@@ -83,7 +83,7 @@ pub(crate) struct RoleGroupInputs<'a> {
     pub(crate) role: HbaseRole,
     pub(crate) role_group_name: RoleGroupName,
     pub(crate) affinity: StackableAffinity,
-    pub(crate) graceful_shutdown_timeout: Option<Duration>,
+    pub(crate) graceful_shutdown_timeout: Duration,
     pub(crate) requested_secret_lifetime: Duration,
     /// Container resources and the `HBASE_HEAPSIZE` derivation both read this.
     pub(crate) resources: Resources<HbaseStorageConfig, NoRuntimeLimits>,
@@ -120,7 +120,7 @@ pub(crate) struct RoleGroupBuilder<'a> {
     /// Read for the pod's affinity.
     pub(crate) affinity: StackableAffinity,
     /// Read for the pod's termination grace period.
-    pub(crate) graceful_shutdown_timeout: Option<Duration>,
+    pub(crate) graceful_shutdown_timeout: Duration,
     /// The role group's replica count, passed to the StatefulSet as is; `None` makes Kubernetes
     /// run one pod.
     pub(crate) replicas: Option<u16>,

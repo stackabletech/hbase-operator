@@ -5,12 +5,8 @@
 use shell_escape::escape;
 use stackable_operator::shared::time::Duration;
 
-use crate::crd::RegionServerConfig;
+use crate::controller::ValidatedRegionServerConfig;
 
-/// Fallback region-mover timeout, used only when no graceful shutdown timeout is set. In practice
-/// the merged config always defaults `graceful_shutdown_timeout` (60m for region servers), so this
-/// is a defensive default; it mirrors that 60m default minus [`DEFAULT_REGION_MOVER_DELTA_TO_SHUTDOWN`].
-const DEFAULT_REGION_MOVER_TIMEOUT: Duration = Duration::from_minutes_unchecked(59);
 /// Time reserved before the graceful shutdown deadline, subtracted from the configured timeout so
 /// the region move finishes before the pod is terminated.
 const DEFAULT_REGION_MOVER_DELTA_TO_SHUTDOWN: Duration = Duration::from_minutes_unchecked(1);
@@ -22,18 +18,15 @@ const DEFAULT_REGION_MOVER_DELTA_TO_SHUTDOWN: Duration = Duration::from_minutes_
 /// because it contains the pod's hostname.
 ///
 /// Returns an empty string if the region mover is disabled or any other role is "self".
-pub fn region_mover_args(config: &RegionServerConfig) -> String {
+pub fn region_mover_args(config: &ValidatedRegionServerConfig) -> String {
     if config.region_mover.run_before_shutdown {
-        let timeout = config
-            .graceful_shutdown_timeout
-            .map(|d| {
-                if d.as_secs() <= DEFAULT_REGION_MOVER_DELTA_TO_SHUTDOWN.as_secs() {
-                    d.as_secs()
-                } else {
-                    d.as_secs() - DEFAULT_REGION_MOVER_DELTA_TO_SHUTDOWN.as_secs()
-                }
-            })
-            .unwrap_or(DEFAULT_REGION_MOVER_TIMEOUT.as_secs());
+        let graceful_shutdown_timeout = config.graceful_shutdown_timeout.as_secs();
+        let timeout =
+            if graceful_shutdown_timeout <= DEFAULT_REGION_MOVER_DELTA_TO_SHUTDOWN.as_secs() {
+                graceful_shutdown_timeout
+            } else {
+                graceful_shutdown_timeout - DEFAULT_REGION_MOVER_DELTA_TO_SHUTDOWN.as_secs()
+            };
         let mut command = vec![
             "--maxthreads".to_string(),
             config.region_mover.max_threads.to_string(),
@@ -110,9 +103,7 @@ mod tests {
         let validated = test_utils::validated_cluster_from(&hbase);
 
         region_mover_args(
-            &test_utils::region_server_role_group_config(&validated, "default")
-                .config
-                .config,
+            &test_utils::region_server_role_group_config(&validated, "default").config,
         )
     }
 

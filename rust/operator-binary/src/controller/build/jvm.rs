@@ -133,7 +133,7 @@ mod tests {
         let region_server =
             test_utils::region_server_role_group_config(&validated_cluster, "default");
         let hbase_heapsize_env =
-            construct_hbase_heapsize_env(&region_server.config.config.resources).unwrap();
+            construct_hbase_heapsize_env(&region_server.config.resources).unwrap();
 
         assert_eq!(global_jvm_args, "");
         assert_eq!(
@@ -198,7 +198,7 @@ mod tests {
 
         let global_jvm_args = construct_global_jvm_args(validated_cluster.has_kerberos_enabled());
         let hbase_heapsize_env =
-            construct_hbase_heapsize_env(&region_server.config.config.resources).unwrap();
+            construct_hbase_heapsize_env(&region_server.config.resources).unwrap();
 
         assert_eq!(
             global_jvm_args,

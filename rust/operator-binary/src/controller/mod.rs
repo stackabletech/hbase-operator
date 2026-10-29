@@ -10,7 +10,11 @@ use std::{collections::BTreeMap, marker::PhantomData, ops::Deref, str::FromStr};
 use const_format::concatcp;
 pub use stackable_operator::v2::types::operator::RoleGroupName;
 use stackable_operator::{
-    commons::product_image_selection::ResolvedProductImage,
+    commons::{
+        affinity::StackableAffinity,
+        product_image_selection::ResolvedProductImage,
+        resources::{NoRuntimeLimits, Resources},
+    },
     constant,
     k8s_openapi::{
         api::{
@@ -22,6 +26,7 @@ use stackable_operator::{
         apimachinery::pkg::apis::meta::v1::ObjectMeta,
     },
     kube::Resource,
+    shared::time::Duration,
     v2::{
         HasName, HasUid, NameIsValidLabelValue,
         builder::pod::container::EnvVarName,
@@ -29,7 +34,7 @@ use stackable_operator::{
         role_group_utils::ResourceNames,
         role_utils::{self, JavaCommonConfig, RoleGroupConfig},
         types::{
-            kubernetes::{ConfigMapName, NamespaceName, SecretClassName, Uid},
+            kubernetes::{ConfigMapName, ListenerClassName, NamespaceName, SecretClassName, Uid},
             operator::{ClusterName, ControllerName, OperatorName, ProductName, ProductVersion},
         },
     },
@@ -40,7 +45,7 @@ use crate::{
         build::opa::HbaseOpaConfig, validate::ValidatedLogging,
         zookeeper::ZookeeperConnectionInformation,
     },
-    crd::{APP_NAME, HBASE_OPERATOR_NAME, HbaseConfig, HbaseRole, RegionServerConfig, v1alpha1},
+    crd::{APP_NAME, HBASE_OPERATOR_NAME, HbaseRole, HbaseStorageConfig, RegionMover, v1alpha1},
 };
 
 pub const HBASE_CONTROLLER_NAME: &str = "hbasecluster";
@@ -81,21 +86,47 @@ pub struct KubernetesResources<T> {
     pub status: PhantomData<T>,
 }
 
-/// A master role group's validated config together with its validated logging.
+/// A master role group's validated config: the fields of the merged
+/// [`HbaseConfig`](crate::crd::HbaseConfig) that the build step reads, with the logging validated
+/// and the values the merge always sets unwrapped.
 #[derive(Clone, Debug)]
 pub struct ValidatedMasterConfig {
-    pub config: HbaseConfig,
+    pub hbase_rootdir: String,
+    pub resources: Resources<HbaseStorageConfig, NoRuntimeLimits>,
     pub logging: ValidatedLogging,
+    pub affinity: StackableAffinity,
+    pub graceful_shutdown_timeout: Duration,
+    pub requested_secret_lifetime: Duration,
+    pub listener_class: ListenerClassName,
 }
+
+/// A region server role group's validated config: the fields of the merged
+/// [`RegionServerConfig`](crate::crd::RegionServerConfig) that the build step reads, with the
+/// logging validated and the values the merge always sets unwrapped.
 #[derive(Clone, Debug)]
 pub struct ValidatedRegionServerConfig {
-    pub config: RegionServerConfig,
+    pub hbase_rootdir: String,
+    pub resources: Resources<HbaseStorageConfig, NoRuntimeLimits>,
     pub logging: ValidatedLogging,
+    pub affinity: StackableAffinity,
+    pub graceful_shutdown_timeout: Duration,
+    pub requested_secret_lifetime: Duration,
+    pub listener_class: ListenerClassName,
+    pub region_mover: RegionMover,
 }
+
+/// A rest server role group's validated config: the fields of the merged
+/// [`HbaseConfig`](crate::crd::HbaseConfig) that the build step reads, with the logging validated
+/// and the values the merge always sets unwrapped.
 #[derive(Clone, Debug)]
 pub struct ValidatedRestServerConfig {
-    pub config: HbaseConfig,
+    pub hbase_rootdir: String,
+    pub resources: Resources<HbaseStorageConfig, NoRuntimeLimits>,
     pub logging: ValidatedLogging,
+    pub affinity: StackableAffinity,
+    pub graceful_shutdown_timeout: Duration,
+    pub requested_secret_lifetime: Duration,
+    pub listener_class: ListenerClassName,
 }
 
 /// The merged `configOverrides` of a role group, with the `hbase-env.sh` variable names

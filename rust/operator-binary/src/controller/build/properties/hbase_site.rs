@@ -263,9 +263,7 @@ spec:
     #[test]
     fn renders_operator_defaults() {
         let validated_cluster = validated_cluster();
-        let config = &test_utils::master_role_group_config(&validated_cluster, "default")
-            .config
-            .config;
+        let config = &test_utils::master_role_group_config(&validated_cluster, "default").config;
         let xml = build(
             &config.hbase_rootdir,
             hbase_site::master_entries(),
@@ -292,9 +290,8 @@ spec:
     #[test]
     fn renders_region_server_bind_settings() {
         let validated_cluster = validated_cluster();
-        let config = &test_utils::region_server_role_group_config(&validated_cluster, "default")
-            .config
-            .config;
+        let config =
+            &test_utils::region_server_role_group_config(&validated_cluster, "default").config;
         let xml = build(
             &config.hbase_rootdir,
             hbase_site::region_server_entries(),
@@ -321,9 +318,8 @@ spec:
     #[test]
     fn renders_rest_server_endpoint() {
         let validated_cluster = validated_cluster();
-        let config = &test_utils::rest_server_role_group_config(&validated_cluster, "default")
-            .config
-            .config;
+        let config =
+            &test_utils::rest_server_role_group_config(&validated_cluster, "default").config;
         let xml = build(
             &config.hbase_rootdir,
             hbase_site::rest_server_entries(),
@@ -344,9 +340,8 @@ spec:
     #[test]
     fn renders_client_bootstrap_servers() {
         let validated_cluster = validated_cluster();
-        let config = &test_utils::rest_server_role_group_config(&validated_cluster, "default")
-            .config
-            .config;
+        let config =
+            &test_utils::rest_server_role_group_config(&validated_cluster, "default").config;
         let xml = build(
             &config.hbase_rootdir,
             hbase_site::rest_server_entries(),
@@ -367,9 +362,8 @@ spec:
     #[test]
     fn user_override_wins_for_client_bootstrap_servers() {
         let validated_cluster = validated_cluster();
-        let config = &test_utils::rest_server_role_group_config(&validated_cluster, "default")
-            .config
-            .config;
+        let config =
+            &test_utils::rest_server_role_group_config(&validated_cluster, "default").config;
         let xml = build(
             &config.hbase_rootdir,
             hbase_site::rest_server_entries(),
@@ -390,9 +384,8 @@ spec:
     #[test]
     fn user_override_wins() {
         let validated_cluster = validated_cluster();
-        let config = &test_utils::rest_server_role_group_config(&validated_cluster, "default")
-            .config
-            .config;
+        let config =
+            &test_utils::rest_server_role_group_config(&validated_cluster, "default").config;
         let xml = build(
             &config.hbase_rootdir,
             hbase_site::master_entries(),

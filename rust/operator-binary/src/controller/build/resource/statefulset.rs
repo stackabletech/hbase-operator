@@ -71,13 +71,9 @@ pub fn build_statefulset(builder: &RoleGroupBuilder) -> Result<StatefulSet> {
                 .build(),
         );
 
-    // This must be always set by the merge mechanism, as we provide a default value,
-    // users can not disable graceful shutdown.
-    if let Some(graceful_shutdown_timeout) = builder.graceful_shutdown_timeout {
-        pod_builder
-            .termination_grace_period(&graceful_shutdown_timeout)
-            .context(TerminationGracePeriodSnafu)?;
-    }
+    pod_builder
+        .termination_grace_period(&builder.graceful_shutdown_timeout)
+        .context(TerminationGracePeriodSnafu)?;
 
     for container in builder.containers.clone() {
         pod_builder.add_container(container);

@@ -76,6 +76,12 @@ pub enum Error {
     ))]
     MissingVectorAggregatorConfigMapName,
 
+    #[snafu(display("the graceful shutdown timeout of {role} role group {role_group} is missing"))]
+    MissingGracefulShutdownTimeout { role: HbaseRole, role_group: String },
+
+    #[snafu(display("the secret lifetime of {role} role group {role_group} is missing"))]
+    MissingSecretLifetime { role: HbaseRole, role_group: String },
+
     #[snafu(display(
         "invalid hbase-env.sh variable name {variable:?} in the configOverrides of {role} role group {role_group}"
     ))]
@@ -178,9 +184,7 @@ pub fn validate_cluster(
             opa_config,
         ),
         &vector_aggregator_config_map_name,
-        // The annotation names the merged config type, which nothing else at this call site does.
-        |config: &HbaseConfig| &config.logging,
-        |config, logging| ValidatedMasterConfig { config, logging },
+        validated_master_config,
     )?;
     ensure!(
         !master_role_group_configs.is_empty(),
@@ -210,8 +214,7 @@ pub fn validate_cluster(
             opa_config,
         ),
         &vector_aggregator_config_map_name,
-        |config: &RegionServerConfig| &config.logging,
-        |config, logging| ValidatedRegionServerConfig { config, logging },
+        validated_region_server_config,
     )?;
     ensure!(
         !region_server_role_group_configs.is_empty(),
@@ -236,8 +239,7 @@ pub fn validate_cluster(
                 opa_config,
             ),
             &vector_aggregator_config_map_name,
-            |config: &HbaseConfig| &config.logging,
-            |config, logging| ValidatedRestServerConfig { config, logging },
+            validated_rest_server_config,
         )?,
         None => BTreeMap::new(),
     };
@@ -289,11 +291,8 @@ pub fn validate_cluster(
 /// Each role group is merged and validated via [`with_validated_config`], which folds the CRD
 /// config fragment (default <- role <- role group) plus the `configOverrides`, `envOverrides`,
 /// `cliOverrides`, `podOverrides` and the `jvmArgumentOverrides` (role group wins) into a single
-/// merged `RoleGroup`. Its logging and `configOverrides` are then validated and its name parsed.
-///
-/// The roles differ only in their config type and in the wrapper that pairs it with its
-/// validated logging, so `logging` reads the logging config out of a merged config and
-/// `with_logging` builds that wrapper.
+/// merged `RoleGroup`. Its config is then turned into the role's validated config by
+/// `validated_config`, its `configOverrides` are validated and its name parsed.
 ///
 /// Returns an empty map if the role has no role groups.
 fn validate_role_group_configs<Fragment, Config, ValidatedConfig>(
@@ -301,8 +300,12 @@ fn validate_role_group_configs<Fragment, Config, ValidatedConfig>(
     role: &Role<Fragment, v1alpha1::HbaseConfigOverrides, GenericRoleConfig, JavaCommonConfig>,
     default_config: &Fragment,
     vector_aggregator_config_map_name: &Option<ConfigMapName>,
-    logging: impl Fn(&Config) -> &Logging<Container>,
-    with_logging: impl Fn(Config, ValidatedLogging) -> ValidatedConfig,
+    validated_config: impl Fn(
+        Config,
+        &Option<ConfigMapName>,
+        &HbaseRole,
+        &str,
+    ) -> Result<ValidatedConfig, Error>,
 ) -> Result<
     BTreeMap<
         RoleGroupName,
@@ -337,11 +340,14 @@ where
                 product_specific_common_config,
             } = merged.config;
 
-            let validated_logging =
-                validate_logging(logging(&config), vector_aggregator_config_map_name)?;
             let validated = RoleGroupConfig {
                 replicas: merged.replicas,
-                config: with_logging(config, validated_logging),
+                config: validated_config(
+                    config,
+                    vector_aggregator_config_map_name,
+                    hbase_role,
+                    role_group_name,
+                )?,
                 config_overrides: validate_config_overrides(
                     hbase_role,
                     role_group_name,
@@ -361,6 +367,122 @@ where
             Ok((role_group_name, validated))
         })
         .collect()
+}
+
+/// Turns a master role group's merged [`HbaseConfig`] into its [`ValidatedMasterConfig`]: validates the logging and
+/// unwraps the values the merge always sets.
+fn validated_master_config(
+    config: HbaseConfig,
+    vector_aggregator_config_map_name: &Option<ConfigMapName>,
+    hbase_role: &HbaseRole,
+    role_group_name: &str,
+) -> Result<ValidatedMasterConfig, Error> {
+    let HbaseConfig {
+        hbase_rootdir,
+        resources,
+        logging,
+        affinity,
+        graceful_shutdown_timeout,
+        requested_secret_lifetime,
+        listener_class,
+    } = config;
+    Ok(ValidatedMasterConfig {
+        hbase_rootdir,
+        resources,
+        logging: validate_logging(&logging, vector_aggregator_config_map_name)?,
+        affinity,
+        graceful_shutdown_timeout: graceful_shutdown_timeout.with_context(|| {
+            MissingGracefulShutdownTimeoutSnafu {
+                role: hbase_role.clone(),
+                role_group: role_group_name.to_owned(),
+            }
+        })?,
+        requested_secret_lifetime: requested_secret_lifetime.with_context(|| {
+            MissingSecretLifetimeSnafu {
+                role: hbase_role.clone(),
+                role_group: role_group_name.to_owned(),
+            }
+        })?,
+        listener_class,
+    })
+}
+
+/// Turns a region server role group's merged [`RegionServerConfig`] into its [`ValidatedRegionServerConfig`]: validates the logging and
+/// unwraps the values the merge always sets.
+fn validated_region_server_config(
+    config: RegionServerConfig,
+    vector_aggregator_config_map_name: &Option<ConfigMapName>,
+    hbase_role: &HbaseRole,
+    role_group_name: &str,
+) -> Result<ValidatedRegionServerConfig, Error> {
+    let RegionServerConfig {
+        hbase_rootdir,
+        resources,
+        logging,
+        affinity,
+        graceful_shutdown_timeout,
+        requested_secret_lifetime,
+        listener_class,
+        region_mover,
+    } = config;
+    Ok(ValidatedRegionServerConfig {
+        hbase_rootdir,
+        resources,
+        logging: validate_logging(&logging, vector_aggregator_config_map_name)?,
+        affinity,
+        graceful_shutdown_timeout: graceful_shutdown_timeout.with_context(|| {
+            MissingGracefulShutdownTimeoutSnafu {
+                role: hbase_role.clone(),
+                role_group: role_group_name.to_owned(),
+            }
+        })?,
+        requested_secret_lifetime: requested_secret_lifetime.with_context(|| {
+            MissingSecretLifetimeSnafu {
+                role: hbase_role.clone(),
+                role_group: role_group_name.to_owned(),
+            }
+        })?,
+        listener_class,
+        region_mover,
+    })
+}
+
+/// Turns a rest server role group's merged [`HbaseConfig`] into its [`ValidatedRestServerConfig`]: validates the logging and
+/// unwraps the values the merge always sets.
+fn validated_rest_server_config(
+    config: HbaseConfig,
+    vector_aggregator_config_map_name: &Option<ConfigMapName>,
+    hbase_role: &HbaseRole,
+    role_group_name: &str,
+) -> Result<ValidatedRestServerConfig, Error> {
+    let HbaseConfig {
+        hbase_rootdir,
+        resources,
+        logging,
+        affinity,
+        graceful_shutdown_timeout,
+        requested_secret_lifetime,
+        listener_class,
+    } = config;
+    Ok(ValidatedRestServerConfig {
+        hbase_rootdir,
+        resources,
+        logging: validate_logging(&logging, vector_aggregator_config_map_name)?,
+        affinity,
+        graceful_shutdown_timeout: graceful_shutdown_timeout.with_context(|| {
+            MissingGracefulShutdownTimeoutSnafu {
+                role: hbase_role.clone(),
+                role_group: role_group_name.to_owned(),
+            }
+        })?,
+        requested_secret_lifetime: requested_secret_lifetime.with_context(|| {
+            MissingSecretLifetimeSnafu {
+                role: hbase_role.clone(),
+                role_group: role_group_name.to_owned(),
+            }
+        })?,
+        listener_class,
+    })
 }
 
 /// Validates the merged `configOverrides` of one role group: the `hbase-env.sh` keys become

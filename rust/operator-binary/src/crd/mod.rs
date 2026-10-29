@@ -610,7 +610,6 @@ spec:
 
         let config =
             &test_utils::region_server_role_group_config(&validated_cluster, role_group_name)
-                .config
                 .config;
         assert_eq!(run_before_shutdown, config.region_mover.run_before_shutdown);
         assert_eq!(max_threads, config.region_mover.max_threads);

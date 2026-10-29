@@ -162,20 +162,17 @@ mod tests {
             HbaseRole::Master => {
                 crate::test_utils::master_role_group_config(&validated_cluster, "default")
                     .config
-                    .config
                     .affinity
                     .clone()
             }
             HbaseRole::RegionServer => {
                 crate::test_utils::region_server_role_group_config(&validated_cluster, "default")
                     .config
-                    .config
                     .affinity
                     .clone()
             }
             HbaseRole::RestServer => {
                 crate::test_utils::rest_server_role_group_config(&validated_cluster, "default")
-                    .config
                     .config
                     .affinity
                     .clone()

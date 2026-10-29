@@ -1,14 +1,14 @@
 //! Gathers the inputs of one region server role group. Region servers get their listener from
 //! an ephemeral pod volume and are the only role that runs the region mover.
 
-use snafu::{OptionExt, ResultExt, Snafu};
+use snafu::{ResultExt, Snafu};
 use stackable_operator::{
     utils::cluster_info::KubernetesClusterInfo, v2::types::operator::RoleGroupName,
 };
 
 use crate::{
     controller::{
-        RegionServerRoleGroupConfig, ValidatedCluster,
+        RegionServerRoleGroupConfig, ValidatedCluster, ValidatedRegionServerConfig,
         build::{
             properties::{hbase_env::HBASE_REGIONSERVER_OPTS, hbase_site},
             recommended_labels_for_role_group_resources, region_mover,
@@ -16,7 +16,7 @@ use crate::{
             role_group::{ListenerPlacement, RoleGroupInputs},
         },
     },
-    crd::{HbaseRole, RegionServerConfig},
+    crd::HbaseRole,
 };
 
 pub(crate) const ROLE: HbaseRole = HbaseRole::RegionServer;
@@ -27,9 +27,6 @@ const DNS_CACHE_TTL_SECONDS: u32 = 10;
 /// it was.
 #[derive(Snafu, Debug)]
 pub enum Error {
-    #[snafu(display("missing secret lifetime"))]
-    MissingSecretLifetime,
-
     #[snafu(display("failed to build the listener volume"))]
     Listener { source: listener::Error },
 }
@@ -41,17 +38,16 @@ pub(crate) fn inputs<'a>(
     role_group_name: &RoleGroupName,
     rg_config: &RegionServerRoleGroupConfig,
 ) -> Result<RoleGroupInputs<'a>, Error> {
-    let RegionServerConfig {
+    let ValidatedRegionServerConfig {
         hbase_rootdir,
         resources,
-        // Validated up front into `rg_config.config.logging`.
-        logging: _,
+        logging,
         affinity,
         graceful_shutdown_timeout,
         requested_secret_lifetime,
         listener_class,
         region_mover,
-    } = &rg_config.config.config;
+    } = &rg_config.config;
 
     // Region servers, like masters, get their listener from an ephemeral pod volume.
     let recommended_labels =
@@ -67,13 +63,12 @@ pub(crate) fn inputs<'a>(
         role_group_name: role_group_name.clone(),
         affinity: affinity.clone(),
         graceful_shutdown_timeout: *graceful_shutdown_timeout,
-        requested_secret_lifetime: (*requested_secret_lifetime)
-            .context(MissingSecretLifetimeSnafu)?,
+        requested_secret_lifetime: *requested_secret_lifetime,
         resources: resources.clone(),
         hbase_rootdir: hbase_rootdir.clone(),
-        logging: rg_config.config.logging.clone(),
+        logging: logging.clone(),
         listener,
-        region_mover_opts: region_mover::region_mover_args(&rg_config.config.config),
+        region_mover_opts: region_mover::region_mover_args(&rg_config.config),
         run_region_mover: region_mover.run_before_shutdown,
         replicas: rg_config.replicas,
         config_overrides: rg_config.config_overrides.clone(),
