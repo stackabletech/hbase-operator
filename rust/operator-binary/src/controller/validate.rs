@@ -405,6 +405,10 @@ fn validate_config_overrides(
 #[cfg(test)]
 mod tests {
     use indoc::indoc;
+    use stackable_operator::product_logging::spec::{
+        AutomaticContainerLogConfig, ConfigMapLogConfig, ContainerLogConfig,
+        ContainerLogConfigChoice, CustomContainerLogConfig,
+    };
 
     use super::*;
     use crate::{crd::HbaseConfig, test_utils};
@@ -493,11 +497,6 @@ spec:
     /// A custom log ConfigMap name that is not a valid Kubernetes name is rejected up-front.
     #[test]
     fn validate_logging_rejects_invalid_custom_config_map_name() {
-        use stackable_operator::product_logging::spec::{
-            ConfigMapLogConfig, ContainerLogConfig, ContainerLogConfigChoice,
-            CustomContainerLogConfig,
-        };
-
         let logging = Logging {
             enable_vector_agent: false,
             containers: [(
@@ -520,10 +519,6 @@ spec:
     /// succeeds once a valid name is provided.
     #[test]
     fn validate_logging_requires_vector_aggregator_when_enabled() {
-        use stackable_operator::product_logging::spec::{
-            AutomaticContainerLogConfig, ContainerLogConfig, ContainerLogConfigChoice,
-        };
-
         let automatic = || ContainerLogConfig {
             choice: Some(ContainerLogConfigChoice::Automatic(
                 AutomaticContainerLogConfig::default(),
