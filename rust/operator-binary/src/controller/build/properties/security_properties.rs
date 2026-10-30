@@ -10,29 +10,26 @@ use stackable_operator::v2::{
     config_overrides::KeyValueConfigOverrides,
 };
 
-use crate::crd::HbaseRole;
+/// The JVM's positive DNS cache TTL in seconds.
+const NETWORKADDRESS_CACHE_TTL: &str = "networkaddress.cache.ttl";
+/// The JVM's negative DNS cache TTL in seconds.
+const NETWORKADDRESS_CACHE_NEGATIVE_TTL: &str = "networkaddress.cache.negative.ttl";
 
 /// Renders `security.properties`: role-specific DNS cache TTLs plus user overrides.
 pub fn build(
-    role: &HbaseRole,
+    dns_cache_ttl_seconds: u32,
     overrides: KeyValueConfigOverrides,
 ) -> Result<String, PropertiesWriterError> {
-    // Role-specific positive DNS cache TTLs. Caching forever (the JVM default for
-    // successful lookups) breaks failover when a peer's IP changes, so cap the
+    // Caching forever (the JVM default for successful lookups)
+    // breaks failover when a peer's IP changes, so cap the
     // positive cache and disable the negative cache.
-    let positive_ttl = match role {
-        HbaseRole::Master => "5",
-        HbaseRole::RegionServer => "10",
-        HbaseRole::RestServer => "30",
-    };
-
     let mut config: BTreeMap<String, String> = BTreeMap::from([
         (
-            "networkaddress.cache.ttl".to_string(),
-            positive_ttl.to_string(),
+            NETWORKADDRESS_CACHE_TTL.to_string(),
+            dns_cache_ttl_seconds.to_string(),
         ),
         (
-            "networkaddress.cache.negative.ttl".to_string(),
+            NETWORKADDRESS_CACHE_NEGATIVE_TTL.to_string(),
             "0".to_string(),
         ),
     ]);
@@ -48,36 +45,36 @@ mod tests {
     #[test]
     fn injects_master_dns_cache_ttl() {
         assert_eq!(
-            build(&HbaseRole::Master, KeyValueConfigOverrides::default()).unwrap(),
-            "networkaddress.cache.negative.ttl=0\nnetworkaddress.cache.ttl=5\n"
+            build(5, KeyValueConfigOverrides::default())
+                .expect("the default security.properties should render"),
+            format!("{NETWORKADDRESS_CACHE_NEGATIVE_TTL}=0\n{NETWORKADDRESS_CACHE_TTL}=5\n")
         );
     }
 
     #[test]
     fn injects_regionserver_dns_cache_ttl() {
         assert_eq!(
-            build(&HbaseRole::RegionServer, KeyValueConfigOverrides::default()).unwrap(),
-            "networkaddress.cache.negative.ttl=0\nnetworkaddress.cache.ttl=10\n"
+            build(10, KeyValueConfigOverrides::default())
+                .expect("the default security.properties should render"),
+            format!("{NETWORKADDRESS_CACHE_NEGATIVE_TTL}=0\n{NETWORKADDRESS_CACHE_TTL}=10\n")
         );
     }
 
     #[test]
     fn injects_restserver_dns_cache_ttl() {
         assert_eq!(
-            build(&HbaseRole::RestServer, KeyValueConfigOverrides::default()).unwrap(),
-            "networkaddress.cache.negative.ttl=0\nnetworkaddress.cache.ttl=30\n"
+            build(30, KeyValueConfigOverrides::default())
+                .expect("the default security.properties should render"),
+            format!("{NETWORKADDRESS_CACHE_NEGATIVE_TTL}=0\n{NETWORKADDRESS_CACHE_TTL}=30\n")
         );
     }
 
     #[test]
     fn user_overrides_win_over_injected_defaults() {
         assert_eq!(
-            build(
-                &HbaseRole::Master,
-                [("networkaddress.cache.ttl", "60")].into()
-            )
-            .unwrap(),
-            "networkaddress.cache.negative.ttl=0\nnetworkaddress.cache.ttl=60\n"
+            build(5, [(NETWORKADDRESS_CACHE_TTL, "60")].into())
+                .expect("security.properties with an override should render"),
+            format!("{NETWORKADDRESS_CACHE_NEGATIVE_TTL}=0\n{NETWORKADDRESS_CACHE_TTL}=60\n")
         );
     }
 }

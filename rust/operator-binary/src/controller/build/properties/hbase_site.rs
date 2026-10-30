@@ -12,9 +12,10 @@ use crate::{
     controller::{
         ValidatedCluster,
         build::{opa::HbaseOpaConfig, properties::build_xml_config},
+        replicas_or_default,
     },
     crd::{
-        AnyServiceConfig, HBASE_CLUSTER_DISTRIBUTED, HBASE_MASTER_PORT, HBASE_MASTER_UI_PORT,
+        HBASE_CLUSTER_DISTRIBUTED, HBASE_MASTER_PORT, HBASE_MASTER_UI_PORT,
         HBASE_REGIONSERVER_PORT, HBASE_REGIONSERVER_UI_PORT, HBASE_ROOTDIR, HbaseRole,
     },
 };
@@ -22,19 +23,19 @@ use crate::{
 // `hbase-site.xml` property keys (the `port` keys carry a `_KEY` suffix to avoid clashing with the
 // `Port`-typed `HBASE_*_PORT` constants imported from the `crd` module).
 const HBASE_CLIENT_RPC_BIND_ADDRESS: &str = "hbase.client.rpc.bind.address";
-const HBASE_MASTER_IPC_ADDRESS: &str = "hbase.master.ipc.address";
+pub(crate) const HBASE_MASTER_IPC_ADDRESS: &str = "hbase.master.ipc.address";
 const HBASE_MASTER_IPC_PORT: &str = "hbase.master.ipc.port";
 const HBASE_MASTER_HOSTNAME: &str = "hbase.master.hostname";
 const HBASE_MASTER_PORT_KEY: &str = "hbase.master.port";
 const HBASE_MASTER_INFO_PORT: &str = "hbase.master.info.port";
 const HBASE_MASTER_BOUND_INFO_PORT: &str = "hbase.master.bound.info.port";
-const HBASE_REGIONSERVER_IPC_ADDRESS: &str = "hbase.regionserver.ipc.address";
+pub(crate) const HBASE_REGIONSERVER_IPC_ADDRESS: &str = "hbase.regionserver.ipc.address";
 const HBASE_REGIONSERVER_IPC_PORT: &str = "hbase.regionserver.ipc.port";
 const HBASE_UNSAFE_REGIONSERVER_HOSTNAME: &str = "hbase.unsafe.regionserver.hostname";
 const HBASE_REGIONSERVER_PORT_KEY: &str = "hbase.regionserver.port";
 const HBASE_REGIONSERVER_INFO_PORT: &str = "hbase.regionserver.info.port";
 const HBASE_REGIONSERVER_BOUND_INFO_PORT: &str = "hbase.regionserver.bound.info.port";
-const HBASE_REST_ENDPOINT: &str = "hbase.rest.endpoint";
+pub(crate) const HBASE_REST_ENDPOINT: &str = "hbase.rest.endpoint";
 
 // `hbase-site.xml` property values that recur across roles. The `${env:...}` placeholders are
 // resolved by HBase at runtime from the Pod's environment.
@@ -59,17 +60,13 @@ pub fn client_bootstrap_servers(
     let namespace = cluster.namespace.as_ref();
     let cluster_domain = &cluster_info.cluster_domain;
     cluster
-        .role_group_configs
-        .get(&HbaseRole::Master)
-        .into_iter()
-        .flatten()
+        .master_role_group_configs.iter()
         .flat_map(|(role_group_name, role_group)| {
             let resource_names =
                 cluster.role_group_resource_names(&HbaseRole::Master, role_group_name);
             let stateful_set = resource_names.stateful_set_name();
             let headless_service = resource_names.headless_service_name();
-            // `None` leaves `replicas` unset on the StatefulSet, which Kubernetes defaults to 1
-            (0..role_group.replicas.unwrap_or(1)).map(move |ordinal| {
+            (0..replicas_or_default(role_group.replicas)).map(move |ordinal| {
                 format!(
                     "{stateful_set}-{ordinal}.{headless_service}.{namespace}.svc.{cluster_domain}:{HBASE_MASTER_PORT}"
                 )
@@ -81,8 +78,8 @@ pub fn client_bootstrap_servers(
 
 /// Renders `hbase-site.xml`.
 pub fn build(
-    role: &HbaseRole,
-    merged_config: &AnyServiceConfig,
+    hbase_rootdir: &str,
+    role_hbase_site: BTreeMap<String, String>,
     zookeeper_config: BTreeMap<String, String>,
     kerberos_config: BTreeMap<String, String>,
     opa_config: Option<&HbaseOpaConfig>,
@@ -93,7 +90,7 @@ pub fn build(
 
     // Defaults
     config.insert(HBASE_CLUSTER_DISTRIBUTED.to_string(), "true".to_string());
-    config.insert(HBASE_ROOTDIR.to_string(), merged_config.hbase_rootdir());
+    config.insert(HBASE_ROOTDIR.to_string(), hbase_rootdir.to_owned());
     config.insert(
         HBASE_CLIENT_BOOTSTRAP_SERVERS.to_string(),
         client_bootstrap_servers,
@@ -114,71 +111,79 @@ pub fn build(
         "false".to_string(),
     );
 
-    match role {
-        HbaseRole::Master => {
-            config.insert(
-                HBASE_MASTER_IPC_ADDRESS.to_string(),
-                BIND_ALL_ADDRESSES.to_string(),
-            );
-            config.insert(
-                HBASE_MASTER_IPC_PORT.to_string(),
-                HBASE_MASTER_PORT.to_string(),
-            );
-            config.insert(
-                HBASE_MASTER_HOSTNAME.to_string(),
-                ENV_HBASE_SERVICE_HOST.to_string(),
-            );
-            config.insert(
-                HBASE_MASTER_PORT_KEY.to_string(),
-                ENV_HBASE_SERVICE_PORT.to_string(),
-            );
-            config.insert(
-                HBASE_MASTER_INFO_PORT.to_string(),
-                ENV_HBASE_INFO_PORT.to_string(),
-            );
-            config.insert(
-                HBASE_MASTER_BOUND_INFO_PORT.to_string(),
-                HBASE_MASTER_UI_PORT.to_string(),
-            );
-        }
-        HbaseRole::RegionServer => {
-            config.insert(
-                HBASE_REGIONSERVER_IPC_ADDRESS.to_string(),
-                BIND_ALL_ADDRESSES.to_string(),
-            );
-            config.insert(
-                HBASE_REGIONSERVER_IPC_PORT.to_string(),
-                HBASE_REGIONSERVER_PORT.to_string(),
-            );
-            config.insert(
-                HBASE_UNSAFE_REGIONSERVER_HOSTNAME.to_string(),
-                ENV_HBASE_SERVICE_HOST.to_string(),
-            );
-            config.insert(
-                HBASE_REGIONSERVER_PORT_KEY.to_string(),
-                ENV_HBASE_SERVICE_PORT.to_string(),
-            );
-            config.insert(
-                HBASE_REGIONSERVER_INFO_PORT.to_string(),
-                ENV_HBASE_INFO_PORT.to_string(),
-            );
-            config.insert(
-                HBASE_REGIONSERVER_BOUND_INFO_PORT.to_string(),
-                HBASE_REGIONSERVER_UI_PORT.to_string(),
-            );
-        }
-        HbaseRole::RestServer => {
-            config.insert(
-                // N.B. a custom tag, so as not to interfere with HBase internals.
-                // The other roles use a patch to correctly resolve host/port.
-                HBASE_REST_ENDPOINT.to_string(),
-                format!("{ENV_HBASE_SERVICE_HOST}:{ENV_HBASE_SERVICE_PORT}"),
-            );
-        }
-    };
+    config.extend(role_hbase_site);
 
     // configOverride come last
     build_xml_config(config, overrides)
+}
+
+pub(crate) fn master_entries() -> BTreeMap<String, String> {
+    BTreeMap::from([
+        (
+            HBASE_MASTER_IPC_ADDRESS.to_string(),
+            BIND_ALL_ADDRESSES.to_string(),
+        ),
+        (
+            HBASE_MASTER_IPC_PORT.to_string(),
+            HBASE_MASTER_PORT.to_string(),
+        ),
+        (
+            HBASE_MASTER_HOSTNAME.to_string(),
+            ENV_HBASE_SERVICE_HOST.to_string(),
+        ),
+        (
+            HBASE_MASTER_PORT_KEY.to_string(),
+            ENV_HBASE_SERVICE_PORT.to_string(),
+        ),
+        (
+            HBASE_MASTER_INFO_PORT.to_string(),
+            ENV_HBASE_INFO_PORT.to_string(),
+        ),
+        (
+            HBASE_MASTER_BOUND_INFO_PORT.to_string(),
+            HBASE_MASTER_UI_PORT.to_string(),
+        ),
+    ])
+}
+
+pub(crate) fn region_server_entries() -> BTreeMap<String, String> {
+    BTreeMap::from([
+        (
+            HBASE_REGIONSERVER_IPC_ADDRESS.to_string(),
+            BIND_ALL_ADDRESSES.to_string(),
+        ),
+        (
+            HBASE_REGIONSERVER_IPC_PORT.to_string(),
+            HBASE_REGIONSERVER_PORT.to_string(),
+        ),
+        (
+            HBASE_UNSAFE_REGIONSERVER_HOSTNAME.to_string(),
+            ENV_HBASE_SERVICE_HOST.to_string(),
+        ),
+        (
+            HBASE_REGIONSERVER_PORT_KEY.to_string(),
+            ENV_HBASE_SERVICE_PORT.to_string(),
+        ),
+        (
+            HBASE_REGIONSERVER_INFO_PORT.to_string(),
+            ENV_HBASE_INFO_PORT.to_string(),
+        ),
+        (
+            HBASE_REGIONSERVER_BOUND_INFO_PORT.to_string(),
+            HBASE_REGIONSERVER_UI_PORT.to_string(),
+        ),
+    ])
+}
+
+pub(crate) fn rest_server_entries() -> BTreeMap<String, String> {
+    BTreeMap::from([
+        // N.B. a custom tag, so as not to interfere with HBase internals.
+        // The other roles use a patch to correctly resolve host/port.
+        (
+            HBASE_REST_ENDPOINT.to_string(),
+            format!("{ENV_HBASE_SERVICE_HOST}:{ENV_HBASE_SERVICE_PORT}"),
+        ),
+    ])
 }
 
 #[cfg(test)]
@@ -186,8 +191,11 @@ mod tests {
     use indoc::indoc;
 
     use super::*;
-    use crate::test_utils::{
-        cluster_info, hbase_from_yaml, merged_config, validated_cluster, validated_cluster_from,
+    use crate::{
+        controller::build::properties::hbase_site,
+        test_utils::{
+            self, cluster_info, hbase_from_yaml, validated_cluster, validated_cluster_from,
+        },
     };
 
     fn bootstrap_servers_for(masters_yaml: &str) -> String {
@@ -255,10 +263,10 @@ spec:
     #[test]
     fn renders_operator_defaults() {
         let validated_cluster = validated_cluster();
-        let merged = merged_config(&validated_cluster, &HbaseRole::Master);
+        let config = &test_utils::master_role_group_config(&validated_cluster, "default").config;
         let xml = build(
-            &HbaseRole::Master,
-            merged,
+            &config.hbase_rootdir,
+            hbase_site::master_entries(),
             BTreeMap::new(),
             BTreeMap::new(),
             None,
@@ -282,10 +290,11 @@ spec:
     #[test]
     fn renders_region_server_bind_settings() {
         let validated_cluster = validated_cluster();
-        let merged = merged_config(&validated_cluster, &HbaseRole::RegionServer);
+        let config =
+            &test_utils::region_server_role_group_config(&validated_cluster, "default").config;
         let xml = build(
-            &HbaseRole::RegionServer,
-            merged,
+            &config.hbase_rootdir,
+            hbase_site::region_server_entries(),
             BTreeMap::new(),
             BTreeMap::new(),
             None,
@@ -309,10 +318,11 @@ spec:
     #[test]
     fn renders_rest_server_endpoint() {
         let validated_cluster = validated_cluster();
-        let merged = merged_config(&validated_cluster, &HbaseRole::RestServer);
+        let config =
+            &test_utils::rest_server_role_group_config(&validated_cluster, "default").config;
         let xml = build(
-            &HbaseRole::RestServer,
-            merged,
+            &config.hbase_rootdir,
+            hbase_site::rest_server_entries(),
             BTreeMap::new(),
             BTreeMap::new(),
             None,
@@ -330,10 +340,11 @@ spec:
     #[test]
     fn renders_client_bootstrap_servers() {
         let validated_cluster = validated_cluster();
-        let merged = merged_config(&validated_cluster, &HbaseRole::RestServer);
+        let config =
+            &test_utils::rest_server_role_group_config(&validated_cluster, "default").config;
         let xml = build(
-            &HbaseRole::RestServer,
-            merged,
+            &config.hbase_rootdir,
+            hbase_site::rest_server_entries(),
             BTreeMap::new(),
             BTreeMap::new(),
             None,
@@ -351,10 +362,11 @@ spec:
     #[test]
     fn user_override_wins_for_client_bootstrap_servers() {
         let validated_cluster = validated_cluster();
-        let merged = merged_config(&validated_cluster, &HbaseRole::RestServer);
+        let config =
+            &test_utils::rest_server_role_group_config(&validated_cluster, "default").config;
         let xml = build(
-            &HbaseRole::RestServer,
-            merged,
+            &config.hbase_rootdir,
+            hbase_site::rest_server_entries(),
             BTreeMap::new(),
             BTreeMap::new(),
             None,
@@ -372,10 +384,11 @@ spec:
     #[test]
     fn user_override_wins() {
         let validated_cluster = validated_cluster();
-        let merged = merged_config(&validated_cluster, &HbaseRole::Master);
+        let config =
+            &test_utils::rest_server_role_group_config(&validated_cluster, "default").config;
         let xml = build(
-            &HbaseRole::Master,
-            merged,
+            &config.hbase_rootdir,
+            hbase_site::master_entries(),
             BTreeMap::new(),
             BTreeMap::new(),
             None,

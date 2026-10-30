@@ -1,74 +1,53 @@
-//! Build-side region-mover logic for [`AnyServiceConfig`]: derives the `bin/hbase` region-mover
+//! Build-side region-mover logic for the config: derives the `bin/hbase` region-mover
 //! CLI arguments from the merged config. Kept out of the `crd` module so it stays a pure API
 //! definition.
 
 use shell_escape::escape;
 use stackable_operator::shared::time::Duration;
 
-use crate::crd::AnyServiceConfig;
+use crate::controller::ValidatedRegionServerConfig;
 
-/// Fallback region-mover timeout, used only when no graceful shutdown timeout is set. In practice
-/// the merged config always defaults `graceful_shutdown_timeout` (60m for region servers), so this
-/// is a defensive default; it mirrors that 60m default minus [`DEFAULT_REGION_MOVER_DELTA_TO_SHUTDOWN`].
-const DEFAULT_REGION_MOVER_TIMEOUT: Duration = Duration::from_minutes_unchecked(59);
 /// Time reserved before the graceful shutdown deadline, subtracted from the configured timeout so
 /// the region move finishes before the pod is terminated.
 const DEFAULT_REGION_MOVER_DELTA_TO_SHUTDOWN: Duration = Duration::from_minutes_unchecked(1);
 
-impl AnyServiceConfig {
-    /// Returns command line arguments to pass on to the region mover tool.
-    /// The following arguments are excluded because they are already part of the
-    /// hbase-entrypoint.sh script.
-    /// The most important argument, '--regionserverhost' can only be computed on the Pod
-    /// because it contains the pod's hostname.
-    ///
-    /// Returns an empty string if the region mover is disabled or any other role is "self".
-    pub fn region_mover_args(&self) -> String {
-        match self {
-            AnyServiceConfig::RegionServer(config) => {
-                if config.region_mover.run_before_shutdown {
-                    let timeout = config
-                        .graceful_shutdown_timeout
-                        .map(|d| {
-                            if d.as_secs() <= DEFAULT_REGION_MOVER_DELTA_TO_SHUTDOWN.as_secs() {
-                                d.as_secs()
-                            } else {
-                                d.as_secs() - DEFAULT_REGION_MOVER_DELTA_TO_SHUTDOWN.as_secs()
-                            }
-                        })
-                        .unwrap_or(DEFAULT_REGION_MOVER_TIMEOUT.as_secs());
-                    let mut command = vec![
-                        "--maxthreads".to_string(),
-                        config.region_mover.max_threads.to_string(),
-                        "--timeout".to_string(),
-                        timeout.to_string(),
-                    ];
-                    if !config.region_mover.ack {
-                        command.push("--noack".to_string());
-                    }
-
-                    command.extend(
-                        config
-                            .region_mover
-                            .cli_opts
-                            .iter()
-                            .flat_map(|o| o.additional_mover_options.clone())
-                            .map(|s| escape(std::borrow::Cow::Borrowed(&s)).to_string()),
-                    );
-                    command.join(" ")
-                } else {
-                    "".to_string()
-                }
-            }
-            _ => "".to_string(),
+/// Returns command line arguments to pass on to the region mover tool.
+/// The following arguments are excluded because they are already part of the
+/// hbase-entrypoint.sh script.
+/// The most important argument, '--regionserverhost' can only be computed on the Pod
+/// because it contains the pod's hostname.
+///
+/// Returns an empty string if the region mover is disabled or any other role is "self".
+pub fn region_mover_args(config: &ValidatedRegionServerConfig) -> String {
+    if config.region_mover.run_before_shutdown {
+        let graceful_shutdown_timeout = config.graceful_shutdown_timeout.as_secs();
+        let timeout =
+            if graceful_shutdown_timeout <= DEFAULT_REGION_MOVER_DELTA_TO_SHUTDOWN.as_secs() {
+                graceful_shutdown_timeout
+            } else {
+                graceful_shutdown_timeout - DEFAULT_REGION_MOVER_DELTA_TO_SHUTDOWN.as_secs()
+            };
+        let mut command = vec![
+            "--maxthreads".to_string(),
+            config.region_mover.max_threads.to_string(),
+            "--timeout".to_string(),
+            timeout.to_string(),
+        ];
+        if !config.region_mover.ack {
+            command.push("--noack".to_string());
         }
-    }
 
-    pub fn run_region_mover(&self) -> bool {
-        match self {
-            AnyServiceConfig::RegionServer(config) => config.region_mover.run_before_shutdown,
-            _ => false,
-        }
+        command.extend(
+            config
+                .region_mover
+                .cli_opts
+                .iter()
+                .flat_map(|o| o.additional_mover_options.clone())
+                .map(|s| escape(std::borrow::Cow::Borrowed(&s)).to_string()),
+        );
+        command.join(" ")
+    } else {
+        "".to_string()
     }
 }
 
@@ -76,7 +55,7 @@ impl AnyServiceConfig {
 mod tests {
     use indoc::indoc;
 
-    use crate::{crd::HbaseRole, test_utils};
+    use crate::{controller::build::region_mover::region_mover_args, test_utils};
 
     /// Renders the region-mover args for the default region-server role group of a cluster whose
     /// `regionServers.config` is built from `config_lines`. Each entry is one YAML line nested
@@ -122,24 +101,16 @@ mod tests {
 
         let hbase = test_utils::hbase_from_yaml(&yaml);
         let validated = test_utils::validated_cluster_from(&hbase);
-        test_utils::merged_config_for(&validated, &HbaseRole::RegionServer, "default")
-            .region_mover_args()
+
+        region_mover_args(
+            &test_utils::region_server_role_group_config(&validated, "default").config,
+        )
     }
 
     #[test]
     fn empty_when_disabled() {
         assert_eq!(
             region_mover_args_for(&["regionMover:", "  runBeforeShutdown: false"]),
-            ""
-        );
-    }
-
-    #[test]
-    fn empty_for_non_region_server_role() {
-        // The region mover only applies to region servers; every other role returns no args.
-        let validated = test_utils::validated_cluster();
-        assert_eq!(
-            test_utils::merged_config(&validated, &HbaseRole::Master).region_mover_args(),
             ""
         );
     }

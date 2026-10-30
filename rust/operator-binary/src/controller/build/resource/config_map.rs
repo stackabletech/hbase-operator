@@ -1,114 +1,51 @@
 //! Build the per-rolegroup `ConfigMap` for the HbaseCluster.
 
-use snafu::{OptionExt, ResultExt, Snafu};
+use std::collections::BTreeMap;
+
+use snafu::{ResultExt, Snafu};
 use stackable_operator::{
-    builder::configmap::ConfigMapBuilder,
-    k8s_openapi::api::core::v1::ConfigMap,
-    product_logging::framework::VECTOR_CONFIG_FILE,
-    utils::cluster_info::KubernetesClusterInfo,
-    v2::{config_file_writer::PropertiesWriterError, types::operator::RoleGroupName},
+    builder::configmap::ConfigMapBuilder, k8s_openapi::api::core::v1::ConfigMap,
+    product_logging::framework::VECTOR_CONFIG_FILE, v2::config_file_writer::PropertiesWriterError,
 };
 
-use crate::{
-    controller::{
-        ValidatedCluster,
-        build::{
-            jvm::construct_role_specific_non_heap_jvm_args,
-            kerberos, object_meta,
-            properties::{
-                ConfigFileName, hbase_env, hbase_site, product_logging, security_properties,
-                ssl_client, ssl_server,
-            },
-            recommended_labels_for_role_group_resources,
-        },
+use crate::controller::build::{
+    jvm::construct_role_specific_non_heap_jvm_args,
+    kerberos, object_meta,
+    properties::{
+        ConfigFileName, hbase_env, hbase_site, product_logging, security_properties, ssl_client,
+        ssl_server,
     },
-    crd::HbaseRole,
+    recommended_labels_for_role_group_resources,
+    role_group::{RoleGroupBuilder, RoleGroupInputs},
 };
 
 #[derive(Snafu, Debug)]
 pub enum Error {
-    #[snafu(display("the validated cluster has no role group {role_group:?} for role {role:?}"))]
-    MissingRoleGroup { role: String, role_group: String },
-
     #[snafu(display("failed to build hbase-env.sh"))]
     BuildHbaseEnv { source: hbase_env::Error },
 
-    #[snafu(display("failed to serialize {} for {role_group}", ConfigFileName::Security))]
-    JvmSecurityProperties {
-        source: PropertiesWriterError,
-        role_group: String,
-    },
+    #[snafu(display("failed to serialize {}", ConfigFileName::Security))]
+    JvmSecurityProperties { source: PropertiesWriterError },
 
-    #[snafu(display("cannot build config map for role {role:?} and role group {role_group:?}"))]
+    #[snafu(display("failed to assemble the ConfigMap"))]
     Assemble {
         source: stackable_operator::builder::configmap::Error,
-        role: String,
-        role_group: String,
     },
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
 
-pub fn build_rolegroup_config_map(
-    cluster: &ValidatedCluster,
-    cluster_info: &KubernetesClusterInfo,
-    role: &HbaseRole,
-    role_group_name: &RoleGroupName,
-) -> Result<ConfigMap> {
+pub fn build_config_map(builder: &RoleGroupBuilder) -> Result<ConfigMap> {
+    let cluster = builder.cluster;
+    let role = &builder.role;
+    let role_group_name = &builder.role_group_name;
+
     tracing::info!(
         "Setting up ConfigMap for {role}/{role_group_name}",
         role = role.to_string()
     );
 
-    let rg = cluster
-        .role_group_configs
-        .get(role)
-        .and_then(|groups| groups.get(role_group_name))
-        .with_context(|| MissingRoleGroupSnafu {
-            role: role.to_string(),
-            role_group: role_group_name.to_string(),
-        })?;
-
-    let cluster_config = &cluster.cluster_config;
-    let merged_config = &rg.config.config;
-    let overrides = &rg.config_overrides;
-
-    let hbase_site_xml = hbase_site::build(
-        role,
-        merged_config,
-        cluster_config
-            .zookeeper_connection_information
-            .as_hbase_settings(),
-        kerberos::hbase_site_kerberos_config(cluster, cluster_info),
-        cluster_config.hbase_opa_config.as_ref(),
-        hbase_site::client_bootstrap_servers(cluster, cluster_info),
-        overrides.hbase_site_xml.clone(),
-    );
-
-    let hbase_env_sh = hbase_env::build(
-        merged_config,
-        role,
-        cluster.has_kerberos_enabled(),
-        construct_role_specific_non_heap_jvm_args(cluster, rg),
-        overrides.hbase_env_sh.clone(),
-    )
-    .context(BuildHbaseEnvSnafu)?;
-
-    let ssl_server_xml = ssl_server::build(
-        kerberos::ssl_server_settings(cluster),
-        overrides.ssl_server_xml.clone(),
-    );
-    let ssl_client_xml = ssl_client::build(
-        kerberos::ssl_client_settings(cluster),
-        overrides.ssl_client_xml.clone(),
-    );
-
-    let security_properties =
-        security_properties::build(role, overrides.security_properties.clone()).with_context(
-            |_| JvmSecurityPropertiesSnafu {
-                role_group: role_group_name.to_string(),
-            },
-        )?;
+    let data = builder.config_map_data.clone();
 
     let cm_metadata = object_meta(
         cluster,
@@ -120,37 +57,84 @@ pub fn build_rolegroup_config_map(
     )
     .build();
 
-    let mut builder = ConfigMapBuilder::new();
-    builder
+    ConfigMapBuilder::new()
         .metadata(cm_metadata)
-        .add_data(ConfigFileName::HbaseSite.to_string(), hbase_site_xml)
-        .add_data(ConfigFileName::HbaseEnv.to_string(), hbase_env_sh)
-        .add_data(ConfigFileName::Security.to_string(), security_properties);
+        .data(data)
+        .build()
+        .context(AssembleSnafu)
+}
+
+/// Renders the role group's config files, keyed by file name.
+///
+/// The `ssl-*.xml` files are present only when they carry settings and `log4j2.properties` only
+/// for the automatic log config, so the set of keys is part of what this renders.
+pub(crate) fn config_map_data(inputs: &RoleGroupInputs) -> Result<BTreeMap<String, String>> {
+    let cluster = inputs.cluster;
+    let cluster_config = &cluster.cluster_config;
+
+    let hbase_site_xml = hbase_site::build(
+        &inputs.hbase_rootdir,
+        inputs.role_hbase_site.clone(),
+        cluster_config
+            .zookeeper_connection_information
+            .as_hbase_settings(),
+        kerberos::hbase_site_kerberos_config(cluster, inputs.cluster_info),
+        cluster_config.hbase_opa_config.as_ref(),
+        hbase_site::client_bootstrap_servers(cluster, inputs.cluster_info),
+        inputs.config_overrides.hbase_site_xml.clone(),
+    );
+
+    let hbase_env_sh = hbase_env::build(
+        &inputs.resources,
+        &inputs.hbase_env_opts_variable,
+        cluster.has_kerberos_enabled(),
+        construct_role_specific_non_heap_jvm_args(cluster, &inputs.jvm_argument_overrides),
+        inputs.config_overrides.hbase_env_sh.clone(),
+    )
+    .context(BuildHbaseEnvSnafu)?;
+
+    let ssl_server_xml = ssl_server::build(
+        kerberos::ssl_server_settings(cluster),
+        inputs.config_overrides.ssl_server_xml.clone(),
+    );
+    let ssl_client_xml = ssl_client::build(
+        kerberos::ssl_client_settings(cluster),
+        inputs.config_overrides.ssl_client_xml.clone(),
+    );
+
+    let security_properties = security_properties::build(
+        inputs.dns_cache_ttl_seconds,
+        inputs.config_overrides.security_properties.clone(),
+    )
+    .context(JvmSecurityPropertiesSnafu)?;
+
+    let mut data = BTreeMap::from([
+        (ConfigFileName::HbaseSite.to_string(), hbase_site_xml),
+        (ConfigFileName::HbaseEnv.to_string(), hbase_env_sh),
+        (ConfigFileName::Security.to_string(), security_properties),
+    ]);
 
     // HBase does not like empty config files, so the ssl-*.xml files are only
     // written when they actually carry settings (see `ssl_server::build`):
-    // Caused by: com.ctc.wstx.exc.WstxEOFException: Unexpected EOF in prolog at [row,col,system-id]: [1,0,"file:/stackable/conf/ssl-server.xml"]
+    // Caused by: com.ctc.wstx.exc.WstxEOFException: Unexpected EOF in prolog
+    // at [row,col,system-id]: [1,0,"file:/stackable/conf/ssl-server.xml"]
     if let Some(ssl_server_xml) = ssl_server_xml {
-        builder.add_data(ConfigFileName::SslServer.to_string(), ssl_server_xml);
+        data.insert(ConfigFileName::SslServer.to_string(), ssl_server_xml);
     }
     if let Some(ssl_client_xml) = ssl_client_xml {
-        builder.add_data(ConfigFileName::SslClient.to_string(), ssl_client_xml);
+        data.insert(ConfigFileName::SslClient.to_string(), ssl_client_xml);
     }
 
-    if let Some(log4j2_properties) =
-        product_logging::build_log4j2(&rg.config.logging.hbase_container)
+    if let Some(log4j2_properties) = product_logging::build_log4j2(&inputs.logging.hbase_container)
     {
-        builder.add_data(ConfigFileName::Log4j2.to_string(), log4j2_properties);
+        data.insert(ConfigFileName::Log4j2.to_string(), log4j2_properties);
     }
-    if rg.config.logging.enable_vector_agent {
-        builder.add_data(
-            VECTOR_CONFIG_FILE,
+    if inputs.logging.vector_container.is_some() {
+        data.insert(
+            VECTOR_CONFIG_FILE.to_string(),
             product_logging::vector_config_file_content(),
         );
     }
 
-    builder.build().with_context(|_| AssembleSnafu {
-        role: role.to_string(),
-        role_group: role_group_name.to_string(),
-    })
+    Ok(data)
 }

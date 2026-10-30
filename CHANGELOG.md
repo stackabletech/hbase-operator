@@ -36,6 +36,12 @@
 - test: Update OPA to 1.20.2 in integration tests ([#823]).
 - All pods now set `securityContext.seccompProfile.type` to `RuntimeDefault` ([#824]).
 - Replace the unmaintained `serde_yaml` with `yaml_serde` ([#824]).
+- Internal operator refactoring: build each role group through per-role modules (masters,
+  region servers, rest servers) and a shared role group builder, with each role's configuration
+  held in typed fields of the validated cluster ([#827]).
+- Variable names in `configOverrides` for `hbase-env.sh` are now validated (non-empty, printable
+  ASCII, no `=`); an invalid name is rejected when the HbaseCluster is validated instead of
+  producing a broken `hbase-env.sh` ([#827]).
 - The operator Deployment runs with a restricted security context and a read-only root filesystem, so it can be deployed into namespaces that enforce the `restricted` Pod Security Standard ([#829]).
 
 ### Fixed
@@ -68,6 +74,7 @@
 [#823]: https://github.com/stackabletech/hbase-operator/pull/823
 [#824]: https://github.com/stackabletech/hbase-operator/pull/824
 [#825]: https://github.com/stackabletech/hbase-operator/pull/825
+[#827]: https://github.com/stackabletech/hbase-operator/pull/827
 [#829]: https://github.com/stackabletech/hbase-operator/pull/829
 
 ## [26.7.0] - 2026-07-21

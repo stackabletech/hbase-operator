@@ -1,14 +1,26 @@
 //! Builds the `hbase-env.sh` config file: JVM heap/options env vars + overrides.
 
-use std::{collections::BTreeMap, fmt::Write};
+use std::{collections::BTreeMap, fmt::Write, str::FromStr};
 
 use snafu::{ResultExt, Snafu};
-use stackable_operator::v2::config_overrides::KeyValueConfigOverrides;
+use stackable_operator::{
+    commons::resources::{NoRuntimeLimits, Resources},
+    constant,
+    v2::builder::pod::container::EnvVarName,
+};
 
 use crate::{
     controller::build::jvm::{self, construct_global_jvm_args, construct_hbase_heapsize_env},
-    crd::{AnyServiceConfig, HbaseRole},
+    crd::HbaseStorageConfig,
 };
+
+constant!(pub(crate) HBASE_MASTER_OPTS: EnvVarName = "HBASE_MASTER_OPTS");
+constant!(pub(crate) HBASE_REGIONSERVER_OPTS: EnvVarName = "HBASE_REGIONSERVER_OPTS");
+constant!(pub(crate) HBASE_REST_OPTS: EnvVarName = "HBASE_REST_OPTS");
+
+constant!(HBASE_MANAGES_ZK: EnvVarName = "HBASE_MANAGES_ZK");
+constant!(HBASE_HEAPSIZE: EnvVarName = "HBASE_HEAPSIZE");
+constant!(HBASE_OPTS: EnvVarName = "HBASE_OPTS");
 
 #[derive(Snafu, Debug)]
 pub enum Error {
@@ -18,35 +30,24 @@ pub enum Error {
 
 /// Renders `hbase-env.sh` as `export VAR="VALUE"` lines.
 pub fn build(
-    merged_config: &AnyServiceConfig,
-    role: &HbaseRole,
+    resources: &Resources<HbaseStorageConfig, NoRuntimeLimits>,
+    opts_variable: &EnvVarName,
     kerberos_enabled: bool,
     non_heap_jvm_args: String,
-    overrides: KeyValueConfigOverrides,
+    overrides: BTreeMap<EnvVarName, String>,
 ) -> Result<String, Error> {
-    let mut env: BTreeMap<String, String> = BTreeMap::new();
+    let mut env: BTreeMap<EnvVarName, String> = BTreeMap::new();
 
-    env.insert("HBASE_MANAGES_ZK".to_string(), "false".to_string());
+    env.insert(HBASE_MANAGES_ZK.clone(), "false".to_string());
     env.insert(
-        "HBASE_HEAPSIZE".to_string(),
-        construct_hbase_heapsize_env(merged_config).context(ConstructHbaseHeapsizeEnvSnafu)?,
+        HBASE_HEAPSIZE.clone(),
+        construct_hbase_heapsize_env(resources).context(ConstructHbaseHeapsizeEnvSnafu)?,
     );
     env.insert(
-        "HBASE_OPTS".to_string(),
+        HBASE_OPTS.clone(),
         construct_global_jvm_args(kerberos_enabled),
     );
-
-    match role {
-        HbaseRole::Master => {
-            env.insert("HBASE_MASTER_OPTS".to_string(), non_heap_jvm_args);
-        }
-        HbaseRole::RegionServer => {
-            env.insert("HBASE_REGIONSERVER_OPTS".to_string(), non_heap_jvm_args);
-        }
-        HbaseRole::RestServer => {
-            env.insert("HBASE_REST_OPTS".to_string(), non_heap_jvm_args);
-        }
-    }
+    env.insert(opts_variable.clone(), non_heap_jvm_args);
 
     // configOverride come last
     env.extend(overrides);
@@ -62,18 +63,20 @@ pub fn build(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_utils::{merged_config, validated_cluster};
+    use crate::test_utils::{self, validated_cluster};
 
     #[test]
     fn renders_operator_defaults() {
         let validated_cluster = validated_cluster();
-        let merged = merged_config(&validated_cluster, &HbaseRole::Master);
+        let merged = &test_utils::master_role_group_config(&validated_cluster, "default")
+            .config
+            .resources;
         let env = build(
             merged,
-            &HbaseRole::Master,
+            &HBASE_MASTER_OPTS,
             false,
             "-Xtest".to_string(),
-            KeyValueConfigOverrides::default(),
+            BTreeMap::new(),
         )
         .unwrap();
         assert!(env.contains("export HBASE_MANAGES_ZK=\"false\""), "{env}");
@@ -83,13 +86,15 @@ mod tests {
     #[test]
     fn renders_region_server_opts() {
         let validated_cluster = validated_cluster();
-        let merged = merged_config(&validated_cluster, &HbaseRole::RegionServer);
+        let merged = &test_utils::region_server_role_group_config(&validated_cluster, "default")
+            .config
+            .resources;
         let env = build(
             merged,
-            &HbaseRole::RegionServer,
+            &HBASE_REGIONSERVER_OPTS,
             false,
             "-Xtest".to_string(),
-            KeyValueConfigOverrides::default(),
+            BTreeMap::new(),
         )
         .unwrap();
         assert!(env.contains("export HBASE_REGIONSERVER_OPTS="), "{env}");
@@ -98,13 +103,18 @@ mod tests {
     #[test]
     fn user_override_appears() {
         let validated_cluster = validated_cluster();
-        let merged = merged_config(&validated_cluster, &HbaseRole::Master);
+        let merged = &test_utils::master_role_group_config(&validated_cluster, "default")
+            .config
+            .resources;
         let env = build(
             merged,
-            &HbaseRole::Master,
+            &HBASE_MASTER_OPTS,
             false,
             "-Xtest".to_string(),
-            [("CUSTOM_VAR", "custom_value")].into(),
+            BTreeMap::from([(
+                EnvVarName::from_str("CUSTOM_VAR").expect("valid variable name"),
+                "custom_value".to_string(),
+            )]),
         )
         .unwrap();
         assert!(env.contains("export CUSTOM_VAR=\"custom_value\""), "{env}");
