@@ -124,7 +124,7 @@ mod tests {
 
     /// `envOverrides` are applied after every operator-set environment variable, so users can
     /// override any of them (previously the operator's value silently won for the variables set
-    /// after the merge, and `CONTAINERDEBUG_LOG_DIRECTORY` was appended separately, producing a
+    /// after the merge, and `FILE_LOG_DIRECTORY` was appended separately, producing a
     /// duplicate entry when overridden).
     #[test]
     fn env_overrides_take_precedence_over_operator_set_env_vars() {
@@ -146,7 +146,7 @@ spec:
   masters:
     envOverrides:
       RUN_REGION_MOVER: "overridden"
-      CONTAINERDEBUG_LOG_DIRECTORY: /debug-override
+      FILE_LOG_DIRECTORY: /debug-override
     roleGroups:
       default:
         replicas: 1
@@ -187,9 +187,7 @@ spec:
             .env
             .expect("the hbase container has env vars")
             .into_iter()
-            .filter(|env_var| {
-                ["RUN_REGION_MOVER", "CONTAINERDEBUG_LOG_DIRECTORY"].contains(&&*env_var.name)
-            })
+            .filter(|env_var| ["RUN_REGION_MOVER", "FILE_LOG_DIRECTORY"].contains(&&*env_var.name))
             .map(|env_var| (env_var.name, env_var.value.unwrap_or_default()))
             .collect();
 
@@ -198,7 +196,7 @@ spec:
             env,
             [
                 (
-                    "CONTAINERDEBUG_LOG_DIRECTORY".to_string(),
+                    "FILE_LOG_DIRECTORY".to_string(),
                     "/debug-override".to_string()
                 ),
                 ("RUN_REGION_MOVER".to_string(), "overridden".to_string()),

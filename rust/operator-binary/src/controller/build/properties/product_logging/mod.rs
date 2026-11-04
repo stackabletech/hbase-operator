@@ -61,7 +61,9 @@ mod tests {
         assert!(!content.is_empty());
         // A kept source must be present ...
         assert!(content.contains("files_log4j2"));
+        assert!(content.contains("files_tracing_rs"));
+        assert!(content.contains("*.tracing-rs.json"));
         // ... while a product-specific source we don't emit must not.
-        assert!(!content.contains("files_tracing_rs"));
+        assert!(!content.contains("files_py"));
     }
 }
