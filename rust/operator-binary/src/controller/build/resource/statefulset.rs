@@ -13,6 +13,7 @@ use stackable_operator::{
         api::apps::v1::{StatefulSet, StatefulSetSpec},
         apimachinery::pkg::apis::meta::v1::LabelSelector,
     },
+    v2::rbac::RbacResourceNames,
 };
 
 use crate::controller::build::{
