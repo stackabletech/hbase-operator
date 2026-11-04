@@ -46,7 +46,8 @@ pub enum Error {
 
     #[snafu(display("HBaseCluster object is invalid"))]
     InvalidHBaseCluster {
-        source: error_boundary::InvalidObject,
+        #[snafu(source(from(error_boundary::InvalidObject, Box::new)))]
+        source: Box<error_boundary::InvalidObject>,
     },
 
     #[snafu(display("failed to dereference cluster resources"))]
