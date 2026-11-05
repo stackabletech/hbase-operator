@@ -10525,6 +10525,11 @@ rec {
             packageId = "rstest";
           }
           {
+            name = "stackable-operator";
+            packageId = "stackable-operator";
+            features = [ "crds" "webhook" "test-support" ];
+          }
+          {
             name = "yaml_serde";
             packageId = "yaml_serde";
           }
@@ -10733,7 +10738,7 @@ rec {
           "time" = [ "stackable-shared/time" ];
           "webhook" = [ "dep:stackable-webhook" ];
         };
-        resolvedDefaultFeatures = [ "crds" "default" "webhook" ];
+        resolvedDefaultFeatures = [ "crds" "default" "test-support" "webhook" ];
       };
       "stackable-operator-derive" = rec {
         crateName = "stackable-operator-derive";

@@ -31,4 +31,5 @@ built.workspace = true
 
 [dev-dependencies]
 rstest.workspace = true
+stackable-operator = { workspace = true, features = ["test-support"] }
 yaml_serde.workspace = true
