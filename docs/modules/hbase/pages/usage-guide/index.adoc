@@ -1,4 +1,5 @@
 = Usage guide
+:description: Guides for Apache HBase on Kubernetes, covering cluster operations, Pod placement, resource requests, logging, monitoring and Apache Phoenix.
 
 Learn about xref:usage-guide/operations/cluster-operations.adoc[starting, stopping and pausing] your cluster.
 

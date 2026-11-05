@@ -1,4 +1,5 @@
 = Graceful shutdown
+:description: Graceful shutdown of Apache HBase masters, RegionServers and RestServers, covering the configurable shutdown timeout per role.
 
 You can configure the graceful shutdown grace period as described in xref:concepts:operations/graceful_shutdown.adoc[].
 
