@@ -5,6 +5,7 @@
 :page-aliases: discovery.adoc
 
 = Discovery
+:description: Reference for the discovery ConfigMap the Stackable operator for Apache HBase publishes, with the client configuration for connecting to the cluster.
 
 The Stackable Operator for Apache HBase publishes a discovery https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.23/#configmap-v1-core[ConfigMap], which exposes a client configuration bundle that allows access to the Apache HBase cluster.
 
