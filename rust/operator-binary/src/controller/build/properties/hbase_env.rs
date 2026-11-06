@@ -112,7 +112,7 @@ mod tests {
             false,
             "-Xtest".to_string(),
             BTreeMap::from([(
-                EnvVarName::from_str("CUSTOM_VAR").expect("valid variable name"),
+                EnvVarName::from_str_unsafe("CUSTOM_VAR"),
                 "custom_value".to_string(),
             )]),
         )

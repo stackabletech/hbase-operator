@@ -9,6 +9,8 @@
 - Add `/ready` endpoint to the operator Deployment, which reports the CRD installation status ([#812]).
 - Add support for 2.6.7 and 3.0.0 (experimental)  ([#815]).
 - Masters and region servers now have a default affinity to the OPA Pods when OPA authorization is configured ([#816]).
+- The logs of the `containerdebug` process are now collected by the Vector agent and forwarded to
+  the Vector aggregator ([#832]).
 
 ### Changed
 
@@ -56,6 +58,10 @@
 - BREAKING: The rest-server listener PVC template now carries the recommended labels without the
   version label, so that the labels stay stable across upgrades.
   Existing rest-server StatefulSets must be deleted once before the new operator can reconcile them ([#799]).
+- The `containerdebug` process writes its log file again. The operator set
+  `CONTAINERDEBUG_LOG_DIRECTORY`, which containerdebug stopped reading in its version 0.2.0 when it
+  moved to `stackable-telemetry`; the directory is now set via `FILE_LOG_DIRECTORY`. The file is
+  rotated hourly and at most two files are kept, because rotation is opt-in ([#832]).
 
 [#776]: https://github.com/stackabletech/hbase-operator/pull/776
 [#782]: https://github.com/stackabletech/hbase-operator/pull/782
@@ -76,6 +82,7 @@
 [#825]: https://github.com/stackabletech/hbase-operator/pull/825
 [#827]: https://github.com/stackabletech/hbase-operator/pull/827
 [#829]: https://github.com/stackabletech/hbase-operator/pull/829
+[#832]: https://github.com/stackabletech/hbase-operator/pull/832
 
 ## [26.7.0] - 2026-07-21
 

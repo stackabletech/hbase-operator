@@ -1,6 +1,7 @@
 use core::fmt;
 use std::{ops::Deref, str::FromStr};
 
+use const_format::concatcp;
 use security::AuthenticationConfig;
 use serde::{Deserialize, Serialize};
 use stackable_operator::{
@@ -29,6 +30,7 @@ use stackable_operator::{
     status::condition::{ClusterCondition, HasStatusCondition},
     v2::{
         config_overrides::KeyValueConfigOverrides,
+        product_logging::framework::STACKABLE_LOG_DIR,
         role_utils::{JavaCommonConfig, Role},
         types::{
             common::Port,
@@ -52,6 +54,11 @@ pub const HBASE_OPERATOR_NAME: &str = "hbase.stackable.tech";
 // This constant is hard coded in hbase-entrypoint.sh
 // You need to change it there too.
 pub const CONFIG_DIR_NAME: &str = "/stackable/conf";
+
+/// Directory which the `containerdebug` process writes its log files to. It must be exactly one
+/// level below the log directory, because the Vector agent derives the container name from that
+/// path segment.
+pub const CONTAINERDEBUG_LOG_DIR: &str = concatcp!(STACKABLE_LOG_DIR, "/containerdebug");
 
 pub const TLS_STORE_DIR: &str = "/stackable/tls";
 constant!(pub TLS_STORE_VOLUME_NAME: VolumeName = "tls");

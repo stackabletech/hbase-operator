@@ -259,8 +259,12 @@ spec:
         - pipefail
         - -c
         env:
-        - name: CONTAINERDEBUG_LOG_DIRECTORY
+        - name: FILE_LOG_DIRECTORY
           value: /stackable/log/containerdebug
+        - name: FILE_LOG_MAX_FILES
+          value: "2"
+        - name: FILE_LOG_ROTATION_PERIOD
+          value: hourly
         - name: HADOOP_CONF_DIR
           value: /stackable/conf
         - name: HBASE_CONF_DIR
@@ -494,8 +498,12 @@ spec:
         - pipefail
         - -c
         env:
-        - name: CONTAINERDEBUG_LOG_DIRECTORY
+        - name: FILE_LOG_DIRECTORY
           value: /stackable/log/containerdebug
+        - name: FILE_LOG_MAX_FILES
+          value: "2"
+        - name: FILE_LOG_ROTATION_PERIOD
+          value: hourly
         - name: HADOOP_CONF_DIR
           value: /stackable/conf
         - name: HBASE_CONF_DIR
@@ -725,8 +733,12 @@ spec:
         - pipefail
         - -c
         env:
-        - name: CONTAINERDEBUG_LOG_DIRECTORY
+        - name: FILE_LOG_DIRECTORY
           value: /stackable/log/containerdebug
+        - name: FILE_LOG_MAX_FILES
+          value: "2"
+        - name: FILE_LOG_ROTATION_PERIOD
+          value: hourly
         - name: HADOOP_CONF_DIR
           value: /stackable/conf
         - name: HBASE_CONF_DIR
