@@ -1,4 +1,5 @@
 = Pod placement
+:description: Pod placement for Apache HBase, covering default affinities that place RegionServers next to HDFS DataNodes and custom placement settings.
 :page-aliases: pod_placement.adoc
 
 You can configure Pod placement for HBase nodes as described in xref:concepts:operations/pod_placement.adoc[].
