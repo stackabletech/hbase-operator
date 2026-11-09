@@ -1,4 +1,5 @@
 = Getting started
+:description: Getting started with Apache HBase on Kubernetes, covering installation of the Stackable operator and its dependencies and a first HBase cluster.
 
 This guide gets you started with HBase using the Stackable operator.
 It guides you through the installation of the operator and its dependencies, setting up your first HBase cluster and verifying its operation.

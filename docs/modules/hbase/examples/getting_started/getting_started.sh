@@ -24,11 +24,12 @@ case "$1" in
 "helm")
 echo "Installing Operators with Helm"
 # tag::helm-install-operators[]
-helm install --wait zookeeper-operator oci://oci.stackable.tech/sdp-charts/zookeeper-operator --version 0.0.0-dev &
-helm install --wait hdfs-operator oci://oci.stackable.tech/sdp-charts/hdfs-operator --version 0.0.0-dev &
 helm install --wait commons-operator oci://oci.stackable.tech/sdp-charts/commons-operator --version 0.0.0-dev &
 helm install --wait secret-operator oci://oci.stackable.tech/sdp-charts/secret-operator --version 0.0.0-dev &
 helm install --wait listener-operator oci://oci.stackable.tech/sdp-charts/listener-operator --version 0.0.0-dev &
+wait
+helm install --wait zookeeper-operator oci://oci.stackable.tech/sdp-charts/zookeeper-operator --version 0.0.0-dev &
+helm install --wait hdfs-operator oci://oci.stackable.tech/sdp-charts/hdfs-operator --version 0.0.0-dev &
 helm install --wait hbase-operator oci://oci.stackable.tech/sdp-charts/hbase-operator --version 0.0.0-dev &
 wait
 # end::helm-install-operators[]
