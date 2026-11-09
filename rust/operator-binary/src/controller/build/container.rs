@@ -7,6 +7,7 @@
 
 use std::str::FromStr;
 
+use const_format::concatcp;
 use indoc::formatdoc;
 use snafu::{ResultExt, Snafu};
 use stackable_operator::{
@@ -35,10 +36,7 @@ use crate::{
         properties::product_logging::MAX_HBASE_LOG_FILES_SIZE,
         role_group::{ListenerPlacement, RoleGroupInputs},
     },
-    crd::{
-        CONFIG_DIR_NAME, CONTAINERDEBUG_LOG_DIR, HbaseRole, LISTENER_VOLUME_DIR,
-        LISTENER_VOLUME_NAME,
-    },
+    crd::{CONFIG_DIR_NAME, HbaseRole, LISTENER_VOLUME_DIR, LISTENER_VOLUME_NAME},
 };
 
 constant!(pub(crate) HBASE_CONTAINER_NAME: ContainerName = "hbase");
@@ -152,9 +150,13 @@ pub(crate) fn containers_and_volumes(inputs: &RoleGroupInputs) -> Result<Contain
         .with_value(&STACKABLE_LOG_DIR_ENV, STACKABLE_LOG_DIR)
         // Let the `containerdebug` process write its tracing information to a file. These are the
         // generic `stackable-telemetry` variables and apply to the whole HBase container, so any
-        // other telemetry-based process in it would log into the same directory and the Vector
-        // agent would label its events with `container: containerdebug`.
-        .with_value(&FILE_LOG_DIRECTORY_ENV, CONTAINERDEBUG_LOG_DIR)
+        // other telemetry-based process in it would log into the same directory. It must be
+        // exactly one level below the log directory, because the Vector agent derives the
+        // container name from that path segment.
+        .with_value(
+            &FILE_LOG_DIRECTORY_ENV,
+            concatcp!(STACKABLE_LOG_DIR, "/containerdebug"),
+        )
         // Rotation is opt-in, so without these the file would grow unbounded.
         .with_value(&FILE_LOG_ROTATION_PERIOD_ENV, "hourly")
         .with_value(&FILE_LOG_MAX_FILES_ENV, "2")
