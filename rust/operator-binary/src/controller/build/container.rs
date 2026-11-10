@@ -7,6 +7,7 @@
 
 use std::str::FromStr;
 
+use const_format::concatcp;
 use indoc::formatdoc;
 use snafu::{ResultExt, Snafu};
 use stackable_operator::{
@@ -56,7 +57,9 @@ constant!(HADOOP_CONF_DIR_ENV: EnvVarName = "HADOOP_CONF_DIR");
 constant!(pub(crate) REGION_MOVER_OPTS_ENV: EnvVarName = "REGION_MOVER_OPTS");
 constant!(pub(crate) RUN_REGION_MOVER_ENV: EnvVarName = "RUN_REGION_MOVER");
 constant!(STACKABLE_LOG_DIR_ENV: EnvVarName = "STACKABLE_LOG_DIR");
-constant!(CONTAINERDEBUG_LOG_DIRECTORY_ENV: EnvVarName = "CONTAINERDEBUG_LOG_DIRECTORY");
+constant!(FILE_LOG_DIRECTORY_ENV: EnvVarName = "FILE_LOG_DIRECTORY");
+constant!(FILE_LOG_MAX_FILES_ENV: EnvVarName = "FILE_LOG_MAX_FILES");
+constant!(FILE_LOG_ROTATION_PERIOD_ENV: EnvVarName = "FILE_LOG_ROTATION_PERIOD");
 
 // These constants are hard coded in hbase-entrypoint.sh
 // You need to change them there too.
@@ -145,11 +148,18 @@ pub(crate) fn containers_and_volumes(inputs: &RoleGroupInputs) -> Result<Contain
         .with_value(&REGION_MOVER_OPTS_ENV, inputs.region_mover_opts.clone())
         .with_value(&RUN_REGION_MOVER_ENV, inputs.run_region_mover.to_string())
         .with_value(&STACKABLE_LOG_DIR_ENV, STACKABLE_LOG_DIR)
-        // Needed for the `containerdebug` process to log its tracing information to.
+        // Let the `containerdebug` process write its tracing information to a file. These are the
+        // generic `stackable-telemetry` variables and apply to the whole HBase container, so any
+        // other telemetry-based process in it would log into the same directory. It must be
+        // exactly one level below the log directory, because the Vector agent derives the
+        // container name from that path segment.
         .with_value(
-            &CONTAINERDEBUG_LOG_DIRECTORY_ENV,
-            format!("{STACKABLE_LOG_DIR}/containerdebug"),
+            &FILE_LOG_DIRECTORY_ENV,
+            concatcp!(STACKABLE_LOG_DIR, "/containerdebug"),
         )
+        // Rotation is opt-in, so without these the file would grow unbounded.
+        .with_value(&FILE_LOG_ROTATION_PERIOD_ENV, "hourly")
+        .with_value(&FILE_LOG_MAX_FILES_ENV, "2")
         // Empty when Kerberos is disabled.
         .merge(kerberos::kerberos_env_vars(cluster))
         // apply overrides last of all; `EnvVarSet` is keyed by name, so iteration is already
@@ -217,6 +227,9 @@ pub(crate) fn containers_and_volumes(inputs: &RoleGroupInputs) -> Result<Contain
         VolumeBuilder::new(&*LOG_VOLUME_NAME)
             .with_empty_dir(
                 None::<String>,
+                // Only the HBase log files are budgeted. The `containerdebug` files in this
+                // volume are rotated by time, not by size, so they have no budget; raising
+                // `FILE_LOG_LEVEL` via `envOverrides` can therefore evict the Pod.
                 Some(product_logging::framework::calculate_log_volume_size_limit(
                     &[MAX_HBASE_LOG_FILES_SIZE],
                 )),
@@ -303,6 +316,8 @@ mod tests {
         let _ = *REGION_MOVER_OPTS_ENV;
         let _ = *RUN_REGION_MOVER_ENV;
         let _ = *STACKABLE_LOG_DIR_ENV;
-        let _ = *CONTAINERDEBUG_LOG_DIRECTORY_ENV;
+        let _ = *FILE_LOG_DIRECTORY_ENV;
+        let _ = *FILE_LOG_MAX_FILES_ENV;
+        let _ = *FILE_LOG_ROTATION_PERIOD_ENV;
     }
 }
