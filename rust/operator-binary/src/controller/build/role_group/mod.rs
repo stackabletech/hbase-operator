@@ -16,6 +16,7 @@ use stackable_operator::{
         affinity::StackableAffinity,
         resources::{NoRuntimeLimits, Resources},
     },
+    crd::containerdebug::ValidatedContainerdebugConfig,
     k8s_openapi::api::{
         apps::v1::StatefulSet,
         core::v1::{ConfigMap, Container, PersistentVolumeClaim, PodTemplateSpec, Service, Volume},
@@ -89,6 +90,8 @@ pub(crate) struct RoleGroupInputs<'a> {
     pub(crate) resources: Resources<HbaseStorageConfig, NoRuntimeLimits>,
     pub(crate) hbase_rootdir: String,
     pub(crate) logging: ValidatedLogging,
+    /// Passed to the entrypoint script of the image, which starts `containerdebug`.
+    pub(crate) containerdebug: ValidatedContainerdebugConfig,
     pub(crate) listener: ListenerPlacement,
     /// Set on every role because the entrypoint runs under `set -u`; only RegionServers run the
     /// mover, so only they have a non-empty value.

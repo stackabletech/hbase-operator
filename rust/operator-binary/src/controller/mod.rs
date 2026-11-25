@@ -16,6 +16,7 @@ use stackable_operator::{
         resources::{NoRuntimeLimits, Resources},
     },
     constant,
+    crd::containerdebug::ValidatedContainerdebugConfig,
     k8s_openapi::{
         api::{
             apps::v1::StatefulSet,
@@ -95,6 +96,7 @@ pub struct ValidatedMasterConfig {
     pub resources: Resources<HbaseStorageConfig, NoRuntimeLimits>,
     pub logging: ValidatedLogging,
     pub affinity: StackableAffinity,
+    pub containerdebug: ValidatedContainerdebugConfig,
     pub graceful_shutdown_timeout: Duration,
     pub requested_secret_lifetime: Duration,
     pub listener_class: ListenerClassName,
@@ -109,6 +111,7 @@ pub struct ValidatedRegionServerConfig {
     pub resources: Resources<HbaseStorageConfig, NoRuntimeLimits>,
     pub logging: ValidatedLogging,
     pub affinity: StackableAffinity,
+    pub containerdebug: ValidatedContainerdebugConfig,
     pub graceful_shutdown_timeout: Duration,
     pub requested_secret_lifetime: Duration,
     pub listener_class: ListenerClassName,
@@ -124,6 +127,7 @@ pub struct ValidatedRestServerConfig {
     pub resources: Resources<HbaseStorageConfig, NoRuntimeLimits>,
     pub logging: ValidatedLogging,
     pub affinity: StackableAffinity,
+    pub containerdebug: ValidatedContainerdebugConfig,
     pub graceful_shutdown_timeout: Duration,
     pub requested_secret_lifetime: Duration,
     pub listener_class: ListenerClassName,

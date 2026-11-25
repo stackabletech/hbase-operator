@@ -13,6 +13,7 @@ use snafu::{ResultExt, Snafu};
 use stackable_operator::{
     builder::pod::volume::VolumeBuilder,
     constant,
+    crd::containerdebug::ValidatedContainerdebugConfig,
     k8s_openapi::{
         api::core::v1::{
             ConfigMapVolumeSource, Container, ContainerPort, PersistentVolumeClaim, Probe,
@@ -57,6 +58,10 @@ constant!(HADOOP_CONF_DIR_ENV: EnvVarName = "HADOOP_CONF_DIR");
 constant!(pub(crate) REGION_MOVER_OPTS_ENV: EnvVarName = "REGION_MOVER_OPTS");
 constant!(pub(crate) RUN_REGION_MOVER_ENV: EnvVarName = "RUN_REGION_MOVER");
 constant!(STACKABLE_LOG_DIR_ENV: EnvVarName = "STACKABLE_LOG_DIR");
+// Read by hbase-entrypoint.sh, which starts `containerdebug`. Images without support for them
+// ignore both and run `containerdebug` every 30 minutes.
+constant!(CONTAINERDEBUG_ENABLED_ENV: EnvVarName = "CONTAINERDEBUG_ENABLED");
+constant!(CONTAINERDEBUG_INTERVAL_ENV: EnvVarName = "CONTAINERDEBUG_INTERVAL");
 constant!(FILE_LOG_DIRECTORY_ENV: EnvVarName = "FILE_LOG_DIRECTORY");
 constant!(FILE_LOG_MAX_FILES_ENV: EnvVarName = "FILE_LOG_MAX_FILES");
 constant!(FILE_LOG_ROTATION_PERIOD_ENV: EnvVarName = "FILE_LOG_ROTATION_PERIOD");
@@ -160,6 +165,7 @@ pub(crate) fn containers_and_volumes(inputs: &RoleGroupInputs) -> Result<Contain
         // Rotation is opt-in, so without these the file would grow unbounded.
         .with_value(&FILE_LOG_ROTATION_PERIOD_ENV, "hourly")
         .with_value(&FILE_LOG_MAX_FILES_ENV, "2")
+        .merge(containerdebug_env_vars(&inputs.containerdebug))
         // Empty when Kerberos is disabled.
         .merge(kerberos::kerberos_env_vars(cluster))
         // apply overrides last of all; `EnvVarSet` is keyed by name, so iteration is already
@@ -285,6 +291,18 @@ pub(crate) fn containers_and_volumes(inputs: &RoleGroupInputs) -> Result<Contain
         pod_volumes,
         volume_claim_templates,
     })
+}
+
+/// The environment variables with which hbase-entrypoint.sh starts `containerdebug`, or not.
+fn containerdebug_env_vars(containerdebug: &ValidatedContainerdebugConfig) -> EnvVarSet {
+    match containerdebug {
+        ValidatedContainerdebugConfig::Enabled { interval } => EnvVarSet::new()
+            .with_value(&CONTAINERDEBUG_ENABLED_ENV, "true")
+            .with_value(&CONTAINERDEBUG_INTERVAL_ENV, interval.to_string()),
+        ValidatedContainerdebugConfig::Disabled => {
+            EnvVarSet::new().with_value(&CONTAINERDEBUG_ENABLED_ENV, "false")
+        }
+    }
 }
 
 /// Returns the container command.
