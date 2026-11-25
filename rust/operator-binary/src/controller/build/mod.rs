@@ -267,6 +267,7 @@ pub(crate) fn role_group_selector(
 mod tests {
     use std::collections::BTreeMap;
 
+    use indoc::indoc;
     use stackable_operator::{
         k8s_openapi::api::{apps::v1::StatefulSetSpec, core::v1::PodSpec},
         kube::Resource,
@@ -443,6 +444,64 @@ mod tests {
                 env.get(&run_region_mover_env),
                 Some(&expected_run),
                 "{role:?} {run_region_mover_env}",
+            );
+        }
+    }
+
+    /// The entrypoint script of the image starts `containerdebug` from these variables, so every
+    /// role passes on its own validated config.
+    #[test]
+    fn every_role_passes_its_containerdebug_config_to_the_entrypoint() {
+        let cluster = test_utils::validated_cluster_from(&test_utils::hbase_from_yaml(indoc! {r#"
+            ---
+            apiVersion: hbase.stackable.tech/v1alpha1
+            kind: HbaseCluster
+            metadata:
+              name: hbase
+              namespace: default
+              uid: c2c8c5c0-0b5a-4b1e-9f3e-1a2b3c4d5e6f
+            spec:
+              image:
+                productVersion: 2.6.3
+              clusterConfig:
+                hdfsConfigMapName: simple-hdfs
+                zookeeperConfigMapName: simple-znode
+              masters:
+                config:
+                  containerdebug:
+                    enabled: false
+                roleGroups:
+                  default:
+                    replicas: 1
+              regionServers:
+                config:
+                  containerdebug:
+                    interval: 10m
+                roleGroups:
+                  default:
+                    replicas: 1
+              restServers:
+                roleGroups:
+                  default:
+                    replicas: 1
+        "#}));
+        let resources = build(&cluster, &test_utils::cluster_info()).expect("build succeeds");
+
+        for (role, expected_enabled, expected_interval) in [
+            (HbaseRole::Master, "false", None),
+            (HbaseRole::RegionServer, "true", Some("10m")),
+            (HbaseRole::RestServer, "true", Some("30m")),
+        ] {
+            let env = hbase_container_env(stateful_set_spec(&resources, &cluster, &role));
+            assert_eq!(
+                env.get("CONTAINERDEBUG_ENABLED").map(String::as_str),
+                Some(expected_enabled),
+                "{role:?} CONTAINERDEBUG_ENABLED",
+            );
+            assert_eq!(
+                env.get("CONTAINERDEBUG_INTERVAL").map(String::as_str),
+                expected_interval,
+                "{role:?} CONTAINERDEBUG_INTERVAL",
             );
         }
     }

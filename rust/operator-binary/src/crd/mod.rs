@@ -19,6 +19,7 @@ use stackable_operator::{
         merge::{Atomic, Merge},
     },
     constant,
+    crd::containerdebug::{default_containerdebug_config, v1alpha1::ContainerdebugConfig},
     deep_merger::ObjectOverrides,
     k8s_openapi::apimachinery::pkg::api::resource::Quantity,
     kube::CustomResource,
@@ -327,6 +328,7 @@ impl HbaseConfigFragment {
             resources: default_resources(role),
             logging: product_logging::spec::default_logging(),
             affinity: get_affinity(cluster_name, role, hdfs_discovery_cm_name, opa_config),
+            containerdebug: default_containerdebug_config(),
             graceful_shutdown_timeout: Some(graceful_shutdown_timeout),
             requested_secret_lifetime: Some(HbaseRole::DEFAULT_SECRET_LIFETIME),
             listener_class: Some(
@@ -350,6 +352,7 @@ impl RegionServerConfigFragment {
             resources: default_resources(role),
             logging: product_logging::spec::default_logging(),
             affinity: get_affinity(cluster_name, role, hdfs_discovery_cm_name, opa_config),
+            containerdebug: default_containerdebug_config(),
             graceful_shutdown_timeout: Some(
                 HbaseRole::DEFAULT_REGION_SERVER_GRACEFUL_SHUTDOWN_TIMEOUT,
             ),
@@ -433,6 +436,9 @@ pub struct HbaseConfig {
     #[fragment_attrs(serde(default))]
     pub affinity: StackableAffinity,
 
+    #[fragment_attrs(serde(default))]
+    pub containerdebug: ContainerdebugConfig,
+
     /// Time period Pods have to gracefully shut down, e.g. `30m`, `1h` or `2d`. Consult the operator documentation for details.
     #[fragment_attrs(serde(default))]
     pub graceful_shutdown_timeout: Option<Duration>,
@@ -509,6 +515,9 @@ pub struct RegionServerConfig {
     pub logging: Logging<Container>,
     #[fragment_attrs(serde(default))]
     pub affinity: StackableAffinity,
+
+    #[fragment_attrs(serde(default))]
+    pub containerdebug: ContainerdebugConfig,
 
     /// Time period Pods have to gracefully shut down, e.g. `30m`, `1h` or `2d`. Consult the operator documentation for details.
     #[fragment_attrs(serde(default))]

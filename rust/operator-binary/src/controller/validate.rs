@@ -7,6 +7,7 @@ use stackable_operator::{
         fragment::{self, FromFragment},
         merge::Merge,
     },
+    crd::containerdebug,
     kube::ResourceExt,
     product_logging::spec::Logging,
     role_utils::GenericRoleConfig,
@@ -81,6 +82,13 @@ pub enum Error {
 
     #[snafu(display("the secret lifetime of {role} role group {role_group} is missing"))]
     MissingSecretLifetime { role: HbaseRole, role_group: String },
+
+    #[snafu(display("invalid containerdebug configuration for {role} role group {role_group}"))]
+    InvalidContainerdebugConfig {
+        source: containerdebug::Error,
+        role: HbaseRole,
+        role_group: String,
+    },
 
     #[snafu(display(
         "invalid hbase-env.sh variable name {variable:?} in the configOverrides of {role} role group {role_group}"
@@ -382,6 +390,7 @@ fn validated_master_config(
         resources,
         logging,
         affinity,
+        containerdebug,
         graceful_shutdown_timeout,
         requested_secret_lifetime,
         listener_class,
@@ -391,6 +400,12 @@ fn validated_master_config(
         resources,
         logging: validate_logging(&logging, vector_aggregator_config_map_name)?,
         affinity,
+        containerdebug: containerdebug.validate().with_context(|_| {
+            InvalidContainerdebugConfigSnafu {
+                role: hbase_role.clone(),
+                role_group: role_group_name.to_owned(),
+            }
+        })?,
         graceful_shutdown_timeout: graceful_shutdown_timeout.with_context(|| {
             MissingGracefulShutdownTimeoutSnafu {
                 role: hbase_role.clone(),
@@ -420,6 +435,7 @@ fn validated_region_server_config(
         resources,
         logging,
         affinity,
+        containerdebug,
         graceful_shutdown_timeout,
         requested_secret_lifetime,
         listener_class,
@@ -430,6 +446,12 @@ fn validated_region_server_config(
         resources,
         logging: validate_logging(&logging, vector_aggregator_config_map_name)?,
         affinity,
+        containerdebug: containerdebug.validate().with_context(|_| {
+            InvalidContainerdebugConfigSnafu {
+                role: hbase_role.clone(),
+                role_group: role_group_name.to_owned(),
+            }
+        })?,
         graceful_shutdown_timeout: graceful_shutdown_timeout.with_context(|| {
             MissingGracefulShutdownTimeoutSnafu {
                 role: hbase_role.clone(),
@@ -460,6 +482,7 @@ fn validated_rest_server_config(
         resources,
         logging,
         affinity,
+        containerdebug,
         graceful_shutdown_timeout,
         requested_secret_lifetime,
         listener_class,
@@ -469,6 +492,12 @@ fn validated_rest_server_config(
         resources,
         logging: validate_logging(&logging, vector_aggregator_config_map_name)?,
         affinity,
+        containerdebug: containerdebug.validate().with_context(|_| {
+            InvalidContainerdebugConfigSnafu {
+                role: hbase_role.clone(),
+                role_group: role_group_name.to_owned(),
+            }
+        })?,
         graceful_shutdown_timeout: graceful_shutdown_timeout.with_context(|| {
             MissingGracefulShutdownTimeoutSnafu {
                 role: hbase_role.clone(),
@@ -709,6 +738,133 @@ spec:
                 } if role_group == "default" && variable == "BAD=NAME"
             ),
             "{error:?}"
+        );
+    }
+
+    /// A role `config` that does not mention `containerdebug` still gets the default, so the
+    /// `containerdebug` field of the CRD must be optional in every role.
+    #[test]
+    fn containerdebug_defaults_when_not_configured() {
+        use stackable_operator::crd::containerdebug::{
+            DEFAULT_INTERVAL, ValidatedContainerdebugConfig,
+        };
+
+        let hbase = test_utils::hbase_from_yaml(indoc! {r#"
+            ---
+            apiVersion: hbase.stackable.tech/v1alpha1
+            kind: HbaseCluster
+            metadata:
+              name: hbase
+              namespace: default
+              uid: c2c8c5c0-0b5a-4b1e-9f3e-1a2b3c4d5e6f
+            spec:
+              image:
+                productVersion: 2.6.3
+              clusterConfig:
+                hdfsConfigMapName: simple-hdfs
+                zookeeperConfigMapName: simple-znode
+              masters:
+                config:
+                  gracefulShutdownTimeout: 1m
+                roleGroups:
+                  default:
+                    replicas: 1
+              regionServers:
+                config:
+                  gracefulShutdownTimeout: 1m
+                roleGroups:
+                  default:
+                    replicas: 1
+              restServers:
+                config:
+                  gracefulShutdownTimeout: 1m
+                roleGroups:
+                  default:
+                    replicas: 1
+        "#});
+
+        let cluster = match validate_cluster(
+            &hbase,
+            "oci.example.org",
+            test_utils::dereferenced_objects(),
+        ) {
+            Ok(cluster) => cluster,
+            Err(error) => panic!("the cluster is valid, but: {error:?}"),
+        };
+
+        let default = ValidatedContainerdebugConfig::Enabled {
+            interval: DEFAULT_INTERVAL,
+        };
+        assert_eq!(
+            test_utils::master_role_group_config(&cluster, "default")
+                .config
+                .containerdebug,
+            default
+        );
+        assert_eq!(
+            test_utils::region_server_role_group_config(&cluster, "default")
+                .config
+                .containerdebug,
+            default
+        );
+        assert_eq!(
+            test_utils::rest_server_role_group_config(&cluster, "default")
+                .config
+                .containerdebug,
+            default
+        );
+    }
+
+    /// An invalid `containerdebug` config fails the validation, naming the role and the role
+    /// group.
+    #[test]
+    fn zero_containerdebug_interval_fails_validation() {
+        let hbase = test_utils::hbase_from_yaml(indoc! {r#"
+            ---
+            apiVersion: hbase.stackable.tech/v1alpha1
+            kind: HbaseCluster
+            metadata:
+              name: hbase
+              namespace: default
+              uid: c2c8c5c0-0b5a-4b1e-9f3e-1a2b3c4d5e6f
+            spec:
+              image:
+                productVersion: 2.6.3
+              clusterConfig:
+                hdfsConfigMapName: simple-hdfs
+                zookeeperConfigMapName: simple-znode
+              masters:
+                roleGroups:
+                  default:
+                    replicas: 1
+              regionServers:
+                config:
+                  containerdebug:
+                    interval: 0s
+                roleGroups:
+                  default:
+                    replicas: 1
+        "#});
+
+        let error = validate_cluster(
+            &hbase,
+            "oci.example.org",
+            test_utils::dereferenced_objects(),
+        )
+        .expect_err("a zero containerdebug interval should be rejected");
+        let chain: Vec<String> =
+            std::iter::successors(Some(&error as &dyn std::error::Error), |error| {
+                error.source()
+            })
+            .map(ToString::to_string)
+            .collect();
+
+        assert_eq!(
+            chain,
+            [
+                "invalid containerdebug configuration for regionserver role group default",
+                "the containerdebug interval must not be zero",
+            ]
         );
     }
 }
